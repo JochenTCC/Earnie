@@ -116,13 +116,14 @@ def _thermal_daily_for_date(
     daily_fn,
 ) -> float:
     from data.heating_need import heating_params_from_thermal
+    from house_config.heating_systems import consumer_input_power_kw
 
     thermal = consumer.get("thermal") or consumer
     params = heating_params_from_thermal(thermal)
     params["latitude"] = float(profile["latitude"])
     params["longitude"] = float(profile["longitude"])
     if "hp_electric_kw" not in params:
-        params["hp_electric_kw"] = float(consumer.get("nominal_power_kw", 3.0) or 3.0)
+        params["hp_electric_kw"] = consumer_input_power_kw(consumer)
     day_index = day.timetuple().tm_yday - 1
     if climate is not None:
         bundle = climate._bundle_for_calendar_year(day.year)

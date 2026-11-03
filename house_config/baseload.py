@@ -109,9 +109,11 @@ def consumer_annual_kwh(consumer: dict) -> float:
 
         return estimate_ev_annual_kwh(consumer)
     if consumer.get("type") == "thermal_annual":
+        from house_config.heating_systems import consumer_input_power_kw
+
         thermal = dict(consumer.get("thermal") or consumer)
         if "nominal_power_kw" not in thermal:
-            thermal["nominal_power_kw"] = float(consumer.get("nominal_power_kw", 3.0) or 3.0)
+            thermal["nominal_power_kw"] = consumer_input_power_kw(consumer)
         lat = thermal.get("latitude")
         lon = thermal.get("longitude")
         if lat is not None and lon is not None:

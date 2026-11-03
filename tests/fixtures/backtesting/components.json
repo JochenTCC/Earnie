@@ -60,7 +60,7 @@
                 "type": "heat_pump",
                 "heat_pump_type": "luft"
             },
-            "nominal_power_kw": 3.0
+            "heating_power_kw": 10.5
         }
     ]
 }

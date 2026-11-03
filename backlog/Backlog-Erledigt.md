@@ -2,6 +2,16 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Heating system — generic heating power instead of „Nennleistung Wärmepumpe“ (2026-11-03)
+
+- [x] **Heating-system form: generic heating power instead of „Nennleistung Wärmepumpe“** `[feat]` *(dog-fooding 2026-11-03; done 2026-11-03 on `feat/heating-power`; live check by the maintainer open)*: design [heating-system-variants.md](../docs/dev/heating-system-variants.md) § Heating power. Every catalog entry stores `heating_power_kw` (thermal kW, mandatory > 0, no default) for every heat source; the loader derives the input power `nominal_power_kw = heating_power_kw / efficiency` (electric for heat pump / direct electric, the MILP power; fuel power otherwise, caps the year model), so results do not change. `min_on_quarterhours` only for electric sources.
+  - **Decisions (maintainer, 2026-11-03):** derive the electric power instead of storing it; new step instead of amending `dm5.heating_systems`; no migration question for entries with power 0, the value is mandatory.
+  - **Forms:** house configurator and variants editor share `render_generation_power_fields` („Heizleistung (kW, thermisch)“, derived electric power as a caption, min-on time for electric sources only).
+  - **No hidden 3 kW:** the readers of the input power fail loud (`consumer_input_power_kw`) instead of falling back to 3 kW.
+  - **Migration:** `dm5.heating_power` (data model 5, unreleased): `heating_power_kw = nominal_power_kw × JAZ / Nutzungsgrad`, fuel entries lose `min_on_quarterhours`; goldens, example pack, backtesting fixture and the POC pack converted. Regression suite: all 12 cases pass unchanged. Release-notes fragment `.github/release-notes/drafts/v2.8.0-heating-power.draft.md`.
+  - **Tests:** `tests/test_heating_power_migration.py`, catalog validation in `tests/test_heating_system_variants.py`, AppTests for the heat-pump power field and the gas switch (min-on time not carried over).
+  - **Not migrated here:** the private site pack (Earnie-env-home), needs the maintainer's OK.
+
 ### Hauskonfigurator — input lock during reruns, obsolete (2026-11-03)
 
 - [x] **Hauskonfigurator: input lock with busy indicator during reruns** `[feat]` *(dog-fooding 2026-11-03; the item it waited for, *Hauskonfigurator: thermal properties of the building at house level*, is done 2026-11-03 → [Erledigt](Backlog-Erledigt.md); the house profile now has one more section, „Gebäude / Wärmebedarf“ with the switch „Heizung betrachten“, whose reruns the lock must cover too)*: house-profile reruns (auto-save, baseload preview, checks) take long enough that the user changes further fields while a run is still going. Streamlit then stops the run and starts a new one; a stop between the house-file write and the session's file-stamp update makes the next run re-seed the form from the file and drop the user's edits (same effect as the bugfix „Plant auto-save resets the house-profile form“ in `Backlog-Bugfixes.md`). Lock the page while a run is busy: a full-page overlay with an hourglass rendered at the start of each run and cleared at its end, visible only after ~0.3 s so short runs do not flicker; it blocks clicks and typing until the run finished.

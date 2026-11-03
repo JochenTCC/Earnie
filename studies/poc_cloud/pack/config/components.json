@@ -92,7 +92,7 @@
                 "type": "heat_pump",
                 "heat_pump_type": "erde"
             },
-            "nominal_power_kw": 3.5,
+            "heating_power_kw": 15.05,
             "min_on_quarterhours": 4
         }
     ]

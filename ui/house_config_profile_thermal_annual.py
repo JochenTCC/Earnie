@@ -116,6 +116,63 @@ def _render_heat_source_fields(thermal: dict, index: int, *, session_scope: str)
     return heat_source
 
 
+def render_generation_power_fields(
+    heat_source: dict,
+    existing: dict,
+    *,
+    power_key: str,
+    min_on_key: str,
+) -> dict:
+    """Heizleistung (thermal kW, every heat source); Mindestlaufzeit only for electric sources.
+
+    Returns the catalog fields (``heating_power_kw``, ``min_on_quarterhours``). For an
+    electric source the derived electric power (heating power / JAZ or Nutzungsgrad, what the
+    optimizer plans with) is shown below the field. There is no start default: an entry
+    without heating power shows 0 and saving asks for a value.
+    """
+    from house_config.heat_source import heat_source_efficiency, heat_source_is_electric
+    from house_config.heating_systems import HEATING_POWER_KEY, heating_input_power_kw
+
+    power = float(
+        labeled_number_input(
+            "Heizleistung (kW, thermisch)",
+            min_value=0.0,
+            value=float(existing.get(HEATING_POWER_KEY) or 0.0),
+            step=0.5,
+            help=(
+                "Wärmeleistung des Wärmeerzeugers (Typenschild / Auslegung), für jede "
+                "Wärmequelle. Sie begrenzt die Wärme, die das Modell je Stunde liefern kann."
+            ),
+            ratios=WIDE_LABEL_RATIOS,
+            key=power_key,
+        )
+    )
+    fields: dict = {HEATING_POWER_KEY: power}
+    if power <= 0.0:
+        st.warning("Heizleistung eintragen (muss größer als 0 sein).")
+    if not heat_source_is_electric(heat_source):
+        return fields
+    if power > 0.0:
+        eff_label = "JAZ" if heat_source["type"] == "heat_pump" else "Nutzungsgrad"
+        st.caption(
+            f"≈ {heating_input_power_kw(heat_source, power):.2f} kW elektrisch bei "
+            f"{eff_label} {heat_source_efficiency(heat_source):.2f} (damit plant der Optimierer)."
+        )
+    fields["min_on_quarterhours"] = int(
+        labeled_number_input(
+            "Mindestlaufzeit (Viertelstunden)",
+            min_value=1,
+            value=int(
+                existing.get("min_on_quarterhours")
+                or consumer_default("min_on_quarterhours", consumer_type="thermal_annual")
+            ),
+            ratios=WIDE_LABEL_RATIOS,
+            key=min_on_key,
+        )
+    )
+    return fields
+
+
 def _render_heating_rod_fields(
     consumer: dict, index: int, *, session_scope: str
 ) -> list[dict]:
@@ -278,6 +335,16 @@ def _reference_system_heading(consumer: dict, *, session_scope: str) -> str:
     return f"**Heizsystem (Referenzsystem: {entry['label']})**"
 
 
+def _preview_input_power_kw(item: dict) -> float:
+    """Input power of the edited system for previews; 0 while the heating power is missing."""
+    from house_config.heating_systems import HEATING_POWER_KEY, heating_input_power_kw
+
+    power = float(item.get(HEATING_POWER_KEY) or 0.0)
+    if power <= 0.0:
+        return 0.0
+    return heating_input_power_kw(item["heat_source"], power)
+
+
 def _render_reference_system_fields(
     item: dict,
     consumer: dict,
@@ -298,26 +365,16 @@ def _render_reference_system_fields(
     from ui.house_config_heating_change import reserve_gate_slot
 
     reserve_gate_slot(session_scope, index)
-    item["nominal_power_kw"] = float(
-        labeled_number_input(
-            "Nennleistung Wärmepumpe (kW, elektrisch)",
-            min_value=0.0,
-            value=float(consumer.get("nominal_power_kw", 0.0)),
-            key=_scoped_key(session_scope, f"hc_nom_{index}"),
+    item.update(
+        render_generation_power_fields(
+            item["heat_source"],
+            consumer,
+            power_key=_scoped_key(session_scope, f"hc_heat_power_{index}"),
+            min_on_key=_scoped_key(session_scope, f"hc_ta_min_qh_{index}"),
         )
     )
-    item["min_on_quarterhours"] = labeled_number_input(
-        "Mindestlaufzeit (Viertelstunden)",
-        min_value=1,
-        value=int(
-            consumer.get(
-                "min_on_quarterhours",
-                consumer_default("min_on_quarterhours", consumer_type="thermal_annual"),
-            )
-        ),
-        ratios=WIDE_LABEL_RATIOS,
-        key=_scoped_key(session_scope, f"hc_ta_min_qh_{index}"),
-    )
+    # Form preview only (expander kWh/a, CSV scaling); saving drops it, the loader derives it.
+    item["nominal_power_kw"] = _preview_input_power_kw(item)
     storage = _render_thermal_storage_fields(
         thermal, index, session_scope=session_scope
     )
@@ -365,8 +422,9 @@ def _render_thermal_annual_fields(
             "WP-Bindings unter **Daemon Control → EHAL-Com** "
             "(Entity-Mapping, `flex.*`) pflegen."
         )
-    preview = {**thermal_preview_fields(house_heating_state(session_scope)), **item}
-    _render_wp_annual_metric(preview, location=location)
+    if item["nominal_power_kw"] > 0.0:
+        preview = {**thermal_preview_fields(house_heating_state(session_scope)), **item}
+        _render_wp_annual_metric(preview, location=location)
     return item
 
 
@@ -526,6 +584,10 @@ def _overlay_thermal_annual_fields(
     if heat_source.get("type") != "heat_pump":
         heat_source.pop("heat_pump_type", None)
     preview["heat_source"] = heat_source
+    _overlay_session_fields(
+        preview, session_scope, (("heating_power_kw", f"hc_heat_power_{index}", float),)
+    )
+    preview["nominal_power_kw"] = _preview_input_power_kw(preview)
     _overlay_profile_geo(preview, session_scope)
 
 

@@ -16,7 +16,7 @@ from streamlit.testing.v1 import AppTest
 
 _SCRIPT = Path(__file__).parent / "scripts" / "run_page_house_config.py"
 _TIMEOUT_S = 30.0
-_NOM = "test_home__hc_g0_nom_0"
+_POWER = "test_home__hc_g0_heat_power_0"
 
 
 def _read(env: str) -> dict:
@@ -63,15 +63,16 @@ def test_form_shows_building_and_heating_system_sections() -> None:
     keys = {w.key for w in at.number_input}
     assert "test_home__house_thermal_area" in keys
     assert not any(k.endswith("_area_0") and "solar" not in k for k in keys)
-    assert at.number_input(key=_NOM).label == "Nennleistung Wärmepumpe (kW, elektrisch)"
+    assert at.number_input(key=_POWER).label == "Heizleistung (kW, thermisch)"
 
 
-def test_nominal_power_is_saved_into_the_reference_system() -> None:
+def test_heating_power_is_saved_into_the_reference_system() -> None:
     at = _session()
-    at.number_input(key=_NOM).set_value(2.5).run(timeout=_TIMEOUT_S)
+    at.number_input(key=_POWER).set_value(8.75).run(timeout=_TIMEOUT_S)
     assert not at.exception
     assert not at.error, [e.value for e in at.error]
-    assert _reference()["nominal_power_kw"] == 2.5
+    assert _reference()["heating_power_kw"] == 8.75
+    assert "nominal_power_kw" not in _reference()
     profile = next(
         p for p in _read("EARNIE_HOUSE_PROFILES_PATH")["profiles"] if p["id"] == "test_home"
     )

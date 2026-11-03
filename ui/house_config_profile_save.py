@@ -94,6 +94,10 @@ def _merge_passthrough_consumer_fields(original: dict, edited: dict) -> dict:
     for key in _PASSTHROUGH_CONSUMER_KEYS:
         if key not in original or key in merged:
             continue
+        # „Haus Wärme“ renders its min-on time for electric heat sources only; a fuel
+        # source has none (heating-system catalog), so the old value must not come back.
+        if key == "min_on_quarterhours" and edited.get("type") == "thermal_annual":
+            continue
         value = original[key]
         merged[key] = dict(value) if isinstance(value, dict) else value
     orig_sched = original.get("charging_schedule")

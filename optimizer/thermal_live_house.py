@@ -17,9 +17,11 @@ from optimizer.thermal_live_ref import live
 
 def _thermal_with_nominal(thermal: dict, consumer: dict) -> dict:
     """Same parameter key as baseload (``consumer_annual_kwh``): WP kW on thermal."""
+    from house_config.heating_systems import consumer_input_power_kw
+
     if "nominal_power_kw" in thermal:
         return thermal
-    return {**thermal, "nominal_power_kw": float(consumer.get("nominal_power_kw", 3.0) or 3.0)}
+    return {**thermal, "nominal_power_kw": consumer_input_power_kw(consumer)}
 
 
 @dataclass(frozen=True)
@@ -65,10 +67,7 @@ def plan_live_house_horizon(
     house_h = house_thermal_parameters(
         _thermal_with_nominal(thermal, consumer), house_profile=house_profile
     ).house_heat_loss_kw_per_k
-    wp_kw = max(
-        0.1,
-        float(thermal.get("nominal_power_kw") or consumer.get("nominal_power_kw") or 3.0),
-    )
+    wp_kw = max(0.1, float(_thermal_with_nominal(thermal, consumer)["nominal_power_kw"]))
     target = float(thermal.get("target_temp_c", 21.5) or 21.5)
     tol_raw = thermal.get("house_tolerance_c")
     tol = DEFAULT_HOUSE_TOLERANCE_C if tol_raw in (None, "") else max(0.05, float(tol_raw))

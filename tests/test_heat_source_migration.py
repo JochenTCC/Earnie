@@ -80,10 +80,12 @@ def test_migrated_profile_loads(tmp_path):
             "netznutzung": {"area_id": "user_no_grid_fee"},
         }
     )
+    from runtime_store.migration.steps.heating_power import apply as apply_heating_power
     from runtime_store.migration.steps.heating_systems import apply as apply_catalog
     from runtime_store.migration.steps.house_thermal import apply as apply_house_thermal
 
     migrated = apply_house_thermal(apply_catalog(apply(docs, {}).docs, {}).docs, {}).docs
+    migrated = apply_heating_power(migrated, {}).docs
     path = tmp_path / "house_profiles.json"
     path.write_text(json.dumps(migrated["house_profiles.json"]), encoding="utf-8")
     (tmp_path / "components.json").write_text(

@@ -72,11 +72,18 @@ def _select(system_id: str) -> None:
 def _summary_lines(entry: dict) -> list[str]:
     from ui.house_config_profile_thermal_annual import _HEAT_PUMP_LABELS, _HEAT_SOURCE_LABELS
 
+    from house_config.heat_source import heat_source_is_electric
+    from house_config.heating_systems import HEATING_POWER_KEY, heating_input_power_kw
+
     source = entry["heat_source"]
     kind = _HEAT_SOURCE_LABELS.get(source["type"], source["type"])
     if source["type"] == "heat_pump":
         kind += f" ({_HEAT_PUMP_LABELS.get(source['heat_pump_type'], source['heat_pump_type'])})"
-    lines = [f"Wärmequelle: {kind}", f"Nennleistung: {entry['nominal_power_kw']:g} kW"]
+    power = f"Heizleistung: {entry[HEATING_POWER_KEY]:g} kW thermisch"
+    if heat_source_is_electric(source):
+        electric = heating_input_power_kw(source, entry[HEATING_POWER_KEY])
+        power += f" (≈ {electric:.2f} kW elektrisch)"
+    lines = [f"Wärmequelle: {kind}", power]
     if entry.get("heat_storage"):
         lines.append(f"Wärmespeicher: {entry['heat_storage']['volume_liters']:g} l")
     if entry.get("parts"):
@@ -86,35 +93,26 @@ def _summary_lines(entry: dict) -> list[str]:
 
 def _render_variant_form(entry: dict, scope: str) -> dict:
     """Form fields of a variant; returns the raw catalog entry (validated on save)."""
-    from ui.form_layout import labeled_number_input, labeled_text_input
+    from ui.form_layout import labeled_text_input
     from ui.house_config_profile_thermal_annual import (
         _render_heat_source_fields,
         _render_heating_rod_fields,
         _render_thermal_storage_fields,
+        render_generation_power_fields,
     )
 
     label = labeled_text_input("Bezeichnung", value=entry.get("label", ""), key=f"{scope}__label")
     heat_source = _render_heat_source_fields(entry, 0, session_scope=scope)
-    nominal = labeled_number_input(
-        "Nennleistung Wärmepumpe (kW, elektrisch)",
-        min_value=0.0,
-        value=float(entry.get("nominal_power_kw") or 0.0),
-        step=0.1,
-        key=f"{scope}__nominal",
-    )
-    min_on = labeled_number_input(
-        "Mindestlaufzeit (Viertelstunden)",
-        min_value=1,
-        value=int(entry.get("min_on_quarterhours") or 1),
-        step=1,
-        key=f"{scope}__min_on",
-    )
     raw: dict = {
         "id": entry["id"],
         "label": str(label or "").strip() or entry["id"],
         "heat_source": heat_source,
-        "nominal_power_kw": float(nominal),
-        "min_on_quarterhours": int(min_on),
+        **render_generation_power_fields(
+            heat_source,
+            entry,
+            power_key=f"{scope}__heat_power",
+            min_on_key=f"{scope}__min_on",
+        ),
     }
     storage = _render_thermal_storage_fields(entry, 0, session_scope=scope)
     if storage is not None:

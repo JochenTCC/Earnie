@@ -139,7 +139,7 @@ def _cons(entity, kind, suffix, key, valid, boundaries=()):
 
 CONSUMER_FIELDS = [
     # Haus Wärme (thermal_annual)
-    _cons("wp", "number_input", "nom_0", "nominal_power_kw", 4.5),
+    _cons("wp", "number_input", "heat_power_0", "heating_power_kw", 12.5),
     _cons("wp", "number_input", "ta_min_qh_0", "min_on_quarterhours", 6),
     _cons("wp", "number_input", "solar_area_0", "solar_thermal_area_m2", 5.0),
     _cons("wp", "number_input", "solar_tilt_0", "solar_thermal_tilt_deg", 30, boundaries=(0,)),

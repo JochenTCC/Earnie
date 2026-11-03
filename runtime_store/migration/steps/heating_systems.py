@@ -17,7 +17,6 @@ from typing import Any, Iterator
 from house_config.heating_systems import (
     HEATING_SYSTEM_ID_KEY,
     HEATING_SYSTEMS_KEY,
-    SYSTEM_FIELDS,
     reference_system_id,
 )
 from runtime_store.migration.types import Answers, Blocker, Docs, MigrationStep, StepResult
@@ -25,6 +24,15 @@ from runtime_store.migration.types import Answers, Blocker, Docs, MigrationStep,
 STEP_ID = "dm5.heating_systems"
 HOUSE_FILE = "house_profiles.json"
 COMPONENTS_FILE = "components.json"
+# Generation fields of the inline consumer shape (frozen; ``dm5.heating_power`` then turns
+# ``nominal_power_kw`` into ``heating_power_kw``).
+MOVED_FIELDS: tuple[str, ...] = (
+    "heat_source",
+    "nominal_power_kw",
+    "min_on_quarterhours",
+    "heat_storage",
+    "parts",
+)
 
 
 def _iter_profiles(house: Any) -> Iterator[dict[str, Any]]:
@@ -92,7 +100,7 @@ def apply(docs: Docs, answers: Answers) -> StepResult:
         taken.add(system_id)
         label = str(profile.get("label") or profile_id).strip() or profile_id
         entry: dict[str, Any] = {"id": system_id, "label": f"Heizsystem {label}"}
-        for key in SYSTEM_FIELDS:
+        for key in MOVED_FIELDS:
             if key in consumer:
                 entry[key] = consumer.pop(key)
         consumer[HEATING_SYSTEM_ID_KEY] = system_id

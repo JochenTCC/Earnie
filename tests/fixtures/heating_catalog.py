@@ -4,7 +4,9 @@ Tests often write a house profile inline in the old shape (``heat_source`` and t
 fields on the consumer). ``split_inline_heating`` moves the generation fields into a catalog
 the way the house configurator does (``heating_<profile_id>``) and the building fields to the
 house profile (``dm5.house_thermal``: ``heating_enabled``, ``thermal``, ``persons``), so the
-loader sees the real file shape.
+loader sees the real file shape. An old-shape ``nominal_power_kw`` (electric power) becomes
+``heating_power_kw`` as in ``dm5.heating_power``, so the loaded consumer keeps that
+``nominal_power_kw``.
 """
 from __future__ import annotations
 
@@ -36,6 +38,29 @@ def _hoist_building_fields(doc: dict) -> dict:
     return result.docs["house_profiles.json"]
 
 
+# Input power the year model used for a thermal_annual consumer without nominal_power_kw
+# before heating_power_kw existed; old-shape test data keeps its results with it.
+LEGACY_INPUT_POWER_KW = 3.0
+
+
+def _heating_power_entry(entry: dict[str, Any]) -> dict[str, Any]:
+    from runtime_store.migration.steps.heating_power import convert_entry
+
+    return convert_entry(entry)
+
+
+def legacy_entry(entry: dict[str, Any]) -> dict[str, Any]:
+    """Catalog entry in the old shape (``nominal_power_kw`` or none) → current shape.
+
+    Same conversion as ``dm5.heating_power``; a missing or zero power is the old effective
+    ``LEGACY_INPUT_POWER_KW``, so the loader derives the same input power as before.
+    """
+    if "heating_power_kw" in entry:
+        return dict(entry)
+    nominal = float(entry.get("nominal_power_kw") or 0.0) or LEGACY_INPUT_POWER_KW
+    return _heating_power_entry({**entry, "nominal_power_kw": nominal})
+
+
 def split_inline_heating(doc: dict) -> tuple[dict, list[dict[str, Any]]]:
     """(house document in file shape, raw catalog entries)."""
     out = _hoist_building_fields(copy.deepcopy(doc))
@@ -52,9 +77,12 @@ def split_inline_heating(doc: dict) -> tuple[dict, list[dict[str, Any]]]:
                 str(profile.get("id") or "haus"), taken
             )
             taken.add(system_id)
+            nominal = consumer.get("nominal_power_kw")
             item, entry = split_inline_heating_system(
                 consumer, system_id=system_id, label=system_id
             )
+            if "heating_power_kw" not in entry:
+                entry = legacy_entry({**entry, "nominal_power_kw": nominal})
             consumers[index] = item
             entries.append(entry)
     return out, entries

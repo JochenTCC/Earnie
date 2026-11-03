@@ -187,7 +187,7 @@
                 "type": "heat_pump",
                 "heat_pump_type": "erde"
             },
-            "nominal_power_kw": 1.9,
+            "heating_power_kw": 8.17,
             "min_on_quarterhours": 1,
             "heat_storage": {
                 "volume_liters": 887.0,
@@ -203,7 +203,7 @@
                 "type": "heat_pump",
                 "heat_pump_type": "erde"
             },
-            "nominal_power_kw": 1.9,
+            "heating_power_kw": 8.17,
             "min_on_quarterhours": 1,
             "heat_storage": {
                 "volume_liters": 887.0,
@@ -219,7 +219,7 @@
                 "type": "heat_pump",
                 "heat_pump_type": "erde"
             },
-            "nominal_power_kw": 1.9,
+            "heating_power_kw": 8.17,
             "min_on_quarterhours": 1,
             "heat_storage": {
                 "volume_liters": 887.0,

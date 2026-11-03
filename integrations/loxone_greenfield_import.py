@@ -312,8 +312,11 @@ def _stub_consumer(*, consumer_id: str, label: str, hk_type: str, bindings: dict
         consumer["min_on_quarterhours"] = 4
         consumer["charging_schedule"] = dict(_DEFAULT_EV_SCHEDULE)
     elif hk_type == "thermal_annual":
-        # Building fields live at the house (see apply_typed_matches).
+        # Building fields live at the house (see apply_typed_matches). Heating power in kW
+        # thermal: the former 1 kW electric stub at the default JAZ 3.5 of an air heat pump.
+        consumer.pop("nominal_power_kw")
         consumer["heat_source"] = {"type": "heat_pump", "heat_pump_type": "luft"}
+        consumer["heating_power_kw"] = 3.5
     elif hk_type == "thermal_rc":
         consumer["thermal_rc"] = dict(_DEFAULT_THERMAL_RC)
     return consumer

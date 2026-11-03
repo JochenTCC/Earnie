@@ -75,8 +75,9 @@ def test_heating_rod_requires_heat_storage():
 
 def _catalog(**fields) -> dict:
     from house_config.heating_systems import heating_systems_by_id
+    from tests.fixtures.heating_catalog import legacy_entry
 
-    return heating_systems_by_id({"heating_systems": [{"id": "hs", **fields}]})
+    return heating_systems_by_id({"heating_systems": [legacy_entry({"id": "hs", **fields})]})
 
 
 def test_legacy_heat_pump_type_is_rejected_on_load():
@@ -174,7 +175,14 @@ def test_profile_save_keeps_flex_fields_and_writes_only_the_reference():
     assert spec["nominal_power_kw"] == 1.9
     out = _serialize_consumer(spec)
     assert out["heating_system_id"] == "hs"
-    for key in ("parts", "heat_source", "heat_storage", "nominal_power_kw", "min_on_quarterhours"):
+    for key in (
+        "parts",
+        "heat_source",
+        "heat_storage",
+        "heating_power_kw",
+        "nominal_power_kw",
+        "min_on_quarterhours",
+    ):
         assert key not in out
     assert out["optimizer_flex"] is True
     assert out["max_on_quarterhours"] == 12

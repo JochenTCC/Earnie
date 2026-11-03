@@ -149,7 +149,7 @@ Je mehr Spielraum Earnie beim Verschieben der Verbraucher bekommt, desto größe
 Die Heizung des Hauses (Wärmepumpe oder andere Wärmequelle), nur wählbar bei eingeschaltetem **„Heizung betrachten“**:
 
 - **Gebäudedaten** stehen nicht hier, sondern im Abschnitt **Gebäude / Wärmebedarf** des Hausprofils. Ein Energieausweis des Gebäudes hilft dabei.
-- **Heizsystem:** Wärmequelle, Leistung, Mindestlaufzeit, Wärmespeicher und Heizstab; dazu der Solarthermie-Kollektor.
+- **Heizsystem:** Wärmequelle, Heizleistung (kW, thermisch), Wärmespeicher und Heizstab; bei Wärmepumpe und Stromheizung zusätzlich die Mindestlaufzeit. Dazu der Solarthermie-Kollektor.
 - **Temperaturabsenkung wenn abwesend** (im Abschnitt Gebäude / Wärmebedarf): Bei wirksamem Abwesenheitsmodus und eingeschaltetem „Absenken wenn abwesend“ gilt im Live-Betrieb Solltemperatur minus Absenkung. Den Warmwasserbedarf rechnet Earnie dann mit 0 Personen.
 - **Wärmebedarf:** Earnie schätzt ihn aus Wetterdaten und den thermischen Parametern und plant den Strombedarf zeitlich ein.
 - **Live-Betrieb:** Die Anbindung erfolgt später über die **Signalliste** (Leistung, Freigabe, ggf. Temperaturen).

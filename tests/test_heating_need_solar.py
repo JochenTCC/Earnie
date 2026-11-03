@@ -105,6 +105,7 @@ def test_consumer_annual_kwh_reflects_solar_thermal(monkeypatch):
         "living_area_m2": 120.0,
         "building_class": 3,
         "heat_source": {"type": "heat_pump", "heat_pump_type": "luft"},
+        "nominal_power_kw": 3.0,
         "persons": 2,
         "heat_storage": _heat_storage(),
     }

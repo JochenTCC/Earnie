@@ -315,6 +315,7 @@ def test_profiles_normalize_heat_storage():
                 {
                     "id": "hs",
                     "heat_source": {"type": "heat_pump", "heat_pump_type": "luft"},
+                    "heating_power_kw": 10.5,
                     "heat_storage": _storage(volume_liters=1000.0),
                 }
             ]

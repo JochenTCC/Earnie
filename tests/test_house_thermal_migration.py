@@ -141,6 +141,13 @@ def test_fixture_migrates_and_loads_with_the_same_building_values(tmp_path):
     result = apply(docs, {})
     assert not result.blockers
     (config_dir / HOUSE).write_text(json.dumps(result.docs[HOUSE]), encoding="utf-8")
+    from runtime_store.migration.steps.heating_power import apply as apply_heating_power
+
+    components = apply_heating_power(result.docs, {}).docs["components.json"]
+    # The gas variant has nominal_power_kw 0: no heating power to derive, the user enters it.
+    for entry in components["heating_systems"]:
+        entry.setdefault("heating_power_kw", 9.0)
+    (config_dir / "components.json").write_text(json.dumps(components), encoding="utf-8")
     clear_components_doc_cache()
     clear_house_profiles_doc_cache()
     profiles = load_house_profiles_document(str(config_dir / HOUSE))["profiles"]

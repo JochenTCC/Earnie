@@ -19,7 +19,12 @@ _SCRIPT = Path(__file__).parent / "scripts" / "run_page_scenario_editor.py"
 _HOUSE_SCRIPT = Path(__file__).parent / "scripts" / "run_page_house_config.py"
 _TIMEOUT_S = 30.0
 _PICK_KEY = f"{SCENARIO_ID}__scenario_heating_wp"
-_GAS = {"id": "gas_variante", "label": "Gas-Variante", "heat_source": {"type": "gas"}}
+_GAS = {
+    "id": "gas_variante",
+    "label": "Gas-Variante",
+    "heat_source": {"type": "gas"},
+    "heating_power_kw": 9.0,
+}
 
 
 def _components_path() -> Path:

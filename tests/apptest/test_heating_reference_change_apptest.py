@@ -18,7 +18,7 @@ _SCRIPT = Path(__file__).parent / "scripts" / "run_page_house_config.py"
 _TIMEOUT_S = 30.0
 _SOURCE = "test_home__hc_g0_heat_source_0"
 _WP_TYPE = "test_home__hc_g0_wp_0"
-_NOM = "test_home__hc_g0_nom_0"
+_POWER = "test_home__hc_g0_heat_power_0"
 _ANNUAL = "test_home__house_annual_kwh"
 
 
@@ -183,21 +183,21 @@ def test_gas_to_heat_pump_with_csv_warns(tmp_path) -> None:
 def test_heat_pump_type_and_parameters_save_without_warning() -> None:
     at = _session()
     at.selectbox(key=_WP_TYPE).set_value("erde").run(timeout=_TIMEOUT_S)
-    at.number_input(key=_NOM).set_value(2.5).run(timeout=_TIMEOUT_S)
+    at.number_input(key=_POWER).set_value(8.75).run(timeout=_TIMEOUT_S)
     assert not at.exception
     assert not _warnings(at)
     reference = _reference()
     assert reference["heat_source"]["heat_pump_type"] == "erde"
-    assert reference["nominal_power_kw"] == 2.5
+    assert reference["heating_power_kw"] == 8.75
 
 
 def test_change_reverted_before_saving_is_no_change() -> None:
     at = _to_gas(_session())
     assert _warnings(at)
     at.selectbox(key=_SOURCE).set_value("heat_pump").run(timeout=_TIMEOUT_S)
-    at.number_input(key=_NOM).set_value(2.5).run(timeout=_TIMEOUT_S)
+    at.number_input(key=_POWER).set_value(8.75).run(timeout=_TIMEOUT_S)
     assert not at.exception
     assert not _warnings(at)
     reference = _reference()
     assert reference["heat_source"]["type"] == "heat_pump"
-    assert reference["nominal_power_kw"] == 2.5
+    assert reference["heating_power_kw"] == 8.75

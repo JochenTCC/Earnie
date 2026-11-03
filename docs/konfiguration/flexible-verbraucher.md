@@ -111,8 +111,8 @@ Der Verbraucher `type: thermal_annual` ist die Heizung des Hauses: Verweis auf d
 | ---- | --------- |
 | `id`, `label` | Kennung und Bezeichnung des Heizsystems |
 | `heat_source` | Hauptwärmequelle, siehe [Wärmequelle](#haus-wärme-wärmequelle-heat_source) |
-| `nominal_power_kw` | Elektrische Leistung der Wärmepumpe (kW); bei Brennstoffen ungenutzt |
-| `min_on_quarterhours` | Mindestlaufzeit in Viertelstunden |
+| `heating_power_kw` | Pflicht, > 0. Heizleistung des Wärmeerzeugers in kW thermisch (Typenschild / Auslegung), für jede Wärmequelle |
+| `min_on_quarterhours` | Mindestlaufzeit in Viertelstunden, nur bei Wärmepumpe und Stromheizung |
 | `heat_storage` | Optionaler Wärmespeicher, siehe [Wärmespeicher](#haus-wärme-optionaler-wärmespeicher-heat_storage) |
 | `parts` | Optionaler Heizstab, siehe [Heizstab](#haus-wärme-heizstab-im-wärmespeicher-parts) |
 
@@ -120,21 +120,23 @@ Der Verbraucher `type: thermal_annual` ist die Heizung des Hauses: Verweis auf d
 "heating_systems": [
   {"id": "heating_haus", "label": "Heizsystem Haus",
    "heat_source": {"type": "heat_pump", "heat_pump_type": "erde"},
-   "nominal_power_kw": 1.9, "min_on_quarterhours": 4,
+   "heating_power_kw": 8.2, "min_on_quarterhours": 4,
    "heat_storage": {"volume_liters": 800}}
 ]
 ```
 
+**Heizleistung und Eingangsleistung:** Earnie leitet die Eingangsleistung aus Heizleistung und Wirkungsgrad ab: Heizleistung / JAZ bei einer Wärmepumpe, Heizleistung / Nutzungsgrad bei allen anderen Quellen. Im Beispiel sind das 8,2 kW / 4,3 ≈ 1,9 kW elektrisch. Mit dieser elektrischen Leistung plant der Optimierer Wärmepumpe und Stromheizung. Bei Brennstoffen und Fernwärme ist es die Brennstoffleistung. Sie begrenzt nur die Wärme je Stunde in der Jahressimulation, denn diese Quellen plant der Optimierer nicht. Ein Heizsystem ohne Heizleistung lehnt Earnie beim Laden ab; es gibt keinen Standardwert.
+
 **Referenzsystem:** Der Verbraucher verweist mit `heating_system_id` (Pflicht) auf das eingebaute Heizsystem. Live-Betrieb, Grundlast und die Vorschau im Hauskonfigurator rechnen immer mit diesem System. Der Hauskonfigurator legt den Eintrag beim Speichern an (Kennung `heating_<Hausprofil-ID>`) und ändert ihn direkt im Katalog. Am Verbraucher steht nur der Verweis.
 
 - **Ein Haus je Heizsystem:** Ein Heizsystem ist Referenzsystem höchstens eines Hauses, weil eine Änderung sonst auch die Grundlast des anderen Hauses verschiebt. Verweisen zwei Hausprofile auf denselben Eintrag (z. B. von Hand in `house_profiles.json`), lehnt Earnie das Speichern ab.
-- **Nur Verweis am Verbraucher:** Die Felder der Wärmeerzeugung (`heat_source`, `heat_storage`, `parts`, `nominal_power_kw`, `min_on_quarterhours`) gehören in den Katalog. Stehen sie zusätzlich am Verbraucher, lehnt Earnie die Datei beim Laden ab, statt sie still zu überschreiben.
+- **Nur Verweis am Verbraucher:** Die Felder der Wärmeerzeugung (`heat_source`, `heat_storage`, `parts`, `heating_power_kw`, `min_on_quarterhours`) gehören in den Katalog. Stehen sie oder `nominal_power_kw` zusätzlich am Verbraucher, lehnt Earnie die Datei beim Laden ab, statt sie still zu überschreiben.
 - **Hausprofil entfernen:** Das Referenzsystem bleibt im Katalog und ist danach eine gewöhnliche Variante (änderbar, im Szenario wählbar, entfernbar).
 
 Im Formular des Verbrauchers „Haus Wärme“ (Bereich **Hausprofil**, nur bei eingeschaltetem „Heizung betrachten“) stehen:
 
 - **Solarthermie-Kollektor:** Fläche, Neigung, Azimut. Sie bleiben am Verbraucher.
-- **Heizsystem (Referenzsystem: …):** Wärmequelle, Nennleistung, Mindestlaufzeit, Wärmespeicher und Heizstab. Sie landen beim Speichern im Katalogeintrag des Referenzsystems.
+- **Heizsystem (Referenzsystem: …):** Wärmequelle, **Heizleistung (kW, thermisch)**, Wärmespeicher und Heizstab; bei Wärmepumpe und Stromheizung zusätzlich die Mindestlaufzeit und darunter die abgeleitete elektrische Leistung („≈ … kW elektrisch bei JAZ …“). Sie landen beim Speichern im Katalogeintrag des Referenzsystems. Dieselben Felder hat das Formular einer Variante im Bereich **Heizsysteme**.
 - Darunter der geschätzte Strom- bzw. Brennstoffbedarf, gerechnet mit den Gebäudedaten des Hausprofils.
 
 **Heizsystem wechseln:** Das Referenzsystem ändert sich nur hier, im Abschnitt **Heizsystem** des Hauses. Ein anderes Heizsystem aus dem Katalog übernimmt ein Haus nicht; wer eine modellierte Variante eingebaut hat, trägt ihre Werte hier ein. Ändert sich die **Wärmequelle** gegenüber der gespeicherten Datei (z. B. Gas → Wärmepumpe), passen die Verbrauchsdaten des Hauses nicht mehr, denn sie stammen vom bisherigen System. Earnie speichert dann erst nach einer Wahl und zeigt direkt unter der Wärmequelle eine Warnung. Die Buttons nennen die beiden Systeme, im Beispiel Gas → Wärmepumpe:
@@ -175,8 +177,8 @@ Quellen: Nutzungsgrade und Energieinhalte aus SUSI, Brennstoffpreise aus dem Hei
 
 **Wie rechnet Earnie mit der Wärmequelle?** Die Jahressimulation des Hauses bleibt gleich: Wärmebedarf, Warmwasser und Wärmespeicher laufen unverändert. Die Wärmequelle bestimmt nur, welche Energie dafür nötig ist:
 
-- **Wärmepumpe und Stromheizung:** Strombedarf = gelieferte Wärme / JAZ bzw. Nutzungsgrad. `nominal_power_kw` ist die elektrische Leistung.
-- **Brennstoffe:** Brennstoffbedarf (Endenergie) = gelieferte Wärme / Nutzungsgrad. Die Heizung bezieht keinen Strom und ist kein flexibler Verbraucher in der Optimierung. `nominal_power_kw` ist die Brennstoffleistung des Kessels.
+- **Wärmepumpe und Stromheizung:** Strombedarf = gelieferte Wärme / JAZ bzw. Nutzungsgrad. Die elektrische Leistung ist `heating_power_kw` / JAZ bzw. Nutzungsgrad.
+- **Brennstoffe:** Brennstoffbedarf (Endenergie) = gelieferte Wärme / Nutzungsgrad. Die Heizung bezieht keinen Strom und ist kein flexibler Verbraucher in der Optimierung. `heating_power_kw` begrenzt die Wärme je Stunde.
 
 Verteilverluste rechnet Earnie nicht zusätzlich ein. Der Wärmeverlust des Gebäudes ist auf den HWB kalibriert, der Speicherverlust ist eigens modelliert.
 
@@ -192,7 +194,7 @@ Ein Heizstab lädt den Wärmespeicher elektrisch mit Wirkungsgrad 1. Er ist ein 
 
 - **Nur mit Wärmespeicher:** Ohne `heat_storage` lehnt Earnie den Heizstab beim Laden ab. Eine reine Elektroheizung ohne Speicher ist die Wärmequelle `electric_direct`.
 - **Kennung:** In Signalen und Ergebnissen heißt der Heizstab `<Kennung des Verbrauchers>_heating_rod`, z. B. `waermepumpe_heating_rod`.
-- **Neben einer Wärmepumpe:** Der Optimierer verteilt die Tageswärme auf Wärmepumpe und Heizstab. Der Heizstab lohnt sich, wenn Strom in einem Zeitfenster weniger kostet als der Strompreis der Wärmepumpe geteilt durch ihre JAZ, z. B. bei negativen Preisen. Die Wärmepumpe braucht dafür die Planung durch den Optimierer (`nominal_power_kw` > 0, `optimizer_flex` nicht `false`).
+- **Neben einer Wärmepumpe:** Der Optimierer verteilt die Tageswärme auf Wärmepumpe und Heizstab. Der Heizstab lohnt sich, wenn Strom in einem Zeitfenster weniger kostet als der Strompreis der Wärmepumpe geteilt durch ihre JAZ, z. B. bei negativen Preisen. Die Wärmepumpe braucht dafür die Planung durch den Optimierer (`optimizer_flex` nicht `false`).
 - **Neben einem Brennstoff:** Jede kWh Heizstab-Wärme spart Brennstoff im Wert von Brennstoffpreis / Nutzungsgrad. Der Optimierer setzt den Heizstab ein, wenn Strom günstiger ist, z. B. bei PV-Überschuss mit niedriger Einspeisevergütung. Höchstens so viel Wärme, wie das Haus am Tag braucht.
 - **Grenzen:** Der Optimierer rechnet mit der Tageswärme des Hauses, nicht mit der freien Kapazität des Speichers. Der Heizstab plant derzeit nur im Szenarien-Explorer. Im Live-Betrieb bleibt er aus, eine Steuerung über ein eigenes Binding folgt später.
 

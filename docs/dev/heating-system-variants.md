@@ -19,7 +19,8 @@ The `thermal_annual` consumer also mixes two concerns:
   `target_temp_c`, `heating_limit_c`, `building_mass`, `house_tolerance_c`, absent mode.
 - **Heat generation:** `heat_source`, `nominal_power_kw` (the electric power of a heat pump,
   unused for fuel sources, see `planning_flex_converters.py`), `min_on_quarterhours`,
-  `heat_storage`, `parts[heating_rod]`.
+  `heat_storage`, `parts[heating_rod]`. Since `dm5.heating_power` the catalog stores the
+  thermal `heating_power_kw` instead, see [Heating power](#heating-power-2026-11-03).
 
 Swapping only `heat_source` is not enough; several generation fields change together.
 
@@ -251,6 +252,40 @@ property of the house, the heating only uses them. Decisions (maintainer, 2026-1
   with the house values). With the switch off the form keeps the consumer row hidden and
   passes it through on save; „Haus Wärme“ is not offered as a type; the heating-system change
   gate is skipped (the heating stays in the baseload, the measured data cannot contradict it).
+
+## Heating power (2026-11-03)
+
+The forms showed „Nennleistung Wärmepumpe (kW, elektrisch)“ and „Mindestlaufzeit“ for every
+heat source. Decisions (maintainer, 2026-11-03):
+
+- **One field for every heat source:** a catalog entry stores `heating_power_kw`, the thermal
+  heating power of the generator („Heizleistung“ as in SUSI / Heizrechner; it also feeds the
+  later SUSI investment and sizing steps P4 / P7). Mandatory and > 0, no default: an entry
+  without it fails loud on load. `nominal_power_kw` in a catalog entry fails loud with the
+  migration hint.
+- **Electric power is derived, not stored:** the loader places `heating_power_kw` and the
+  input power `nominal_power_kw = heating_power_kw / efficiency`
+  (`house_config.heating_systems.heating_input_power_kw`; JAZ for a heat pump, Nutzungsgrad
+  otherwise, rounded to 6 decimals) into the normalized consumer. For heat pump and direct
+  electric heating that is the MILP power; for fuel sources it is the fuel power that caps the
+  year model's heat (`max_heat = input × efficiency` in `optimizer/thermal_house.py`), as
+  before. So the calculation core reads the same fields, and the year model and the MILP stay
+  consistent (`heat = electric × JAZ`). Storing a second electric field was rejected: it could
+  contradict the heating power.
+- **Min-on time only for electric sources:** `min_on_quarterhours` is allowed and shown only
+  for heat pump and direct electric heating; on a fuel entry it fails loud.
+- **No hidden 3 kW:** the readers of the thermal input power
+  (`consumer_input_power_kw`) fail loud instead of falling back to 3 kW. Before, a fuel source
+  with `nominal_power_kw` 0 was simulated with 3 kW fuel power.
+- **Migration** `dm5.heating_power` (after `dm5.house_thermal`, same data model 5; detection:
+  a catalog entry with `nominal_power_kw`): `heating_power_kw = nominal_power_kw × efficiency`
+  (stored or default efficiency), so the derived power and all results stay the same. Fuel
+  entries lose `min_on_quarterhours`. An entry with power 0 gets no heating power (no question,
+  2.8 is unreleased) and fails loud on load until the value is entered. `dm5.heating_systems`
+  moves the inline fields with its own frozen field list (`MOVED_FIELDS`).
+- **UI:** `render_generation_power_fields` in `ui/house_config_profile_thermal_annual.py` is
+  shared by the house configurator and the variants editor: „Heizleistung (kW, thermisch)“,
+  for electric sources the derived electric power as a caption and the min-on time.
 
 ## Docs and tests
 

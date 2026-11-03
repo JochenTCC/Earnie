@@ -133,7 +133,7 @@ def _write_id_only_config(config_dir, *, battery_wear_enabled: bool = False) -> 
                     {
                         "id": "heating_efh",
                         "heat_source": {"type": "heat_pump", "heat_pump_type": "luft"},
-                        "nominal_power_kw": 3.0,
+                        "heating_power_kw": 10.5,
                     }
                 ],
             }

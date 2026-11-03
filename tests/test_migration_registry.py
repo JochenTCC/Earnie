@@ -154,6 +154,7 @@ def test_per_step_detect_apply_smoke(tmp_path):
         "dm5.heat_source": "v5_pre_heat_source",
         "dm5.heating_systems": "v5_pre_heating_systems",
         "dm5.house_thermal": "v5_pre_heating_systems",
+        "dm5.heating_power": "v5_pre_heating_systems",
         "tf1.tariff_format": "v4_pre_tariff_track",
     }
     for step in STEPS:

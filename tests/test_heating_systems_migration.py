@@ -127,9 +127,18 @@ def test_dogfooding_fixture_migrates_and_loads(tmp_path):
     assert not result.blockers
     from runtime_store.migration.steps.house_thermal import apply as apply_house_thermal
 
+    from runtime_store.migration.steps.heating_power import apply as apply_heating_power
+
     hoisted = apply_house_thermal(result.docs, {})
-    for name in {*result.changed_files, *hoisted.changed_files}:
-        (config_dir / name).write_text(json.dumps(hoisted.docs[name]), encoding="utf-8")
+    powered = apply_heating_power(hoisted.docs, {})
+    assert not powered.blockers
+    # Gas entries with nominal_power_kw 0 get no heating power; the user enters it.
+    for entry in powered.docs["components.json"]["heating_systems"]:
+        if "heating_power_kw" not in entry:
+            assert entry["heat_source"]["type"] == "gas"
+            entry["heating_power_kw"] = 9.0
+    for name in {*result.changed_files, *hoisted.changed_files, *powered.changed_files}:
+        (config_dir / name).write_text(json.dumps(powered.docs[name]), encoding="utf-8")
     catalog = {e["id"]: e for e in result.docs["components.json"]["heating_systems"]}
     assert set(catalog) == {"heating_profile_a", "heating_profile_b", "heating_profile_b_2",
                             "heating_profile_c"}

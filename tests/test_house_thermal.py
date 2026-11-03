@@ -21,9 +21,9 @@ _CATALOG = heating_systems_by_id(
             {
                 "id": "heating_home",
                 "heat_source": {"type": "heat_pump", "heat_pump_type": "luft"},
-                "nominal_power_kw": 2.0,
+                "heating_power_kw": 7.0,
             },
-            {"id": "gas", "heat_source": {"type": "gas"}},
+            {"id": "gas", "heat_source": {"type": "gas"}, "heating_power_kw": 2.85},
         ]
     }
 )

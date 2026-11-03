@@ -173,9 +173,11 @@ def _house_year_temps(
     thermal = consumer.get("thermal") or consumer
     if float(thermal.get("living_area_m2", 0.0) or 0.0) <= 0.0:
         return None, None
+    from house_config.heating_systems import consumer_input_power_kw
+
     params = heating_params_from_thermal(thermal)
     if "hp_electric_kw" not in params:
-        params["hp_electric_kw"] = float(consumer.get("nominal_power_kw", 3.0) or 3.0)
+        params["hp_electric_kw"] = consumer_input_power_kw(consumer)
     from optimizer.thermal_house import house_year_result
 
     result = house_year_result(

@@ -208,9 +208,11 @@ def _thermal_annual_daily_from_archive(consumer: dict) -> list[float] | None:
         last_full_archive_year,
     )
 
+    from house_config.heating_systems import consumer_input_power_kw
+
     params = heating_params_from_thermal(thermal)
     if "hp_electric_kw" not in params:
-        params["hp_electric_kw"] = float(consumer.get("nominal_power_kw", 3.0) or 3.0)
+        params["hp_electric_kw"] = consumer_input_power_kw(consumer)
     area_m2 = float(params.get("solar_thermal_area_m2", 0.0) or 0.0)
     year = last_full_archive_year()
     timezone = str(thermal.get("timezone_name") or _cfg.get_planning_timezone())
@@ -236,9 +238,11 @@ def _thermal_annual_daily_from_archive(consumer: dict) -> list[float] | None:
 def _modeled_thermal_annual_hourly_kw(consumer: dict, *, hours: int) -> list[float]:
     """Hourly WP profile; prefer Open-Meteo + collector irradiance over fixture."""
     thermal = consumer.get("thermal") or consumer
+    from house_config.heating_systems import consumer_input_power_kw
+
     params = heating_params_from_thermal(thermal)
     if "hp_electric_kw" not in params:
-        params["hp_electric_kw"] = float(consumer.get("nominal_power_kw", 3.0) or 3.0)
+        params["hp_electric_kw"] = consumer_input_power_kw(consumer)
     daily = _thermal_annual_daily_from_archive(consumer)
     if daily is None:
         daily = daily_electric_kwh(**params)

@@ -131,7 +131,7 @@ def _default_consumer() -> dict:
     return {
         "label": "Haus Wärme",
         "type": "thermal_annual",
-        "nominal_power_kw": 3.5,
+        "heating_power_kw": 10.0,
         "heat_source": {"type": "heat_pump", "heat_pump_type": "luft"},
     }
 

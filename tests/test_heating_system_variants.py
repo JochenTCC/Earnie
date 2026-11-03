@@ -21,9 +21,9 @@ _HP = {
     "id": "heating_home",
     "label": "Erdwärmepumpe",
     "heat_source": {"type": "heat_pump", "heat_pump_type": "erde"},
-    "nominal_power_kw": 1.9,
+    "heating_power_kw": 8.17,  # 1.9 kW electric at the default JAZ 4.3
 }
-_GAS = {"id": "gas", "label": "Gasbrennwert", "heat_source": {"type": "gas"}}
+_GAS = {"id": "gas", "label": "Gasbrennwert", "heat_source": {"type": "gas"}, "heating_power_kw": 2.85}
 
 
 def _catalog() -> dict:
@@ -76,6 +76,44 @@ def test_catalog_rejects_duplicates_and_unknown_fields():
         normalize_heating_systems([{**_GAS, "living_area_m2": 100}])
     with pytest.raises(ValueError, match="heat_source fehlt"):
         normalize_heating_systems([{"id": "x"}])
+
+
+@pytest.mark.parametrize("power", [None, 0.0, -1.0])
+def test_catalog_requires_a_positive_heating_power(power):
+    entry = {k: v for k, v in _GAS.items() if k != "heating_power_kw"}
+    if power is not None:
+        entry["heating_power_kw"] = power
+    with pytest.raises(ValueError, match="heating_power_kw"):
+        normalize_heating_systems([entry])
+
+
+def test_catalog_rejects_the_old_nominal_power_with_migration_hint():
+    with pytest.raises(ValueError, match="nominal_power_kw wird nicht mehr unterstützt.*migrieren"):
+        normalize_heating_systems([{**_HP, "nominal_power_kw": 1.9}])
+
+
+def test_min_on_only_for_electric_sources():
+    with pytest.raises(ValueError, match="nur für elektrische Wärmequellen"):
+        normalize_heating_systems([{**_GAS, "min_on_quarterhours": 4}])
+    direct = {"id": "direct", "heat_source": {"type": "electric_direct"}, "heating_power_kw": 6.0}
+    assert normalize_heating_systems([{**direct, "min_on_quarterhours": 2}])[0][
+        "min_on_quarterhours"
+    ] == 2
+
+
+def test_loader_derives_the_input_power_from_heating_power_and_efficiency():
+    from house_config.heating_systems import apply_heating_system
+
+    catalog = _catalog()
+    wp: dict = {}
+    apply_heating_system(wp, catalog["heating_home"])
+    assert wp["heating_power_kw"] == 8.17
+    assert wp["nominal_power_kw"] == 1.9  # 8.17 / JAZ 4.3
+    assert "min_on_quarterhours" in wp
+    gas: dict = {"min_on_quarterhours": 4}
+    apply_heating_system(gas, catalog["gas"])
+    assert gas["nominal_power_kw"] == pytest.approx(2.85 / 0.95)  # fuel power
+    assert "min_on_quarterhours" not in gas
 
 
 def test_house_without_catalog_fails_loud():
@@ -476,7 +514,7 @@ def test_loaded_profile_reads_catalog_and_reloads_after_catalog_change(tmp_path)
     assert first["nominal_power_kw"] == 1.9
     comp = config_dir / "components.json"
     doc = json.loads(comp.read_text(encoding="utf-8"))
-    doc["heating_systems"][0]["nominal_power_kw"] = 2.5
+    doc["heating_systems"][0]["heating_power_kw"] = 10.75
     comp.write_text(json.dumps(doc), encoding="utf-8")
     stamp = time.time() + 5
     os.utime(comp, (stamp, stamp))
@@ -516,6 +554,7 @@ def test_measured_rod_fields_fail_loud_on_load(field, value):
         ("heat_source", {"type": "gas"}),
         ("heat_storage", _STORAGE),
         ("parts", [_ROD]),
+        ("heating_power_kw", 8.0),
         ("nominal_power_kw", 2.0),
         ("min_on_quarterhours", 4),
     ],

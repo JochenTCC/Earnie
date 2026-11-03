@@ -329,9 +329,23 @@ def test_consumer_annual_kwh_flat_thermal():
         "living_area_m2": 120.0,
         "building_class": 3,
         "heat_source": {"type": "heat_pump", "heat_pump_type": "luft"},
+        "nominal_power_kw": 3.0,
         "persons": 2,
     }
     assert consumer_annual_kwh(consumer) > 0.0
+
+
+def test_consumer_annual_kwh_thermal_without_power_fails_loud():
+    consumer = {
+        "id": "wp",
+        "type": "thermal_annual",
+        "living_area_m2": 120.0,
+        "building_class": 3,
+        "heat_source": {"type": "heat_pump", "heat_pump_type": "luft"},
+        "persons": 2,
+    }
+    with pytest.raises(ValueError, match="Leistung des Wärmeerzeugers fehlt"):
+        consumer_annual_kwh(consumer)
 
 
 def test_house_profile_thermal_annual(monkeypatch):
@@ -1639,7 +1653,7 @@ def test_live_scenario_resolves_entity_refs(tmp_path, monkeypatch):
             "heating_systems": [{
                 "id": "heating_efh",
                 "heat_source": {"type": "heat_pump", "heat_pump_type": "luft"},
-                "nominal_power_kw": 3.0
+                "heating_power_kw": 10.5
             }]
         }
         """.strip(),

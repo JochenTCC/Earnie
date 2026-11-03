@@ -5,15 +5,20 @@ Design: ``docs/dev/heating-system-variants.md``. One entry holds the heat genera
 
     {"id": "heating_haus", "label": "Wärmepumpe Luft",
      "heat_source": {"type": "heat_pump", "heat_pump_type": "luft"},
-     "nominal_power_kw": 3.5, "min_on_quarterhours": 4,
+     "heating_power_kw": 11.0, "min_on_quarterhours": 4,
      "heat_storage": {...}, "parts": [{"id": "heating_rod", ...}]}
+
+``heating_power_kw`` is the thermal heating power of the generator for every heat source
+(„Heizleistung“ as in SUSI / Heizrechner). ``min_on_quarterhours`` exists only for electric
+sources (heat pump, direct electric), the only ones the MILP plans.
 
 The consumer keeps the building demand and stores only ``heating_system_id`` (its reference
 system = the installed one, used by Live and for the baseload). The house-profile loader
 places the resolved system into the normalized consumer (``thermal.heat_source``,
-``thermal.heat_storage``, ``parts``, ``nominal_power_kw``, ``min_on_quarterhours``), so the
-calculation core reads the same fields as before. Scenarios may select another entry per
-consumer (``heating_system_ids``); see ``apply_heating_system``.
+``thermal.heat_storage``, ``parts``, ``heating_power_kw``, ``min_on_quarterhours``) plus the
+derived input power ``nominal_power_kw`` (``heating_input_power_kw``), so the calculation
+core reads the same fields as before. Scenarios may select another entry per consumer
+(``heating_system_ids``); see ``apply_heating_system``.
 """
 from __future__ import annotations
 
@@ -22,21 +27,33 @@ import json
 import os
 from typing import Any, Iterable
 
-from house_config.heat_source import normalize_heat_source, normalize_parts
+from house_config.heat_source import (
+    heat_source_efficiency,
+    heat_source_is_electric,
+    normalize_heat_source,
+    normalize_parts,
+)
 from house_config.id_slug import slug_id
 
 HEATING_SYSTEMS_KEY = "heating_systems"
 HEATING_SYSTEM_ID_KEY = "heating_system_id"
 SCENARIO_HEATING_SYSTEM_IDS_KEY = "heating_system_ids"
+HEATING_POWER_KEY = "heating_power_kw"
+# Electric power of a heat pump before dm5.heating_power; derived on load since then.
+LEGACY_NOMINAL_POWER_KEY = "nominal_power_kw"
 # Fields of an entry that the loader places into the normalized consumer.
 SYSTEM_FIELDS: tuple[str, ...] = (
     "heat_source",
-    "nominal_power_kw",
+    HEATING_POWER_KEY,
     "min_on_quarterhours",
     "heat_storage",
     "parts",
 )
 _ENTRY_KEYS = frozenset({"id", "label", *SYSTEM_FIELDS})
+# Generation fields a raw consumer must not carry (the derived input power included).
+_CONSUMER_REJECTED_FIELDS: tuple[str, ...] = (*SYSTEM_FIELDS, LEGACY_NOMINAL_POWER_KEY)
+# Rounding of the derived input power: drops float noise of the heat × η / η round trip.
+_INPUT_POWER_DECIMALS = 6
 _MIGRATE_HINT = (
     "Konfiguration migrieren (Streamlit-Seite „Konfigurations-Migration“ oder "
     "python -m scripts.migrate_config --config-dir <config>)"
@@ -60,22 +77,31 @@ def normalize_heating_system(raw: Any, index: int) -> dict[str, Any]:
     if not system_id:
         raise ValueError(f"{where}: id fehlt.")
     label = f"Heizsystem '{system_id}'"
+    if LEGACY_NOMINAL_POWER_KEY in raw:
+        raise ValueError(
+            f"{label}: nominal_power_kw wird nicht mehr unterstützt (ersetzt durch "
+            f"heating_power_kw, Heizleistung in kW thermisch) — {_MIGRATE_HINT}."
+        )
     extra = sorted(set(raw) - _ENTRY_KEYS)
     if extra:
         raise ValueError(f"{label}: unbekannte Felder {', '.join(extra)}.")
-    nominal = float(raw.get("nominal_power_kw", 0.0) or 0.0)
-    if nominal < 0.0:
-        raise ValueError(f"{label}: nominal_power_kw muss >= 0 sein (ist {nominal}).")
-    min_on_default = _min_on_default()
+    heat_source = normalize_heat_source(raw.get("heat_source"), label=label)
     spec: dict[str, Any] = {
         "id": system_id,
         "label": str(raw.get("label") or system_id).strip() or system_id,
-        "heat_source": normalize_heat_source(raw.get("heat_source"), label=label),
-        "nominal_power_kw": nominal,
-        "min_on_quarterhours": max(
-            1, int(raw.get("min_on_quarterhours", min_on_default) or min_on_default)
-        ),
+        "heat_source": heat_source,
+        HEATING_POWER_KEY: _heating_power(raw.get(HEATING_POWER_KEY), label=label),
     }
+    if heat_source_is_electric(heat_source):
+        min_on_default = _min_on_default()
+        spec["min_on_quarterhours"] = max(
+            1, int(raw.get("min_on_quarterhours", min_on_default) or min_on_default)
+        )
+    elif "min_on_quarterhours" in raw:
+        raise ValueError(
+            f"{label}: min_on_quarterhours gilt nur für elektrische Wärmequellen "
+            "(Wärmepumpe, Stromheizung) — Feld entfernen."
+        )
     storage = normalize_heat_storage(raw.get("heat_storage"))
     if storage is not None:
         spec["heat_storage"] = storage
@@ -83,6 +109,45 @@ def normalize_heating_system(raw: Any, index: int) -> dict[str, Any]:
         raw.get("parts"), label=label, has_heat_storage=storage is not None
     )
     return spec
+
+
+def _heating_power(value: Any, *, label: str) -> float:
+    if value in (None, ""):
+        raise ValueError(
+            f"{label}: heating_power_kw (Heizleistung, kW thermisch) fehlt. In "
+            "components.json (heating_systems) beim Eintrag ergänzen."
+        )
+    power = float(value)
+    if power <= 0.0:
+        raise ValueError(
+            f"{label}: heating_power_kw (Heizleistung, kW thermisch) muss > 0 sein "
+            f"(ist {power}). Im Hauskonfigurator (Abschnitt Heizsystem), im Bereich "
+            "„Heizsysteme“ oder in components.json (heating_systems) eintragen."
+        )
+    return power
+
+
+def heating_input_power_kw(heat_source: dict[str, Any], heating_power_kw: float) -> float:
+    """Input power of the generator: heating power / JAZ or Nutzungsgrad.
+
+    Electric power for a heat pump or direct-electric heating (the MILP's nominal power),
+    fuel power for every other source (caps the heat of the year model, no MILP consumer).
+    """
+    return round(
+        float(heating_power_kw) / heat_source_efficiency(heat_source), _INPUT_POWER_DECIMALS
+    )
+
+
+def consumer_input_power_kw(consumer: dict[str, Any]) -> float:
+    """Derived input power of a normalized ``thermal_annual`` consumer (fail loud, no default)."""
+    value = consumer.get("nominal_power_kw")
+    if value in (None, "") or float(value) <= 0.0:
+        raise ValueError(
+            f"thermal_annual '{consumer.get('id') or '?'}': Leistung des Wärmeerzeugers fehlt "
+            "(heating_power_kw im Heizsystem-Katalog). Im Hauskonfigurator (Abschnitt "
+            "Heizsystem) die Heizleistung eintragen."
+        )
+    return float(value)
 
 
 def normalize_heating_systems(raw_list: Any) -> list[dict[str, Any]]:
@@ -106,9 +171,10 @@ def serialize_heating_system(spec: dict[str, Any]) -> dict[str, Any]:
         "id": spec["id"],
         "label": spec["label"],
         "heat_source": dict(spec["heat_source"]),
-        "nominal_power_kw": spec["nominal_power_kw"],
-        "min_on_quarterhours": spec["min_on_quarterhours"],
+        HEATING_POWER_KEY: spec[HEATING_POWER_KEY],
     }
+    if "min_on_quarterhours" in spec:
+        out["min_on_quarterhours"] = spec["min_on_quarterhours"]
     if spec.get("heat_storage"):
         out["heat_storage"] = dict(spec["heat_storage"])
     if spec.get("parts"):
@@ -161,16 +227,17 @@ def resolve_heating_system(
 def reject_inline_heating_fields(raw: dict[str, Any], *, label: str) -> None:
     """Raw consumers carry only ``heating_system_id``; inline generation fields fail loud.
 
-    Every one of the five ``SYSTEM_FIELDS`` on a raw consumer is rejected, also next to a
-    ``heating_system_id`` (never overwritten silently by the catalog entry). Without
-    ``heating_system_id`` the consumer is in the old file shape and needs the migration.
+    Every one of the five ``SYSTEM_FIELDS`` and ``nominal_power_kw`` on a raw consumer is
+    rejected, also next to a ``heating_system_id`` (never overwritten silently by the catalog
+    entry). Without ``heating_system_id`` the consumer is in the old file shape and needs the
+    migration.
     """
     if HEATING_SYSTEM_ID_KEY not in raw:
         raise ValueError(
             f"{label}: Wärmeerzeugung gehört in den Heizsystem-Katalog "
             f"(components.json heating_systems, Verweis heating_system_id) — {_MIGRATE_HINT}."
         )
-    inline = [key for key in SYSTEM_FIELDS if key in raw]
+    inline = [key for key in _CONSUMER_REJECTED_FIELDS if key in raw]
     if inline:
         raise ValueError(
             f"{label}: {', '.join(inline)} gehört in den Heizsystem-Katalog "
@@ -203,8 +270,14 @@ def apply_heating_system(consumer: dict[str, Any], system: dict[str, Any]) -> No
     if system.get("heat_storage"):
         thermal["heat_storage"] = dict(system["heat_storage"])
     consumer["parts"] = [dict(part) for part in system.get("parts") or []]
-    consumer["nominal_power_kw"] = float(system["nominal_power_kw"])
-    consumer["min_on_quarterhours"] = int(system["min_on_quarterhours"])
+    consumer[HEATING_POWER_KEY] = float(system[HEATING_POWER_KEY])
+    consumer["nominal_power_kw"] = heating_input_power_kw(
+        system["heat_source"], system[HEATING_POWER_KEY]
+    )
+    if "min_on_quarterhours" in system:
+        consumer["min_on_quarterhours"] = int(system["min_on_quarterhours"])
+    else:
+        consumer.pop("min_on_quarterhours", None)
 
 
 def split_inline_heating_system(
@@ -227,6 +300,8 @@ def split_inline_heating_system(
     for key in SYSTEM_FIELDS:
         if key in item:
             entry[key] = item.pop(key)
+    # Derived from heating power and efficiency on load, never stored.
+    item.pop(LEGACY_NOMINAL_POWER_KEY, None)
     item[HEATING_SYSTEM_ID_KEY] = system_id
     return item, entry
 

@@ -28,7 +28,7 @@ _KEY_PREFIX = f"{_PROFILE_ID}__"
 _SWITCH = f"{_KEY_PREFIX}house_heating_enabled"
 _AREA = f"{_KEY_PREFIX}house_thermal_area"
 # Generation field of the „Haus Wärme“ consumer (index 0).
-_WP_NOM = f"{_KEY_PREFIX}hc_g0_nom_0"
+_WP_NOM = f"{_KEY_PREFIX}hc_g0_heat_power_0"
 
 
 @pytest.fixture(autouse=True)

@@ -46,22 +46,21 @@
   "definitions": {
     "heating_system_entity": {
       "type": "object",
-      "required": ["id", "heat_source"],
+      "required": ["id", "heat_source", "heating_power_kw"],
       "additionalProperties": false,
       "properties": {
         "id": { "type": "string" },
         "label": { "type": "string" },
         "heat_source": { "$ref": "./house_profiles.schema.json#/definitions/heat_source" },
-        "nominal_power_kw": {
+        "heating_power_kw": {
           "type": "number",
-          "minimum": 0,
-          "default": 0.0,
-          "description": "Elektrische Leistung der Wärmepumpe (kW); bei Brennstoffen ungenutzt."
+          "exclusiveMinimum": 0,
+          "description": "Heizleistung des Wärmeerzeugers (kW thermisch), für jede Wärmequelle. Die Eingangsleistung (Strom bei Wärmepumpe / Stromheizung, Brennstoff sonst) leitet Earnie als Heizleistung / Wirkungsgrad (JAZ bzw. Nutzungsgrad) ab."
         },
         "min_on_quarterhours": {
           "type": "integer",
           "minimum": 1,
-          "description": "Mindestlaufzeit in Viertelstunden; ohne Angabe der thermal_annual-Standard aus house_profiles.schema.json."
+          "description": "Mindestlaufzeit in Viertelstunden, nur für elektrische Wärmequellen (Wärmepumpe, Stromheizung); ohne Angabe der thermal_annual-Standard aus house_profiles.schema.json."
         },
         "heat_storage": { "$ref": "./house_profiles.schema.json#/definitions/heat_storage" },
         "parts": {
