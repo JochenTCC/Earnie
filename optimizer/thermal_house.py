@@ -102,6 +102,25 @@ def vent_house_temp(temp_c: float, ambient_c: float, target_temp_c: float) -> fl
     return min(float(temp_c), cap)
 
 
+def cool_house_temp(
+    temp_c: float,
+    *,
+    setpoint_c: float,
+    cooling_power_kw: float,
+    capacity_kwh_per_k: float,
+) -> tuple[float, float]:
+    """Air conditioning for one hour: (indoor temp, cold kWh) after cooling down to the setpoint.
+
+    The device removes the heat above ``setpoint_c`` up to its capacity (ideal thermostat; an
+    undersized device leaves the house warmer).
+    """
+    excess = (float(temp_c) - float(setpoint_c)) * float(capacity_kwh_per_k)
+    if excess <= 0.0:
+        return float(temp_c), 0.0
+    cold = min(excess, float(cooling_power_kw))
+    return float(temp_c) - cold / float(capacity_kwh_per_k), cold
+
+
 def house_requests_heat(
     temp_c: float,
     ambient_c: float,
@@ -131,6 +150,10 @@ class HouseYearResult:
     ``electric_direct`` and fuel (final energy, kWh) for every other heat source.
     ``house_heat_loss_kw_per_k`` is the envelope H the run used (calibrated with gains, or the
     override); ``annual_space_heat_kwh`` the space heat delivered into the house (no warm water).
+    With air conditioning, ``hourly_cooling_electric_kw`` is its electricity per hour (never in
+    ``daily_electric_kwh``, which stays the heat source's input) and ``annual_cooling_kwh`` the
+    cold it removed. Heating not booked (switch „Heizung betrachten“ off, cooling-only run):
+    the heat source still holds the house temperature, but its input energy is 0.
     """
 
     daily_electric_kwh: list[float]
@@ -139,6 +162,8 @@ class HouseYearResult:
     daily_fuel_kwh: list[float] = field(default_factory=list)
     house_heat_loss_kw_per_k: float | None = None
     annual_space_heat_kwh: float = 0.0
+    hourly_cooling_electric_kw: list[float] = field(default_factory=list)
+    annual_cooling_kwh: float = 0.0
 
 
 def _flat_ambient_from_daily(daily_temps: list[float]) -> list[float]:
@@ -274,6 +299,8 @@ def _copy_house_year_result(result: HouseYearResult) -> HouseYearResult:
         daily_fuel_kwh=list(result.daily_fuel_kwh),
         house_heat_loss_kw_per_k=result.house_heat_loss_kw_per_k,
         annual_space_heat_kwh=result.annual_space_heat_kwh,
+        hourly_cooling_electric_kw=list(result.hourly_cooling_electric_kw),
+        annual_cooling_kwh=result.annual_cooling_kwh,
     )
 
 
@@ -369,12 +396,17 @@ def _simulate_house_year(
     internal_gains: dict | None = None,
     solar_gains: dict | None = None,
     hourly_solar_gain_kw=None,
+    cooling: dict | None = None,
+    heating_booked: bool = True,
 ) -> HouseYearResult:
-    """Year simulation with house RC, gains and optional heat storage coupling.
+    """Year simulation with house RC, gains, optional heat storage and air conditioning.
 
     Without an H override, H is calibrated so the simulated annual space heat (after solar and
     internal gains) equals HWB × BGF; the Grundlast part of the internal gains is solved in the
-    same loop (it depends on the heating's own electric draw).
+    same loop (it depends on the house's own electric draw: heating and cooling).
+    ``cooling`` is the normalized ``cooling`` block (``house_config.house_cooling``); the
+    calibration ignores it (ideal heater, building property). ``heating_booked=False`` books no
+    heating input energy (cooling-only run of a house with „Heizung betrachten“ off).
     """
     call_kwargs = dict(locals())  # the call's keyword arguments (before any other local)
     from data.heating_need import _resolve_climate_series
@@ -420,6 +452,7 @@ def _simulate_house_year(
     annual_heat = sim_common.pop("annual_heat")
     sim_common["start_house_temp_c"] = start_house_temp_c
     sim_common["start_store_temp_c"] = start_store_temp_c
+    sim_common["cooling"] = cooling
 
     day_rows = _climate_rows(
         latitude=latitude,
@@ -482,14 +515,18 @@ def _simulate_house_year(
         result = _simulate_rows(
             day_rows=day_rows, house_h=house_h, gain_by_hour=gains, **sim_common
         )
-        new_electric = float(sum(result.daily_electric_kwh)) if heat_electric else 0.0
+        new_electric = _own_electric_kwh(
+            result, heat_electric=heat_electric, heating_booked=heating_booked
+        )
         diff = abs(new_electric - electric)
         if (
             not has_baseload_gain
             or reference_electric is not None
             or diff <= max(CALIBRATION_ENERGY_TOL_KWH, CALIBRATION_REL_TOL * new_electric)
         ):
-            return _split_input_energy(result, heat_electric=heat_electric)
+            return _split_input_energy(
+                result, heat_electric=heat_electric, heating_booked=heating_booked
+            )
         # Damped update: the bang-bang heat pump makes the draw jump in steps, an undamped
         # update can cycle between two values.
         electric = new_electric if iteration < 2 else 0.5 * (electric + new_electric)
@@ -507,7 +544,15 @@ def _reference_heating_electric_kwh(call_kwargs: dict) -> float:
     kwargs = {**call_kwargs, **reference}
     kwargs["internal_gains"] = gains
     result = house_year_result(**kwargs)
-    return float(sum(result.daily_electric_kwh))
+    return float(sum(result.daily_electric_kwh)) + float(sum(result.hourly_cooling_electric_kw))
+
+
+def _own_electric_kwh(
+    result: HouseYearResult, *, heat_electric: bool, heating_booked: bool
+) -> float:
+    """Electricity of the house's heating and cooling (not part of the Grundlast)."""
+    heating = float(sum(result.daily_electric_kwh)) if heat_electric and heating_booked else 0.0
+    return heating + float(sum(result.hourly_cooling_electric_kw))
 
 
 def ideal_space_heat_kwh(
@@ -596,24 +641,29 @@ def calibrate_house_heat_loss_with_gains(
     return 0.5 * (lo_h + hi_h)
 
 
-def _split_input_energy(result: HouseYearResult, *, heat_electric: bool) -> HouseYearResult:
-    """The simulation books input energy (heat / efficiency); a fuel source draws no power."""
-    if heat_electric:
-        return HouseYearResult(
-            daily_electric_kwh=result.daily_electric_kwh,
-            hourly_house_temp_c=result.hourly_house_temp_c,
-            hourly_store_temp_c=result.hourly_store_temp_c,
-            daily_fuel_kwh=[0.0] * len(result.daily_electric_kwh),
-            house_heat_loss_kw_per_k=result.house_heat_loss_kw_per_k,
-            annual_space_heat_kwh=result.annual_space_heat_kwh,
-        )
+def _split_input_energy(
+    result: HouseYearResult, *, heat_electric: bool, heating_booked: bool = True
+) -> HouseYearResult:
+    """The simulation books input energy (heat / efficiency); a fuel source draws no power.
+
+    Heating not booked: both input series are 0 (the heating stays in the Grundlast).
+    """
+    zeros = [0.0] * len(result.daily_electric_kwh)
+    if not heating_booked:
+        electric, fuel = zeros, list(zeros)
+    elif heat_electric:
+        electric, fuel = result.daily_electric_kwh, zeros
+    else:
+        electric, fuel = zeros, list(result.daily_electric_kwh)
     return HouseYearResult(
-        daily_electric_kwh=[0.0] * len(result.daily_electric_kwh),
+        daily_electric_kwh=electric,
         hourly_house_temp_c=result.hourly_house_temp_c,
         hourly_store_temp_c=result.hourly_store_temp_c,
-        daily_fuel_kwh=list(result.daily_electric_kwh),
+        daily_fuel_kwh=fuel,
         house_heat_loss_kw_per_k=result.house_heat_loss_kw_per_k,
         annual_space_heat_kwh=result.annual_space_heat_kwh,
+        hourly_cooling_electric_kw=result.hourly_cooling_electric_kw,
+        annual_cooling_kwh=result.annual_cooling_kwh,
     )
 
 
@@ -724,8 +774,12 @@ def _simulate_rows(
     storage: dict | None,
     start_house_temp_c: float | None,
     start_store_temp_c: float | None,
+    cooling: dict | None = None,
 ) -> HouseYearResult:
-    """Hour loop over (day, ambient[24], collector kW[24]) rows with gains per hour."""
+    """Hour loop over (day, ambient[24], collector kW[24]) rows with gains per hour.
+
+    With ``cooling`` the air conditioning takes the house back to its setpoint after each hour.
+    """
     ww_kw = ww_day / 24.0
     house_temp = float(
         start_house_temp_c if start_house_temp_c is not None else target_temp_c
@@ -738,6 +792,8 @@ def _simulate_rows(
         storage, start_store_temp_c
     )
     ww_electric_kw = ww_kw / jaz if jaz > 0 else 0.0
+    cooling_electric: list[float] = []
+    cold_total = 0.0
     hour_index = 0
     for _day, amb, solar_hours in day_rows:
         day_electric = 0.0
@@ -782,6 +838,15 @@ def _simulate_rows(
                 space = max_heat if electric > ww_electric_kw + 1e-12 else 0.0
             space_heat += space
             day_electric += electric
+            if cooling is not None:
+                house_temp, cold = cool_house_temp(
+                    house_temp,
+                    setpoint_c=cooling["setpoint_c"],
+                    cooling_power_kw=cooling["cooling_power_kw"],
+                    capacity_kwh_per_k=house_c,
+                )
+                cold_total += cold
+                cooling_electric.append(cold / float(cooling["seer"]))
             house_temps.append(house_temp)
         daily_out.append(round(day_electric, 3))
     return HouseYearResult(
@@ -790,4 +855,6 @@ def _simulate_rows(
         store_temps,
         house_heat_loss_kw_per_k=float(house_h),
         annual_space_heat_kwh=round(space_heat, 3),
+        hourly_cooling_electric_kw=cooling_electric,
+        annual_cooling_kwh=round(cold_total, 3),
     )

@@ -186,18 +186,20 @@ def compute_baseload_kwh(
     consumers: list[dict],
     *,
     min_fraction: float | None = None,
+    cooling_kwh: float = 0.0,
 ) -> dict:
     """Grundlast = max(floor × Jahresverbrauch, Jahresverbrauch − Σ Verbraucher).
 
-    The result also carries ``allocation_diagnostics`` (over-allocation flags and
-    suggestions) — callers decide where to fail loud (see
+    ``cooling_kwh`` is the air conditioning's annual electricity (``optimizer.house_cooling``);
+    it counts as a consumer. The result also carries ``allocation_diagnostics``
+    (over-allocation flags and suggestions) — callers decide where to fail loud (see
     ``ensure_baseload_not_over_allocated``).
     """
     annual = float(annual_kwh)
     floor = BASELOAD_MIN_FRACTION if min_fraction is None else float(min_fraction)
     if floor < 0.0:
         raise ValueError(f"min_fraction must be >= 0, got {floor}")
-    consumer_sum = sum(consumer_annual_kwh(c) for c in consumers)
+    consumer_sum = sum(consumer_annual_kwh(c) for c in consumers) + float(cooling_kwh)
     raw_baseload = max(0.0, annual - consumer_sum)
     min_baseload = annual * floor
     baseload = max(raw_baseload, min_baseload) if annual > 0 else 0.0
@@ -232,8 +234,14 @@ def resolve_profile_baseload(profile: dict) -> dict:
     from house_config.heating_systems import baseload_reference_profile
 
     # Scenario heating variants: the baseload is fixed by the installed (reference) system.
+    from optimizer.house_cooling import cooling_annual_electric_kwh
+
     reference = baseload_reference_profile(profile)
-    result = compute_baseload_kwh(profile["annual_kwh"], reference["consumers"])
+    result = compute_baseload_kwh(
+        profile["annual_kwh"],
+        reference["consumers"],
+        cooling_kwh=cooling_annual_electric_kwh(reference),
+    )
     for key in _DERIVED_BASELOAD_KEYS:
         profile.setdefault(key, result[key])  # explicit values (fixtures) win
     return profile

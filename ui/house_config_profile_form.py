@@ -282,9 +282,11 @@ def _render_baseload_preview(
     resolved_for_preview: list,
     existing: dict,
     preview_id: str,
+    *,
+    cooling_kwh: float = 0.0,
 ) -> dict:
     try:
-        preview = preview_baseload(annual_kwh, resolved_for_preview)
+        preview = preview_baseload(annual_kwh, resolved_for_preview, cooling_kwh=cooling_kwh)
     except (ValueError, OSError) as exc:
         # e.g. a consumer CSV that does not span 12 whole months, or an unreadable file
         st.error(f"Grundlast nicht berechenbar: {exc}")
@@ -340,7 +342,12 @@ def _render_household_size(existing: dict, *, session_scope: str) -> dict:
 
 
 def _render_household_reference(
-    household: dict, annual_kwh: float, preview_consumers: list, heating: dict
+    household: dict,
+    annual_kwh: float,
+    preview_consumers: list,
+    heating: dict,
+    *,
+    cooling_kwh: float = 0.0,
 ) -> None:
     """SUSI P6: household electricity of the profile vs. the reference value per persons."""
     from house_config.household_reference import (
@@ -349,7 +356,9 @@ def _render_household_reference(
     )
 
     persons = household["persons"]
-    comparison = household_comparison(annual_kwh, persons, preview_consumers)
+    comparison = household_comparison(
+        annual_kwh, persons, preview_consumers, cooling_kwh=cooling_kwh
+    )
     deviation_pct = int(round(comparison["deviation"] * 100))
     reference = comparison["reference_kwh"]
     persons_text = f"{persons} Person" if persons == 1 else f"{persons} Personen"
@@ -460,13 +469,41 @@ def render_house_profile_tab() -> None:
         persons=household["persons"],
         annual_kwh=annual_kwh,
     )
+    from house_config.house_cooling import COOLING_ENABLED_KEY
+    from ui.house_config_profile_cooling import (
+        cooling_preview_kwh,
+        render_cooling_metric,
+        render_house_cooling_section,
+        with_cooling,
+    )
+    from ui.house_config_profile_house_thermal import thermal_preview_fields
+
+    cooling = render_house_cooling_section(
+        session_scope=ctx["session_scope"], existing=ctx["existing"], heating=heating
+    )
+    heating[COOLING_ENABLED_KEY] = cooling[COOLING_ENABLED_KEY]
     resolved, resolved_for_preview = _edit_and_sync_consumers(
         ctx["session_scope"], location, heating
     )
+    resolved = with_cooling(resolved, cooling)
+    resolved_for_preview = with_cooling(resolved_for_preview, cooling)
+    try:
+        cooling_kwh = cooling_preview_kwh(
+            with_cooling(st.session_state.get(_SESSION_CONSUMERS_KEY, []), cooling),
+            heating=heating,
+            cooling=cooling,
+            preview_carrier=lambda c: {**c, **thermal_preview_fields(heating)},
+        )
+    except (ValueError, RuntimeError, OSError) as exc:
+        st.error(f"Klimaanlage nicht berechenbar: {exc}")
+        st.stop()
+    render_cooling_metric(cooling_kwh)
     preview = _render_baseload_preview(
-        annual_kwh, resolved_for_preview, ctx["existing"], preview_id
+        annual_kwh, resolved_for_preview, ctx["existing"], preview_id, cooling_kwh=cooling_kwh
     )
-    _render_household_reference(household, annual_kwh, resolved_for_preview, heating)
+    _render_household_reference(
+        household, annual_kwh, resolved_for_preview, heating, cooling_kwh=cooling_kwh
+    )
     from ui.house_config_heating_change import render_reference_change_gate
     from ui.house_config_historical_csv import historical_csv_save_fields
 

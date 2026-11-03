@@ -183,7 +183,14 @@ def thermal_hourly_overlay(
     milp_flex_thermal_ids: set[str] | None = None,
     climate: ModeledClimateContext | None = None,
 ) -> list[float]:
-    """Summiert kW thermischer Verbraucher je Slot (annual + CSV thermal_rc)."""
+    """Summiert kW thermischer Verbraucher je Slot (annual + CSV thermal_rc + Klimaanlage).
+
+    The air conditioning (``optimizer.house_cooling``) is a fixed load: it is added even when
+    the heating consumer itself is MILP flex or its switch is off.
+    """
+    from optimizer.house_cooling import cooling_kw_for_slots
+
+    cooling = cooling_kw_for_slots(house_profile, slot_datetimes, climate=climate)
     thermal_annual = _house_thermal_consumers(house_profile)
     thermal_rc_csv = [
         consumer
@@ -192,7 +199,7 @@ def thermal_hourly_overlay(
     ]
     thermal = list(thermal_annual) + thermal_rc_csv
     if not thermal:
-        return [0.0] * len(slot_datetimes)
+        return [round(kw, 6) for kw in cooling]
     from data.consumption_profiles import modeled_consumer_kw_at_datetime
 
     skip = skip_consumer_ids or set()
@@ -204,10 +211,10 @@ def thermal_hourly_overlay(
         and str(consumer.get("id") or "") not in milp_skip
     ]
     if not active:
-        return [0.0] * len(slot_datetimes)
+        return [round(kw, 6) for kw in cooling]
     overlay: list[float] = []
-    for slot_dt in slot_datetimes:
-        kw = sum(
+    for slot_dt, cooling_kw in zip(slot_datetimes, cooling):
+        kw = cooling_kw + sum(
             modeled_consumer_kw_at_datetime(consumer, slot_dt, climate=climate)
             for consumer in active
         )
@@ -331,15 +338,18 @@ def meter_residual_baseload_kw(
     from house_config.heating_systems import baseload_reference_profile
 
     # Residual of the installed system: a scenario heating variant swaps only the heat load.
-    peeled = meter_residual_peel_consumers(
-        baseload_reference_profile(house_profile), milp_flex_ids
-    )
+    from optimizer.house_cooling import cooling_kw_for_slots
+
+    reference = baseload_reference_profile(house_profile)
+    peeled = meter_residual_peel_consumers(reference, milp_flex_ids)
+    # The air conditioning is re-added by the thermal overlay: the residual must not hold it.
+    cooling = cooling_kw_for_slots(reference, slot_datetimes, climate=climate)
     residual: list[float] = []
     clipped = 0
-    for slot_dt in slot_datetimes:
+    for slot_dt, cooling_kw in zip(slot_datetimes, cooling):
         total = float(csv_kw_at_datetime(csv_path, slot_dt) or 0.0)
         # modeled_consumer_kw_at_datetime returns the CSV series when use_profile_csv is set.
-        peel = sum(
+        peel = cooling_kw + sum(
             float(modeled_consumer_kw_at_datetime(consumer, slot_dt, climate=climate) or 0.0)
             for consumer in peeled
         )

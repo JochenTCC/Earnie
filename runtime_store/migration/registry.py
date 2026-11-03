@@ -20,6 +20,7 @@ from runtime_store.migration.steps.ha_sign import STEP as HA_SIGN
 from runtime_store.migration.steps.heat_source import STEP as HEAT_SOURCE
 from runtime_store.migration.steps.heating_power import STEP as HEATING_POWER
 from runtime_store.migration.steps.heating_systems import STEP as HEATING_SYSTEMS
+from runtime_store.migration.steps.house_cooling import STEP as HOUSE_COOLING
 from runtime_store.migration.steps.house_gains import STEP as HOUSE_GAINS
 from runtime_store.migration.steps.house_thermal import STEP as HOUSE_THERMAL
 from runtime_store.migration.steps.required_signal_activation import (
@@ -75,6 +76,7 @@ STEPS: tuple[MigrationStep, ...] = (
     HEATING_POWER,
     VAT_DEDUCTIBLE,
     HOUSE_GAINS,
+    HOUSE_COOLING,
     TARIFF_FORMAT,
 )
 

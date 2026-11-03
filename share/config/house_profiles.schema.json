@@ -651,6 +651,9 @@
           "exclusiveMinimum": 0,
           "maximum": 1
         },
+        "cooling": {
+          "$ref": "#/definitions/cooling"
+        },
         "heating_system_id": {
           "type": "string",
           "description": "thermal_annual: Verweis auf das Referenz-Heizsystem in components.json heating_systems[] (das eingebaute System; Live und Grundlast rechnen damit). Wärmequelle, Wärmespeicher, Heizstab, Nennleistung und Mindestlaufzeit stehen im Katalogeintrag, nicht am Verbraucher."
@@ -801,6 +804,44 @@
         }
       }
     },
+    "cooling": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type"
+      ],
+      "description": "Klimaanlage des Hauses als umgekehrte Wärmequelle am Haus-Wärme-Verbraucher (thermal_annual). Gerechnet wird sie nur mit cooling_enabled=true am Hausprofil; der Block bleibt bei false gespeichert.",
+      "properties": {
+        "type": {
+          "enum": [
+            "split",
+            "heat_pump"
+          ],
+          "description": "split = eigenes Klimagerät (Split oder Monoblock); heat_pump = die Wärmepumpe des Heizsystems kühlt (reversibel, nur mit Wärmequelle heat_pump)."
+        },
+        "seer": {
+          "default": 5.0,
+          "x-earnie-type-defaults": {
+            "split": 5.0,
+            "heat_pump": 4.0
+          },
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Saisonale Kälteleistungszahl (Kälte / Strom). Ohne Angabe: split 5,0, heat_pump 4,0 [Annahme: typische Geräte; Datenblatt-Wert eintragen]."
+        },
+        "cooling_power_kw": {
+          "default": 3.5,
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Kälteleistung in kW (thermisch, nicht Stromaufnahme)."
+        },
+        "setpoint_c": {
+          "default": 26.0,
+          "type": "number",
+          "description": "Raumtemperatur, die die Klimaanlage hält (°C)."
+        }
+      }
+    },
     "profile": {
       "type": "object",
       "required": [
@@ -823,6 +864,11 @@
           "default": false,
           "type": "boolean",
           "description": "Schalter „Heizung betrachten“. false: Abschnitt „Gebäude / Wärmebedarf“ und Heizungs-Verbraucher (thermal_annual) werden nicht geplant, der Heizungsverbrauch bleibt in der Grundlast; gespeicherte Werte bleiben erhalten. Fehlt der Schlüssel, gilt false — nur zulässig ohne thermal_annual-Verbraucher (sonst Migration dm5.house_thermal)."
+        },
+        "cooling_enabled": {
+          "default": false,
+          "type": "boolean",
+          "description": "Schalter „Kühlung betrachten“. true: die Klimaanlage (cooling am Haus-Wärme-Verbraucher) kühlt das Hausmodell, ihr Strom ist ein fester Verbraucher und wird von der Grundlast abgezogen. Unabhängig von heating_enabled. Fehlt der Schlüssel, gilt false."
         },
         "persons": {
           "default": 2,

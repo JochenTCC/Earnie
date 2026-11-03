@@ -1,4 +1,4 @@
-"""Optional Earnie-Points consumer keys: ``bidirectional`` (ev), ``appliance_kind``."""
+"""Optional Earnie-Points consumer key ``bidirectional`` (ev); ``appliance_kind`` is gone."""
 from __future__ import annotations
 
 import pytest
@@ -60,12 +60,11 @@ def test_bidirectional_roundtrip(value):
     assert _serialize_consumer(spec)["bidirectional"] is value
 
 
-@pytest.mark.parametrize("raw", [_generic(), _rc()])
-def test_appliance_kind_roundtrip(raw):
-    raw["appliance_kind"] = "Air_Conditioner"
-    spec = _normalize_consumer(raw, 0, "home")
-    assert spec["appliance_kind"] == "air_conditioner"
-    assert _serialize_consumer(spec)["appliance_kind"] == "air_conditioner"
+@pytest.mark.parametrize("raw", [_generic(), _rc(), _ev()])
+def test_appliance_kind_fails_loud_with_migration_hint(raw):
+    raw["appliance_kind"] = "air_conditioner"
+    with pytest.raises(ValueError, match="appliance_kind gibt es nicht mehr.*migrieren"):
+        _normalize_consumer(raw, 0, "home")
 
 
 @pytest.mark.parametrize("bad", ["yes", 1, None])
@@ -77,13 +76,3 @@ def test_bidirectional_must_be_bool(bad):
 def test_bidirectional_rejected_on_non_ev():
     with pytest.raises(ValueError, match="bidirectional ist nur für type=ev"):
         _normalize_consumer(_generic(bidirectional=True), 0, "home")
-
-
-def test_appliance_kind_unknown_value_rejected():
-    with pytest.raises(ValueError, match="appliance_kind 'dryer' unbekannt"):
-        _normalize_consumer(_generic(appliance_kind="dryer"), 0, "home")
-
-
-def test_appliance_kind_rejected_on_ev():
-    with pytest.raises(ValueError, match="appliance_kind ist nur für type=generic oder thermal_rc"):
-        _normalize_consumer(_ev(appliance_kind="air_conditioner"), 0, "home")

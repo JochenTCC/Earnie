@@ -368,8 +368,11 @@ def render_house_heating_section(
 
 def house_heating_payload(state: dict) -> dict:
     """Profile keys of the section for the house-profile save."""
+    from house_config.house_cooling import COOLING_ENABLED_KEY
+
     out = {
         HEATING_ENABLED_KEY: state[HEATING_ENABLED_KEY],
+        COOLING_ENABLED_KEY: bool(state.get(COOLING_ENABLED_KEY, False)),
         PERSONS_KEY: state[PERSONS_KEY],
         BASELOAD_GAIN_FACTOR_KEY: state[BASELOAD_GAIN_FACTOR_KEY],
     }

@@ -329,6 +329,10 @@ def build_modeled_hourly_kw_by_consumer(
             consumer,
             hours=hours,
         )
+    from optimizer.house_cooling import cooling_modeled_hourly_kw
+
+    # Air conditioning: own series ``<heating id>_cooling`` (never in the heating's kW).
+    result.update(cooling_modeled_hourly_kw(profile, hours=hours))
     baseload_kwh = profile_baseload_kwh(profile)
     baseload_kw = baseload_kwh / max(1, hours)
     result["baseload"] = [baseload_kw] * hours
@@ -405,6 +409,14 @@ def _by_consumer_aligned_to_total_csv(
                 )
                 for ts in timestamps
             ]
+    from house_config.house_cooling import cooling_consumer, cooling_id
+    from optimizer.house_cooling import cooling_kw_for_slots
+
+    carrier = cooling_consumer(profile)
+    if carrier is not None:
+        result[cooling_id(carrier)] = cooling_kw_for_slots(
+            profile, [_parse_profile_timestamp(ts) for ts in timestamps]
+        )
     result["baseload"] = _residual_baseload_from_aligned(
         csv_path,
         profile,

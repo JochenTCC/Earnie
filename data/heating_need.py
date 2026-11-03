@@ -317,6 +317,8 @@ def house_year_for_params(
     internal_gains: dict | None = None,
     solar_gains: dict | None = None,
     hourly_solar_gain_kw: pd.Series | None = None,
+    cooling: dict | None = None,
+    heating_booked: bool = True,
 ) -> "HouseYearResult":
     """House-RC year result for heating parameters (same defaults as ``daily_electric_kwh``).
 
@@ -353,6 +355,8 @@ def house_year_for_params(
         internal_gains=internal_gains,
         solar_gains=solar_gains,
         hourly_solar_gain_kw=hourly_solar_gain_kw,
+        cooling=cooling,
+        heating_booked=heating_booked,
     )
 
 

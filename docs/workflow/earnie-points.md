@@ -18,7 +18,7 @@ The Earnie-Points rate the size and complexity of one **plant** (one location). 
 | `pv` | sum of `components.json` → `pv_systems[].kwp` of the PV systems the **live scenario** selects (`pv_system_ids`) | 0 if the sum is 0; 1 up to 6 kWp; then +1 per started 4 kWp |
 | `storage` | sum of `batteries[].battery_capacity_kwh` of the house batteries the live scenario selects (`battery_ids`) **and all powerstations** (always part of the plant) | 0 if the sum is 0; 1 up to 5 kWh; then +1 per started 5 kWh |
 | `wallbox` | live house profile, consumer `type: ev` (one consumer = one wallbox) | 1-phase 1; 3-phase 2; `bidirectional: true` 3 |
-| `heat` | live house profile | 1 per `thermal_annual` consumer (heat pump); 1 per consumer with `appliance_kind: air_conditioner` |
+| `heat` | live house profile | 1 per `thermal_annual` consumer (heat pump); 1 for the air conditioning (`cooling` with `cooling_enabled`, see below) |
 | `other` | live house profile | 1 per flexible large consumer: `thermal_rc`, or `generic` with `earnie_role: flex`, with `nominal_power_kw >= 2.5` and not already counted in `heat` |
 | `total` | sum of the parts above | |
 
@@ -41,7 +41,7 @@ Boundaries: 6.0 kWp = 1, 6.1 kWp = 2, 10.0 kWp = 2, 10.1 kWp = 3; 5.0 kWh = 1, 5
 - **Bidirectional** is the optional bool `bidirectional` on `ev` consumers (absent = false). A bidirectional wallbox scores 3 regardless of phases.
 - **Number of EVs is not rated**; only wallboxes (EV consumers) are.
 - **Manual consumers are never counted.** For `generic` consumers only the role `flex` is eligible (`manual` and `known` are not controlled by Earnie). `thermal_annual`, `thermal_rc` and `ev` consumers are always controlled by Earnie.
-- **Air conditioner:** optional `appliance_kind: "air_conditioner"` on `generic` or `thermal_rc` consumers. It counts 1 point in `heat` regardless of power; for `generic` the role must be `flex`.
+- **Air conditioner:** the `cooling` block of the house's `thermal_annual` consumer, counted only with the profile switch `cooling_enabled` („Kühlung betrachten“). `type: split` (a device of its own) counts 1 point in `heat` regardless of power; `type: heat_pump` (the reversible heat pump) counts 1 point only when the heating consumer is not counted (switch „Heizung betrachten“ off), so one device never counts twice. Until data model 5 this was `appliance_kind: "air_conditioner"` on a `generic` / `thermal_rc` consumer (removed by `dm5.house_cooling`).
 - **No double counting:** each consumer contributes to exactly one part (`wallbox`, `heat` or `other`). Powerstation-attached consumers are ordinary consumers of the profile and are counted once there.
 - **One plant = one location = one ping.** No cross-location sums.
 - Several wallboxes behind one `ev` consumer, or an EV without its own wallbox (car API only), count as one wallbox as long as there is no wallbox entity (see backlog "Enable multiple EV / Wallboxes").

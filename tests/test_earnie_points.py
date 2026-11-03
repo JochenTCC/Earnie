@@ -95,19 +95,29 @@ def test_each_wallbox_counts_not_each_car():
     assert _points(consumers=[_ev(phases=3), {**_ev(phases=1), "id": "ev2"}])["wallbox"] == 3
 
 
+def _cooled(cooling_type: str, *, heating_on: bool) -> dict:
+    carrier = {**_heat_pump(), "cooling": {"type": cooling_type}}
+    key = "consumers" if heating_on else "inactive_consumers"
+    return {"cooling_enabled": True, "consumers": [], "inactive_consumers": [], key: [carrier]}
+
+
 def test_heat_pump_and_air_conditioner():
     assert _points(consumers=[_heat_pump()])["heat"] == 1
-    ac = _generic(nominal=1.2, appliance_kind="air_conditioner")
-    assert _points(consumers=[ac])["heat"] == 1
-    assert _points(consumers=[_rc(appliance_kind="air_conditioner")])["heat"] == 1
-    assert _points(consumers=[_heat_pump(), ac])["heat"] == 2
+    split = compute_earnie_points(_components(), _cooled("split", heating_on=True))
+    assert split["heat"] == 2
+    # The reversible heat pump is one device: counted once, with or without heating.
+    reversible = compute_earnie_points(_components(), _cooled("heat_pump", heating_on=True))
+    assert reversible["heat"] == 1
+    cooling_only = compute_earnie_points(_components(), _cooled("heat_pump", heating_on=False))
+    assert cooling_only["heat"] == 1
+    switched_off = {**_cooled("split", heating_on=True), "cooling_enabled": False}
+    assert compute_earnie_points(_components(), switched_off)["heat"] == 1
 
 
 def test_manual_and_known_consumers_never_counted():
     for role in ("manual", "known"):
         big = _generic(role=role, nominal=7.0)
-        ac = _generic(role=role, nominal=2.0, appliance_kind="air_conditioner")
-        result = _points(consumers=[big, ac])
+        result = _points(consumers=[big])
         assert result["other"] == 0
         assert result["heat"] == 0
         assert result["total"] == 0
@@ -123,13 +133,6 @@ def test_other_flex_consumers_from_2_5_kw():
     assert _points(consumers=[_generic(nominal=2.5)])["other"] == 1
     assert _points(consumers=[_rc(nominal=2.4)])["other"] == 0
     assert _points(consumers=[_rc(nominal=2.5)])["other"] == 1
-
-
-def test_air_conditioner_not_double_counted_as_other():
-    ac = _generic(nominal=5.0, appliance_kind="air_conditioner")
-    result = _points(consumers=[ac, _rc(nominal=5.0, appliance_kind="air_conditioner")])
-    assert result["heat"] == 2
-    assert result["other"] == 0
 
 
 def test_spec_examples():

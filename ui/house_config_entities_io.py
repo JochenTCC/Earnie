@@ -593,10 +593,14 @@ def delete_scenario(scenario_id: str) -> None:
     doc["scenarios"] = remaining
     _io.save_backtesting_scenarios(doc)
 
-def preview_baseload(annual_kwh: float, consumers: list[dict]) -> dict:
-    return compute_baseload_kwh(annual_kwh, consumers)
+def preview_baseload(
+    annual_kwh: float, consumers: list[dict], *, cooling_kwh: float = 0.0
+) -> dict:
+    return compute_baseload_kwh(annual_kwh, consumers, cooling_kwh=cooling_kwh)
 
-def compute_baseload_kwh(annual_kwh: float, consumers: list[dict]) -> dict:
+def compute_baseload_kwh(
+    annual_kwh: float, consumers: list[dict], *, cooling_kwh: float = 0.0
+) -> dict:
     from house_config.baseload import compute_baseload_kwh as _compute
 
-    return _compute(annual_kwh, consumers)
+    return _compute(annual_kwh, consumers, cooling_kwh=cooling_kwh)

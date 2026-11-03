@@ -1,8 +1,7 @@
 """AppTest für die Earnie-Points-Felder im Hausprofil-Verbraucherformular.
 
-``bidirectional`` (nur ev) und ``appliance_kind`` (nur generic / thermal_rc) sind optionale
-Felder; abgewählt / ohne Angabe darf der Schlüssel nicht (appliance_kind) bzw. als false
-(bidirectional) im Ergebnis stehen.
+``bidirectional`` (nur ev) ist optional und steht abgewählt als false im Ergebnis. Die frühere
+„Geräteart“ (``appliance_kind``) gibt es nicht mehr: die Klimaanlage steht im Abschnitt „Kühlung“.
 """
 from __future__ import annotations
 
@@ -54,15 +53,10 @@ def test_ev_shows_bidirectional_checkbox_and_returns_bool():
     assert at.session_state["points_result"] == {"bidirectional": False}
 
 
-def test_generic_appliance_kind_select_roundtrip():
+def test_generic_has_no_appliance_kind_field():
     at = AppTest.from_function(_generic_app).run(timeout=_TIMEOUT_S)
     assert not at.exception
-    [select] = at.selectbox
-    assert select.label == "Geräteart"
-    assert at.session_state["points_result"] == {}
-    select.select("air_conditioner").run(timeout=_TIMEOUT_S)
-    assert at.session_state["points_result"] == {"appliance_kind": "air_conditioner"}
-    at.selectbox[0].select("").run(timeout=_TIMEOUT_S)
+    assert not at.selectbox
     assert at.session_state["points_result"] == {}
 
 

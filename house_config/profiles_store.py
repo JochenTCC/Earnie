@@ -9,6 +9,11 @@ from house_config.baseload import normalize_baseload_distribution
 from house_config.consumption_csv import load_hourly_profile_csv
 from house_config.geo_timezone import timezone_for_land
 from house_config.profile_schema_defaults import profile_default
+from house_config.house_cooling import (
+    COOLING_ENABLED_KEY,
+    COOLING_KEY,
+    normalize_cooling_enabled,
+)
 from house_config.house_gains import (
     BASELOAD_GAIN_FACTOR_KEY,
     INTERNAL_GAINS_KEY,
@@ -237,6 +242,7 @@ def _normalize_profile(raw: dict, index: int, *, heating_systems: dict | None) -
             f"{where}: heating_enabled ist true, aber die Gebäude-Wärmedaten (thermal) "
             "fehlen. Im Hauskonfigurator den Abschnitt „Gebäude / Wärmebedarf“ ausfüllen."
         )
+    cooling_on = normalize_cooling_enabled(raw, label=where)
     persons = normalize_persons(raw.get(PERSONS_KEY), label=where)
     vat_deductible = normalize_vat_deductible(raw.get(VAT_DEDUCTIBLE_KEY), label=where)
     baseload_gain = normalize_baseload_gain_factor(
@@ -266,7 +272,16 @@ def _normalize_profile(raw: dict, index: int, *, heating_systems: dict | None) -
     inactive = [
         c for c in normalized_consumers if not heating_on and c["type"] == "thermal_annual"
     ]
-    _attach_internal_gains(consumers, annual_kwh=fields["annual_kwh"], factor=baseload_gain)
+    _attach_internal_gains(
+        consumers, inactive, annual_kwh=fields["annual_kwh"], factor=baseload_gain
+    )
+    if cooling_on and not any(
+        c["type"] == "thermal_annual" and c.get(COOLING_KEY) for c in normalized_consumers
+    ):
+        raise ValueError(
+            f"{where}: cooling_enabled ist true, aber der Haus-Wärme-Verbraucher (thermal_annual) "
+            "hat keine Klimaanlage (cooling). Im Hauskonfigurator unter „Kühlung“ eintragen."
+        )
     # Grundlast (baseload_kwh / consumer_kwh / baseload_min_kwh) is NOT derived here:
     # it needs Open-Meteo weather and thus a built Config. Resolve at the point of use
     # via house_config.baseload.resolve_profile_baseload / profile_baseload_kwh.
@@ -292,6 +307,7 @@ def _normalize_profile(raw: dict, index: int, *, heating_systems: dict | None) -
         ),
         "consumers": consumers,
         HEATING_ENABLED_KEY: heating_on,
+        COOLING_ENABLED_KEY: cooling_on,
         PERSONS_KEY: persons,
         VAT_DEDUCTIBLE_KEY: vat_deductible,
         BASELOAD_GAIN_FACTOR_KEY: baseload_gain,
@@ -306,15 +322,18 @@ def _normalize_profile(raw: dict, index: int, *, heating_systems: dict | None) -
     return spec
 
 
-def _attach_internal_gains(consumers: list[dict], *, annual_kwh: float, factor: float) -> None:
-    """Internal-gain inputs of the year model on the planned heating consumer (SUSI P2).
+def _attach_internal_gains(
+    consumers: list[dict], inactive: list[dict], *, annual_kwh: float, factor: float
+) -> None:
+    """Internal-gain inputs of the year model on the heating consumer (SUSI P2).
 
     The heating consumer's ``thermal`` gets the Jahresverbrauch, the Grundlast factor and the
     other planned consumers: the year model derives the Grundlast (fixed point with its own
-    electric draw) and the hourly internal gains from them.
+    electric draw) and the hourly internal gains from them. A parked heating consumer (switch
+    „Heizung betrachten“ off) gets them too: the cooling run reads the same block.
     """
     others = [c for c in consumers if c["type"] != "thermal_annual"]
-    for consumer in consumers:
+    for consumer in [*consumers, *inactive]:
         if consumer["type"] == "thermal_annual" and consumer.get("thermal"):
             consumer["thermal"][INTERNAL_GAINS_KEY] = internal_gain_descriptor(
                 annual_kwh=annual_kwh, baseload_factor=factor, consumers=others
@@ -555,6 +574,7 @@ def _serialize_profile(profile: dict) -> dict:
             for c in [*profile["consumers"], *(profile.get(INACTIVE_CONSUMERS_KEY) or [])]
         ],
         HEATING_ENABLED_KEY: bool(profile[HEATING_ENABLED_KEY]),
+        COOLING_ENABLED_KEY: bool(profile.get(COOLING_ENABLED_KEY, False)),
         PERSONS_KEY: int(profile[PERSONS_KEY]),
         VAT_DEDUCTIBLE_KEY: bool(profile[VAT_DEDUCTIBLE_KEY]),
         BASELOAD_GAIN_FACTOR_KEY: normalize_baseload_gain_factor(

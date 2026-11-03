@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import math
 
-from house_config.consumer_points_fields import APPLIANCE_KIND_AIR_CONDITIONER
 from house_config.earnie_role import EARNIE_ROLE_FLEX, resolve_earnie_role
 from settings.ev_power import ev_nominal_power_conversion
 
@@ -92,10 +91,6 @@ def _is_controlled(consumer: dict) -> bool:
     return True
 
 
-def _is_air_conditioner(consumer: dict) -> bool:
-    return consumer.get("appliance_kind") == APPLIANCE_KIND_AIR_CONDITIONER
-
-
 def _is_large_flex_consumer(consumer: dict) -> bool:
     if consumer.get("type") not in ("generic", "thermal_rc"):
         return False
@@ -112,8 +107,6 @@ def _consumer_parts(consumer: dict) -> dict[str, int]:
         return {"heat": HEAT_POINTS_PER_DEVICE}
     if not _is_controlled(consumer):
         return {}
-    if _is_air_conditioner(consumer):
-        return {"heat": HEAT_POINTS_PER_DEVICE}
     if _is_large_flex_consumer(consumer):
         return {"other": OTHER_POINTS_PER_DEVICE}
     return {}
@@ -129,7 +122,22 @@ def _consumer_points(profile: dict) -> dict[str, int]:
             raise ValueError("earnie_points: Verbraucher muss ein Objekt sein.")
         for part, points in _consumer_parts(consumer).items():
             parts[part] += points
+    parts["heat"] += _cooling_points(profile)
     return parts
+
+
+def _cooling_points(profile: dict) -> int:
+    """Air conditioning („Kühlung betrachten“): a split device counts 1 heat point; a reversible
+    heat pump only when its heating is not counted already (switch „Heizung betrachten“ off)."""
+    from house_config.house_cooling import COOLING_KEY, COOLING_TYPE_SPLIT, cooling_consumer
+
+    carrier = cooling_consumer(profile)
+    if carrier is None:
+        return 0
+    if carrier[COOLING_KEY]["type"] == COOLING_TYPE_SPLIT:
+        return HEAT_POINTS_PER_DEVICE
+    heating_counted = any(c is carrier for c in profile.get("consumers") or [])
+    return 0 if heating_counted else HEAT_POINTS_PER_DEVICE
 
 
 def compute_earnie_points(components: dict, profile: dict) -> dict[str, int]:

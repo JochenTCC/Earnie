@@ -18,6 +18,7 @@ from house_config.generic_schedule import (
     generic_annual_kwh,
     normalize_generic_schedule,
 )
+from house_config.house_cooling import COOLING_KEY, serialize_cooling
 from house_config.house_gains import (
     INTERNAL_GAIN_FACTOR_KEY,
     normalize_consumer_gain_factor,
@@ -383,6 +384,11 @@ def _normalize_consumer(
         )
     elif consumer_type == "thermal_rc":
         _normalize_thermal_rc_consumer(raw, spec, profile_id=profile_id, index=index)
+    if consumer_type != "thermal_annual" and COOLING_KEY in raw:
+        raise ValueError(
+            f"profiles '{profile_id}' consumers '{consumer_id}': cooling gehört an den "
+            "Haus-Wärme-Verbraucher (type thermal_annual)."
+        )
     normalize_points_fields(raw, spec, profile_id=profile_id, index=index)
     _copy_ehal_entity_fields(raw, spec)
     return spec
@@ -448,6 +454,8 @@ def _serialize_thermal_annual_fields(consumer: dict, out: dict) -> None:
             out[key] = consumer[key]
     if consumer.get("thermal_flex_window"):
         out["thermal_flex_window"] = dict(consumer["thermal_flex_window"])
+    if consumer.get(COOLING_KEY):
+        out[COOLING_KEY] = serialize_cooling(consumer[COOLING_KEY])
     _copy_loxone_io_fields(consumer, out)
 
 

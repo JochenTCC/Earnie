@@ -153,7 +153,8 @@
       "persons": 2,
       "heating_enabled": true,
       "vat_deductible": false,
-      "baseload_internal_gain_factor": 0.8
+      "baseload_internal_gain_factor": 0.8,
+      "cooling_enabled": false
     }
   ],
   "plant": {

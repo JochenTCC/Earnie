@@ -217,6 +217,11 @@ class ModeledClimateContext:
         default_factory=dict,
         repr=False,
     )
+    # (consumer_id, heating_system_id, heating switch, cooling block, year).
+    _cooling_year_profiles: dict[tuple, list[float]] = field(
+        default_factory=dict,
+        repr=False,
+    )
 
     @property
     def pv_kwp(self) -> float:
@@ -404,6 +409,35 @@ class ModeledClimateContext:
     def thermal_consumer_kw_at(self, consumer: dict, slot_dt: datetime) -> float:
         profile = self._thermal_hourly_profile_for_year(consumer, slot_dt.year)
         return float(profile[_slot_hour_index_in_year(slot_dt)])
+
+    def cooling_kw_at(self, consumer: dict, profile: dict, slot_dt: datetime) -> float:
+        """Air-conditioning kW at ``slot_dt`` with the weather of the slot's year.
+
+        H is the reference-year calibration (as for the heating, ``_reference_house_heat_loss``).
+        """
+        from optimizer.house_cooling import cooling_year_hourly_kw
+
+        year = slot_dt.year
+        key = (
+            str(consumer.get("id") or ""),
+            str(consumer.get("heating_system_id") or ""),
+            bool(profile.get("heating_enabled")),
+            tuple(sorted((consumer.get("cooling") or {}).items())),
+            year,
+        )
+        profile_kw = self._cooling_year_profiles.get(key)
+        if profile_kw is None:
+            thermal = consumer["thermal"]
+            profile_kw = cooling_year_hourly_kw(
+                consumer,
+                profile,
+                bundle=self._bundle_for_calendar_year(year),
+                collector=collector_surface_from_thermal(thermal, profile),
+                house_heat_loss_kw_per_k=self._reference_house_heat_loss(consumer, thermal),
+            )
+            self._cooling_year_profiles[key] = profile_kw
+        index = _slot_hour_index_in_year(slot_dt)
+        return float(profile_kw[index]) if index < len(profile_kw) else 0.0
 
     def _thermal_rc_archive_year(self, year: int) -> int:
         from data.open_meteo_solar_archive import archive_latest_complete_date

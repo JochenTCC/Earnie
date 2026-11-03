@@ -9,6 +9,7 @@ from house_config.heating_systems import (
     reject_measured_rod_fields,
     resolve_heating_system,
 )
+from house_config.house_cooling import COOLING_KEY, normalize_cooling
 from house_config.house_thermal import (
     consumer_thermal_from_house,
     reject_consumer_building_fields,
@@ -109,4 +110,8 @@ def normalize_thermal_annual_consumer(
         spec["max_on_quarterhours"] = max(4, int(raw.get("max_on_quarterhours", 16) or 16))
     if "max_pulses_per_day" in raw:
         spec["max_pulses_per_day"] = max(1, int(raw.get("max_pulses_per_day", 4) or 4))
+    if raw.get(COOLING_KEY) is not None:
+        spec[COOLING_KEY] = normalize_cooling(
+            raw[COOLING_KEY], label=_label(raw), heat_source=spec["thermal"].get("heat_source")
+        )
     copy_loxone_binding(raw, spec)

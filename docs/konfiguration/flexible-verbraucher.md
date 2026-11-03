@@ -14,7 +14,6 @@ Die Optimierung legt fest, **wann** die Verbraucher laufen. Ob die Anlage techni
 | `chart_color_index` | Farbindex 0–7 für Chart 1 und Sankey (siehe [Charts](../ui/charts.md)) |
 | `optimizer_enabled` | `false` = von der Optimierung ausgeschlossen |
 | `bidirectional` | Nur Typ `ev`, optional (`true`/`false`, fehlt = `false`): Die Wallbox kann entladen (V2G). Fließt mit 3 Punkten in die [Earnie-Points](../einrichtung/betrieb.md#earnie-points) ein. Im Hauskonfigurator: **Wallbox bidirektional (V2G)**. |
-| `appliance_kind` | Nur Typ `generic` und `thermal_rc`, optional: `air_conditioner` kennzeichnet eine Klimaanlage. Sie zählt in den [Earnie-Points](../einrichtung/betrieb.md#earnie-points) wie eine Wärmepumpe. Im Hauskonfigurator: **Geräteart**. |
 
 ## Abwesenheits- / Urlaubsmodus (Live)
 
@@ -131,6 +130,37 @@ Gewinn je Stunde = Σ Fensterfläche × g-Wert × Abminderung × Einstrahlung au
 Die Live-Planung rechnet mit denselben Gewinnen. Die Fenster-Einstrahlung kommt aus der Open-Meteo-Prognose; fällt sie aus, nimmt Earnie die Werte des Vorjahres und schreibt eine Warnung ins Log. Die Grundlast kommt aus der Verbrauchsprognose, die Geräte aus ihren Zeitplänen. Bei einer Heizsystem-Variante im Szenario bleibt die Grundlast die des eingebauten Systems.
 
 Solare Gewinne brauchen stündliche Wetterdaten. Ohne Open-Meteo-Archiv, also nur mit dem Offline-Klima aus Tageswerten, bricht die Berechnung mit einer Meldung ab.
+
+<a id="kuehlung"></a>
+
+### Kühlung (Klimaanlage)
+
+Eine Klimaanlage ist kein eigener Verbraucher, sondern die umgekehrte Wärmequelle des Hausmodells. Sie steht als Block `cooling` am Verbraucher „Haus Wärme“ (`thermal_annual`). Eingeschaltet wird sie mit dem Schalter `cooling_enabled` am Hausprofil, im Hauskonfigurator **Kühlung betrachten** im Abschnitt **Kühlung**.
+
+| Feld | Bedeutung | Standard |
+| ---- | --------- | -------- |
+| `cooling_enabled` (Hausprofil) | Kühlung im Hausmodell rechnen | aus |
+| `cooling.type` | `split`: eigenes Klimagerät (Split oder Monoblock). `heat_pump`: die Wärmepumpe des Heizsystems kühlt (reversibel, nur mit Wärmequelle Wärmepumpe) | Pflicht; im Hauskonfigurator Klimagerät |
+| `cooling.seer` | Saisonale Kälteleistungszahl: Kälte je kWh Strom (Datenblatt) | Klimagerät 5,0, Wärmepumpe 4,0 |
+| `cooling.cooling_power_kw` | Kälteleistung in kW (thermisch, nicht die Stromaufnahme) | 3,5 |
+| `cooling.setpoint_c` | Ab dieser Raumtemperatur kühlt das Gerät (°C) | 26 |
+
+```json
+"cooling_enabled": true,
+"consumers": [{"id": "haus_waerme", "type": "thermal_annual", "heating_system_id": "heating_haus",
+               "cooling": {"type": "split", "seer": 5.0, "cooling_power_kw": 3.5, "setpoint_c": 26}}]
+```
+
+So rechnet Earnie:
+
+- Das Hausmodell läuft stündlich mit denselben solaren und internen Gewinnen wie die Heizung. Liegt die Raumtemperatur über dem Sollwert, nimmt die Klimaanlage die überschüssige Wärme heraus, höchstens mit ihrer Kälteleistung. Ein zu kleines Gerät lässt das Haus also wärmer. Strom je Stunde = Kälte / SEER.
+- Vorher wird gelüftet: Das Haus kühlt über Fenster und Verschattung bis Solltemperatur + 3 K ab, solange es draußen kühler ist. Die Klimaanlage läuft deshalb vor allem an heißen Tagen, wenn die Außenluft selbst über dem Kühl-Sollwert liegt. Ohne solare Gewinne kühlt sie in Mitteleuropa kaum.
+- Der Strom der Klimaanlage ist ein **fester Verbraucher**. Earnie zieht ihn von der Grundlast ab, rechnet ihn stündlich in die Verbrauchsprognose (Live und Szenarien-Explorer) und zeigt ihn im Hauskonfigurator als „Klimaanlage im Hausmodell: … kWh/a Strom“. Beim Richtwert Haushaltsstrom zählt er wie die Heizung nicht mit.
+- Earnie plant die Klimaanlage noch nicht als flexiblen Verbraucher und schaltet sie im Live-Betrieb nicht. Der Kühlstrom ist nie Teil des Wärmepumpen-Tagesziels.
+- „Kühlung betrachten“ ist unabhängig von „Heizung betrachten“. Ist die Heizung aus, rechnet das Hausmodell die Heizung trotzdem mit, damit die Raumtemperatur stimmt; ihr Strom bleibt dann aber in der Grundlast. Die Kühlung braucht das Hausmodell, also einmal ausgefüllte Gebäudedaten und einen Verbraucher „Haus Wärme“.
+- In den [Earnie-Points](../einrichtung/betrieb.md#earnie-points) zählt ein Klimagerät wie eine Wärmepumpe (1 Punkt). Eine reversible Wärmepumpe zählt nur einmal.
+
+Bis Datenmodell 5 gab es das Verbraucherfeld `appliance_kind: "air_conditioner"` (Hauskonfigurator **Geräteart**). Die Migration `dm5.house_cooling` entfernt es (siehe [Betrieb](../einrichtung/betrieb.md)).
 
 ## Tagesenergie-Ziel
 
