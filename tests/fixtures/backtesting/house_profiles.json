@@ -34,7 +34,8 @@
                 "absent_mode_enabled": false
             },
             "persons": 2,
-            "heating_enabled": true
+            "heating_enabled": true,
+            "vat_deductible": false
         }
     ],
     "earnie_data_model": 5,

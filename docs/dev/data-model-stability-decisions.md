@@ -126,4 +126,4 @@ Status: **decided (2026-10-25).**
 
 - *VAT model* (2.+1): flag name `vat_deductible`, already in the profile since 2.8, link to this memo.
 - *Edibert integration* sub-item *Versioning + Netznutzung split*: the rule above (D3b), with the Edibert text.
-- SUSI P6 / migration step: add `vat_deductible: false`.
+- SUSI P6 / migration step: add `vat_deductible: false`. **Done 2026-11-03:** step `dm5.vat_deductible` (data model 5, after `dm5.heating_power`); loader `house_config.profiles_store.normalize_vat_deductible` (bool, missing = schema default `false`), serializer and house-configurator save pass it through; no UI field.

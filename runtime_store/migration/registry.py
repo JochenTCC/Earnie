@@ -40,6 +40,7 @@ from runtime_store.migration.steps.se_conf_defaults import STEP as SE_CONF_DEFAU
 from runtime_store.migration.steps.tariff_format import STEP as TARIFF_FORMAT
 from runtime_store.migration.steps.topology import STEP as TOPOLOGY
 from runtime_store.migration.steps.v3_to_v4 import STEP as V3_TO_V4
+from runtime_store.migration.steps.vat_deductible import STEP as VAT_DEDUCTIBLE
 from runtime_store.migration.types import MigrationStep
 
 # Inventory order (Earnie-env-home chronology + code dependencies). Data model 5 comes after
@@ -71,6 +72,7 @@ STEPS: tuple[MigrationStep, ...] = (
     HEATING_SYSTEMS,
     HOUSE_THERMAL,
     HEATING_POWER,
+    VAT_DEDUCTIBLE,
     TARIFF_FORMAT,
 )
 

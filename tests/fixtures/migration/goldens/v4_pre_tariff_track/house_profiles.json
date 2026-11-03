@@ -300,7 +300,8 @@
                 "absent_mode_enabled": true
             },
             "persons": 2,
-            "heating_enabled": true
+            "heating_enabled": true,
+            "vat_deductible": false
         },
         {
             "id": "profile_b",
@@ -602,7 +603,8 @@
                 "absent_mode_enabled": true
             },
             "persons": 2,
-            "heating_enabled": true
+            "heating_enabled": true,
+            "vat_deductible": false
         },
         {
             "id": "profile_c",
@@ -904,7 +906,8 @@
                 "absent_mode_enabled": true
             },
             "persons": 2,
-            "heating_enabled": true
+            "heating_enabled": true,
+            "vat_deductible": false
         }
     ],
     "plant": {

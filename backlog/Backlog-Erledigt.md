@@ -2,6 +2,16 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### SUSI P6 — household consumption reference values (2026-11-03)
+
+- [x] **SUSI P6 — Household consumption reference values** `[feat]` *(done 2026-11-03; live check by the maintainer open)*: „Personen im Haushalt“ moved from the section „Gebäude / Wärmebedarf“ next to `annual_kwh` (shown with „Heizung betrachten“ off too, same widget key and profile field `persons`). Below it the household electricity (`annual_kwh` minus heating `thermal_annual`, EV and pool / RC store `thermal_rc`; `generic` appliances stay in; the heating rod has no annual consumption) is compared with the SUSI reference value (1,700 / 3,400 / 4,200 / 4,700 kWh/a for 1 / 2 / 3 / 4+ persons); warning above ±40 %, never blocks saving. With the heating switch off nothing is subtracted for heating and a caption says so.
+  - **Decision (maintainer, 2026-11-03):** the pool (`thermal_rc`) is subtracted as well, not only WP and EV.
+  - **Code:** `house_config/household_reference.py`, `ui/house_config_profile_form.py` (`_render_household_size`, `_render_household_reference`), `render_house_heating_section(..., persons=...)`.
+  - **D3a VAT flag:** `vat_deductible` (bool, default `false`, top level) in `house_profiles.schema.json` ("not yet evaluated"); migration step `dm5.vat_deductible` (data model 5, after `dm5.heating_power`; separate step because `dm5.house_thermal`, which did the `persons` hoist, already ran on dogfooding packs); loader `normalize_vat_deductible` (non-bool fails loud), serializer and house-configurator save pass it through; no UI field, no reader. Example pack, backtesting fixture, POC pack and migration goldens carry `vat_deductible: false`. Release-notes fragment `.github/release-notes/drafts/v2.8.0-susi-p6.draft.md`.
+  - **Docs:** `docs/konfiguration/flexible-verbraucher.md` § Personen und Richtwert Haushaltsstrom, `docs/einrichtung/betrieb.md` (migration step), `docs/dev/data-model-stability-decisions.md` § D3.
+  - **Tests:** `tests/test_household_reference.py` (reference values, subtracted types, ±40 % bound, VAT step, loader round trip / non-bool), AppTest `tests/apptest/test_household_reference_apptest.py` (reference line and warning, persons with heating off, save keeps `vat_deductible`).
+  - **Not done:** the epic draft's optional hint next to `suggested_annual_kwh` in `house_config/baseload.py`; the private site pack (Earnie-env-home) is not migrated here, needs the maintainer's OK.
+
 ### Hauskonfigurator — heat demand in kWh_th (2026-11-03)
 
 - [x] **Heat demand in kWh_th in the Hauskonfigurator** `[feat]` *(decided 2026-11-03; done 2026-11-03; live check by the maintainer open)*: design [heating-system-variants.md](../docs/dev/heating-system-variants.md) § Calculation rule. The „Haus Wärme“ form shows „Geschätzter Wärmebedarf (kWh_th/a)“ as the main figure, below it „Strombedarf / Brennstoffbedarf mit diesem Heizsystem“ (`_render_wp_annual_metric`).

@@ -117,6 +117,7 @@ HOUSE_THERMAL_FIELDS = [
           boundaries=(0.0, 400.0)),
     Field("selectbox", "house_thermal_class", "thermal.building_class", 2),
     Field("selectbox", "house_thermal_mass", "thermal.building_mass", "schwer"),
+    # Rendered next to the Jahresverbrauch since SUSI P6, stored at profile level as before.
     Field("number_input", "house_persons", "persons", 4, boundaries=(1, 2)),
     Field("number_input", "house_thermal_target_temp", "thermal.target_temp_c", 22.5),
     Field("number_input", "house_thermal_tolerance", "thermal.house_tolerance_c", 1.5),

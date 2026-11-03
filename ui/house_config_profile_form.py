@@ -316,7 +316,74 @@ def _render_baseload_preview(
     return preview
 
 
-def _render_profile_identity(ctx: dict) -> tuple[str, str, float, dict, bool]:
+def _render_household_size(existing: dict, *, session_scope: str) -> dict:
+    """Personen im Haushalt next to the Jahresverbrauch; the reference line follows later.
+
+    Returns ``persons`` and ``slot``, a container filled by ``_render_household_reference``
+    once the consumers (and their annual kWh) are known.
+    """
+    from house_config.house_thermal import PERSONS_KEY
+    from house_config.profile_schema_defaults import profile_default
+
+    persons = int(
+        labeled_number_input(
+            "Personen im Haushalt",
+            min_value=1,
+            value=int(existing.get(PERSONS_KEY, profile_default(PERSONS_KEY))),
+            help=(
+                "Für den Richtwert Haushaltsstrom und den Warmwasserbedarf der Heizung."
+            ),
+            key=_scoped_key(session_scope, "house_persons"),
+        )
+    )
+    return {"persons": persons, "slot": st.container()}
+
+
+def _render_household_reference(
+    household: dict, annual_kwh: float, preview_consumers: list, heating: dict
+) -> None:
+    """SUSI P6: household electricity of the profile vs. the reference value per persons."""
+    from house_config.household_reference import (
+        DEVIATION_WARN_FRACTION,
+        household_comparison,
+    )
+
+    persons = household["persons"]
+    comparison = household_comparison(annual_kwh, persons, preview_consumers)
+    deviation_pct = int(round(comparison["deviation"] * 100))
+    reference = comparison["reference_kwh"]
+    persons_text = f"{persons} Person" if persons == 1 else f"{persons} Personen"
+    with household["slot"]:
+        if annual_kwh <= 0.0:
+            st.caption(
+                f"Richtwert Haushaltsstrom (SUSI, {persons_text}): {reference:.0f} kWh/a."
+            )
+            return
+        excluded = ""
+        if comparison["excluded_labels"]:
+            excluded = (
+                f" ohne {', '.join(comparison['excluded_labels'])} "
+                f"({comparison['excluded_kwh']:.0f} kWh/a)"
+            )
+        st.caption(
+            f"Haushaltsstrom laut Profil: {comparison['household_kwh']:.0f} kWh/a "
+            f"(Jahresverbrauch{excluded}) · Richtwert (SUSI, {persons_text}): "
+            f"{reference:.0f} kWh/a · Abweichung {deviation_pct:+d} %"
+        )
+        if not heating["heating_enabled"]:
+            st.caption(
+                "„Heizung betrachten“ ist aus: ein Heizungsstrom ist im Haushaltsstrom "
+                "enthalten."
+            )
+        if comparison["warn"]:
+            st.warning(
+                f"Der Haushaltsstrom weicht um {deviation_pct:+d} % vom Richtwert "
+                f"für {persons_text} ab (mehr als ±{DEVIATION_WARN_FRACTION * 100:.0f} %). "
+                "Jahresverbrauch, Personenzahl und Verbraucher prüfen."
+            )
+
+
+def _render_profile_identity(ctx: dict) -> tuple[str, str, float, dict, dict, bool]:
     session_scope = ctx["session_scope"]
     label = labeled_text_input(
         "Bezeichnung",
@@ -334,6 +401,7 @@ def _render_profile_identity(ctx: dict) -> tuple[str, str, float, dict, bool]:
         step=100.0,
         key=_scoped_key(session_scope, "house_annual_kwh"),
     )
+    household = _render_household_size(ctx["existing"], session_scope=session_scope)
     absent_mode = labeled_checkbox(
         "Abwesend / Urlaub",
         key=_scoped_key(session_scope, "house_absent_mode"),
@@ -344,7 +412,7 @@ def _render_profile_identity(ctx: dict) -> tuple[str, str, float, dict, bool]:
     )
     _render_absent_mode_status(profile_absent=bool(absent_mode))
     location = _render_location_fields(session_scope=session_scope)
-    return label, preview_id, float(annual_kwh), location, bool(absent_mode)
+    return label, preview_id, float(annual_kwh), household, location, bool(absent_mode)
 
 
 def _render_absent_mode_status(*, profile_absent: bool) -> None:
@@ -381,11 +449,15 @@ def render_house_profile_tab() -> None:
     ctx = _render_profile_selector()
     render_plant_export_limit()
     render_plant_grid_meter_assertions()
-    label, preview_id, annual_kwh, location, absent_mode = _render_profile_identity(ctx)
+    label, preview_id, annual_kwh, household, location, absent_mode = _render_profile_identity(
+        ctx
+    )
     from ui.house_config_profile_house_thermal import render_house_heating_section
 
     heating = render_house_heating_section(
-        session_scope=ctx["session_scope"], existing=ctx["existing"]
+        session_scope=ctx["session_scope"],
+        existing=ctx["existing"],
+        persons=household["persons"],
     )
     resolved, resolved_for_preview = _edit_and_sync_consumers(
         ctx["session_scope"], location, heating
@@ -393,6 +465,7 @@ def render_house_profile_tab() -> None:
     preview = _render_baseload_preview(
         annual_kwh, resolved_for_preview, ctx["existing"], preview_id
     )
+    _render_household_reference(household, annual_kwh, resolved_for_preview, heating)
     from ui.house_config_heating_change import render_reference_change_gate
     from ui.house_config_historical_csv import historical_csv_save_fields
 

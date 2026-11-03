@@ -763,7 +763,12 @@
           "default": 2,
           "type": "integer",
           "minimum": 1,
-          "description": "Personen im Haushalt (Warmwasserbedarf der Heizung)."
+          "description": "Personen im Haushalt: Warmwasserbedarf der Heizung und Richtwert Haushaltsstrom (SUSI) neben dem Jahresverbrauch."
+        },
+        "vat_deductible": {
+          "default": false,
+          "type": "boolean",
+          "description": "Der Betreiber kann die Vorsteuer abziehen (Preise netto rechnen). Noch nicht ausgewertet: Earnie liest das Feld erst mit dem USt-Modell; bis dahin rechnet es unverändert."
         },
         "thermal": {
           "$ref": "#/definitions/house_thermal"

@@ -169,11 +169,12 @@ def _render_comfort_fields(stored: dict, out: dict, *, session_scope: str) -> No
     )
 
 
-def render_house_heating_section(*, session_scope: str, existing: dict) -> dict:
+def render_house_heating_section(*, session_scope: str, existing: dict, persons: int) -> dict:
     """Switch plus building fields; returns ``heating_enabled``, ``persons``, ``thermal``.
 
-    ``thermal`` is ``None`` for a house that never had the section on. With the switch off
-    the stored block and ``persons`` pass through unchanged.
+    ``persons`` comes from the field „Personen im Haushalt“ next to the Jahresverbrauch (SUSI
+    P6). ``thermal`` is ``None`` for a house that never had the section on. With the switch
+    off the stored block passes through unchanged.
     """
     st.subheader("Gebäude / Wärmebedarf")
     enabled = bool(
@@ -189,7 +190,6 @@ def render_house_heating_section(*, session_scope: str, existing: dict) -> dict:
         )
     )
     stored_thermal = existing.get(HOUSE_THERMAL_KEY)
-    stored_persons = int(existing.get(PERSONS_KEY, profile_default(PERSONS_KEY)))
     if not enabled:
         st.caption(
             "Heizung wird nicht betrachtet: kein Verbraucher „Haus Wärme“, der "
@@ -197,25 +197,16 @@ def render_house_heating_section(*, session_scope: str, existing: dict) -> dict:
         )
         state = {
             HEATING_ENABLED_KEY: False,
-            PERSONS_KEY: stored_persons,
+            PERSONS_KEY: int(persons),
             HOUSE_THERMAL_KEY: stored_thermal,
         }
     else:
         stored = stored_thermal or default_house_thermal()
         thermal = _render_building_fields(stored, session_scope=session_scope)
-        persons = int(
-            labeled_number_input(
-                "Personen im Haushalt",
-                min_value=1,
-                value=stored_persons,
-                help="Für den Warmwasserbedarf.",
-                key=_scoped_key(session_scope, "house_persons"),
-            )
-        )
         _render_comfort_fields(stored, thermal, session_scope=session_scope)
         state = {
             HEATING_ENABLED_KEY: True,
-            PERSONS_KEY: persons,
+            PERSONS_KEY: int(persons),
             HOUSE_THERMAL_KEY: thermal,
         }
     st.session_state[_scoped_key(session_scope, _STATE_KEY)] = state

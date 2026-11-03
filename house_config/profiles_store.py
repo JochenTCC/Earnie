@@ -39,22 +39,17 @@ from house_config.profiles_consumers import (  # noqa: F401  (re-exported)
     _thermal_rc_source,
 )
 
+# D3a VAT flag; carried through load / save, read by the code only with the VAT model.
+VAT_DEDUCTIBLE_KEY = "vat_deductible"
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+def normalize_vat_deductible(raw: object, *, label: str) -> bool:
+    """House-level ``vat_deductible`` (missing = schema default ``false``)."""
+    if raw is None:
+        return bool(profile_default(VAT_DEDUCTIBLE_KEY))
+    if not isinstance(raw, bool):
+        raise ValueError(f"{label}: vat_deductible muss true oder false sein (ist {raw!r}).")
+    return raw
 
 
 def _read_json(path: str) -> dict:
@@ -237,6 +232,7 @@ def _normalize_profile(raw: dict, index: int, *, heating_systems: dict | None) -
             "fehlen. Im Hauskonfigurator den Abschnitt „Gebäude / Wärmebedarf“ ausfüllen."
         )
     persons = normalize_persons(raw.get(PERSONS_KEY), label=where)
+    vat_deductible = normalize_vat_deductible(raw.get(VAT_DEDUCTIBLE_KEY), label=where)
     if has_thermal and (raw.get("latitude") is None or raw.get("longitude") is None):
         raise ValueError(
             f"profiles '{profile_id}': latitude und longitude sind bei "
@@ -287,6 +283,7 @@ def _normalize_profile(raw: dict, index: int, *, heating_systems: dict | None) -
         "consumers": consumers,
         HEATING_ENABLED_KEY: heating_on,
         PERSONS_KEY: persons,
+        VAT_DEDUCTIBLE_KEY: vat_deductible,
     }
     if house_thermal is not None:
         spec[HOUSE_THERMAL_KEY] = house_thermal
@@ -533,6 +530,7 @@ def _serialize_profile(profile: dict) -> dict:
         ],
         HEATING_ENABLED_KEY: bool(profile[HEATING_ENABLED_KEY]),
         PERSONS_KEY: int(profile[PERSONS_KEY]),
+        VAT_DEDUCTIBLE_KEY: bool(profile[VAT_DEDUCTIBLE_KEY]),
     }
     if profile.get(HOUSE_THERMAL_KEY):
         out[HOUSE_THERMAL_KEY] = serialize_house_thermal(profile[HOUSE_THERMAL_KEY])

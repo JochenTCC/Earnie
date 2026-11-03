@@ -173,6 +173,14 @@ def _resolve_consumer_ids(consumers: list[dict], edited: list[dict]) -> list[dic
         resolved.append(activate_consumer_required(item))
     return resolved
 
+def _vat_payload(existing: dict) -> dict:
+    """D3a ``vat_deductible``: not edited in the form yet, the stored value passes through."""
+    from house_config.profile_schema_defaults import profile_default
+    from house_config.profiles_store import VAT_DEDUCTIBLE_KEY
+
+    value = existing.get(VAT_DEDUCTIBLE_KEY, profile_default(VAT_DEDUCTIBLE_KEY))
+    return {VAT_DEDUCTIBLE_KEY: bool(value)}
+
 def _perform_house_profile_save(
     *,
     is_new: bool,
@@ -229,6 +237,7 @@ def _perform_house_profile_save(
                     "baseload_distribution", "equal"
                 ),
                 **house_heating_payload(heating),
+                **_vat_payload(existing),
             }
         )
     except ValueError as exc:
@@ -300,6 +309,7 @@ def _render_house_profile_save(
         "historical_csv_source": hist["historical_csv_source"],
         "baseload_distribution": hist.get("baseload_distribution", "equal"),
         **house_heating_payload(heating),
+        **_vat_payload(existing),
     }
 
     if is_new:

@@ -271,7 +271,8 @@
                 "absent_mode_enabled": true
             },
             "persons": 2,
-            "heating_enabled": true
+            "heating_enabled": true,
+            "vat_deductible": false
         }
     ],
     "plant": {

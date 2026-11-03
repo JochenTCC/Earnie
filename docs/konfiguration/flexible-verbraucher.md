@@ -32,6 +32,27 @@ Die folgenden Hausprofil-Felder wirken nur in der **Live**-Optimierung; der Szen
 
 Der Modus ist wirksam, sobald der Schalter im Hauskonfigurator **oder** das EHAL-Live-Signal aktiv ist (alle Backends). Der Schalter `absent_mode` wirkt dabei **backend-unabhängig**. Verbraucher mit Opt-in nimmt Earnie aus der Live-MILP-Liste. Die Haus-Wärme bleibt in der Optimierung, mit reduzierter Solltemperatur, wenn „Absenken wenn abwesend“ an ist.
 
+<a id="personen-richtwert-haushaltsstrom"></a>
+
+## Personen und Richtwert Haushaltsstrom (Hausprofil)
+
+Direkt unter dem **Jahresverbrauch** steht im Hauskonfigurator das Feld **Personen im Haushalt** (`persons`, Standard 2). Es gilt für jedes Haus, auch bei ausgeschaltetem „Heizung betrachten“. Earnie nutzt es für den Warmwasserbedarf der Heizung und für einen Richtwert zum Jahresverbrauch.
+
+Darunter vergleicht Earnie den **Haushaltsstrom** des Profils mit dem Richtwert aus SUSI (Energieinstitut Vorarlberg):
+
+| Personen | Richtwert Haushaltsstrom |
+| -------- | ------------------------ |
+| 1 | 1.700 kWh/a |
+| 2 | 3.400 kWh/a |
+| 3 | 4.200 kWh/a |
+| ab 4 | 4.700 kWh/a |
+
+- **Haushaltsstrom** = Jahresverbrauch minus Haus Wärme, E-Auto und Pool (Typ `thermal_rc`), denn der Richtwert enthält keinen Strom für Heizung, E-Auto oder Pool. Geräte-Verbraucher (z. B. Waschmaschine) gehören zum Haushaltsstrom und bleiben drin. Der Heizstab hat keinen eigenen Jahresverbrauch.
+- Weicht der Haushaltsstrom um **mehr als ±40 %** vom Richtwert ab, zeigt Earnie eine Warnung. Sie ist nur ein Hinweis zum Prüfen von Jahresverbrauch, Personenzahl und Verbrauchern; gespeichert wird trotzdem.
+- Bei ausgeschaltetem „Heizung betrachten“ plant Earnie die Haus-Wärme nicht und zieht sie nicht ab. Ein Heizungsstrom (z. B. einer Wärmepumpe) steckt dann im Haushaltsstrom; Earnie weist darauf hin.
+
+**USt-Abzug (`vat_deductible`):** Das Hausprofil trägt außerdem das Feld `vat_deductible` (`true` = der Betreiber kann die Vorsteuer abziehen, Standard `false`). Earnie wertet es noch nicht aus und rechnet unverändert; im Hauskonfigurator gibt es dafür noch kein Feld, Speichern behält den Wert aus der Datei.
+
 <a id="gebäude--wärmebedarf-hausprofil"></a>
 
 ## Gebäude / Wärmebedarf (Hausprofil)
@@ -55,7 +76,7 @@ Die wärmetechnischen Eigenschaften gehören zum Haus, nicht zur Heizung. Im Hau
 | `thermal.heating_limit_c` | Heizgrenze: oberhalb dieser Tagesmitteltemperatur wird nicht geheizt |
 | `thermal.house_heat_loss_kw_per_k` | Optional: Verlustkoeffizient H (kW/K); fehlt er, kalibriert Earnie H aus dem HWB |
 | `thermal.absent_mode_enabled`, `thermal.absent_temp_reduction_c` | Absenkung bei Abwesenheit, siehe [Abwesenheitsmodus](#abwesenheitsmodus-live) |
-| `persons` | Personen im Haushalt (Warmwasserbedarf); steht direkt am Hausprofil |
+| `persons` | Personen im Haushalt (Warmwasserbedarf); steht direkt am Hausprofil, im Hauskonfigurator neben dem Jahresverbrauch (siehe [Richtwert Haushaltsstrom](#personen-richtwert-haushaltsstrom)) |
 
 ```json
 {"id": "haus", "heating_enabled": true, "persons": 3,
