@@ -279,7 +279,15 @@ def _render_scenario_entity_picks(ctx: dict) -> dict:
         container=pv_col,
     )
     _render_imported_pv_option(session_scope, selected_profile)
+    from ui.scenario_heating_picks import render_heating_picks
+
+    heating_picks = render_heating_picks(
+        session_scope,
+        selected_profile,
+        is_live=bool(ctx["live_id"]) and ctx["stable_scenario_id"] == ctx["live_id"],
+    )
     return {
+        "heating_system_ids": heating_picks,
         "prof_pick": prof_pick,
         "battery_pick": battery_picks,
         "battery_picks": battery_picks,
@@ -339,6 +347,7 @@ def _scenario_persist_payload(
         ),
         user_import_cent_kwh=user_import_cent,
         user_export_cent_kwh=user_export_cent,
+        heating_system_ids=picks.get("heating_system_ids"),
     )
     payload = {
         "id": save_id,

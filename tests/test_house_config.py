@@ -1,6 +1,7 @@
 """Tests für Hauskonfigurator-Entitäten, Tarife und Szenario-Auflösung (Version 1.24)."""
 from __future__ import annotations
 
+from tests.fixtures.heating_catalog import normalize_inline_house, save_inline_house
 import json
 import re
 from datetime import date, datetime
@@ -175,7 +176,7 @@ def test_strip_assets_for_reference():
 def test_house_profile_without_consumers():
     from house_config.profiles_store import normalize_house_profiles_document
 
-    doc = normalize_house_profiles_document(
+    doc = normalize_inline_house(
         {
             "profiles": [
                 {
@@ -233,7 +234,7 @@ def test_ev_min_power_must_not_exceed_nominal():
     from house_config.profiles_store import normalize_house_profiles_document
 
     with pytest.raises(ValueError, match="min_power_kw .* darf nicht größer"):
-        normalize_house_profiles_document(
+        normalize_inline_house(
             _ev_profile_doc(nominal_power_kw=1.0, min_power_kw=1.4)
         )
 
@@ -243,10 +244,10 @@ def test_ev_min_on_quarterhours_defaults_to_one_and_is_never_zero():
 
     raw = _ev_profile_doc()
     assert "min_on_quarterhours" not in raw["profiles"][0]["consumers"][0]
-    doc = normalize_house_profiles_document(raw)
+    doc = normalize_inline_house(raw)
     assert doc["profiles"]["ev_profile"]["consumers"][0]["min_on_quarterhours"] == 1
 
-    doc_zero = normalize_house_profiles_document(_ev_profile_doc(min_on_quarterhours=0))
+    doc_zero = normalize_inline_house(_ev_profile_doc(min_on_quarterhours=0))
     assert doc_zero["profiles"]["ev_profile"]["consumers"][0]["min_on_quarterhours"] == 1
 
 
@@ -809,7 +810,7 @@ def test_house_profile_save_preserves_loxone_bindings(tmp_path, monkeypatch):
         _merge_passthrough_consumer_fields(ev_original, ev_edited),
         _merge_passthrough_consumer_fields(spa_original, spa_edited),
     ]
-    save_house_profiles_document(
+    save_inline_house(
         str(path),
         {
             "profiles": [
@@ -1634,6 +1635,11 @@ def test_live_scenario_resolves_entity_refs(tmp_path, monkeypatch):
                 "pv_tilt": 30,
                 "pv_azimuth": 180,
                 "inverter_id": "wr_main"
+            }],
+            "heating_systems": [{
+                "id": "heating_efh",
+                "heat_source": {"type": "heat_pump", "heat_pump_type": "luft"},
+                "nominal_power_kw": 3.0
             }]
         }
         """.strip(),
@@ -1654,8 +1660,7 @@ def test_live_scenario_resolves_entity_refs(tmp_path, monkeypatch):
                     {
                         "id": "heat",
                         "type": "thermal_annual",
-                        "nominal_power_kw": 3.0,
-                        "heat_source": {"type": "heat_pump", "heat_pump_type": "luft"}
+                        "heating_system_id": "heating_efh"
                     }
                 ]
             }]

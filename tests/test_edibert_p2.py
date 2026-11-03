@@ -55,6 +55,7 @@ def test_plan_lists_both_steps_and_all_questions(tmp_path: Path) -> None:
         "dm4.deviation_energy_shortfall",
         "dm5.netznutzung_split",
         "dm5.heat_source",
+        "dm5.heating_systems",
         "tf1.tariff_format",
     )
     by_id = {q.id: q for q in plan.questions}
@@ -77,6 +78,7 @@ def test_one_run_one_backup_matches_golden_and_is_idempotent(tmp_path: Path) -> 
         "dm4.deviation_energy_shortfall",
         "dm5.netznutzung_split",
         "dm5.heat_source",
+        "dm5.heating_systems",
         "tf1.tariff_format",
     )
     backups = list((config_dir / "backups").iterdir())

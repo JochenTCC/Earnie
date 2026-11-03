@@ -16,12 +16,10 @@
                     "id": "waermepumpe",
                     "label": "Wärmepumpe",
                     "type": "thermal_annual",
-                    "nominal_power_kw": 1.9,
                     "use_profile_csv": false,
                     "absent_mode_enabled": true,
                     "living_area_m2": 157.0,
                     "building_class": 2,
-                    "heat_source": {"type": "heat_pump", "heat_pump_type": "erde"},
                     "persons": 2,
                     "target_temp_c": 21.5,
                     "absent_temp_reduction_c": 2.5,
@@ -32,20 +30,14 @@
                     "building_mass": "leicht",
                     "house_tolerance_c": 0.5,
                     "hwb_kwh_m2": 40.0,
-                    "heat_storage": {
-                        "volume_liters": 887.0,
-                        "heat_loss_kw_per_k": 0.01,
-                        "setpoint_c": 47.0,
-                        "tolerance_c": 5.0
-                    },
                     "timezone_name": "Europe/Vienna",
-                    "min_on_quarterhours": 1,
                     "ehal_bindings": {
                         "heatpump.waermepumpe.sens_power_act": "alias_7",
                         "heatpump.waermepumpe.set_enable": "alias_8",
                         "sens_temperature_heat_storage": "alias_9",
                         "sens_temperature_heat_storage_low": "alias_10"
-                    }
+                    },
+                    "heating_system_id": "heating_profile_a"
                 },
                 {
                     "id": "e_auto",

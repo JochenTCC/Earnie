@@ -1,6 +1,7 @@
 """Unit tests for live-only holiday / absent mode."""
 from __future__ import annotations
 
+from tests.fixtures.heating_catalog import normalize_inline_house, save_inline_house
 from optimizer.absent_mode import (
     apply_absent_mode_to_live_flex,
     apply_thermal_absent_override,
@@ -177,7 +178,7 @@ def test_normalize_absent_fields_roundtrip(tmp_path, monkeypatch):
             }
         ]
     }
-    normalized = normalize_house_profiles_document(doc)
+    normalized = normalize_inline_house(doc)
     profile = normalized["profiles"]["home"]
     assert profile["absent_mode"] is True
     consumer = profile["consumers"][0]
@@ -185,7 +186,7 @@ def test_normalize_absent_fields_roundtrip(tmp_path, monkeypatch):
     assert consumer["thermal"]["absent_temp_reduction_c"] == 4.0
     assert "absent_temp_c" not in consumer["thermal"]
     path = tmp_path / "house_profiles.json"
-    save_house_profiles_document(str(path), {"profiles": [doc["profiles"][0]]})
+    save_inline_house(str(path), {"profiles": [doc["profiles"][0]]})
     reloaded = load_house_profiles_document(str(path))
     assert reloaded["profiles"]["home"]["absent_mode"] is True
     thermal = reloaded["profiles"]["home"]["consumers"][0]["thermal"]
@@ -229,11 +230,11 @@ def test_normalize_migrates_legacy_absent_temp_c(tmp_path, monkeypatch):
             }
         ]
     }
-    normalized = normalize_house_profiles_document(doc)
+    normalized = normalize_inline_house(doc)
     thermal = normalized["profiles"]["home"]["consumers"][0]["thermal"]
     assert thermal["absent_temp_reduction_c"] == 6.5
     path = tmp_path / "house_profiles.json"
-    save_house_profiles_document(str(path), {"profiles": [doc["profiles"][0]]})
+    save_inline_house(str(path), {"profiles": [doc["profiles"][0]]})
     reloaded = load_house_profiles_document(str(path))
     assert reloaded["profiles"]["home"]["consumers"][0]["thermal"][
         "absent_temp_reduction_c"

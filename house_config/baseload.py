@@ -195,7 +195,10 @@ def compute_baseload_kwh(
     floor = BASELOAD_MIN_FRACTION if min_fraction is None else float(min_fraction)
     if floor < 0.0:
         raise ValueError(f"min_fraction must be >= 0, got {floor}")
-    consumer_sum = sum(consumer_annual_kwh(c) for c in consumers)
+    from house_config.heating_systems import measured_rod_annual_kwh
+
+    # Measured rod consumption of the real house is part of annual_kwh, not of the baseload.
+    consumer_sum = sum(consumer_annual_kwh(c) + measured_rod_annual_kwh(c) for c in consumers)
     raw_baseload = max(0.0, annual - consumer_sum)
     min_baseload = annual * floor
     baseload = max(raw_baseload, min_baseload) if annual > 0 else 0.0
@@ -227,7 +230,11 @@ def resolve_profile_baseload(profile: dict) -> dict:
             "(Profil über house_config.profiles_store normalisieren oder "
             "baseload_kwh/consumer_kwh/baseload_min_kwh explizit setzen)."
         )
-    result = compute_baseload_kwh(profile["annual_kwh"], profile["consumers"])
+    from house_config.heating_systems import baseload_reference_profile
+
+    # Scenario heating variants: the baseload is fixed by the installed (reference) system.
+    reference = baseload_reference_profile(profile)
+    result = compute_baseload_kwh(profile["annual_kwh"], reference["consumers"])
     for key in _DERIVED_BASELOAD_KEYS:
         profile.setdefault(key, result[key])  # explicit values (fixtures) win
     return profile
@@ -327,7 +334,11 @@ def trim_baseload_floor_to_match_ist(
             f"(1 %), got {floor}"
         )
     if model_consumer_kwh is None:
-        consumer_sum = sum(consumer_annual_kwh(c) for c in consumers)
+        from house_config.heating_systems import measured_rod_annual_kwh
+
+        consumer_sum = sum(
+            consumer_annual_kwh(c) + measured_rod_annual_kwh(c) for c in consumers
+        )
     else:
         consumer_sum = float(model_consumer_kwh)
     ideal = max(0.0, ist - consumer_sum)

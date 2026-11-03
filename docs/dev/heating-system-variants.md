@@ -94,16 +94,34 @@ The heating rod is not part of the baseload calculation today (`heating_rod` app
 `house_config/heat_source.py`, `house_config/planning_flex_converters.py` and
 `simulation/heat_fuel.py`). If the real rod runs in the house (e.g. a PV-surplus controller),
 its consumption is in the measured total and therefore ends up in the baseload; the MILP then
-plans the rod again in the scenario and counts it twice. Decided handling, in this order:
+plans the rod again in the scenario and counts it twice.
 
-1. **Rod with its own meter:** the measured rod consumption is subtracted from the total before
-   the baseload is derived.
-2. **No meter, user-entered annual rod consumption:** a new optional field (annual kWh of the
-   real rod) on the reference system; this amount is subtracted from the baseload.
+**Decided (2026-11-02, replaces the earlier three-step handling):** the historical rod
+consumption is measured data of the real house, not a property of a heating system. It is
+stored on the `thermal_annual` consumer, never on a catalog entry (a copy of the reference
+system in the variants editor must not carry the house's measurements along):
+
+1. **`heating_rod_profile_csv`:** hourly measured rod consumption (same CSV format as the
+   consumer `profile_csv`); subtracted hour by hour from the measured total before the
+   baseload is derived.
+2. **`heating_rod_annual_kwh`:** user-entered annual rod consumption; subtracted from the
+   baseload as a lump sum.
 3. **Neither:** a visible hint in the scenario results that the rod may be counted twice. No
    silent correction.
 
-Houses without measured data (`profile_spec`) are not affected.
+Both fields set → fail loud on load (no silent precedence). Either field is only allowed when
+the reference system has a `heating_rod` part. The subtraction belongs to the baseload step
+and therefore uses the reference system only, independent of the variant a scenario selects:
+a variant with a rod lets the MILP plan it afresh without a double count, a variant without a
+rod simply drops the measured rod consumption. The rod keeps no demand of its own and stays
+out of `cons_data` (as since `73461c4d`); the MILP alone decides when it runs.
+
+A rod meter for Live (control, visualisation, later balancing) is a separate topic via EHAL
+fields of the `heating_rod` part (*SUSI P1 follow-up — Live control of the heating rod*); the
+SE fields above need no EHAL binding. Those bindings stay on the house consumer, not in the
+catalog entry.
+
+Houses without measured data (`profile_spec`) get no double-count hint. A user-entered rod value is still subtracted from their annual baseload, because `annual_kwh` (the bill) contains the real rod as well. In hourly residual paths the annual kWh is spread evenly over the hours (implementation 2026-11-02).
 
 ## Migration
 
@@ -118,14 +136,20 @@ dogfooding are migrated too. Schemas to update: `components.schema.json`,
 `house_profiles.schema.json`, `backtesting_scenarios.schema.json`; example and minimal packs
 under `share/config/`.
 
-## Open points for the implementation
+## Implementation decisions (2026-11-02)
 
-- Solar thermal (`solar_thermal_*`): stays on the consumer or moves into the heating system.
-  Default: stays (it is tied to the house roof and location); move only if SUSI variants need
-  "+ solar thermal".
-- ID generation for migrated entries and for entries created by the house configurator.
-- Shape of the per-consumer selection in the scenario editor when a house has more than one
-  `thermal_annual` consumer.
+- **Solar thermal** (`solar_thermal_*`) stays on the consumer (tied to the house roof and
+  location); it moves into the heating system only if SUSI variants need "+ solar thermal".
+- **Catalog source on load:** the house-profile loader reads `components.json` from the same
+  config directory and resolves `heating_system_id` there; the resolved system is placed into
+  the normalized consumer (`thermal.heat_source`, `thermal.heat_storage`, `parts`,
+  `nominal_power_kw`, `min_on_quarterhours`), so the calculation core reads the same fields as
+  before. Saving writes only `heating_system_id`. The load memo is stamped with both files.
+- **IDs:** `heating_<profile_id>` for entries written by the migration and by the house
+  configurator; a collision gets `_2`, `_3`, … Variants get an ID slugged from their label.
+- **Several `thermal_annual` consumers:** not possible, a house profile allows only one
+  (`profiles_store`). The scenario editor shows one select box per house; the stored shape stays
+  `heating_system_ids: {"<consumer_id>": "<heating_system_id>"}`.
 
 ## Docs and tests
 
@@ -133,6 +157,7 @@ under `share/config/`.
   scenario editor and components pages under `docs/konfiguration/`.
 - Tests: migration step (fixtures before / after, already-migrated dm5 pack), catalog
   validation (rod without storage, unknown reference, delete guard), baseload order guard,
-  cache key, heating-rod handling 1–3, Streamlit AppTest for the variants editor and the
-  scenario select box; golden masters must stay green (the reference system reproduces today's
+  cache key, heating-rod handling 1–3 (CSV, annual kWh, hint; both set and no rod part fail
+  loud; same baseload for a variant with and without rod), rod stays out of `cons_data`,
+  Streamlit AppTest for the variants editor and the scenario select box; golden masters must stay green (the reference system reproduces today's
   results).

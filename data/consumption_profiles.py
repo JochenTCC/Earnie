@@ -408,10 +408,45 @@ def _by_consumer_aligned_to_total_csv(
     result["baseload"] = _residual_baseload_from_aligned(
         csv_path,
         profile,
-        result,
+        _reference_series_for_residual(profile, result, timestamps),
         total=total,
     )
     return result
+
+
+def _reference_series_for_residual(
+    profile: dict, series: dict[str, list[float]], timestamps: list[str]
+) -> dict[str, list[float]]:
+    """Consumer series the residual subtracts: those of the reference heating systems.
+
+    A scenario heating variant (``baseload_reference_consumers``) swaps only the heat load;
+    the baseload stays the residual of the installed system. A measured heating rod of the
+    real house is subtracted as well.
+    """
+    from house_config.heating_systems import (
+        BASELOAD_REFERENCE_CONSUMERS_KEY,
+        profile_measured_rod_kw_at,
+    )
+
+    out = dict(series)
+    rod_kw = [profile_measured_rod_kw_at(profile, _parse_profile_timestamp(ts)) for ts in timestamps]
+    if any(rod_kw):
+        # Measured heating rod of the real house: not baseload, the MILP plans the rod.
+        out["__measured_heating_rod"] = rod_kw
+    reference = profile.get(BASELOAD_REFERENCE_CONSUMERS_KEY)
+    if reference is None:
+        return out
+    for index, consumer in enumerate(reference):
+        cid = _consumer_id(consumer, index)
+        if consumer_uses_profile_csv(consumer):
+            lookup = _csv_kw_lookup(consumer["profile_csv"])
+            out[cid] = [float(lookup.get(ts, 0.0)) for ts in timestamps]
+        else:
+            out[cid] = [
+                modeled_consumer_kw_at_datetime(consumer, _parse_profile_timestamp(ts))
+                for ts in timestamps
+            ]
+    return out
 
 
 def _residual_baseload_from_aligned(

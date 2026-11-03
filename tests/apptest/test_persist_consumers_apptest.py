@@ -12,6 +12,8 @@ import os
 from pathlib import Path
 
 import pytest
+
+from house_config.heating_systems import SYSTEM_FIELDS
 from streamlit.testing.v1 import AppTest
 
 from house_config.profiles_store import clear_house_profiles_doc_cache
@@ -76,6 +78,11 @@ def _stored(spec: Field):
         doc = json.load(handle)
     profile = next(p for p in doc["profiles"] if p["id"] == _PROFILE_ID)
     consumer = next(c for c in profile["consumers"] if c["id"] == spec.entity)
+    if spec.profile_key.split(".")[0] in SYSTEM_FIELDS and "heating_system_id" in consumer:
+        # Heat generation is written into the reference entry of the heating-system catalog.
+        with open(os.environ["EARNIE_COMPONENTS_PATH"], encoding="utf-8") as handle:
+            catalog = json.load(handle)["heating_systems"]
+        consumer = next(e for e in catalog if e["id"] == consumer["heating_system_id"])
     return _dig(consumer, spec.profile_key)
 
 

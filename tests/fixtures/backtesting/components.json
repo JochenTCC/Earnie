@@ -51,5 +51,16 @@
             "ehal_bindings": {}
         }
     ],
-    "earnie_data_model": 5
+    "earnie_data_model": 5,
+    "heating_systems": [
+        {
+            "id": "heating_test_home",
+            "label": "Heizsystem Test-Haushalt 4000 kWh/a",
+            "heat_source": {
+                "type": "heat_pump",
+                "heat_pump_type": "luft"
+            },
+            "nominal_power_kw": 3.0
+        }
+    ]
 }

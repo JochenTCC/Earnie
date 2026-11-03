@@ -83,5 +83,17 @@
             "inverter_id": "wr_main",
             "ehal_bindings": {}
         }
+    ],
+    "heating_systems": [
+        {
+            "id": "heating_example_efh",
+            "label": "Heizsystem POC-EFH 20040 kWh/a (WP, E-Auto, Haushaltsgeraete)",
+            "heat_source": {
+                "type": "heat_pump",
+                "heat_pump_type": "erde"
+            },
+            "nominal_power_kw": 3.5,
+            "min_on_quarterhours": 4
+        }
     ]
 }

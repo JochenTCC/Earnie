@@ -5,6 +5,12 @@ from house_config.components_store import load_components_document
 from house_config.entity_resolution import resolve_components_into_settings
 from house_config.geo_timezone import timezone_for_land
 from house_config.planning_flex_bridge import collect_planning_flex_consumers
+from house_config.heating_systems import (
+    SCENARIO_HEATING_SYSTEM_IDS_KEY,
+    apply_scenario_heating_systems,
+    heating_systems_by_id,
+    normalize_scenario_heating_system_ids,
+)
 from house_config.profiles_store import load_house_profiles_document
 from house_config.tariffs_store import (
     USER_EXPORT_CENT_KEY,
@@ -100,7 +106,12 @@ def resolve_scenario_settings(
     user_cents = _pop_user_fixed_cents(out, import_tariff_id, export_tariff_id)
 
     profile_id = out.pop("house_profile_id", None)
+    heating_picks = normalize_scenario_heating_system_ids(
+        out.pop(SCENARIO_HEATING_SYSTEM_IDS_KEY, None), label="Szenario"
+    )
     profile: dict | None = None
+    if heating_picks and not profile_id:
+        raise ValueError("Szenario: heating_system_ids ohne house_profile_id.")
     if profile_id:
         profiles_doc = load_house_profiles_document(house_profiles_path)
         profiles = profiles_doc.get("profiles", {})
@@ -108,6 +119,14 @@ def resolve_scenario_settings(
         if profile_id not in profiles:
             raise ValueError(f"Unbekannte house_profile_id '{profile_id}'.")
         profile = profiles[profile_id]
+        if heating_picks:
+            # Swaps only the heat load; the baseload keeps the reference system.
+            profile = apply_scenario_heating_systems(
+                profile,
+                heating_picks,
+                heating_systems_by_id(components),
+                label=f"Szenario (Hausprofil '{profile_id}')",
+            )
         out["_house_profile"] = profile
         _apply_profile_geo(out, profile)
         flex_consumers = collect_planning_flex_consumers(profile)
@@ -249,6 +268,11 @@ def _prepare_live_scenario_settings(
 ) -> dict:
     """Geo aus Hausprofil; Default-Hausprofil wenn leer."""
     prepared = dict(settings)
+    if prepared.get(SCENARIO_HEATING_SYSTEM_IDS_KEY):
+        raise ValueError(
+            "Live-Szenario: heating_system_ids ist nicht erlaubt — Live rechnet immer mit "
+            "dem Referenz-Heizsystem des Hausprofils (Hauskonfigurator)."
+        )
     if str(prepared.get("house_profile_id", "") or "").strip():
         for geo_key in ("latitude", "longitude", "timezone_name"):
             prepared.pop(geo_key, None)

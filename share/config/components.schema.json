@@ -30,6 +30,13 @@
         "$ref": "#/definitions/pv_system_entity"
       }
     },
+    "heating_systems": {
+      "type": "array",
+      "description": "Heizsystem-Katalog: Referenzsysteme der Häuser (thermal_annual heating_system_id in house_profiles.json) und Varianten für Szenarien (settings.heating_system_ids).",
+      "items": {
+        "$ref": "#/definitions/heating_system_entity"
+      }
+    },
     "earnie_data_model": {
       "type": "integer",
       "const": 5,
@@ -37,6 +44,33 @@
     }
   },
   "definitions": {
+    "heating_system_entity": {
+      "type": "object",
+      "required": ["id", "heat_source"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "label": { "type": "string" },
+        "heat_source": { "$ref": "./house_profiles.schema.json#/definitions/heat_source" },
+        "nominal_power_kw": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0.0,
+          "description": "Elektrische Leistung der Wärmepumpe (kW); bei Brennstoffen ungenutzt."
+        },
+        "min_on_quarterhours": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Mindestlaufzeit in Viertelstunden; ohne Angabe der thermal_annual-Standard aus house_profiles.schema.json."
+        },
+        "heat_storage": { "$ref": "./house_profiles.schema.json#/definitions/heat_storage" },
+        "parts": {
+          "type": "array",
+          "description": "Innere Teile (D1): nur der Heizstab (id/type heating_rod), nur mit heat_storage. Wire-Kennung = <consumer_id>_<part_id>.",
+          "items": { "$ref": "./house_profiles.schema.json#/definitions/consumer_part" }
+        }
+      }
+    },
     "battery_wear": {
       "type": "object",
       "description": "Verschleißkosten für Batterie-Durchsatz (Laden + Entladen) in der MILP-Zielfunktion.",

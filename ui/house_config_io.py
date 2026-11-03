@@ -66,9 +66,37 @@ def house_doc_for_save(doc: dict) -> dict:
     return out
 
 def save_house_profiles(doc: dict) -> None:
-    save_house_profiles_document(
-        resolve_house_profiles_json_path(), house_doc_for_save(doc)
+    payload = merge_inline_heating_systems(
+        house_doc_for_save(doc), read_existing=resolve_house_profiles_json_path()
     )
+    save_house_profiles_document(resolve_house_profiles_json_path(), payload)
+
+
+def merge_inline_heating_systems(doc: dict, *, read_existing: str) -> dict:
+    """Move inline heat generation of every profile into its catalog entry (saved here)."""
+    from house_config.components_store import load_components_document
+    from house_config.heating_systems import (
+        HEATING_SYSTEMS_KEY,
+        merge_inline_reference_systems,
+        reference_ids_by_profile,
+    )
+
+    existing_raw = read_json_document(read_existing) if os.path.isfile(read_existing) else {}
+    existing_refs = reference_ids_by_profile(existing_raw)
+    components = load_components_document(resolve_components_json_path())
+    before = list(components.get(HEATING_SYSTEMS_KEY) or [])
+    catalog = before
+    profiles: list[dict] = []
+    for profile in doc.get("profiles") or []:
+        merged, catalog = merge_inline_reference_systems(
+            profile,
+            catalog,
+            existing_refs=existing_refs.get(str(profile.get("id") or "")),
+        )
+        profiles.append(merged)
+    if catalog != before:
+        _save_components_document({**components, HEATING_SYSTEMS_KEY: catalog})
+    return {**doc, "profiles": profiles}
 
 def tariffs_json_path() -> str:
     return resolve_tariffs_json_path()
@@ -136,6 +164,13 @@ def load_tariffs_catalog_meta() -> dict:
     return meta
 
 def upsert_house_profile(profile: dict) -> None:
+    from house_config.components_store import load_components_document
+    from house_config.heating_systems import (
+        HEATING_SYSTEMS_KEY,
+        heating_systems_by_id,
+        merge_inline_reference_systems,
+        reference_ids_by_profile,
+    )
     from house_config.label_uniqueness import assert_unique_label, assert_unique_labels_in_list
 
     path = resolve_house_profiles_json_path()
@@ -151,11 +186,24 @@ def upsert_house_profile(profile: dict) -> None:
     assert_unique_label(profile.get("label"), profiles, exclude_id=profile_id)
     consumers = list(profile.get("consumers") or [])
     assert_unique_labels_in_list(consumers)
+    # The form edits the reference heating system in place (components.json catalog).
+    components_path = resolve_components_json_path()
+    components = load_components_document(components_path)
+    profile, catalog = merge_inline_reference_systems(
+        profile,
+        list(components.get(HEATING_SYSTEMS_KEY) or []),
+        existing_refs=reference_ids_by_profile(raw).get(profile_id),
+    )
     from house_config.baseload import ensure_baseload_not_over_allocated
     from house_config.profiles_store import normalize_house_profiles_document
 
-    normalized = normalize_house_profiles_document({"profiles": [profile]})
+    normalized = normalize_house_profiles_document(
+        {"profiles": [profile]},
+        heating_systems=heating_systems_by_id({HEATING_SYSTEMS_KEY: catalog}),
+    )
     ensure_baseload_not_over_allocated(normalized["profiles"][profile_id])
+    if catalog != list(components.get(HEATING_SYSTEMS_KEY) or []):
+        _save_components_document({**components, HEATING_SYSTEMS_KEY: catalog})
     profiles = [p for p in profiles if p.get("id") != profile["id"]]
     profiles.append(profile)
     payload: dict = {"profiles": profiles}

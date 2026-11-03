@@ -45,6 +45,9 @@ def _iter_thermal_consumers(house: Any) -> Iterator[tuple[str, dict[str, Any]]]:
 
 
 def _needs_migration(consumer: dict[str, Any]) -> bool:
+    # After dm5.heating_systems the heat source lives in the catalog (heating_system_id).
+    if "heating_system_id" in consumer:
+        return False
     return LEGACY_KEY in consumer or "heat_source" not in consumer
 
 

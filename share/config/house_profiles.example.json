@@ -25,15 +25,9 @@
                     "id": "wp_heating",
                     "label": "Wärmepumpe Heizen+WW",
                     "type": "thermal_annual",
-                    "nominal_power_kw": 3.5,
                     "absent_mode_enabled": true,
-                    "min_on_quarterhours": 4,
                     "living_area_m2": 120,
                     "building_class": 2,
-                    "heat_source": {
-                        "type": "heat_pump",
-                        "heat_pump_type": "erde"
-                    },
                     "persons": 2,
                     "target_temp_c": 21.5,
                     "absent_temp_reduction_c": 2.5,
@@ -41,7 +35,8 @@
                     "ehal_bindings": {
                         "heatpump.wp_heating.set_enable": "",
                         "heatpump.wp_heating.sens_power_act": ""
-                    }
+                    },
+                    "heating_system_id": "heating_example_efh"
                 },
                 {
                     "id": "ev",

@@ -72,76 +72,111 @@ def test_heating_rod_requires_heat_storage():
         normalize_parts([{**_ROD, "type": "filter"}], label="t", has_heat_storage=True)
 
 
+def _catalog(**fields) -> dict:
+    from house_config.heating_systems import heating_systems_by_id
+
+    return heating_systems_by_id({"heating_systems": [{"id": "hs", **fields}]})
+
+
 def test_legacy_heat_pump_type_is_rejected_on_load():
     from house_config.profiles_thermal_annual import normalize_thermal_annual_consumer
 
     with pytest.raises(ValueError, match="heat_pump_type wird nicht mehr unterstützt"):
         normalize_thermal_annual_consumer(
-            {"id": "wp", "heat_pump_type": "luft"}, {}, copy_loxone_binding=lambda *_: None
+            {"id": "wp", "heat_pump_type": "luft", "heating_system_id": "hs"},
+            {},
+            copy_loxone_binding=lambda *_: None,
+            heating_systems=_catalog(heat_source={"type": "gas"}),
         )
 
 
-def test_profile_normalizes_parts_next_to_thermal():
+def test_profile_takes_parts_and_storage_from_the_catalog_entry():
     from house_config.profiles_thermal_annual import normalize_thermal_annual_consumer
 
     spec: dict = {}
     normalize_thermal_annual_consumer(
-        {
-            "id": "wp",
-            "heat_source": {"type": "gas"},
-            "heat_storage": _STORAGE,
-            "parts": [_ROD],
-        },
+        {"id": "wp", "heating_system_id": "hs"},
         spec,
         copy_loxone_binding=lambda *_: None,
+        heating_systems=_catalog(
+            heat_source={"type": "gas"}, heat_storage=_STORAGE, parts=[_ROD]
+        ),
     )
+    assert spec["heating_system_id"] == "hs"
     assert spec["thermal"]["heat_source"] == {"type": "gas"}
+    assert spec["thermal"]["heat_storage"]["volume_liters"] == _STORAGE["volume_liters"]
     assert spec["parts"] == [_ROD]
     assert "parts" not in spec["thermal"]
 
 
-def test_profile_save_keeps_heating_rod_and_flex_fields():
-    """Regression: saving the house profile dropped ``parts`` (the rod vanished after reload)."""
+def test_inline_heat_generation_on_the_consumer_needs_migration():
+    from house_config.profiles_thermal_annual import normalize_thermal_annual_consumer
+
+    for raw in (
+        {"id": "wp", "heat_source": {"type": "gas"}},
+        {"id": "wp", "heating_system_id": "hs", "heat_source": {"type": "gas"}},
+        {"id": "wp", "heating_system_id": "hs", "heat_storage": _STORAGE},
+    ):
+        with pytest.raises(ValueError, match="Heizsystem-Katalog"):
+            normalize_thermal_annual_consumer(
+                raw,
+                {},
+                copy_loxone_binding=lambda *_: None,
+                heating_systems=_catalog(heat_source={"type": "gas"}),
+            )
+
+
+def test_unknown_heating_system_id_fails_loud():
+    from house_config.profiles_thermal_annual import normalize_thermal_annual_consumer
+
+    with pytest.raises(ValueError, match="'nope' fehlt in components.json"):
+        normalize_thermal_annual_consumer(
+            {"id": "wp", "heating_system_id": "nope"},
+            {},
+            copy_loxone_binding=lambda *_: None,
+            heating_systems=_catalog(heat_source={"type": "gas"}),
+        )
+
+
+def test_profile_save_keeps_flex_fields_and_writes_only_the_reference():
+    """Regression (rod lost on save) moved: the rod lives in the catalog entry now."""
     from house_config.profiles_store import _normalize_consumer, _serialize_consumer
 
+    catalog = _catalog(
+        heat_source={"type": "heat_pump", "heat_pump_type": "erde"},
+        nominal_power_kw=1.9,
+        heat_storage=_STORAGE,
+        parts=[_ROD],
+    )
     raw = {
         "id": "wp",
         "label": "Wärmepumpe",
         "type": "thermal_annual",
-        "nominal_power_kw": 1.9,
-        "heat_source": {"type": "heat_pump", "heat_pump_type": "erde"},
-        "heat_storage": _STORAGE,
-        "parts": [_ROD],
+        "heating_system_id": "hs",
         "optimizer_flex": True,
         "max_on_quarterhours": 12,
         "max_pulses_per_day": 3,
         "thermal_flex_window": {"start_hour": 10, "end_hour": 16},
     }
-    spec = _normalize_consumer(raw, 0, "home")
+    spec = _normalize_consumer(raw, 0, "home", heating_systems=catalog)
+    assert spec["parts"] == [_ROD]
+    assert spec["nominal_power_kw"] == 1.9
     out = _serialize_consumer(spec)
-    assert out["parts"] == [_ROD]
+    assert out["heating_system_id"] == "hs"
+    for key in ("parts", "heat_source", "heat_storage", "nominal_power_kw", "min_on_quarterhours"):
+        assert key not in out
     assert out["optimizer_flex"] is True
     assert out["max_on_quarterhours"] == 12
     assert out["max_pulses_per_day"] == 3
     assert out["thermal_flex_window"] == {"start_hour": 10, "end_hour": 16}
-    again = _normalize_consumer(out, 0, "home")
+    again = _normalize_consumer(out, 0, "home", heating_systems=catalog)
     assert again["parts"] == spec["parts"]
     assert again["thermal"] == spec["thermal"]
 
 
-def test_profile_save_without_rod_writes_no_parts():
-    from house_config.profiles_store import _normalize_consumer, _serialize_consumer
-
-    raw = {
-        "id": "wp",
-        "label": "Wärmepumpe",
-        "type": "thermal_annual",
-        "nominal_power_kw": 1.9,
-        "heat_source": {"type": "heat_pump", "heat_pump_type": "erde"},
-    }
-    out = _serialize_consumer(_normalize_consumer(raw, 0, "home"))
-    assert "parts" not in out
-    assert "optimizer_flex" not in out
+def test_catalog_entry_rejects_rod_without_storage():
+    with pytest.raises(ValueError, match="Heizstab nur mit Wärmespeicher"):
+        _catalog(heat_source={"type": "gas"}, parts=[_ROD])
 
 
 # --- year simulation: fuel path ----------------------------------------------------------

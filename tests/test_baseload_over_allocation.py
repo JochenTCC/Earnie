@@ -1,6 +1,7 @@
 """Fail-loud when Σ Verbraucher exceeds the Jahresverbrauch (baseload over-allocation)."""
 from __future__ import annotations
 
+from tests.fixtures.heating_catalog import normalize_inline_house
 import pytest
 
 from house_config.baseload import (
@@ -204,7 +205,7 @@ def test_normalization_does_not_derive_baseload_or_touch_weather(monkeypatch):
         raise AssertionError("weather accessed during normalization")
 
     monkeypatch.setattr(baseload, "consumer_annual_kwh", _boom)
-    profile = normalize_house_profiles_document({"profiles": [_thermal_profile_raw()]})[
+    profile = normalize_inline_house({"profiles": [_thermal_profile_raw()]})[
         "profiles"
     ]["home"]
     for key in ("baseload_kwh", "consumer_kwh", "baseload_min_kwh"):
@@ -217,7 +218,7 @@ def test_baseload_resolves_lazily_and_is_idempotent(monkeypatch):
     from tests.fixtures.open_meteo_mock import install_open_meteo_climate_mock
 
     install_open_meteo_climate_mock(monkeypatch)
-    profile = normalize_house_profiles_document({"profiles": [_thermal_profile_raw()]})[
+    profile = normalize_inline_house({"profiles": [_thermal_profile_raw()]})[
         "profiles"
     ]["home"]
     first = profile_baseload_kwh(profile)

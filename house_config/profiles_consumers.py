@@ -273,8 +273,15 @@ def _normalize_ev_consumer(raw: dict, spec: dict, *, profile_id: str, index: int
     _copy_loxone_binding(raw, spec)
 
 
-def _normalize_thermal_annual_consumer(raw: dict, spec: dict) -> None:
-    normalize_thermal_annual_consumer(raw, spec, copy_loxone_binding=_copy_loxone_binding)
+def _normalize_thermal_annual_consumer(
+    raw: dict, spec: dict, *, heating_systems: dict | None
+) -> None:
+    normalize_thermal_annual_consumer(
+        raw,
+        spec,
+        copy_loxone_binding=_copy_loxone_binding,
+        heating_systems=heating_systems,
+    )
 
 
 def _normalize_thermal_rc_consumer(
@@ -296,7 +303,13 @@ def _normalize_thermal_rc_consumer(
             spec["thermal_control"] = {"loxone": dict(loxone)}
 
 
-def _normalize_consumer(raw: dict, index: int, profile_id: str) -> dict:
+def _normalize_consumer(
+    raw: dict,
+    index: int,
+    profile_id: str,
+    *,
+    heating_systems: dict | None = None,
+) -> dict:
     if not isinstance(raw, dict):
         raise ValueError(f"profiles '{profile_id}' consumers[{index}] muss ein Objekt sein.")
     consumer_id = str(raw.get("id", "")).strip()
@@ -341,7 +354,7 @@ def _normalize_consumer(raw: dict, index: int, profile_id: str) -> dict:
     elif consumer_type == "ev":
         _normalize_ev_consumer(raw, spec, profile_id=profile_id, index=index)
     if consumer_type == "thermal_annual":
-        _normalize_thermal_annual_consumer(raw, spec)
+        _normalize_thermal_annual_consumer(raw, spec, heating_systems=heating_systems)
     elif consumer_type == "thermal_rc":
         _normalize_thermal_rc_consumer(raw, spec, profile_id=profile_id, index=index)
     normalize_points_fields(raw, spec, profile_id=profile_id, index=index)
@@ -389,12 +402,20 @@ def _serialize_thermal_annual_fields(consumer: dict, out: dict) -> None:
     thermal = dict(consumer["thermal"])
     thermal.pop("latitude", None)
     thermal.pop("longitude", None)
+    # Generation fields live in the heating-system catalog; the consumer keeps the reference.
+    thermal.pop("heat_source", None)
+    thermal.pop("heat_storage", None)
+    out.pop("nominal_power_kw", None)
     out.update(thermal)
-    out["min_on_quarterhours"] = consumer.get("min_on_quarterhours", 1)
+    out["heating_system_id"] = consumer["heating_system_id"]
     # Optional fields the normalizer reads (normalize_thermal_annual_consumer); a save must keep them.
-    if consumer.get("parts"):
-        out["parts"] = [dict(part) for part in consumer["parts"]]
-    for key in ("optimizer_flex", "max_on_quarterhours", "max_pulses_per_day"):
+    for key in (
+        "optimizer_flex",
+        "max_on_quarterhours",
+        "max_pulses_per_day",
+        "heating_rod_profile_csv",
+        "heating_rod_annual_kwh",
+    ):
         if key in consumer:
             out[key] = consumer[key]
     if consumer.get("thermal_flex_window"):

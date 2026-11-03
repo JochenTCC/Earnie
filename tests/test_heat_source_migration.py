@@ -80,8 +80,19 @@ def test_migrated_profile_loads(tmp_path):
             "netznutzung": {"area_id": "user_no_grid_fee"},
         }
     )
+    from runtime_store.migration.steps.heating_systems import apply as apply_catalog
+
+    migrated = apply_catalog(apply(docs, {}).docs, {}).docs
     path = tmp_path / "house_profiles.json"
-    path.write_text(json.dumps(apply(docs, {}).docs["house_profiles.json"]), encoding="utf-8")
+    path.write_text(json.dumps(migrated["house_profiles.json"]), encoding="utf-8")
+    (tmp_path / "components.json").write_text(
+        json.dumps(migrated["components.json"]), encoding="utf-8"
+    )
     loaded = load_house_profiles_document(str(path))
     thermal = loaded["profiles"]["home"]["consumers"][0]["thermal"]
     assert thermal["heat_source"] == {"type": "heat_pump", "heat_pump_type": "erde"}
+
+
+def test_consumer_already_on_the_catalog_is_not_pending():
+    docs = _house({"id": "wp", "type": "thermal_annual", "heating_system_id": "heating_home"})
+    assert not detect(docs)

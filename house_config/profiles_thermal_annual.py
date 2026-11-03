@@ -1,10 +1,13 @@
 """Normalize thermal_annual consumer fields for house profiles."""
 from __future__ import annotations
 
-from house_config.heat_source import (
-    normalize_heat_source,
-    normalize_parts,
-    reject_legacy_heat_pump_type,
+from house_config.heat_source import reject_legacy_heat_pump_type
+from house_config.heating_systems import (
+    HEATING_SYSTEM_ID_KEY,
+    apply_heating_system,
+    normalize_measured_rod,
+    reject_inline_heating_fields,
+    resolve_heating_system,
 )
 from house_config.profile_schema_defaults import consumer_default
 
@@ -51,8 +54,11 @@ def _label(raw: dict) -> str:
 
 
 def _build_thermal_block(raw: dict) -> dict:
-    """``spec['thermal']`` dict of a thermal_annual consumer (defaults for missing fields)."""
-    from optimizer.thermal_coupled import normalize_heat_storage
+    """Building part of ``spec['thermal']`` (defaults for missing fields).
+
+    The heat generation (``heat_source``, ``heat_storage``) comes from the heating-system
+    catalog, see ``apply_heating_system``.
+    """
     from optimizer.thermal_house import normalize_building_mass
 
     reject_legacy_heat_pump_type(raw, label=_label(raw))
@@ -78,9 +84,6 @@ def _build_thermal_block(raw: dict) -> dict:
         "building_class": int(
             _raw_thermal_field(raw, "building_class")
             or consumer_default("building_class")
-        ),
-        "heat_source": normalize_heat_source(
-            _raw_thermal_field(raw, "heat_source"), label=_label(raw)
         ),
         "persons": _persons(raw),
         "target_temp_c": target_temp_c,
@@ -110,12 +113,6 @@ def _build_thermal_block(raw: dict) -> dict:
     h_override = _raw_thermal_field(raw, "house_heat_loss_kw_per_k")
     if h_override not in (None, "") and float(h_override) > 0.0:
         thermal["house_heat_loss_kw_per_k"] = float(h_override)
-    nested = raw.get("heat_storage")
-    if nested is None and isinstance(raw.get("thermal"), dict):
-        nested = raw["thermal"].get("heat_storage")
-    storage = normalize_heat_storage(nested)
-    if storage is not None:
-        thermal["heat_storage"] = storage
     return thermal
 
 
@@ -124,23 +121,27 @@ def normalize_thermal_annual_consumer(
     spec: dict,
     *,
     copy_loxone_binding,
+    heating_systems: dict | None,
 ) -> None:
-    """Fill ``spec['thermal']`` and related flex fields for thermal_annual."""
-    spec["thermal"] = _build_thermal_block(raw)
-    spec["parts"] = normalize_parts(
-        raw.get("parts"),
-        label=_label(raw),
-        has_heat_storage="heat_storage" in spec["thermal"],
+    """Fill ``spec['thermal']`` and related flex fields for thermal_annual.
+
+    The reference heating system (``heating_system_id``) is resolved against the catalog and
+    placed into the spec; generation fields a normalized consumer still carries (round trip
+    through the UI) are replaced by the catalog entry.
+    """
+    reject_inline_heating_fields(raw, label=_label(raw))
+    system = resolve_heating_system(
+        heating_systems, raw.get(HEATING_SYSTEM_ID_KEY), label=_label(raw)
     )
+    spec[HEATING_SYSTEM_ID_KEY] = system["id"]
+    spec["thermal"] = _build_thermal_block(raw)
+    apply_heating_system(spec, system)
+    normalize_measured_rod(raw, spec, label=_label(raw))
     if "optimizer_flex" in raw:
         spec["optimizer_flex"] = bool(raw["optimizer_flex"])
     window = raw.get("thermal_flex_window")
     if isinstance(window, dict) and window:
         spec["thermal_flex_window"] = dict(window)
-    min_on_default = int(consumer_default("min_on_quarterhours", consumer_type="thermal_annual"))
-    spec["min_on_quarterhours"] = max(
-        1, int(raw.get("min_on_quarterhours", min_on_default) or min_on_default)
-    )
     if "max_on_quarterhours" in raw:
         spec["max_on_quarterhours"] = max(4, int(raw.get("max_on_quarterhours", 16) or 16))
     if "max_pulses_per_day" in raw:

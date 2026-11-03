@@ -33,6 +33,13 @@ _TEST_BATTERY = {
 }
 
 
+def _fixture_heating_systems() -> list[dict]:
+    from tests.fixtures.backtesting_fixtures import FIXTURES_ROOT
+
+    path = FIXTURES_ROOT / "components.json"
+    return json.loads(path.read_text(encoding="utf-8"))["heating_systems"]
+
+
 def _cfg_with_battery(tmp_path, monkeypatch):
     monkeypatch.setenv("EARNIE_OFFLINE", "1")
     monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path / "runtime"))
@@ -44,6 +51,8 @@ def _cfg_with_battery(tmp_path, monkeypatch):
                 "inverters": [main_hybrid_inverter()],
                 "batteries": [house_battery_stub()],
                 "pv_systems": [],
+                # The fixture house profile references its heating system from this catalog.
+                "heating_systems": _fixture_heating_systems(),
             }
         ),
         live_settings={**default_live_settings(), "battery_ids": ["home"]},

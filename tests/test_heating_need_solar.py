@@ -1,6 +1,7 @@
 """Tests für Solarthermie und Geo im Heizbedarfsmodell."""
 from __future__ import annotations
 
+from tests.fixtures.heating_catalog import save_inline_house
 import json
 from pathlib import Path
 
@@ -146,7 +147,7 @@ def test_profiles_store_geo_and_solar_roundtrip(tmp_path: Path, monkeypatch):
             }
         ]
     }
-    save_house_profiles_document(str(path), doc)
+    save_inline_house(str(path), doc)
     raw = json.loads(path.read_text(encoding="utf-8"))
     profile = raw["profiles"][0]
     assert profile["latitude"] == 47.4

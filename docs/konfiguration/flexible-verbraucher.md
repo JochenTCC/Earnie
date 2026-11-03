@@ -68,9 +68,37 @@ Bei `daily_target_source: thermal` leitet das RC-Modell das Tagesenergie-Ziel au
 
 Details: [EHAL-Com](../ui/ehal-com.md), [Loxone-Signale](../referenz/loxone-signals.md) (Loxone-Defaults), [SwimSpa Filter](../dev/done/swimspa-filter.md).
 
-## Haus Wärme: Wärmequelle (`heat_source`)
+## Haus Wärme: Heizsystem (`heating_system_id`)
 
-Jeder Verbraucher `type: thermal_annual` hat eine Hauptwärmequelle `heat_source` (Pflicht). Im Hauskonfigurator heißt das Feld **Wärmequelle**.
+Der Verbraucher `type: thermal_annual` beschreibt den Wärmebedarf des Gebäudes (Wohnfläche, Gebäudeklasse bzw. HWB, Personen, Temperaturen, Solarthermie) und seine Smarthome-Bindings. Die Wärmeerzeugung steht in einem eigenen Katalog: `heating_systems[]` in `components.json`. Ein Eintrag enthält:
+
+| Feld | Bedeutung |
+| ---- | --------- |
+| `id`, `label` | Kennung und Bezeichnung des Heizsystems |
+| `heat_source` | Hauptwärmequelle, siehe [Wärmequelle](#haus-wärme-wärmequelle-heat_source) |
+| `nominal_power_kw` | Elektrische Leistung der Wärmepumpe (kW); bei Brennstoffen ungenutzt |
+| `min_on_quarterhours` | Mindestlaufzeit in Viertelstunden |
+| `heat_storage` | Optionaler Wärmespeicher, siehe [Wärmespeicher](#haus-wärme-optionaler-wärmespeicher-heat_storage) |
+| `parts` | Optionaler Heizstab, siehe [Heizstab](#haus-wärme-heizstab-im-wärmespeicher-parts) |
+
+```json
+"heating_systems": [
+  {"id": "heating_haus", "label": "Heizsystem Haus",
+   "heat_source": {"type": "heat_pump", "heat_pump_type": "erde"},
+   "nominal_power_kw": 1.9, "min_on_quarterhours": 4,
+   "heat_storage": {"volume_liters": 800}}
+]
+```
+
+**Referenzsystem:** Der Verbraucher verweist mit `heating_system_id` (Pflicht) auf das eingebaute Heizsystem. Live-Betrieb, Grundlast und die Vorschau im Hauskonfigurator rechnen immer mit diesem System. Der Hauskonfigurator legt den Eintrag beim Speichern an (Kennung `heating_<Hausprofil-ID>`) und ändert ihn direkt im Katalog. Am Verbraucher steht nur der Verweis.
+
+**Varianten:** Weitere Heizsysteme entstehen im Szenarienkonfigurator unter **Heizsystem-Varianten**, z. B. als Kopie des Referenzsystems. Dort ist das Referenzsystem eines Hauses nur lesbar, weil eine Änderung die Grundlast dieses Hauses verschiebt. Ein Heizsystem, auf das ein Hausprofil oder ein Szenario verweist, lässt sich nicht entfernen. Die Auswahl im Szenario beschreibt [Heizsystem im Szenario](#heizsystem-im-szenario-heating_system_ids).
+
+<a id="haus-wärme-wärmequelle-heat_source"></a>
+
+### Wärmequelle (`heat_source`)
+
+Jedes Heizsystem hat eine Hauptwärmequelle `heat_source` (Pflicht). Im Hauskonfigurator heißt das Feld **Wärmequelle**.
 
 | Feld | Bedeutung |
 | ---- | --------- |
@@ -100,9 +128,11 @@ Quellen: Nutzungsgrade und Energieinhalte aus SUSI, Brennstoffpreise aus dem Hei
 
 Verteilverluste rechnet Earnie nicht zusätzlich ein. Der Wärmeverlust des Gebäudes ist auf den HWB kalibriert, der Speicherverlust ist eigens modelliert.
 
-## Haus Wärme: Heizstab im Wärmespeicher (`parts`)
+<a id="haus-wärme-heizstab-im-wärmespeicher-parts"></a>
 
-Ein Heizstab lädt den Wärmespeicher elektrisch mit Wirkungsgrad 1. Er ist ein Teil des Verbrauchers `thermal_annual` und kein eigener Verbraucher:
+### Heizstab im Wärmespeicher (`parts`)
+
+Ein Heizstab lädt den Wärmespeicher elektrisch mit Wirkungsgrad 1. Er ist ein Teil des Heizsystems und kein eigener Verbraucher:
 
 ```json
 "parts": [{"id": "heating_rod", "type": "heating_rod", "nominal_power_kw": 3.0}]
@@ -114,17 +144,26 @@ Ein Heizstab lädt den Wärmespeicher elektrisch mit Wirkungsgrad 1. Er ist ein 
 - **Neben einem Brennstoff:** Jede kWh Heizstab-Wärme spart Brennstoff im Wert von Brennstoffpreis / Nutzungsgrad. Der Optimierer setzt den Heizstab ein, wenn Strom günstiger ist, z. B. bei PV-Überschuss mit niedriger Einspeisevergütung. Höchstens so viel Wärme, wie das Haus am Tag braucht.
 - **Grenzen:** Der Optimierer rechnet mit der Tageswärme des Hauses, nicht mit der freien Kapazität des Speichers. Der Heizstab plant derzeit nur im Szenarien-Explorer. Im Live-Betrieb bleibt er aus, eine Steuerung über ein eigenes Binding folgt später.
 
-## Haus Wärme: optionaler Wärmespeicher (`heat_storage`)
+**Gemessener Heizstab-Verbrauch:** Lief ein Heizstab im Haus während des Messzeitraums (z. B. über eine PV-Überschussregelung), steckt sein Verbrauch im gemessenen Gesamtverbrauch. Ohne Angabe landet er in der Grundlast, und der Optimierer plant ihn im Szenario ein zweites Mal. Am Verbraucher `thermal_annual` lässt sich deshalb eine der beiden Angaben hinterlegen (Hauskonfigurator: **Gemessener Heizstab-Verbrauch**):
 
-Bei `type: thermal_annual` lässt sich unter `thermal.heat_storage` ein **Pufferspeicher** modellieren. Solarthermie und Wärmepumpe speisen den Speicher; Raumheizung und Warmwasser entnehmen Wärme nur aus dem Speicher. Ohne Speicher bzw. bei `volume_liters = 0` gilt das bisherige Modell: Solarthermie wirkt als Tages-Gutschrift auf den WP-Bedarf.
+- **`heating_rod_profile_csv`:** Stundenwerte des Heizstabs in kW (Format wie die Verbrauchs-CSV der Verbraucher). Earnie zieht sie Stunde für Stunde vom Gesamtverbrauch ab.
+- **`heating_rod_annual_kwh`:** Jahresverbrauch des Heizstabs. Earnie zieht ihn als Pauschale von der Grundlast ab, in Stundenreihen gleichmäßig verteilt.
+
+Beide Angaben zugleich lehnt Earnie beim Laden ab. Erlaubt sind sie nur, wenn das Referenzsystem einen Heizstab hat. Der Abzug gilt für jedes Szenario, auch wenn es ein Heizsystem ohne Heizstab wählt: Dann fällt der gemessene Heizstab-Verbrauch einfach weg. Fehlt bei einem Haus mit Messdaten beides, zeigt der Szenario-Explorer einen Hinweis auf mögliche Doppelzählung. Für die Live-Steuerung ist das ein eigenes Thema; dort braucht ein Heizstab-Zähler eigene Smarthome-Bindings.
+
+<a id="haus-wärme-optionaler-wärmespeicher-heat_storage"></a>
+
+### Optionaler Wärmespeicher (`heat_storage`)
+
+Im Heizsystem lässt sich unter `heat_storage` ein **Pufferspeicher** modellieren. Solarthermie und Wärmepumpe speisen den Speicher; Raumheizung und Warmwasser entnehmen Wärme nur aus dem Speicher. Ohne Speicher bzw. bei `volume_liters = 0` gilt das bisherige Modell: Solarthermie wirkt als Tages-Gutschrift auf den WP-Bedarf.
 
 **Temperaturband (Jahressimulation):** Die Speichertemperatur darf zwischen `setpoint_c − tolerance_c` und **95 °C** liegen. Die Wärmepumpe heizt hart nach, wenn die Temperatur unter die Untergrenze fallen würde. Sie speist höchstens bis zum Sollwert (`setpoint_c`) und bleibt darüber aus. Überschusswärme oberhalb des Sollwerts kommt nur von der Solarthermie; deren Eingang wird erst oberhalb von 95 °C begrenzt.
 
 | Feld | Bedeutung |
 | ---- | --------- |
-| `thermal.heat_storage.volume_liters` | Speichervolumen; `≤ 0` oder fehlend = bisheriges Modell ohne Speicher |
-| `thermal.heat_storage.heat_loss_kw_per_k` | Speicherverlust gegen die Umgebung |
-| `thermal.heat_storage.setpoint_c` / `tolerance_c` | Sollwert und Untergrenze (`setpoint − tolerance`); Obergrenze für die Wärmepumpe = Sollwert, absolute Obergrenze (Solarthermie) = 95 °C |
+| `heat_storage.volume_liters` | Speichervolumen; `≤ 0` oder fehlend = bisheriges Modell ohne Speicher |
+| `heat_storage.heat_loss_kw_per_k` | Speicherverlust gegen die Umgebung |
+| `heat_storage.setpoint_c` / `tolerance_c` | Sollwert und Untergrenze (`setpoint − tolerance`); Obergrenze für die Wärmepumpe = Sollwert, absolute Obergrenze (Solarthermie) = 95 °C |
 
 **Schichtspeicher → Temperaturen für Earnie:** Hat der Speicher mehrere Fühler, muss das **Smarthome-Backend** eine **äquivalente Temperatur** `T_eq` bilden (volumengewichtetes Mittel). Zusätzlich liefert es den **untersten Fühler** `T_low`. Bindings am `thermal_annual`-Verbraucher: `sens_temperature_heat_storage` (`T_eq`) und `sens_temperature_heat_storage_low` (`T_low`). Anleitung: [Wärmespeicher Schichtung / T_eq](waermespeicher-schichtung-teq.md).
 
@@ -144,6 +183,20 @@ Darüber hinaus darf die Live-Optimierung opportunistisch Energie bis zum Sollwe
 **Live ohne Wärmespeicher:** Auch ohne `heat_storage` rechnet die Live-Optimierung nur über den Planungshorizont. Die Simulation des Hauses startet bei der Solltemperatur (`target_temp_c`), da es keinen Innentemperatur-Fühler gibt. Sie nutzt die Außentemperatur-Prognose und dieselben Regeln wie die Jahressimulation. Daraus ergeben sich der WP-Bedarf je Viertelstunde und die Tagesziele. Ohne Wohnfläche (`living_area_m2 = 0`) plant Earnie nur Warmwasser und zieht den prognostizierten Kollektorertrag pro Tag ab. Szenario-Explorer und Backtesting nutzen weiterhin die Jahressimulation mit historischem Wetter.
 
 Entwickler-Spec: [thermals-p2.md](../dev/done/thermals-p2.md).
+
+## Heizsystem im Szenario (`heating_system_ids`)
+
+Ein Szenario kann für die Haus-Wärme ein anderes Heizsystem aus dem Katalog wählen, z. B. Gas statt Wärmepumpe. Im Szenarienkonfigurator steht dafür je Haus-Wärme-Verbraucher die Auswahl **Heizsystem**; Vorgabe ist das Referenzsystem. Gespeichert wird nur eine abweichende Wahl:
+
+```json
+"settings": {"house_profile_id": "haus", "heating_system_ids": {"waermepumpe": "gas_variante"}}
+```
+
+- **Grundlast bleibt:** Der Jahresverbrauch des Hauses gilt für das eingebaute Heizsystem. Earnie leitet die Grundlast deshalb immer mit dem Referenzsystem ab und tauscht danach nur die Wärmeerzeugung. Ein Gas-System senkt so den Strombedarf um den Anteil der Wärmepumpe und bringt Brennstoffkosten hinzu.
+- **Messdaten:** Hat das Referenzsystem einen eigenen Zähler (Verbrauchs-CSV am Verbraucher), zieht Earnie die gemessenen Werte exakt ab. Ohne eigenen Zähler zieht Earnie das modellierte Profil des Referenzsystems ab; dessen Modellfehler bleibt dann in der Grundlast. Der Szenario-Explorer nennt in den Ergebnissen, welcher Fall vorliegt. Die Variante selbst ist immer modelliert.
+- **Referenzspalte:** Szenarien mit unterschiedlichem Heizsystem bekommen getrennte Referenzwerte, weil sich die Hauslast unterscheidet.
+- **Live-Szenario:** Das Live-Szenario rechnet immer mit dem Referenzsystem. Eine Auswahl `heating_system_ids` im Live-Szenario lehnt Earnie ab.
+- **Andere Häuser:** Eine Wärmepumpen-Variante ist auf die Heizlast eines Hauses ausgelegt. Earnie erlaubt sie trotzdem für ein anderes Haus und prüft die Auslegung derzeit nicht.
 
 ## E-Auto: `charging_schedule`
 

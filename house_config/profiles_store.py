@@ -78,12 +78,15 @@ def _normalize_profile_consumers(
     latitude: float,
     longitude: float,
     timezone_name: str,
+    heating_systems: dict | None,
 ) -> list[dict]:
     consumers: list[dict] = []
     seen: set[str] = set()
     thermal_consumer_indices: list[int] = []
     for c_index, item in enumerate(consumers_raw):
-        consumer = _normalize_consumer(item, c_index, profile_id)
+        consumer = _normalize_consumer(
+            item, c_index, profile_id, heating_systems=heating_systems
+        )
         if consumer["type"] == "thermal_annual":
             thermal_consumer_indices.append(c_index)
         if consumer["type"] == "thermal_annual" and consumer.get("thermal"):
@@ -184,7 +187,7 @@ def _profile_geo_and_csv_fields(raw: dict) -> dict:
     }
 
 
-def _normalize_profile(raw: dict, index: int) -> dict:
+def _normalize_profile(raw: dict, index: int, *, heating_systems: dict | None) -> dict:
     if not isinstance(raw, dict):
         raise ValueError(f"profiles[{index}] muss ein Objekt sein.")
     profile_id = str(raw.get("id", "")).strip()
@@ -212,6 +215,7 @@ def _normalize_profile(raw: dict, index: int) -> dict:
         latitude=fields["latitude"],
         longitude=fields["longitude"],
         timezone_name=fields["timezone_name"],
+        heating_systems=heating_systems,
     )
     # Grundlast (baseload_kwh / consumer_kwh / baseload_min_kwh) is NOT derived here:
     # it needs Open-Meteo weather and thus a built Config. Resolve at the point of use
@@ -329,7 +333,14 @@ def _normalize_grid_meter(raw: object) -> dict | None:
     }
 
 
-def normalize_house_profiles_document(doc: dict) -> dict:
+def normalize_house_profiles_document(
+    doc: dict, *, heating_systems: dict | None = None
+) -> dict:
+    """Normalize a house document; ``heating_systems`` is the catalog (id → entry).
+
+    Required as soon as a profile has a ``thermal_annual`` consumer (its
+    ``heating_system_id`` is resolved there, fail loud otherwise).
+    """
     if not isinstance(doc, dict):
         raise ValueError("house_profiles.json muss ein Objekt sein.")
     raw_profiles = doc.get("profiles", [])
@@ -337,7 +348,7 @@ def normalize_house_profiles_document(doc: dict) -> dict:
         raise ValueError("profiles muss ein Array sein.")
     profiles: dict[str, dict] = {}
     for index, item in enumerate(raw_profiles):
-        spec = _normalize_profile(item, index)
+        spec = _normalize_profile(item, index, heating_systems=heating_systems)
         if spec["id"] in profiles:
             raise ValueError(f"profiles: doppelte id '{spec['id']}'.")
         profiles[spec["id"]] = spec
@@ -350,8 +361,9 @@ def normalize_house_profiles_document(doc: dict) -> dict:
     return out
 
 
-# Process-wide mtime memo: abs_path → (file_mtime_ns, shadow, overlay_mtime_ns, doc).
-_house_profiles_doc_cache: dict[str, tuple[int, bool, int, dict]] = {}
+# Process-wide mtime memo: abs_path → ((file_mtime_ns, shadow, overlay_mtime_ns,
+# components_mtime_ns), doc).
+_house_profiles_doc_cache: dict[str, tuple[tuple, dict]] = {}
 
 
 def clear_house_profiles_doc_cache() -> None:
@@ -378,21 +390,49 @@ def _house_profiles_stamp(path: str, *, shadow: bool) -> tuple[int, bool, int]:
     return (_file_mtime_ns(path), shadow, overlay_mtime)
 
 
+def _heating_catalog_for(path: str, raw: dict) -> dict | None:
+    """Catalog next to the house file, read only when a thermal_annual consumer needs it."""
+    from house_config.heating_systems import load_heating_systems_for_house
+
+    if not _has_thermal_annual(raw):
+        return None
+    return load_heating_systems_for_house(path)
+
+
+def _has_thermal_annual(raw: dict) -> bool:
+    profiles = raw.get("profiles") if isinstance(raw, dict) else None
+    items = list(profiles.values()) if isinstance(profiles, dict) else profiles or []
+    return any(
+        isinstance(consumer, dict) and consumer.get("type") == "thermal_annual"
+        for profile in items
+        if isinstance(profile, dict)
+        for consumer in profile.get("consumers") or []
+    )
+
+
 def load_house_profiles_document(path: str) -> dict:
+    from house_config.heating_systems import components_path_for_house
     from runtime_store.shadow.mode import is_shadow_config_readonly
 
     abs_path = os.path.abspath(path)
     shadow = is_shadow_config_readonly()
-    stamp = _house_profiles_stamp(abs_path, shadow=shadow)
+    # The heating-system catalog lives in components.json: its mtime is part of the stamp.
+    stamp = (
+        *_house_profiles_stamp(abs_path, shadow=shadow),
+        _file_mtime_ns(components_path_for_house(abs_path)),
+    )
     cached = _house_profiles_doc_cache.get(abs_path)
-    if cached is not None and cached[0] == stamp[0] and cached[1] == stamp[1] and cached[2] == stamp[2]:
-        return cached[3]
-    doc = normalize_house_profiles_document(_read_json(path))
+    if cached is not None and cached[0] == stamp:
+        return cached[1]
+    raw = _read_json(path)
+    doc = normalize_house_profiles_document(
+        raw, heating_systems=_heating_catalog_for(path, raw)
+    )
     if shadow:
         from runtime_store.shadow.hooks import apply_overlay_to_house
 
         doc = apply_overlay_to_house(doc)
-    _house_profiles_doc_cache[abs_path] = (*stamp, doc)
+    _house_profiles_doc_cache[abs_path] = (stamp, doc)
     return doc
 
 
@@ -453,7 +493,9 @@ def save_house_profiles_document(path: str, doc: dict) -> None:
     if is_shadow_config_readonly():
         _refuse_shadow_config_write(path)
 
-    normalized = normalize_house_profiles_document(doc)
+    normalized = normalize_house_profiles_document(
+        doc, heating_systems=_heating_catalog_for(path, doc)
+    )
     serializable = {
         "profiles": [_serialize_profile(p) for p in normalized["profiles"].values()]
     }

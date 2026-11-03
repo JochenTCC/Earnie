@@ -242,6 +242,9 @@ def _seed_scenario_widget_state(
         scenario.get("enabled", True) is not False
     )
     _seed_own_reference_widget(session_scope, scenario)
+    from ui.scenario_heating_picks import seed_heating_picks
+
+    seed_heating_picks(session_scope, settings, profiles)
 
 def _seed_own_reference_widget(session_scope: str, scenario: dict) -> None:
     key = scoped_widget_key(session_scope, "scenario_own_reference")

@@ -89,6 +89,14 @@ def _render_imported_pv_results_notice(meta: dict) -> None:
             f"(≥12 Monate; Fallback: synthetisches PV aus Wetterdaten): {names}."
         )
 
+def _render_heating_results_notice(meta: dict) -> None:
+    """Heating variants with measured data and possible heating-rod double counts."""
+    labels = meta.get("labels") or scenario_labels_map()
+    for sid, hints in (meta.get("heating_hints_by_scenario") or {}).items():
+        for hint in hints:
+            st.info(f"{labels.get(sid, sid)}: {hint}")
+
+
 def render_backtesting_log_caption(meta: dict) -> None:
     st.subheader("Szenario-Explorer-Log")
     st.caption(f"Ergebnisdatei: `{backtesting_log.backtesting_log_json_path()}`")
@@ -274,6 +282,7 @@ def _deviation_labels_map(meta: dict) -> dict[str, str]:
 def _render_backtesting_results(meta: dict, hourly_df: pd.DataFrame) -> None:
     render_backtesting_log_caption(meta)
     _render_imported_pv_results_notice(meta)
+    _render_heating_results_notice(meta)
     render_annual_cost_table(meta)
     render_backtesting_monthly_chart(meta)
     render_scenario_consumption_table(meta, hourly_df)

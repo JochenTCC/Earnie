@@ -248,7 +248,10 @@ def test_serialize_consumer_keeps_use_profile_csv_false() -> None:
                 },
             },
         ),
-        ("thermal_annual", {"thermal": {"living_area_m2": 100.0}}),
+        (
+            "thermal_annual",
+            {"thermal": {"living_area_m2": 100.0}, "heating_system_id": "heating_home"},
+        ),
         ("thermal_rc", {"thermal_rc": {"water_volume_liters": 1000.0}}),
     ):
         consumer = {

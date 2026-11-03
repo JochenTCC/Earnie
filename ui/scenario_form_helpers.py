@@ -324,6 +324,7 @@ def build_scenario_settings(
     use_imported_pv: bool = False,
     user_import_cent_kwh: float | None = None,
     user_export_cent_kwh: float | None = None,
+    heating_system_ids: dict[str, str] | None = None,
 ) -> dict:
     from house_config.tariffs_store import (
         USER_EXPORT_CENT_KEY,
@@ -363,6 +364,8 @@ def build_scenario_settings(
         settings["house_profile_id"] = house_profile_id
     if use_imported_pv:
         settings["use_imported_pv"] = True
+    if heating_system_ids:
+        settings["heating_system_ids"] = dict(sorted(heating_system_ids.items()))
     return settings
 
 
@@ -394,6 +397,7 @@ def normalize_scenario_form_snapshot(scenario: dict) -> dict:
         use_imported_pv=bool(raw_settings.get("use_imported_pv")),
         user_import_cent_kwh=_optional_user_cent(raw_settings, USER_IMPORT_CENT_KEY),
         user_export_cent_kwh=_optional_user_cent(raw_settings, USER_EXPORT_CENT_KEY),
+        heating_system_ids=raw_settings.get("heating_system_ids") or None,
     )
     out = {
         "label": str(scenario.get("label", "") or "").strip(),

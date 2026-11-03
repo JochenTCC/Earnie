@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from house_config.profiles_store import normalize_house_profiles_document
+from tests.fixtures.heating_catalog import normalize_inline_house
 
 FIXTURE_DIR = Path(__file__).resolve().parent
 
@@ -25,7 +25,7 @@ def load_se_consumption_profile(profile_id: str) -> dict:
     if not path.is_file():
         raise FileNotFoundError(f"SE consumption fixture missing: {path}")
     raw = json.loads(path.read_text(encoding="utf-8"))
-    doc = normalize_house_profiles_document({"profiles": [raw]})
+    doc = normalize_inline_house({"profiles": [raw]})
     profiles = doc["profiles"]
     if profile_id not in profiles:
         raise KeyError(f"Fixture id mismatch: expected {profile_id!r} in {path.name}")

@@ -197,7 +197,8 @@ class ModeledClimateContext:
         default_factory=dict,
         repr=False,
     )
-    _thermal_year_profiles: dict[tuple[str, int], list[float]] = field(
+    # (consumer_id, heating_system_id, year): scenarios may swap the heating system.
+    _thermal_year_profiles: dict[tuple[str, str, int], list[float]] = field(
         default_factory=dict,
         repr=False,
     )
@@ -356,7 +357,7 @@ class ModeledClimateContext:
 
     def _thermal_hourly_profile_for_year(self, consumer: dict, year: int) -> list[float]:
         consumer_id = str(consumer.get("id") or consumer.get("label") or "thermal")
-        key = (consumer_id, year)
+        key = (consumer_id, str(consumer.get("heating_system_id") or ""), year)
         if key in self._thermal_year_profiles:
             return self._thermal_year_profiles[key]
 

@@ -119,6 +119,21 @@ def reference_fingerprint(scenario_params: dict | None) -> tuple:
     return (
         tariff_reference_fingerprint(scenario_params),
         hardware_reference_fingerprint(scenario_params),
+        heating_reference_fingerprint(scenario_params),
+    )
+
+
+def heating_reference_fingerprint(scenario_params: dict | None) -> tuple:
+    """Heating variants of the scenario: another system means another reference load."""
+    profile = (scenario_params or {}).get("_house_profile")
+    if not isinstance(profile, dict):
+        return ()
+    from house_config.heating_systems import HEATING_VARIANTS_KEY
+
+    return tuple(
+        sorted(
+            (v["consumer_id"], v["system_id"]) for v in profile.get(HEATING_VARIANTS_KEY) or []
+        )
     )
 
 

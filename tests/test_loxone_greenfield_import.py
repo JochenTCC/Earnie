@@ -1,6 +1,7 @@
 """Tests for greenfield Loxone Merker + EFM import (2.4.n P2)."""
 from __future__ import annotations
 
+from tests.fixtures.heating_catalog import normalize_inline_house, save_inline_house
 import json
 from pathlib import Path
 
@@ -133,7 +134,7 @@ def test_match_merges_legacy_wp_alias_into_waermepumpe(monkeypatch):
     assert len(thermals) == 1
     assert thermals[0]["ehal_bindings"]["heatpump.waermepumpe.sens_power_act"] == ""
     assert thermals[0]["ehal_bindings"]["heatpump.waermepumpe.set_enable"] == ""
-    normalize_house_profiles_document(
+    normalize_inline_house(
         {"profiles": [dict(house["profiles"][pid], id=pid)]}
     )
 
@@ -455,7 +456,7 @@ def test_normalize_and_save_round_trip(tmp_path, monkeypatch):
     result = run_greenfield_import(_doc(), _empty_house(), grid_area_id=_AREA)
     house = result["house_doc"]
     path = tmp_path / "house_profiles.json"
-    save_house_profiles_document(
+    save_inline_house(
         str(path),
         {
             "plant": house.get("plant"),
@@ -469,7 +470,7 @@ def test_normalize_and_save_round_trip(tmp_path, monkeypatch):
         c.get("type") == "ev" for p in reloaded["profiles"] for c in p.get("consumers", [])
     )
     # In-memory normalize also accepts the list form
-    normalized = normalize_house_profiles_document(
+    normalized = normalize_inline_house(
         {
             "plant": house.get("plant"),
             "profiles": list(house["profiles"].values()),

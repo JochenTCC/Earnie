@@ -426,7 +426,7 @@
     },
     "heat_storage": {
       "type": "object",
-      "description": "Optionaler Wärmespeicher am thermal_annual-Verbraucher; volume_liters 0 = kein Speicher.",
+      "description": "Optionaler Wärmespeicher eines Heizsystems in components.json heating_systems[]; volume_liters 0 = kein Speicher.",
       "properties": {
         "volume_liters": {
           "default": 0.0,
@@ -451,7 +451,7 @@
     },
     "heat_source": {
       "type": "object",
-      "description": "Hauptwärmequelle des thermal_annual-Verbrauchers (SUSI P1). efficiency = JAZ (Wärmepumpe) bzw. Nutzungsgrad; ohne Angabe gilt der Standardwert aus share/config/heat_source_defaults.json. fuel_price nur bei Brennstoffen, in der Einheit des Energieträgers (Öl ct/l, Gas und Fernwärme ct/kWh, Pellets €/t, Holz €/rm).",
+      "description": "Hauptwärmequelle eines Heizsystems in components.json heating_systems[] (SUSI P1). efficiency = JAZ (Wärmepumpe) bzw. Nutzungsgrad; ohne Angabe gilt der Standardwert aus share/config/heat_source_defaults.json. fuel_price nur bei Brennstoffen, in der Einheit des Energieträgers (Öl ct/l, Gas und Fernwärme ct/kWh, Pellets €/t, Holz €/rm).",
       "required": [
         "type"
       ],
@@ -646,15 +646,9 @@
           "exclusiveMinimum": 0,
           "description": "Optional: genauer Heizwärmebedarf HWB in kWh/m²a (überschreibt Gebäudeklasse)."
         },
-        "heat_source": {
-          "$ref": "#/definitions/heat_source"
-        },
-        "parts": {
-          "type": "array",
-          "description": "Innere Teile des Verbrauchers (D1). 2.8: nur der Heizstab (id/type heating_rod) am thermal_annual-Verbraucher, nur mit heat_storage. Wire-Kennung = <consumer_id>_<part_id>.",
-          "items": {
-            "$ref": "#/definitions/consumer_part"
-          }
+        "heating_system_id": {
+          "type": "string",
+          "description": "thermal_annual: Verweis auf das Referenz-Heizsystem in components.json heating_systems[] (das eingebaute System; Live und Grundlast rechnen damit). Wärmequelle, Wärmespeicher, Heizstab, Nennleistung und Mindestlaufzeit stehen im Katalogeintrag, nicht am Verbraucher."
         },
         "persons": {
           "default": 2,
@@ -698,9 +692,6 @@
           "type": "number",
           "minimum": 0,
           "description": "Optional: Haus-Verlustkoeffizient H (kW/K); fehlt oder 0 = aus HWB abgeleitet."
-        },
-        "heat_storage": {
-          "$ref": "#/definitions/heat_storage"
         },
         "solar_thermal_area_m2": {
           "default": 0.0,

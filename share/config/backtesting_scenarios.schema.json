@@ -88,6 +88,13 @@
                 "type": "string"
               }
             },
+            "heating_system_ids": {
+              "type": "object",
+              "description": "Heizsystem-Variante je thermal_annual-Verbraucher: {\"<consumer_id>\": \"<heating_systems[].id>\"} aus components.json. Ohne Eintrag gilt das Referenzsystem des Hauses; die Grundlast rechnet immer mit dem Referenzsystem.",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
             "battery_id": {
               "type": "string",
               "description": "Removed in earnie_data_model 4 — use battery_ids[].",

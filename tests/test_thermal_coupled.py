@@ -307,15 +307,24 @@ def test_coupled_hourly_solar_can_raise_store_above_setpoint():
 def test_profiles_normalize_heat_storage():
     from house_config.profiles_thermal_annual import normalize_thermal_annual_consumer
 
+    from house_config.heating_systems import heating_systems_by_id
+
+    catalog = heating_systems_by_id(
+        {
+            "heating_systems": [
+                {
+                    "id": "hs",
+                    "heat_source": {"type": "heat_pump", "heat_pump_type": "luft"},
+                    "heat_storage": _storage(volume_liters=1000.0),
+                }
+            ]
+        }
+    )
     spec: dict = {}
     normalize_thermal_annual_consumer(
-        {
-            "living_area_m2": 100.0,
-            "building_class": 2,
-            "heat_source": {"type": "heat_pump", "heat_pump_type": "luft"},
-            "heat_storage": _storage(volume_liters=1000.0),
-        },
+        {"living_area_m2": 100.0, "building_class": 2, "heating_system_id": "hs"},
         spec,
         copy_loxone_binding=lambda _r, _s: None,
+        heating_systems=catalog,
     )
     assert spec["thermal"]["heat_storage"]["volume_liters"] == 1000.0

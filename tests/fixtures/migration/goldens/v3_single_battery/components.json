@@ -62,5 +62,23 @@
             },
             "efficiency": 0.97
         }
+    ],
+    "heating_systems": [
+        {
+            "id": "heating_profile_a",
+            "label": "Heizsystem House A",
+            "heat_source": {
+                "type": "heat_pump",
+                "heat_pump_type": "erde"
+            },
+            "nominal_power_kw": 1.9,
+            "min_on_quarterhours": 1,
+            "heat_storage": {
+                "volume_liters": 887.0,
+                "heat_loss_kw_per_k": 0.01,
+                "setpoint_c": 47.0,
+                "tolerance_c": 5.0
+            }
+        }
     ]
 }

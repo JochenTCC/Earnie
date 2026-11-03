@@ -676,7 +676,12 @@ def _warn_cons_data_balance(scenarios: dict, start, end) -> None:
         if not isinstance(profile, dict) or profile.get("id") in seen:
             continue
         seen.add(profile.get("id"))
-        balance = cons_data_window_balance(cons_df, profile, window=(start, end))
+        from house_config.heating_systems import baseload_reference_profile
+
+        # cons_data is the real house: compare it with the installed heating system.
+        balance = cons_data_window_balance(
+            cons_df, baseload_reference_profile(profile), window=(start, end)
+        )
         if balance["status"] != "ok":
             logging.warning("Verbrauchsbilanz Profil '%s': %s", profile.get("id"), balance["message"])
 
@@ -1093,6 +1098,11 @@ def main(argv: list[str] | None = None):
         period_meta["imported_pv_scenario_ids"] = used_pv
     if missing_pv:
         period_meta["imported_pv_missing_scenario_ids"] = missing_pv
+    from house_config.heating_systems import heating_result_hints_by_scenario
+
+    heating_hints = heating_result_hints_by_scenario(scenarios)
+    if heating_hints:
+        period_meta["heating_hints_by_scenario"] = heating_hints
     fee_breakdown_by_scenario = fee_breakdowns_by_result_id(
         scenarios=scenarios,
         historical_params=reference_params,

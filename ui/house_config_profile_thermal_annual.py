@@ -253,6 +253,59 @@ def _render_heating_rod_fields(
     ]
 
 
+_MEASURED_ROD_NONE = "Keine Angabe"
+_MEASURED_ROD_ANNUAL = "Jahresverbrauch (kWh)"
+_MEASURED_ROD_CSV = "Eigene CSV-Datei"
+
+
+def _render_measured_rod_fields(
+    consumer: dict, index: int, *, session_scope: str
+) -> dict:
+    """Measured consumption of the real heating rod (SE baseload only, no EHAL binding)."""
+    from house_config.heating_systems import ROD_ANNUAL_KWH_KEY, ROD_PROFILE_CSV_KEY
+
+    if consumer.get(ROD_PROFILE_CSV_KEY):
+        start = _MEASURED_ROD_CSV
+    elif consumer.get(ROD_ANNUAL_KWH_KEY) is not None:
+        start = _MEASURED_ROD_ANNUAL
+    else:
+        start = _MEASURED_ROD_NONE
+    options = [_MEASURED_ROD_NONE, _MEASURED_ROD_ANNUAL, _MEASURED_ROD_CSV]
+    mode = labeled_selectbox(
+        "Gemessener Heizstab-Verbrauch",
+        options=options,
+        index=options.index(start),
+        help=(
+            "Nur für den Szenario-Explorer mit Messdaten: Lief der Heizstab im Messzeitraum, "
+            "steckt sein Verbrauch im Gesamtverbrauch. Mit CSV oder Jahres-kWh zieht Earnie "
+            "ihn von der Grundlast ab, sonst kann er doppelt gezählt werden."
+        ),
+        ratios=WIDE_LABEL_RATIOS,
+        key=_scoped_key(session_scope, f"hc_rod_measured_mode_{index}"),
+    )
+    if mode == _MEASURED_ROD_ANNUAL:
+        kwh = labeled_number_input(
+            "Heizstab Jahresverbrauch (kWh)",
+            min_value=1.0,
+            value=float(consumer.get(ROD_ANNUAL_KWH_KEY) or 100.0),
+            step=50.0,
+            ratios=WIDE_LABEL_RATIOS,
+            key=_scoped_key(session_scope, f"hc_rod_measured_kwh_{index}"),
+        )
+        return {ROD_ANNUAL_KWH_KEY: float(kwh)}
+    if mode == _MEASURED_ROD_CSV:
+        from ui.form_layout import labeled_text_input
+
+        path = labeled_text_input(
+            "Heizstab CSV (Pfad)",
+            value=str(consumer.get(ROD_PROFILE_CSV_KEY) or ""),
+            help="Stundenwerte in kW, gleiches Format wie die Verbrauchs-CSV der Verbraucher.",
+            key=_scoped_key(session_scope, f"hc_rod_measured_csv_{index}"),
+        )
+        return {ROD_PROFILE_CSV_KEY: str(path).strip()} if str(path).strip() else {}
+    return {}
+
+
 def _render_thermal_comfort_fields(
     item: dict,
     thermal: dict,
@@ -440,6 +493,9 @@ def _render_thermal_annual_wp_preview(
         parts = _render_heating_rod_fields(consumer, index, session_scope=session_scope)
         if parts:
             item["parts"] = parts
+            item.update(
+                _render_measured_rod_fields(consumer, index, session_scope=session_scope)
+            )
     if _live_markers_enabled():
         st.caption(
             "WP-Bindings unter **Daemon Control → EHAL-Com** "

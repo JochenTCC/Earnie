@@ -134,7 +134,7 @@ def test_normalize_rejects_duplicate_battery_ids():
 
 def test_load_missing_file_returns_empty_catalog(tmp_path):
     doc = load_components_document(str(tmp_path / "missing.json"))
-    assert doc == {"inverters": [], "batteries": [], "pv_systems": []}
+    assert doc == {"inverters": [], "batteries": [], "pv_systems": [], "heating_systems": []}
 
 
 def test_save_persists_powerstation_type_fields(tmp_path):

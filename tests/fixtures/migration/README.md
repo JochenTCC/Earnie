@@ -27,6 +27,7 @@ Goldens of migrated results: [`goldens/<snapshot>/`](goldens/) (ConfigMigration 
 | `v4_pre_tariff_track/` | synthetic, from the `v4_pre_topology` golden (2026-10-26) | `dm5.netznutzung_split` + `tf1.tariff_format`: own base price (`profile_a`), base `0` (`profile_b`), no `netznutzung` (`profile_c`), untagged `grid_fees.json` / `user_tariffs.json`, `tariffs.json` on `earnie_data_model: 4`, gross import and net export user tariff without `vat_percent` |
 | `v5_pre_scenario_feed_in/` | synthetic, from the `v4_pre_tariff_track` golden (2026-10-27) | `dm5.scenario_feed_in` (Edibert P3b, D2): flat `k_push_cent` + `feed_in_mode` `fixed` / `dynamic_epex` without tariffs, and a scenario with tariffs plus a leftover `feed_in_mode` |
 | `v5_pre_heat_source/` | synthetic, copy of `v5_pre_scenario_feed_in` (2026-10-31) | `dm5.heat_source` (SUSI P1): `heat_pump_type` `erde` (`profile_a`), missing → `luft` (`profile_b`), `luft` (`profile_c`) |
+| `v5_pre_heating_systems/` | synthetic, `v5_pre_heat_source` after `dm5.heat_source` (2026-11-02, dogfooding state) | `dm5.heating_systems`: heat pump with storage, heating rod and `min_on_quarterhours` (`profile_a`), heat pump with storage (`profile_b`, its ID `heating_profile_b` is already taken in `components.json` → `_2`), gas without storage (`profile_c`) |
 
 Pack files included when present: `config.json`, `house_profiles.json`, `components.json`, `deviation_rules.json`, `backtesting_scenarios.json`, `grid_fees.json`. No `uploads/`, schemas, examples, or private `tariffs.json`.
 

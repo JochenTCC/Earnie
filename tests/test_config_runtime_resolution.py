@@ -129,6 +129,13 @@ def _write_id_only_config(config_dir, *, battery_wear_enabled: bool = False) -> 
                         "inverter_id": "wr_main",
                     }
                 ],
+                "heating_systems": [
+                    {
+                        "id": "heating_efh",
+                        "heat_source": {"type": "heat_pump", "heat_pump_type": "luft"},
+                        "nominal_power_kw": 3.0,
+                    }
+                ],
             }
         ),
         encoding="utf-8",
@@ -149,8 +156,7 @@ def _write_id_only_config(config_dir, *, battery_wear_enabled: bool = False) -> 
                             {
                                 "id": "heat",
                                 "type": "thermal_annual",
-                                "heat_source": {"type": "heat_pump", "heat_pump_type": "luft"},
-                                "nominal_power_kw": 3.0,
+                                "heating_system_id": "heating_efh",
                             }
                         ],
                     }

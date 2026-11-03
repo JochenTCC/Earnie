@@ -1,6 +1,7 @@
 """Tests für Planungs-Editoren und ID-Generierung (1.24.e)."""
 from __future__ import annotations
 
+from tests.fixtures.heating_catalog import save_inline_house, write_inline_house
 import json
 
 import pytest
@@ -666,9 +667,7 @@ def test_house_profile_hwb_normalization(tmp_path, monkeypatch):
 
     install_open_meteo_climate_mock(monkeypatch)
     path = tmp_path / "house_profiles.json"
-    path.write_text(
-        json.dumps(
-            {
+    write_inline_house(path, {
                 "profiles": [
                     {
                         "id": "home",
@@ -691,10 +690,7 @@ def test_house_profile_hwb_normalization(tmp_path, monkeypatch):
                         ],
                     }
                 ]
-            }
-        ),
-        encoding="utf-8",
-    )
+            })
     doc = load_house_profiles_document(str(path))
     thermal = doc["profiles"]["home"]["consumers"][0]["thermal"]
     assert thermal["hwb_kwh_m2"] == 62.0
@@ -936,9 +932,7 @@ def test_consumer_widget_gen_bump_changes_scoped_hc_keys():
 
 def test_profile_accepts_thermal_on_second_consumer(tmp_path):
     path = tmp_path / "house_profiles.json"
-    path.write_text(
-        json.dumps(
-            {
+    write_inline_house(path, {
                 "profiles": [
                     {
                         "id": "home",
@@ -957,10 +951,7 @@ def test_profile_accepts_thermal_on_second_consumer(tmp_path):
                         ],
                     }
                 ]
-            }
-        ),
-        encoding="utf-8",
-    )
+            })
     doc = load_house_profiles_document(str(path))
     consumers = doc["profiles"]["home"]["consumers"]
     assert consumers[1]["type"] == "thermal_annual"
@@ -970,9 +961,7 @@ def test_profile_accepts_thermal_on_second_consumer(tmp_path):
 
 def test_profile_rejects_two_thermal_annual_consumers(tmp_path):
     path = tmp_path / "house_profiles.json"
-    path.write_text(
-        json.dumps(
-            {
+    write_inline_house(path, {
                 "profiles": [
                     {
                         "id": "home",
@@ -996,10 +985,7 @@ def test_profile_rejects_two_thermal_annual_consumers(tmp_path):
                         ],
                     }
                 ]
-            }
-        ),
-        encoding="utf-8",
-    )
+            })
     with pytest.raises(ValueError, match="nur ein Verbraucher"):
         load_house_profiles_document(str(path))
 
@@ -1717,7 +1703,7 @@ def test_upsert_thermal_profile_roundtrip(tmp_path, monkeypatch):
 
     install_open_meteo_climate_mock(monkeypatch)
     path = tmp_path / "house_profiles.json"
-    save_house_profiles_document(
+    save_inline_house(
         str(path),
         {
             "profiles": [
