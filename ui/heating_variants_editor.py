@@ -1,4 +1,4 @@
-"""Heating-system variants editor (components.json ``heating_systems[]``).
+"""Heating-system variants editor (components.json ``heating_systems[]``), Hauskonfigurator area.
 
 Lists every catalog entry. A house's reference system is read-only here (it is edited in the
 house configurator, because it fixes that house's baseload) and can be copied as the start of
@@ -134,9 +134,10 @@ def _copy_of(entry: dict, catalog: list[dict]) -> dict:
 def render_heating_variants_editor() -> None:
     st.subheader("Heizsystem-Varianten")
     st.caption(
-        "Heizsysteme für den Vergleich im Szenario-Explorer. Das Referenzsystem eines Hauses "
-        "(eingebaute Heizung) bearbeitest du im Hauskonfigurator; hier lässt es sich als "
-        "Vorlage kopieren."
+        "Heizsysteme für den Vergleich im Szenario-Explorer; die Auswahl je Szenario "
+        "trifft der Szenarienkonfigurator. Das Referenzsystem eines Hauses (eingebaute "
+        "Heizung) bearbeitest du im Bereich „Hausprofil“ beim Verbraucher „Haus Wärme“; "
+        "hier lässt es sich als Vorlage kopieren."
     )
     try:
         components, catalog, house_raw, scenarios_raw = _load()
@@ -168,7 +169,7 @@ def render_heating_variants_editor() -> None:
     if selected_id == NEW_VARIANT_OPTION:
         if not catalog:
             st.info(
-                "Noch kein Heizsystem. Das Referenzsystem entsteht im Hauskonfigurator "
+                "Noch kein Heizsystem. Das Referenzsystem entsteht im Bereich „Hausprofil“ "
                 "(Verbraucher „Haus Wärme“)."
             )
             return
@@ -187,7 +188,7 @@ def render_heating_variants_editor() -> None:
         st.info(
             "Referenzsystem von Hausprofil "
             + ", ".join(f"'{pid}'" for pid in owners[selected_id])
-            + ": nur lesbar, Änderungen im Hauskonfigurator (sie verschieben die Grundlast)."
+            + ": nur lesbar, Änderungen im Bereich „Hausprofil“ (sie verschieben die Grundlast)."
         )
         st.markdown("\n".join(f"- {line}" for line in _summary_lines(entry)))
         if st.button("Als neue Variante kopieren", key="hsv_copy"):

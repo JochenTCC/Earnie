@@ -26,6 +26,7 @@ def test_title_and_default_tab():
     [tabs] = at.segmented_control
     assert tabs.options == [
         "Hausprofil",
+        "Heizsysteme",
         "Wechselrichter",
         "PV-Felder",
         "Batterien",
@@ -46,6 +47,14 @@ def test_switch_to_pv_tab_renders_without_exception():
     assert not at.exception
     [tabs_after] = at.segmented_control
     assert tabs_after.value == "PV-Felder"
+
+
+def test_switch_to_heizsysteme_tab_shows_variants_editor():
+    at = AppTest.from_file(str(_SCRIPT)).run(timeout=_TIMEOUT_S)
+    [tabs] = at.segmented_control
+    tabs.set_value("Heizsysteme").run(timeout=_TIMEOUT_S)
+    assert not at.exception
+    assert any(h.value == "Heizsystem-Varianten" for h in at.subheader)
 
 
 def test_switch_to_batterien_tab_renders_without_exception():

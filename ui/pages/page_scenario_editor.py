@@ -129,10 +129,6 @@ def render() -> None:
         st.caption(f"Tarifkatalog: Stand {catalog_meta['catalog_as_of']}")
 
     _render_scenarios_tab()
-    from ui.heating_variants_editor import render_heating_variants_editor
-
-    st.divider()
-    render_heating_variants_editor()
 
 from ui.pages.scenario_editor_session import (  # noqa: E402
     _SESSION_ACTIVE_SELECT_KEY,

@@ -106,6 +106,6 @@ def render_heating_picks(
             picks[cid] = system_id
     st.caption(
         "Die Grundlast rechnet immer mit dem Referenzsystem; die Variante tauscht nur die "
-        "Wärmeerzeugung. Varianten im Abschnitt „Heizsystem-Varianten“ anlegen."
+        "Wärmeerzeugung. Varianten im Hauskonfigurator im Bereich „Heizsysteme“ anlegen."
     )
     return picks

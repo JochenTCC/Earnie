@@ -71,14 +71,16 @@ Heating systems become a catalog, following the pattern of batteries and PV syst
 
 ### Configuration flow
 
-1. The user configures the heating in the house configurator as today. The form creates and
-   edits the referenced catalog entry **in place**; the consumer stores only the reference. No
+1. The user configures the heating in the house configurator as today, in the section
+   „Heizsystem (Referenzsystem: <label>)“ of the „Haus Wärme“ form, below the section
+   „Gebäude / Wärmebedarf“. The form creates and edits the referenced catalog entry **in place**; the consumer stores only the reference. No
    inline copy on the consumer and no sync between two copies. Being the reference system is
    derived from the consumer's reference only, not from a flag in the entry. An entry is the
    reference system of **at most one house**: saving a house whose referenced entry another
    house also references fails loud (hand-edited JSON), because the in-place edit would move
    the other house's baseload.
-2. A new heating-variants editor lists all catalog entries. The reference system of a house is
+2. A heating-variants editor (Hauskonfigurator area „Heizsysteme“, moved there from the bottom
+   of the Szenarienkonfigurator on 2026-11-03) lists all catalog entries. The reference system of a house is
    shown **read-only** there ("reference system of house X, edit in the house configurator"),
    because changing it changes that house's baseload. It can be copied as the starting point of
    a new variant.

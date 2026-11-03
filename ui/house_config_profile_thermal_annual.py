@@ -50,21 +50,8 @@ def _render_thermal_annual_building_fields(
     *,
     session_scope: str,
 ) -> dict:
+    st.markdown("**Gebäude / Wärmebedarf**")
     item: dict = {
-        "min_on_quarterhours": labeled_number_input(
-            "Mindestlaufzeit (Viertelstunden)",
-            min_value=1,
-            value=int(
-                consumer.get(
-                    "min_on_quarterhours",
-                    consumer_default(
-                        "min_on_quarterhours", consumer_type="thermal_annual"
-                    ),
-                )
-            ),
-            ratios=WIDE_LABEL_RATIOS,
-            key=_scoped_key(session_scope, f"hc_ta_min_qh_{index}"),
-        ),
         "living_area_m2": labeled_number_input(
             "Wohnfläche (m²)",
             min_value=0.0,
@@ -313,9 +300,6 @@ def _render_thermal_comfort_fields(
     *,
     session_scope: str,
 ) -> None:
-    item["heat_source"] = _render_heat_source_fields(
-        thermal, index, session_scope=session_scope
-    )
     item["persons"] = labeled_number_input(
         "Personen",
         min_value=1,
@@ -464,6 +448,82 @@ def _render_thermal_storage_fields(
     }
 
 
+def _reference_system_heading(consumer: dict, *, session_scope: str) -> str:
+    """Section heading of the generation fields; names the referenced catalog entry.
+
+    The form consumer carries the generation fields inline, not ``heating_system_id``; the
+    reference comes from the saved house file, as on save (``merge_inline_heating_systems``).
+    ``session_scope`` is the profile id (``__new__`` for an unsaved profile).
+    """
+    from house_config.heating_systems import (
+        HEATING_SYSTEM_ID_KEY,
+        load_heating_systems_for_house,
+        read_raw_json,
+        reference_ids_by_profile,
+    )
+    from runtime_store.persist_paths import resolve_house_profiles_json_path
+
+    house_path = resolve_house_profiles_json_path()
+    system_id = str(consumer.get(HEATING_SYSTEM_ID_KEY) or "").strip()
+    if not system_id:
+        refs = reference_ids_by_profile(read_raw_json(house_path)).get(session_scope, {})
+        system_id = refs.get(str(consumer.get("id") or ""), "")
+    entry = load_heating_systems_for_house(house_path).get(system_id) if system_id else None
+    if entry is None:
+        return "**Heizsystem (Referenzsystem, wird beim Speichern angelegt)**"
+    return f"**Heizsystem (Referenzsystem: {entry['label']})**"
+
+
+def _render_reference_system_fields(
+    item: dict,
+    consumer: dict,
+    thermal: dict,
+    index: int,
+    *,
+    session_scope: str,
+) -> None:
+    """Generation fields; saving moves them into the referenced ``heating_systems[]`` entry."""
+    st.markdown(_reference_system_heading(consumer, session_scope=session_scope))
+    st.caption(
+        "Die eingebaute Heizung. Weitere Heizsysteme für den Vergleich im Szenario-Explorer "
+        "im Bereich „Heizsysteme“ oben anlegen."
+    )
+    item["heat_source"] = _render_heat_source_fields(
+        thermal, index, session_scope=session_scope
+    )
+    item["nominal_power_kw"] = float(
+        labeled_number_input(
+            "Nennleistung Wärmepumpe (kW, elektrisch)",
+            min_value=0.0,
+            value=float(consumer.get("nominal_power_kw", 0.0)),
+            key=_scoped_key(session_scope, f"hc_nom_{index}"),
+        )
+    )
+    item["min_on_quarterhours"] = labeled_number_input(
+        "Mindestlaufzeit (Viertelstunden)",
+        min_value=1,
+        value=int(
+            consumer.get(
+                "min_on_quarterhours",
+                consumer_default("min_on_quarterhours", consumer_type="thermal_annual"),
+            )
+        ),
+        ratios=WIDE_LABEL_RATIOS,
+        key=_scoped_key(session_scope, f"hc_ta_min_qh_{index}"),
+    )
+    storage = _render_thermal_storage_fields(
+        thermal, index, session_scope=session_scope
+    )
+    if storage is not None:
+        item["heat_storage"] = storage
+        parts = _render_heating_rod_fields(consumer, index, session_scope=session_scope)
+        if parts:
+            item["parts"] = parts
+            item.update(
+                _render_measured_rod_fields(consumer, index, session_scope=session_scope)
+            )
+
+
 def _render_thermal_annual_wp_preview(
     item: dict,
     consumer: dict,
@@ -485,17 +545,9 @@ def _render_thermal_annual_wp_preview(
             default_azimuth=location["default_pv_azimuth"],
         )
     )
-    storage = _render_thermal_storage_fields(
-        thermal, index, session_scope=session_scope
+    _render_reference_system_fields(
+        item, consumer, thermal, index, session_scope=session_scope
     )
-    if storage is not None:
-        item["heat_storage"] = storage
-        parts = _render_heating_rod_fields(consumer, index, session_scope=session_scope)
-        if parts:
-            item["parts"] = parts
-            item.update(
-                _render_measured_rod_fields(consumer, index, session_scope=session_scope)
-            )
     if _live_markers_enabled():
         st.caption(
             "WP-Bindings unter **Daemon Control → EHAL-Com** "

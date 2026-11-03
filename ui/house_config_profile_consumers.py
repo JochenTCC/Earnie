@@ -237,6 +237,9 @@ def _render_consumer_identity_fields(
     force_id = _render_consumer_id_from_label(
         consumer, index, session_scope=session_scope, label=c_label
     )
+    if c_type == "thermal_annual":
+        # Generation field: rendered in the „Heizsystem“ section (same widget key).
+        return c_type, c_label, float(consumer.get("nominal_power_kw", 0.0)), force_id
     nominal = labeled_number_input(
         "Nennleistung (kW)",
         min_value=0.0,
@@ -338,7 +341,7 @@ def _render_consumer_form_body(
             consumer,
             index,
             session_scope=session_scope,
-            nominal_power_kw=float(nominal),
+            nominal_power_kw=float(item["nominal_power_kw"]),
         )
     )
     return item

@@ -1,4 +1,5 @@
-"""Heating-system variants: scenario select box and variants editor (Szenarienkonfigurator).
+"""Heating-system variants: scenario select box (Szenarienkonfigurator) and variants editor
+(Hauskonfigurator, area "Heizsysteme").
 
 The fixture house ``test_home`` has the thermal_annual consumer ``wp`` with its reference
 system ``heating_test_home``; each test adds a gas variant to the isolated components.json.
@@ -15,6 +16,7 @@ from streamlit.testing.v1 import AppTest
 from tests.apptest.fields import SCENARIO_ID, SCENARIO_RADIO_LABEL
 
 _SCRIPT = Path(__file__).parent / "scripts" / "run_page_scenario_editor.py"
+_HOUSE_SCRIPT = Path(__file__).parent / "scripts" / "run_page_house_config.py"
 _TIMEOUT_S = 30.0
 _PICK_KEY = f"{SCENARIO_ID}__scenario_heating_wp"
 _GAS = {"id": "gas_variante", "label": "Gas-Variante", "heat_source": {"type": "gas"}}
@@ -56,6 +58,18 @@ def _session(radio_label: str = SCENARIO_RADIO_LABEL) -> AppTest:
     return at
 
 
+def _editor_session() -> AppTest:
+    at = AppTest.from_file(str(_HOUSE_SCRIPT)).run(timeout=_TIMEOUT_S)
+    at.segmented_control[0].set_value("Heizsysteme").run(timeout=_TIMEOUT_S)
+    assert not at.exception
+    return at
+
+
+def test_scenario_editor_has_no_variants_editor() -> None:
+    at = _session()
+    assert not [sb for sb in at.selectbox if sb.key == "hsv_select"]
+
+
 def test_scenario_select_defaults_to_the_reference_system() -> None:
     at = _session()
     pick = at.selectbox(key=_PICK_KEY)
@@ -85,7 +99,7 @@ def test_live_scenario_has_no_heating_select() -> None:
 
 
 def test_reference_system_is_read_only_and_can_be_copied() -> None:
-    at = _session()
+    at = _editor_session()
     reference = next(o for o in at.selectbox(key="hsv_select").options if "Referenzsystem" in o)
     at.selectbox(key="hsv_select").set_value(reference).run(timeout=_TIMEOUT_S)
     assert any("nur lesbar" in i.value for i in at.info)
@@ -99,7 +113,7 @@ def test_reference_system_is_read_only_and_can_be_copied() -> None:
 
 
 def test_variant_edit_and_delete_guard() -> None:
-    at = _session()
+    at = _editor_session()
     at.selectbox(key="hsv_select").set_value("Gas-Variante").run(timeout=_TIMEOUT_S)
     label_key = next(t.key for t in at.text_input if str(t.key).endswith("__label"))
     at.text_input(key=label_key).set_value("Gas neu").run(timeout=_TIMEOUT_S)
@@ -109,7 +123,8 @@ def test_variant_edit_and_delete_guard() -> None:
     assert next(e for e in _catalog() if e["id"] == "gas_variante")["label"] == "Gas neu"
 
     # Referenced by a scenario → delete refused, entry stays.
-    at.selectbox(key=_PICK_KEY).set_value("Gas neu").run(timeout=_TIMEOUT_S)
+    _session().selectbox(key=_PICK_KEY).set_value("Gas neu").run(timeout=_TIMEOUT_S)
+    at = _editor_session()
     at.selectbox(key="hsv_select").set_value("Gas neu").run(timeout=_TIMEOUT_S)
     delete_key = next(b.key for b in at.button if str(b.key).endswith("__delete"))
     at.button(key=delete_key).click().run(timeout=_TIMEOUT_S)

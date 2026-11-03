@@ -115,7 +115,7 @@ Empfohlene Reihenfolge:
 
 *Hauskonfigurator: Hausprofil, Verbraucher, PV und Speicher als Kataloge.*
 
-Unter **Konfiguration → Hauskonfigurator** werden die baulichen und technischen Bausteine des Haushalts gepflegt. Gespeichert werden sie als Kataloge (Hausprofile, Komponenten), auf die die Szenarien später verweisen.
+Unter **Konfiguration → Hauskonfigurator** werden die baulichen und technischen Bausteine des Haushalts gepflegt. Gespeichert werden sie als Kataloge (Hausprofile, Komponenten), auf die die Szenarien später verweisen. Die Bereiche sind **Hausprofil**, **Heizsysteme** (Heizsystem-Varianten für den Szenario-Vergleich, siehe [Flexible Verbraucher](../konfiguration/flexible-verbraucher.md#haus-wärme-heizsystem-heating_system_id)), **Wechselrichter**, **PV-Felder** und **Batterien**.
 
 Die Sidebar zeigt, welche Schritte der Ersteinrichtung noch fehlen.
 

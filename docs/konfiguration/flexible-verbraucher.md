@@ -92,7 +92,12 @@ Der Verbraucher `type: thermal_annual` beschreibt den Wärmebedarf des Gebäudes
 
 **Referenzsystem:** Der Verbraucher verweist mit `heating_system_id` (Pflicht) auf das eingebaute Heizsystem. Live-Betrieb, Grundlast und die Vorschau im Hauskonfigurator rechnen immer mit diesem System. Der Hauskonfigurator legt den Eintrag beim Speichern an (Kennung `heating_<Hausprofil-ID>`) und ändert ihn direkt im Katalog. Am Verbraucher steht nur der Verweis.
 
-**Varianten:** Weitere Heizsysteme entstehen im Szenarienkonfigurator unter **Heizsystem-Varianten**, z. B. als Kopie des Referenzsystems. Dort ist das Referenzsystem eines Hauses nur lesbar, weil eine Änderung die Grundlast dieses Hauses verschiebt. Ein Heizsystem, auf das ein Hausprofil oder ein Szenario verweist, lässt sich nicht entfernen. Die Auswahl im Szenario beschreibt [Heizsystem im Szenario](#heizsystem-im-szenario-heating_system_ids).
+Im Formular des Verbrauchers „Haus Wärme“ (Bereich **Hausprofil**) stehen die Felder in zwei Abschnitten:
+
+- **Gebäude / Wärmebedarf:** Wohnfläche, Gebäudeklasse, Bauweise, HWB, Personen, Temperaturen, Verlustkoeffizient, Absenkung bei Abwesenheit und Solarthermie. Sie bleiben am Verbraucher.
+- **Heizsystem (Referenzsystem: …):** Wärmequelle, Nennleistung, Mindestlaufzeit, Wärmespeicher und Heizstab. Sie landen beim Speichern im Katalogeintrag des Referenzsystems.
+
+**Varianten:** Weitere Heizsysteme entstehen im Hauskonfigurator im Bereich **Heizsysteme**, z. B. als Kopie des Referenzsystems. Dort ist das Referenzsystem eines Hauses nur lesbar, weil eine Änderung die Grundlast dieses Hauses verschiebt. Ein Heizsystem, auf das ein Hausprofil oder ein Szenario verweist, lässt sich nicht entfernen. Die Auswahl im Szenario beschreibt [Heizsystem im Szenario](#heizsystem-im-szenario-heating_system_ids).
 
 <a id="haus-wärme-wärmequelle-heat_source"></a>
 
