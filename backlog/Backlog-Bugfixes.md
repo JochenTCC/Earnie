@@ -37,6 +37,7 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
   - **Verify:** Monitor on a slot with Zwangsentladen into the grid: up and down columns equal height, cyan up segment above the green one.
 
 - [ ] **PV forecast comparison run** `[dev]` *(logger done 2026-10-30, [Erledigt](Backlog-Erledigt.md); in autumn the forecast.solar quality varies strongly, e.g. on fog / inversion days)*: run `scripts/pv_forecast_compare.py fetch` hourly for 3–4 weeks in autumn, then `evaluate`. The result decides the default source (see **Solcast as PV forecast source**) and feeds the **PV forecast calibration factor** (**Adaptation P3**): the MAE after the per-source linear scale separates a constant bias, which the calibration factor absorbs, from weather skill. Optional later: DWD MOSMIX `Rad1h` as a further source in the logger.
+  - **Note (2026-11-03):** fetch runs hourly since 2026-10-30 06:08 UTC as its own container next to the shadow instance (no gaps so far, Solcast 4 calls a day); `evaluate` from about 2026-11-20. When the production install moves to 2.8, keep that container and its output directory (`forecasts.jsonl`, `state.json`) running, or move both together, so the series has no break.
 
 
 
