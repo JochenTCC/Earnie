@@ -217,7 +217,28 @@ def _render_profile_selector() -> dict:
     }
 
 
-def _edit_and_sync_consumers(session_scope: str, location: dict) -> tuple[list, list]:
+def _hidden_heating_consumer(consumer: dict, heating: dict) -> bool:
+    """„Heizung betrachten“ off: the „Haus Wärme“ row stays in the form, not rendered."""
+    return not heating["heating_enabled"] and consumer.get("type") == "thermal_annual"
+
+
+def _preview_consumers(consumers: list[dict], heating: dict) -> list[dict]:
+    """Consumers as the planner sees them: building fields from the house, hidden row out."""
+    from ui.house_config_profile_house_thermal import thermal_preview_fields
+
+    out: list[dict] = []
+    for consumer in consumers:
+        if _hidden_heating_consumer(consumer, heating):
+            continue
+        if consumer.get("type") == "thermal_annual":
+            consumer = {**consumer, **thermal_preview_fields(heating)}
+        out.append(consumer)
+    return out
+
+
+def _edit_and_sync_consumers(
+    session_scope: str, location: dict, heating: dict
+) -> tuple[list, list]:
     st.subheader("Verbraucher")
     st.caption(
         "Optional — ohne Verbraucher gilt der gesamte Jahresverbrauch als Grundlast. "
@@ -228,7 +249,9 @@ def _edit_and_sync_consumers(session_scope: str, location: dict) -> tuple[list, 
         st.session_state[_SESSION_CONSUMERS_KEY].append(_default_additional_consumer())
         st.rerun()
     edited = [
-        _render_consumer_form(
+        dict(consumer)
+        if _hidden_heating_consumer(consumer, heating)
+        else _render_consumer_form(
             consumer,
             index,
             consumers=consumers,
@@ -251,7 +274,7 @@ def _edit_and_sync_consumers(session_scope: str, location: dict) -> tuple[list, 
         timezone_name=str(location.get("timezone_name") or ""),
     )
     st.session_state[_SESSION_CONSUMERS_KEY] = resolved_for_preview
-    return resolved, resolved_for_preview
+    return resolved, _preview_consumers(resolved_for_preview, heating)
 
 
 def _render_baseload_preview(
@@ -359,8 +382,13 @@ def render_house_profile_tab() -> None:
     render_plant_export_limit()
     render_plant_grid_meter_assertions()
     label, preview_id, annual_kwh, location, absent_mode = _render_profile_identity(ctx)
+    from ui.house_config_profile_house_thermal import render_house_heating_section
+
+    heating = render_house_heating_section(
+        session_scope=ctx["session_scope"], existing=ctx["existing"]
+    )
     resolved, resolved_for_preview = _edit_and_sync_consumers(
-        ctx["session_scope"], location
+        ctx["session_scope"], location, heating
     )
     preview = _render_baseload_preview(
         annual_kwh, resolved_for_preview, ctx["existing"], preview_id
@@ -368,7 +396,9 @@ def render_house_profile_tab() -> None:
     from ui.house_config_heating_change import render_reference_change_gate
     from ui.house_config_historical_csv import historical_csv_save_fields
 
-    held = render_reference_change_gate(
+    # Switch off: the heating is not planned, its consumption stays in the baseload, so a
+    # changed heating system cannot contradict the measured data.
+    held = bool(heating["heating_enabled"]) and render_reference_change_gate(
         session_scope=ctx["session_scope"],
         is_new=ctx["is_new"],
         profile_id=ctx["stable_profile_id"],
@@ -386,6 +416,7 @@ def render_house_profile_tab() -> None:
         "profile_ids": ctx["profile_ids"],
         "annual_kwh": annual_kwh,
         "absent_mode": absent_mode,
+        "heating": heating,
         "location": location,
         "resolved": resolved,
         "existing": ctx["existing"],

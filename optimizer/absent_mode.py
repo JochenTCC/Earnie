@@ -105,12 +105,12 @@ def apply_thermal_absent_override(source: dict) -> dict:
     """Copy thermal_annual house consumer with reduced setpoint and persons=0."""
     out = dict(source)
     thermal = dict(source.get("thermal") or {})
-    from house_config.profile_schema_defaults import consumer_default
+    from house_config.profile_schema_defaults import house_thermal_default
 
     target = float(
         thermal.get(
             "target_temp_c",
-            source.get("target_temp_c", consumer_default("target_temp_c")),
+            source.get("target_temp_c", house_thermal_default("target_temp_c")),
         )
     )
     reduction = thermal.get("absent_temp_reduction_c")
@@ -121,7 +121,7 @@ def apply_thermal_absent_override(source: dict) -> dict:
         if legacy is not None:
             reduction = max(0.0, target - float(legacy))
         else:
-            reduction = consumer_default("absent_temp_reduction_c")
+            reduction = house_thermal_default("absent_temp_reduction_c")
     effective = max(0.0, target - float(reduction))
     thermal["target_temp_c"] = effective
     thermal["persons"] = 0

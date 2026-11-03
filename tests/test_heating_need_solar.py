@@ -174,11 +174,13 @@ def test_profiles_store_requires_geo_for_thermal(tmp_path: Path):
                         "label": "Ohne Geo",
                         "annual_kwh": 4000.0,
                         "netznutzung": {"area_id": "user_no_grid_fee"},
+                        "heating_enabled": True,
+                        "thermal": {"living_area_m2": 100.0},
                         "consumers": [
                             {
                                 "id": "wp",
                                 "type": "thermal_annual",
-                                "living_area_m2": 100.0,
+                                "heating_system_id": "heating_missing_geo",
                             }
                         ],
                     }

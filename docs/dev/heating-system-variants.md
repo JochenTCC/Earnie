@@ -210,6 +210,48 @@ schema.
   (`profiles_store`). The scenario editor shows one select box per house; the stored shape stays
   `heating_system_ids: {"<consumer_id>": "<heating_system_id>"}`.
 
+## House-level thermal properties (2026-11-03)
+
+Dog-fooding showed that the building fields do not belong to the heating consumer: they are a
+property of the house, the heating only uses them. Decisions (maintainer, 2026-11-03):
+
+- **Data model** (raw `house_profiles.json`, profile level): `heating_enabled` (switch
+  „Heizung betrachten“), `thermal` (building block: `living_area_m2`, `hwb_kwh_m2`,
+  `building_class`, `building_mass`, `target_temp_c`, `heating_limit_c`, `house_tolerance_c`,
+  `house_heat_loss_kw_per_k`, `absent_mode_enabled`, `absent_temp_reduction_c`; later SUSI P2
+  `thermal.solar_gains`) and `persons` (the SUSI P6 hoist, done here). Schema definition
+  `house_thermal`. The `thermal_annual` consumer keeps `heating_system_id`, the solar-thermal
+  collector, the meter CSV, flex fields and bindings; building fields on it fail loud.
+- **Loader** (`house_config/house_thermal.py`, `profiles_store._normalize_profile`): the
+  house block plus `persons` is placed into the normalized consumer's `thermal`
+  (`consumer_thermal_from_house`), `thermal.absent_mode_enabled` into the consumer's
+  `absent_mode_enabled`. Every reader of the thermal block (planner, RC model, Live store,
+  baseload, heating need, scenario variants, Szenarien-Explorer) reads the normalized consumer
+  as before and needed no change.
+- **Switch off:** the normalized profile leaves the `thermal_annual` consumer out of
+  `consumers` (not planned; no baseload subtraction, so its consumption stays in the baseload;
+  no Live signals) and parks it under `inactive_consumers`. The serializer writes it back after
+  the other consumers, `reference_ids_by_profile` and `merge_inline_reference_systems` see it,
+  so its reference system stays protected and a save of the loaded document keeps it. A missing
+  `heating_enabled` means off (documented schema default) only without a `thermal_annual`
+  consumer; with one it is the old file shape and fails loud. A scenario `heating_system_ids`
+  pick for a house with the switch off fails loud.
+- **One heating consumer per house** (decided): air conditioning is planned as an „inverse
+  heat source“ of the same RC model (backlog item), not as a second consumer, and SUSI P2 adds
+  its gains to the house block, so both build on `thermal` without a second consumer.
+- **Migration** `dm5.house_thermal` (after `dm5.heating_systems`, same data model 5): moves the
+  fields and writes `heating_enabled: true` for a house with a `thermal_annual` consumer,
+  `false` otherwise; `persons` from the consumer, else the schema default. It keeps the old
+  loader semantics (falsy `or default` fields dropped, tolerance / setback clamps, legacy
+  `absent_temp_c` converted, nested `thermal` read), so results do not change; two
+  `thermal_annual` consumers in one profile block. Recorder snapshots on dm5 from before this
+  step fail loud in the loader like those before `dm5.heating_systems` (see Migration).
+- **UI:** `ui/house_config_profile_house_thermal.py` renders the section before „Verbraucher“;
+  the „Haus Wärme“ form keeps collector, heating system and the consumption estimate (computed
+  with the house values). With the switch off the form keeps the consumer row hidden and
+  passes it through on save; „Haus Wärme“ is not offered as a type; the heating-system change
+  gate is skipped (the heating stays in the baseload, the measured data cannot contradict it).
+
 ## Docs and tests
 
 - German user docs: `docs/konfiguration/flexible-verbraucher.md` (heat source section),

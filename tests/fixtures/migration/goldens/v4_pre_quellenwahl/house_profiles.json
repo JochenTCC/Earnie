@@ -17,19 +17,9 @@
                     "label": "Wärmepumpe",
                     "type": "thermal_annual",
                     "use_profile_csv": false,
-                    "absent_mode_enabled": true,
-                    "living_area_m2": 157.0,
-                    "building_class": 2,
-                    "persons": 2,
-                    "target_temp_c": 21.5,
-                    "absent_temp_reduction_c": 6.5,
-                    "heating_limit_c": 15.0,
                     "solar_thermal_area_m2": 10.3,
                     "solar_thermal_tilt_deg": 18.0,
                     "solar_thermal_azimuth_deg": 26.0,
-                    "building_mass": "leicht",
-                    "house_tolerance_c": 0.5,
-                    "hwb_kwh_m2": 40.0,
                     "timezone_name": "Europe/Vienna",
                     "ehal_bindings": {
                         "sens_temperature_heat_storage": "alias_3",
@@ -293,7 +283,20 @@
                 "include_status": [
                     "verordnet"
                 ]
-            }
+            },
+            "thermal": {
+                "living_area_m2": 157.0,
+                "hwb_kwh_m2": 40.0,
+                "building_class": 2,
+                "building_mass": "leicht",
+                "target_temp_c": 21.5,
+                "heating_limit_c": 15.0,
+                "house_tolerance_c": 0.5,
+                "absent_temp_reduction_c": 6.5,
+                "absent_mode_enabled": true
+            },
+            "persons": 2,
+            "heating_enabled": true
         }
     ],
     "plant": {

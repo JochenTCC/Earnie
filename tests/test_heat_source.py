@@ -6,6 +6,7 @@ from datetime import date, datetime, time
 import pandas as pd
 import pytest
 
+from house_config.house_thermal import default_house_thermal
 from house_config.heat_source import (
     consumer_heat_source,
     fuel_price_eur_per_kwh,
@@ -86,6 +87,8 @@ def test_legacy_heat_pump_type_is_rejected_on_load():
             {"id": "wp", "heat_pump_type": "luft", "heating_system_id": "hs"},
             {},
             copy_loxone_binding=lambda *_: None,
+            house_thermal=default_house_thermal(),
+            persons=2,
             heating_systems=_catalog(heat_source={"type": "gas"}),
         )
 
@@ -98,6 +101,8 @@ def test_profile_takes_parts_and_storage_from_the_catalog_entry():
         {"id": "wp", "heating_system_id": "hs"},
         spec,
         copy_loxone_binding=lambda *_: None,
+        house_thermal=default_house_thermal(),
+        persons=2,
         heating_systems=_catalog(
             heat_source={"type": "gas"}, heat_storage=_STORAGE, parts=[_ROD]
         ),
@@ -122,6 +127,8 @@ def test_inline_heat_generation_on_the_consumer_needs_migration():
                 raw,
                 {},
                 copy_loxone_binding=lambda *_: None,
+                house_thermal=default_house_thermal(),
+                persons=2,
                 heating_systems=_catalog(heat_source={"type": "gas"}),
             )
 
@@ -134,6 +141,8 @@ def test_unknown_heating_system_id_fails_loud():
             {"id": "wp", "heating_system_id": "nope"},
             {},
             copy_loxone_binding=lambda *_: None,
+            house_thermal=default_house_thermal(),
+            persons=2,
             heating_systems=_catalog(heat_source={"type": "gas"}),
         )
 
@@ -158,7 +167,9 @@ def test_profile_save_keeps_flex_fields_and_writes_only_the_reference():
         "max_pulses_per_day": 3,
         "thermal_flex_window": {"start_hour": 10, "end_hour": 16},
     }
-    spec = _normalize_consumer(raw, 0, "home", heating_systems=catalog)
+    spec = _normalize_consumer(
+        raw, 0, "home", heating_systems=catalog, house_thermal=default_house_thermal(), persons=2
+    )
     assert spec["parts"] == [_ROD]
     assert spec["nominal_power_kw"] == 1.9
     out = _serialize_consumer(spec)
@@ -169,7 +180,9 @@ def test_profile_save_keeps_flex_fields_and_writes_only_the_reference():
     assert out["max_on_quarterhours"] == 12
     assert out["max_pulses_per_day"] == 3
     assert out["thermal_flex_window"] == {"start_hour": 10, "end_hour": 16}
-    again = _normalize_consumer(out, 0, "home", heating_systems=catalog)
+    again = _normalize_consumer(
+        out, 0, "home", heating_systems=catalog, house_thermal=default_house_thermal(), persons=2
+    )
     assert again["parts"] == spec["parts"]
     assert again["thermal"] == spec["thermal"]
 

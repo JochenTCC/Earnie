@@ -2,6 +2,15 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Hauskonfigurator — thermal properties of the building at house level (2026-11-03)
+
+- [x] **Hauskonfigurator: thermal properties of the building at house level** `[feat]` *(dog-fooding 2026-11-03; done 2026-11-03 on `main`; live check by the maintainer open)*: design [heating-system-variants.md](../docs/dev/heating-system-variants.md) § House-level thermal properties. The building fields (living area, HWB, building class, building mass, target temperature, heating limit, tolerance, heat-loss override, absent-mode setback) moved from the `thermal_annual` consumer to the house profile's block `thermal`, `persons` to the house profile (SUSI P6 hoist); new switch `heating_enabled` („Heizung betrachten“). The heating consumer keeps the heating system, the solar-thermal collector, the meter CSV and its bindings.
+  - **Decisions (maintainer, 2026-11-03):** at most one heating consumer per house (air conditioning becomes an inverse heat source of the same RC model); `persons` hoisted now; solar thermal stays on the consumer; keys `heating_enabled` / `thermal`, section before „Verbraucher“.
+  - **Switch off** (default for a new house): section and „Haus Wärme“ hidden, consumer not planned (normalized profile parks it under `inactive_consumers`), consumption stays in the baseload, stored values kept and back on switching on; a scenario heating pick for such a house fails loud.
+  - **Migration:** `dm5.house_thermal` after `dm5.heating_systems` (data model 5, unreleased), keeps the old loader semantics; fixture `v5_pre_house_thermal`, goldens, example pack, backtesting fixture and the POC pack migrated. Regression suite: all 12 cases pass unchanged. Release-notes fragment `.github/release-notes/drafts/v2.8.0-house-thermal.draft.md`.
+  - **Tests:** `tests/test_house_thermal.py`, `tests/test_house_thermal_migration.py`, AppTest `tests/apptest/test_house_thermal_apptest.py` (house fields T1/T2, switch off hides section and consumer and keeps values, type list, house without heating turns it on); updated persistence and form-split AppTests.
+  - **Not migrated here:** the private site pack (Earnie-env-home), needs the maintainer's OK.
+
 ### Bugfix — Szenarien-Explorer: a scenario with a heating variant could not be left (2026-11-03)
 
 - [x] **Szenarien-Explorer: a scenario with a heating variant could not be left** *(found and fixed 2026-11-03 on `main`, `d138f7d6`; verified live by the maintainer 2026-11-03)*: with a scenario selected whose `settings.heating_system_ids` holds a variant, picking another scenario or „— neu —“ jumped back to it. The unsaved-edit check compared the saved baseline (with `heating_system_ids`) against a form snapshot without the heating picks, so the form always looked edited and the switch was held (the „Verwerfen und wechseln“ prompt was easy to miss).

@@ -123,7 +123,7 @@ def test_t2_boundary_values_roundtrip(spec: Field, value) -> None:
 
 def test_t5_changes_across_consumer_types_are_all_persisted() -> None:
     by_id = {_ids(s): s for s in CONSUMER_FIELDS}
-    picks = ["wp-persons_0", "wasch-runs_1", "ev1-ev_cap_2", "pool-rc_set_3"]
+    picks = ["wp-solar_area_0", "wasch-runs_1", "ev1-ev_cap_2", "pool-rc_set_3"]
     at = _new_session()
     for pick in picks:
         _widget(at, by_id[pick]).set_value(by_id[pick].valid)

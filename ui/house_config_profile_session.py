@@ -22,7 +22,7 @@ from house_config.generic_schedule import (
     reject_legacy_start_flexibility,
 )
 from house_config.id_slug import slug_id
-from house_config.profile_schema_defaults import consumer_default, profile_default
+from house_config.profile_schema_defaults import profile_default
 from house_config.thermal_labels import (
     CONSUMER_TYPE_LABELS,
     building_class_option_label,
@@ -127,14 +127,12 @@ def _scoped_key(session_scope: str, base: str) -> str:
     return f"{session_scope}__{base}"
 
 def _default_consumer() -> dict:
+    """New „Haus Wärme“ consumer; the building fields live in the house section."""
     return {
         "label": "Haus Wärme",
         "type": "thermal_annual",
         "nominal_power_kw": 3.5,
-        "living_area_m2": consumer_default("living_area_m2"),
-        "building_class": consumer_default("building_class"),
         "heat_source": {"type": "heat_pump", "heat_pump_type": "luft"},
-        "persons": consumer_default("persons"),
     }
 
 def _default_additional_consumer() -> dict:
@@ -160,18 +158,28 @@ def _live_markers_enabled() -> bool:
     return "live_environment" in get_enabled_ui_mode_keys()
 
 def _flatten_consumer_for_edit(consumer: dict) -> dict:
+    """Form row of a normalized consumer; the house's building fields stay at the house."""
+    from house_config.house_thermal import drop_house_fields
+
     item = dict(consumer)
     thermal = item.pop("thermal", None)
     if isinstance(thermal, dict):
-        for key, value in thermal.items():
+        for key, value in drop_house_fields(thermal).items():
             if key not in item and key not in {"latitude", "longitude"}:
                 item[key] = value
     return item
 
 def _consumers_from_existing(existing: dict) -> list[dict]:
-    consumers = list(existing.get("consumers", []))
-    if not consumers:
-        return []
+    """Form rows incl. the heating consumer of a house with „Heizung betrachten“ off.
+
+    The form keeps that consumer (hidden) so a save writes it back unchanged.
+    """
+    from house_config.house_thermal import INACTIVE_CONSUMERS_KEY
+
+    consumers = [
+        *(existing.get("consumers") or []),
+        *(existing.get(INACTIVE_CONSUMERS_KEY) or []),
+    ]
     return [_flatten_consumer_for_edit(consumer) for consumer in consumers]
 
 def _profile_session_scope(selected_id: str, *, is_new: bool) -> str:
@@ -331,10 +339,10 @@ def _other_consumers_have_thermal_annual(
 
 
 def _consumer_type_options(
-    consumers: list[dict], consumer_index: int
+    consumers: list[dict], consumer_index: int, *, heating_enabled: bool = True
 ) -> list[str]:
-    """Offer Haus Wärme when no *other* consumer already has that type."""
-    if _other_consumers_have_thermal_annual(consumers, consumer_index):
+    """Offer Haus Wärme when „Heizung betrachten“ is on and no *other* consumer has it."""
+    if not heating_enabled or _other_consumers_have_thermal_annual(consumers, consumer_index):
         return [value for value in CONSUMER_TYPE_OPTIONS if value != "thermal_annual"]
     return list(CONSUMER_TYPE_OPTIONS)
 

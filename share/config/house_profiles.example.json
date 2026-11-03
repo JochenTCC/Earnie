@@ -25,13 +25,6 @@
                     "id": "wp_heating",
                     "label": "Wärmepumpe Heizen+WW",
                     "type": "thermal_annual",
-                    "absent_mode_enabled": true,
-                    "living_area_m2": 120,
-                    "building_class": 2,
-                    "persons": 2,
-                    "target_temp_c": 21.5,
-                    "absent_temp_reduction_c": 2.5,
-                    "heating_limit_c": 15.0,
                     "ehal_bindings": {
                         "heatpump.wp_heating.set_enable": "",
                         "heatpump.wp_heating.sens_power_act": ""
@@ -138,7 +131,17 @@
                         "default_power_kw": 1.2
                     }
                 }
-            ]
+            ],
+            "thermal": {
+                "living_area_m2": 120,
+                "building_class": 2,
+                "target_temp_c": 21.5,
+                "heating_limit_c": 15.0,
+                "absent_temp_reduction_c": 2.5,
+                "absent_mode_enabled": true
+            },
+            "persons": 2,
+            "heating_enabled": true
         }
     ],
     "plant": {

@@ -9,6 +9,16 @@ from house_config.baseload import normalize_baseload_distribution
 from house_config.consumption_csv import load_hourly_profile_csv
 from house_config.geo_timezone import timezone_for_land
 from house_config.profile_schema_defaults import profile_default
+from house_config.house_thermal import (
+    HEATING_ENABLED_KEY,
+    HOUSE_THERMAL_KEY,
+    INACTIVE_CONSUMERS_KEY,
+    PERSONS_KEY,
+    heating_enabled,
+    normalize_house_thermal,
+    normalize_persons,
+    serialize_house_thermal,
+)
 from house_config.profiles_consumers import (  # noqa: F401  (re-exported)
     CONSUMER_TYPES,
     _attach_ehal_entity_fields,
@@ -79,13 +89,20 @@ def _normalize_profile_consumers(
     longitude: float,
     timezone_name: str,
     heating_systems: dict | None,
+    house_thermal: dict | None,
+    persons: int,
 ) -> list[dict]:
     consumers: list[dict] = []
     seen: set[str] = set()
     thermal_consumer_indices: list[int] = []
     for c_index, item in enumerate(consumers_raw):
         consumer = _normalize_consumer(
-            item, c_index, profile_id, heating_systems=heating_systems
+            item,
+            c_index,
+            profile_id,
+            heating_systems=heating_systems,
+            house_thermal=house_thermal,
+            persons=persons,
         )
         if consumer["type"] == "thermal_annual":
             thermal_consumer_indices.append(c_index)
@@ -197,11 +214,29 @@ def _normalize_profile(raw: dict, index: int, *, heating_systems: dict | None) -
     consumers_raw = raw.get("consumers", [])
     if not isinstance(consumers_raw, list):
         raise ValueError(f"profiles '{profile_id}': consumers muss ein Array sein.")
+    # A normalized profile handed back for saving parks the heating consumer of a house with
+    # „Heizung betrachten“ off here; the switch decides where it goes.
+    inactive_raw = raw.get(INACTIVE_CONSUMERS_KEY) or []
+    if not isinstance(inactive_raw, list):
+        raise ValueError(
+            f"profiles '{profile_id}': {INACTIVE_CONSUMERS_KEY} muss ein Array sein."
+        )
+    consumers_raw = [*consumers_raw, *inactive_raw]
     has_thermal = any(
-        str(item.get("type", "")).strip().lower() == "thermal_annual"
-        for item in consumers_raw
-        if isinstance(item, dict)
+        _is_thermal_annual(item) for item in consumers_raw
     )
+    where = f"profiles '{profile_id}'"
+    heating_on = heating_enabled(raw, label=where, has_thermal_consumer=has_thermal)
+    thermal_raw = raw.get(HOUSE_THERMAL_KEY)
+    house_thermal = (
+        None if thermal_raw is None else normalize_house_thermal(thermal_raw, label=where)
+    )
+    if heating_on and house_thermal is None:
+        raise ValueError(
+            f"{where}: heating_enabled ist true, aber die Gebäude-Wärmedaten (thermal) "
+            "fehlen. Im Hauskonfigurator den Abschnitt „Gebäude / Wärmebedarf“ ausfüllen."
+        )
+    persons = normalize_persons(raw.get(PERSONS_KEY), label=where)
     if has_thermal and (raw.get("latitude") is None or raw.get("longitude") is None):
         raise ValueError(
             f"profiles '{profile_id}': latitude und longitude sind bei "
@@ -209,14 +244,23 @@ def _normalize_profile(raw: dict, index: int, *, heating_systems: dict | None) -
         )
     fields = _profile_geo_and_csv_fields(raw)
     region = fields.pop("region")
-    consumers = _normalize_profile_consumers(
+    normalized_consumers = _normalize_profile_consumers(
         consumers_raw,
         profile_id=profile_id,
         latitude=fields["latitude"],
         longitude=fields["longitude"],
         timezone_name=fields["timezone_name"],
         heating_systems=heating_systems,
+        house_thermal=house_thermal,
+        persons=persons,
     )
+    # Switch off: the heating consumer is kept for the file but not planned.
+    consumers = [
+        c for c in normalized_consumers if heating_on or c["type"] != "thermal_annual"
+    ]
+    inactive = [
+        c for c in normalized_consumers if not heating_on and c["type"] == "thermal_annual"
+    ]
     # Grundlast (baseload_kwh / consumer_kwh / baseload_min_kwh) is NOT derived here:
     # it needs Open-Meteo weather and thus a built Config. Resolve at the point of use
     # via house_config.baseload.resolve_profile_baseload / profile_baseload_kwh.
@@ -241,11 +285,24 @@ def _normalize_profile(raw: dict, index: int, *, heating_systems: dict | None) -
             raw.get("baseload_distribution")
         ),
         "consumers": consumers,
+        HEATING_ENABLED_KEY: heating_on,
+        PERSONS_KEY: persons,
     }
+    if house_thermal is not None:
+        spec[HOUSE_THERMAL_KEY] = house_thermal
+    if inactive:
+        spec[INACTIVE_CONSUMERS_KEY] = inactive
     # Only when set, so profiles without a region keep their exact normalized shape.
     if region:
         spec["region"] = region
     return spec
+
+
+def _is_thermal_annual(item: object) -> bool:
+    return (
+        isinstance(item, dict)
+        and str(item.get("type", "")).strip().lower() == "thermal_annual"
+    )
 
 
 def _plant_max_export_kw(raw: dict) -> float | None:
@@ -403,10 +460,13 @@ def _has_thermal_annual(raw: dict) -> bool:
     profiles = raw.get("profiles") if isinstance(raw, dict) else None
     items = list(profiles.values()) if isinstance(profiles, dict) else profiles or []
     return any(
-        isinstance(consumer, dict) and consumer.get("type") == "thermal_annual"
+        _is_thermal_annual(consumer)
         for profile in items
         if isinstance(profile, dict)
-        for consumer in profile.get("consumers") or []
+        for consumer in [
+            *(profile.get("consumers") or []),
+            *(profile.get(INACTIVE_CONSUMERS_KEY) or []),
+        ]
     )
 
 
@@ -466,8 +526,16 @@ def _serialize_profile(profile: dict) -> dict:
         "grid_profile_csv": profile.get("grid_profile_csv", ""),
         "historical_csv_source": profile.get("historical_csv_source", "separate"),
         "baseload_distribution": profile.get("baseload_distribution", "equal"),
-        "consumers": [_serialize_consumer(c) for c in profile["consumers"]],
+        # The heating consumer of a house with the switch off is written back after the others.
+        "consumers": [
+            _serialize_consumer(c)
+            for c in [*profile["consumers"], *(profile.get(INACTIVE_CONSUMERS_KEY) or [])]
+        ],
+        HEATING_ENABLED_KEY: bool(profile[HEATING_ENABLED_KEY]),
+        PERSONS_KEY: int(profile[PERSONS_KEY]),
     }
+    if profile.get(HOUSE_THERMAL_KEY):
+        out[HOUSE_THERMAL_KEY] = serialize_house_thermal(profile[HOUSE_THERMAL_KEY])
     land = str(profile.get("land") or "AT").strip().upper()
     out["land"] = land if land in {"AT", "DE", "CH"} else "AT"
     if profile.get("region"):

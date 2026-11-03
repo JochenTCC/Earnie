@@ -22,15 +22,19 @@
                     "id": "wp",
                     "label": "Wärmepumpe",
                     "type": "thermal_annual",
-                    "living_area_m2": 100,
-                    "building_class": 3,
-                    "persons": 2,
                     "ehal_bindings": {
                         "heatpump.wp.set_enable": ""
                     },
                     "heating_system_id": "heating_test_home"
                 }
-            ]
+            ],
+            "thermal": {
+                "living_area_m2": 100,
+                "building_class": 3,
+                "absent_mode_enabled": false
+            },
+            "persons": 2,
+            "heating_enabled": true
         }
     ],
     "earnie_data_model": 5,

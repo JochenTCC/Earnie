@@ -210,7 +210,13 @@ def _render_consumer_identity_fields(
     consumers: list[dict],
     session_scope: str,
 ) -> tuple[str, str, float, bool]:
-    type_options = _consumer_type_options(consumers, index)
+    from ui.house_config_profile_house_thermal import house_heating_state
+
+    type_options = _consumer_type_options(
+        consumers,
+        index,
+        heating_enabled=bool(house_heating_state(session_scope)["heating_enabled"]),
+    )
     current_type = str(consumer.get("type", "generic"))
     if (
         current_type == "thermal_annual"
@@ -302,18 +308,19 @@ def _render_consumer_form_body(
         "label": c_label,
         "type": c_type,
         "nominal_power_kw": nominal,
-        "absent_mode_enabled": labeled_checkbox(
+    }
+    # „Haus Wärme“: the absent-mode setback is a house setting („Gebäude / Wärmebedarf“).
+    if c_type != "thermal_annual":
+        item["absent_mode_enabled"] = labeled_checkbox(
             "Inaktiv wenn abwesend",
             value=bool(consumer.get("absent_mode_enabled", False)),
             key=_scoped_key(session_scope, f"hc_absent_opt_in_{index}"),
             help=(
-                "Bei wirksamem Abwesenheitsmodus (Live): "
-                "andere Verbraucher ohne Live-Optimierung; "
-                "Haus Wärme bleibt aktiv mit Solltemperatur − Absenkung "
-                "und Warmwasser 0."
+                "Bei wirksamem Abwesenheitsmodus (Live): Verbraucher ohne "
+                "Live-Optimierung. Die Heizungs-Absenkung steht im Abschnitt "
+                "„Gebäude / Wärmebedarf“."
             ),
-        ),
-    }
+        )
     provisional = str(consumer.get(ID_PROVISIONAL_LABEL_KEY) or "").strip()
     has_id = bool(str(consumer.get("id") or "").strip())
     if provisional and (not has_id or not is_id_locked(consumer)):

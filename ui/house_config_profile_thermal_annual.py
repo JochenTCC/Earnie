@@ -7,96 +7,12 @@ from house_config.profile_schema_defaults import (
     consumer_default,
     heat_storage_default,
 )
-from house_config.thermal_labels import (
-    building_class_option_label,
-)
 from ui.form_layout import (
     WIDE_LABEL_RATIOS,
     labeled_checkbox,
     labeled_number_input,
     labeled_selectbox,
 )
-
-
-def _render_building_mass_select(
-    thermal: dict, index: int, *, session_scope: str
-) -> str:
-    from optimizer.thermal_house import (
-        BUILDING_MASS_C_WH_PER_M2K,
-        normalize_building_mass,
-    )
-
-    mass_options = list(BUILDING_MASS_C_WH_PER_M2K.keys())
-    mass_current = normalize_building_mass(thermal.get("building_mass"))
-    return labeled_selectbox(
-        "Bauweise (Wärmespeicher)",
-        options=mass_options,
-        index=mass_options.index(mass_current)
-        if mass_current in mass_options
-        else mass_options.index(consumer_default("building_mass")),
-        format_func=lambda key: {
-            "leicht": "Leicht (50 Wh/m²K)",
-            "mittel": "Mittel (90 Wh/m²K)",
-            "schwer": "Schwer (130 Wh/m²K)",
-        }.get(key, key),
-        key=_scoped_key(session_scope, f"hc_building_mass_{index}"),
-    )
-
-
-def _render_thermal_annual_building_fields(
-    consumer: dict,
-    thermal: dict,
-    index: int,
-    *,
-    session_scope: str,
-) -> dict:
-    st.markdown("**Gebäude / Wärmebedarf**")
-    item: dict = {
-        "living_area_m2": labeled_number_input(
-            "Wohnfläche (m²)",
-            min_value=0.0,
-            value=float(
-                thermal.get("living_area_m2", consumer_default("living_area_m2"))
-            ),
-            key=_scoped_key(session_scope, f"hc_area_{index}"),
-        ),
-    }
-    building_class = int(
-        thermal.get("building_class", consumer_default("building_class"))
-    )
-    item["building_class"] = labeled_selectbox(
-        "Gebäudeklasse",
-        options=[1, 2, 3, 4],
-        index=max(0, min(3, building_class - 1)),
-        format_func=building_class_option_label,
-        key=_scoped_key(session_scope, f"hc_class_{index}"),
-    )
-    item["building_mass"] = _render_building_mass_select(
-        thermal, index, session_scope=session_scope
-    )
-    st.caption(
-        "DIN V 18599-2: wirksame Wärmekapazität C = Wert × Wohnfläche "
-        "(für Aufheizen/Auskühlen in Übergangszeiten)."
-    )
-    use_exact_hwb = labeled_checkbox(
-        "Genaue HWB-Angabe",
-        value=bool(float(thermal.get("hwb_kwh_m2", 0.0) or 0.0) > 0),
-        key=_scoped_key(session_scope, f"hc_hwb_use_{index}"),
-    )
-    if use_exact_hwb:
-        from data.heating_need import specific_heating_kwh_m2
-
-        default_hwb = float(thermal.get("hwb_kwh_m2", 0.0) or 0.0)
-        if default_hwb <= 0:
-            default_hwb = specific_heating_kwh_m2(int(item["building_class"]))
-        item["hwb_kwh_m2"] = labeled_number_input(
-            "HWB (kWh/m²a)",
-            min_value=0.1,
-            value=default_hwb,
-            step=1.0,
-            key=_scoped_key(session_scope, f"hc_hwb_{index}"),
-        )
-    return item
 
 
 _HEAT_SOURCE_LABELS = {
@@ -238,65 +154,6 @@ def _render_heating_rod_fields(
             "nominal_power_kw": float(power),
         }
     ]
-
-
-def _render_thermal_comfort_fields(
-    item: dict,
-    thermal: dict,
-    index: int,
-    *,
-    session_scope: str,
-) -> None:
-    item["persons"] = labeled_number_input(
-        "Personen",
-        min_value=1,
-        value=int(thermal.get("persons", consumer_default("persons"))),
-        key=_scoped_key(session_scope, f"hc_persons_{index}"),
-    )
-    item["target_temp_c"] = labeled_number_input(
-        "Solltemperatur (°C)",
-        value=float(
-            thermal.get("target_temp_c", consumer_default("target_temp_c"))
-        ),
-        step=0.5,
-        key=_scoped_key(session_scope, f"hc_target_temp_{index}"),
-    )
-    item["house_tolerance_c"] = labeled_number_input(
-        "Heizband Toleranz (K)",
-        min_value=0.05,
-        value=float(
-            thermal.get("house_tolerance_c", consumer_default("house_tolerance_c"))
-        ),
-        step=0.1,
-        key=_scoped_key(session_scope, f"hc_house_tol_{index}"),
-    )
-    h_existing = thermal.get("house_heat_loss_kw_per_k")
-    h_value = float(h_existing) if h_existing not in (None, "") else 0.0
-    item_h = labeled_number_input(
-        "Haus-Verlustkoeffizient H (kW/K, 0 = auto aus HWB)",
-        min_value=0.0,
-        value=h_value,
-        step=0.01,
-        format="%.3f",
-        key=_scoped_key(session_scope, f"hc_house_h_{index}"),
-    )
-    if float(item_h) > 0.0:
-        item["house_heat_loss_kw_per_k"] = float(item_h)
-    item["absent_temp_reduction_c"] = labeled_number_input(
-        "Temperaturabsenkung wenn abwesend",
-        min_value=0.0,
-        value=float(
-            thermal.get(
-                "absent_temp_reduction_c", consumer_default("absent_temp_reduction_c")
-            )
-        ),
-        step=0.5,
-        key=_scoped_key(session_scope, f"hc_absent_temp_red_{index}"),
-        help=(
-            "Bei wirksamem Abwesenheitsmodus und aktiver Verbraucher-Option: "
-            "Live-Soll = Solltemperatur − Absenkung; Warmwasser dann 0."
-        ),
-    )
 
 
 def _render_wp_annual_metric(item: dict, *, location: dict) -> None:
@@ -471,26 +328,34 @@ def _render_reference_system_fields(
             item["parts"] = parts
 
 
-def _render_thermal_annual_wp_preview(
-    item: dict,
+def _render_thermal_annual_fields(
     consumer: dict,
-    thermal: dict,
     index: int,
     *,
     session_scope: str,
     location: dict,
-) -> None:
-    _render_thermal_comfort_fields(
-        item, thermal, index, session_scope=session_scope
+) -> dict:
+    """„Haus Wärme“: collector, heating system and consumption estimate.
+
+    The building fields come from the house section „Gebäude / Wärmebedarf“; the returned
+    item holds only the consumer's own fields.
+    """
+    from ui.house_config_profile_house_thermal import (
+        house_heating_state,
+        thermal_preview_fields,
     )
-    item.update(
-        _render_thermal_solar_fields(
-            thermal,
-            index,
-            session_scope=session_scope,
-            default_tilt=location["default_pv_tilt"],
-            default_azimuth=location["default_pv_azimuth"],
-        )
+
+    thermal = consumer.get("thermal") or consumer
+    st.caption(
+        "Gebäudedaten (Wohnfläche, HWB, Solltemperatur, …) stehen oben im Abschnitt "
+        "„Gebäude / Wärmebedarf“."
+    )
+    item = _render_thermal_solar_fields(
+        thermal,
+        index,
+        session_scope=session_scope,
+        default_tilt=location["default_pv_tilt"],
+        default_azimuth=location["default_pv_azimuth"],
     )
     _render_reference_system_fields(
         item, consumer, thermal, index, session_scope=session_scope
@@ -500,28 +365,8 @@ def _render_thermal_annual_wp_preview(
             "WP-Bindings unter **Daemon Control → EHAL-Com** "
             "(Entity-Mapping, `flex.*`) pflegen."
         )
-    _render_wp_annual_metric(item, location=location)
-
-
-def _render_thermal_annual_fields(
-    consumer: dict,
-    index: int,
-    *,
-    session_scope: str,
-    location: dict,
-) -> dict:
-    thermal = consumer.get("thermal") or consumer
-    item = _render_thermal_annual_building_fields(
-        consumer, thermal, index, session_scope=session_scope
-    )
-    _render_thermal_annual_wp_preview(
-        item,
-        consumer,
-        thermal,
-        index,
-        session_scope=session_scope,
-        location=location,
-    )
+    preview = {**thermal_preview_fields(house_heating_state(session_scope)), **item}
+    _render_wp_annual_metric(preview, location=location)
     return item
 
 
@@ -658,19 +503,12 @@ def _overlay_thermal_rc_fields(preview: dict, index: int, session_scope: str) ->
 def _overlay_thermal_annual_fields(
     preview: dict, index: int, session_scope: str
 ) -> None:
-    _overlay_session_fields(
-        preview,
-        session_scope,
-        (
-            ("living_area_m2", f"hc_area_{index}", float),
-            ("building_class", f"hc_class_{index}", int),
-            ("building_mass", f"hc_building_mass_{index}", str),
-            ("persons", f"hc_persons_{index}", int),
-            ("hwb_kwh_m2", f"hc_hwb_{index}", float),
-            ("house_tolerance_c", f"hc_house_tol_{index}", float),
-            ("house_heat_loss_kw_per_k", f"hc_house_h_{index}", float),
-        ),
+    from ui.house_config_profile_house_thermal import (
+        house_heating_state,
+        thermal_preview_fields,
     )
+
+    preview.update(thermal_preview_fields(house_heating_state(session_scope)))
     stored = preview.get("heat_source") if isinstance(preview.get("heat_source"), dict) else {}
     start_type, start_hp = _heat_source_select_start(stored)
     heat_source = {**stored, "type": start_type, "heat_pump_type": start_hp}

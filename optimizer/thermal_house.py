@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from house_config.profile_schema_defaults import consumer_default
+from house_config.profile_schema_defaults import house_thermal_default
 
 BUILDING_MASS_C_WH_PER_M2K: dict[str, float] = {
     "leicht": 50.0,
@@ -11,8 +11,8 @@ BUILDING_MASS_C_WH_PER_M2K: dict[str, float] = {
     "schwer": 130.0,
 }
 
-DEFAULT_BUILDING_MASS = str(consumer_default("building_mass"))
-DEFAULT_HOUSE_TOLERANCE_C = float(consumer_default("house_tolerance_c"))
+DEFAULT_BUILDING_MASS = str(house_thermal_default("building_mass"))
+DEFAULT_HOUSE_TOLERANCE_C = float(house_thermal_default("house_tolerance_c"))
 
 
 def normalize_building_mass(raw: object | None) -> str:

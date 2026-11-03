@@ -1,8 +1,9 @@
-"""House configurator: the „Haus Wärme“ form splits building demand and heating system.
+"""House configurator: building demand at house level, heating system in „Haus Wärme“.
 
 The fixture house ``test_home`` has the thermal_annual consumer ``wp`` with its reference
-system ``heating_test_home``. The generation fields (heat source, power, min-on time, storage,
-rod) sit under the „Heizsystem“ heading and are saved into that catalog entry.
+system ``heating_test_home``. The building fields sit in the house section „Gebäude /
+Wärmebedarf“; the generation fields (heat source, power, min-on time, storage, rod) sit under
+the „Heizsystem“ heading of the consumer and are saved into that catalog entry.
 """
 from __future__ import annotations
 
@@ -54,9 +55,14 @@ def _session() -> AppTest:
 
 def test_form_shows_building_and_heating_system_sections() -> None:
     at = _session()
+    assert "Gebäude / Wärmebedarf" in [h.value for h in at.subheader]
     texts = [m.value for m in at.markdown]
-    assert "**Gebäude / Wärmebedarf**" in texts
+    assert "**Gebäude / Wärmebedarf**" not in texts
     assert f"**Heizsystem (Referenzsystem: {_reference()['label']})**" in texts
+    # The consumer form has no building fields of its own.
+    keys = {w.key for w in at.number_input}
+    assert "test_home__house_thermal_area" in keys
+    assert not any(k.endswith("_area_0") and "solar" not in k for k in keys)
     assert at.number_input(key=_NOM).label == "Nennleistung Wärmepumpe (kW, elektrisch)"
 
 

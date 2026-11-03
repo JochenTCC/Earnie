@@ -212,13 +212,16 @@ def split_inline_heating_system(
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """House-configurator save: consumer with inline generation fields → (consumer, entry).
 
-    The consumer keeps the building demand plus ``heating_system_id``; the entry holds the
-    generation fields (validated by ``normalize_heating_system`` on save).
+    The consumer keeps its own fields plus ``heating_system_id``; the entry holds the
+    generation fields (validated by ``normalize_heating_system`` on save). The building fields
+    a normalized consumer carries in ``thermal`` belong to the house profile and are dropped.
     """
+    from house_config.house_thermal import drop_house_fields
+
     item = copy.deepcopy(consumer)
     thermal = item.pop("thermal", None)
     if isinstance(thermal, dict):
-        for key, value in thermal.items():
+        for key, value in drop_house_fields(thermal).items():
             item.setdefault(key, value)
     entry: dict[str, Any] = {"id": system_id, "label": label}
     for key in SYSTEM_FIELDS:
@@ -259,9 +262,17 @@ def _iter_raw_profiles(house_doc: Any) -> list[dict[str, Any]]:
 def reference_ids_by_profile(house_doc: Any) -> dict[str, dict[str, str]]:
     """profile_id → {consumer_id: heating_system_id} (raw or normalized house document)."""
     out: dict[str, dict[str, str]] = {}
+    from house_config.house_thermal import INACTIVE_CONSUMERS_KEY
+
     for profile in _iter_raw_profiles(house_doc):
         refs: dict[str, str] = {}
-        for consumer in profile.get("consumers") or []:
+        # A house with „Heizung betrachten“ off keeps its reference system (normalized docs
+        # park the consumer under ``inactive_consumers``).
+        consumers = [
+            *(profile.get("consumers") or []),
+            *(profile.get(INACTIVE_CONSUMERS_KEY) or []),
+        ]
+        for consumer in consumers:
             if not isinstance(consumer, dict) or consumer.get("type") != "thermal_annual":
                 continue
             sid = str(consumer.get(HEATING_SYSTEM_ID_KEY) or "").strip()
@@ -390,8 +401,17 @@ def merge_inline_reference_systems(
     refs = existing_refs or {}
     profile_id = str(out_profile.get("id") or "").strip()
     profile_label = str(out_profile.get("label") or profile_id).strip() or profile_id
-    consumers = out_profile.get("consumers") or []
-    for index, consumer in enumerate(consumers):
+    from house_config.house_thermal import INACTIVE_CONSUMERS_KEY
+
+    # A normalized profile with „Heizung betrachten“ off parks its heating consumer.
+    rows = [
+        (consumers, index)
+        for key in ("consumers", INACTIVE_CONSUMERS_KEY)
+        for consumers in [out_profile.get(key) or []]
+        for index in range(len(consumers))
+    ]
+    for consumers, index in rows:
+        consumer = consumers[index]
         if not isinstance(consumer, dict) or consumer.get("type") != "thermal_annual":
             continue
         flat = dict(consumer)
@@ -532,7 +552,18 @@ def apply_scenario_heating_systems(
         for c in profile.get("consumers") or []
         if c.get("type") == "thermal_annual"
     }
+    from house_config.house_thermal import INACTIVE_CONSUMERS_KEY
+
+    inactive_ids = {
+        str(c.get("id") or "") for c in profile.get(INACTIVE_CONSUMERS_KEY) or []
+    }
     for consumer_id, system_id in picks.items():
+        if consumer_id in inactive_ids:
+            raise ValueError(
+                f"{label}: heating_system_ids nennt '{consumer_id}', aber im Hausprofil "
+                f"'{profile.get('id')}' ist „Heizung betrachten“ ausgeschaltet. Schalter im "
+                "Hauskonfigurator einschalten oder die Heizsystem-Auswahl im Szenario entfernen."
+            )
         if consumer_id not in thermal_ids:
             raise ValueError(
                 f"{label}: heating_system_ids nennt '{consumer_id}', das ist kein "

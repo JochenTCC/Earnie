@@ -152,6 +152,8 @@ def _write_id_only_config(config_dir, *, battery_wear_enabled: bool = False) -> 
                         "latitude": 48.2,
                         "longitude": 11.0,
                         "netznutzung": {"area_id": "user_no_grid_fee"},
+                        "heating_enabled": True,
+                        "thermal": {},
                         "consumers": [
                             {
                                 "id": "heat",

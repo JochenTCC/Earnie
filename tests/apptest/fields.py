@@ -108,6 +108,26 @@ COMPONENT_FIELDS = [
 ]
 
 
+# --- Abschnitt „Gebäude / Wärmebedarf“ (Hausebene) ----------------------------
+# ``profile_key`` = Pfad im Rohprofil (Punkt-getrennt), Widget-Key ``test_home__<suffix>``.
+# Das Fixture-Haus hat „Heizung betrachten“ an.
+
+HOUSE_THERMAL_FIELDS = [
+    Field("number_input", "house_thermal_area", "thermal.living_area_m2", 150.0,
+          boundaries=(0.0, 400.0)),
+    Field("selectbox", "house_thermal_class", "thermal.building_class", 2),
+    Field("selectbox", "house_thermal_mass", "thermal.building_mass", "schwer"),
+    Field("number_input", "house_persons", "persons", 4, boundaries=(1, 2)),
+    Field("number_input", "house_thermal_target_temp", "thermal.target_temp_c", 22.5),
+    Field("number_input", "house_thermal_tolerance", "thermal.house_tolerance_c", 1.5),
+    Field("number_input", "house_thermal_heating_limit", "thermal.heating_limit_c", 14.0),
+    Field("number_input", "house_thermal_h", "thermal.house_heat_loss_kw_per_k", 0.2),
+    Field("checkbox", "house_thermal_absent_use", "thermal.absent_mode_enabled", True),
+    Field("number_input", "house_thermal_absent_reduction", "thermal.absent_temp_reduction_c",
+          8.0),
+]
+
+
 # --- Verbraucher-Gruppen im Hausprofil -------------------------------------
 # ``entity`` = Verbraucher-id, ``profile_key`` = Pfad im Verbraucher (Punkt-getrennt).
 # Widget-Keys: ``test_home__hc_g0_<suffix>`` (g0 = Widget-Generation, Index = Position
@@ -121,17 +141,10 @@ CONSUMER_FIELDS = [
     # Haus Wärme (thermal_annual)
     _cons("wp", "number_input", "nom_0", "nominal_power_kw", 4.5),
     _cons("wp", "number_input", "ta_min_qh_0", "min_on_quarterhours", 6),
-    _cons("wp", "number_input", "area_0", "living_area_m2", 150.0),
-    _cons("wp", "number_input", "persons_0", "persons", 4, boundaries=(1, 2)),
-    _cons("wp", "number_input", "target_temp_0", "target_temp_c", 22.5),
-    _cons("wp", "number_input", "house_tol_0", "house_tolerance_c", 1.5),
-    _cons("wp", "number_input", "house_h_0", "house_heat_loss_kw_per_k", 0.2),
-    _cons("wp", "number_input", "absent_temp_red_0", "absent_temp_reduction_c", 8.0),
     _cons("wp", "number_input", "solar_area_0", "solar_thermal_area_m2", 5.0),
     _cons("wp", "number_input", "solar_tilt_0", "solar_thermal_tilt_deg", 30, boundaries=(0,)),
     _cons("wp", "number_input", "solar_azimuth_0", "solar_thermal_azimuth_deg", 15),
     _cons("wp", "number_input", "storage_vol_0", "heat_storage.volume_liters", 200.0),
-    _cons("wp", "checkbox", "absent_opt_in_0", "absent_mode_enabled", True),
     # Allgemein (generic) mit Zeitplan
     _cons("wasch", "number_input", "nom_1", "nominal_power_kw", 3.0),
     _cons("wasch", "number_input", "runs_1", "schedule.runs_per_week", 4, boundaries=(1, 7)),

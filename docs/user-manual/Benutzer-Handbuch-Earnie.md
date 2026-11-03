@@ -126,6 +126,7 @@ Die Sidebar zeigt, welche Schritte der Ersteinrichtung noch fehlen.
 Ein **Hausprofil** beschreibt den Standort und wer bzw. was im Haus Strom verbraucht:
 
 - **Standort:** Breite, Länge und Land. Daraus leitet Earnie die Zeitzone ab, die für Sonnenzeiten und PV-Prognose wichtig ist.
+- **Gebäude / Wärmebedarf:** Schalter **„Heizung betrachten“**. Aus (Standard) bleibt die Heizung in der Grundlast und es ist nichts weiter einzugeben. An: Wohnfläche, Gebäudeklasse bzw. HWB, Bauweise, Personen, Solltemperatur, Heizgrenze und Absenkung bei Abwesenheit des Hauses; danach unter **Verbraucher** die Haus-Wärme anlegen. Ausschalten löscht keine Werte. Details: [Gebäude / Wärmebedarf](../konfiguration/flexible-verbraucher.md#gebäude--wärmebedarf-hausprofil).
 - **Verbraucher im Profil:** z. B. Haus-Wärme, E-Auto, Pool oder generische Geräte.
 - **Grundlast:** typischer Haushaltsverbrauch über den Tag (Vorschau im Konfigurator prüfen).
 - **Abwesend / Urlaub:** Schalter für den Abwesenheitsmodus im Live-Betrieb; je Verbraucher optional **„Inaktiv wenn abwesend“**. Der Modus wirkt, sobald der Earnie-Schalter **oder** das Abwesenheitssignal am aktiven Smarthome-Backend eingeschaltet ist (EHAL-Feld `sens_absent_mode`, Zuordnung in der **Signalliste**; Loxone-Namenskatalog: `Earnie_Abwesend`). Details: [Flexible Verbraucher – Abwesenheitsmodus](../konfiguration/flexible-verbraucher.md#abwesenheitsmodus-live).
@@ -145,10 +146,11 @@ Je mehr Spielraum Earnie beim Verschieben der Verbraucher bekommt, desto größe
 
 #### Haus-Wärme
 
-Thermischer Verbraucher für Heizung bzw. Wärmepumpe (je nach Modell im Profil):
+Die Heizung des Hauses (Wärmepumpe oder andere Wärmequelle), nur wählbar bei eingeschaltetem **„Heizung betrachten“**:
 
-- **Solltemperaturen und thermische Parameter** (Wärmeverlust, Volumen bzw. Gebäudekennwerte). Ein Energieausweis des Gebäudes hilft dabei.
-- **Temperaturabsenkung wenn abwesend:** Bei wirksamem Abwesenheitsmodus und aktiver Verbraucher-Option gilt im Live-Betrieb Solltemperatur minus Absenkung. Den Warmwasserbedarf rechnet Earnie dann mit 0 Personen.
+- **Gebäudedaten** stehen nicht hier, sondern im Abschnitt **Gebäude / Wärmebedarf** des Hausprofils. Ein Energieausweis des Gebäudes hilft dabei.
+- **Heizsystem:** Wärmequelle, Leistung, Mindestlaufzeit, Wärmespeicher und Heizstab; dazu der Solarthermie-Kollektor.
+- **Temperaturabsenkung wenn abwesend** (im Abschnitt Gebäude / Wärmebedarf): Bei wirksamem Abwesenheitsmodus und eingeschaltetem „Absenken wenn abwesend“ gilt im Live-Betrieb Solltemperatur minus Absenkung. Den Warmwasserbedarf rechnet Earnie dann mit 0 Personen.
 - **Wärmebedarf:** Earnie schätzt ihn aus Wetterdaten und den thermischen Parametern und plant den Strombedarf zeitlich ein.
 - **Live-Betrieb:** Die Anbindung erfolgt später über die **Signalliste** (Leistung, Freigabe, ggf. Temperaturen).
 

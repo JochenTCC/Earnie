@@ -28,6 +28,7 @@ Goldens of migrated results: [`goldens/<snapshot>/`](goldens/) (ConfigMigration 
 | `v5_pre_scenario_feed_in/` | synthetic, from the `v4_pre_tariff_track` golden (2026-10-27) | `dm5.scenario_feed_in` (Edibert P3b, D2): flat `k_push_cent` + `feed_in_mode` `fixed` / `dynamic_epex` without tariffs, and a scenario with tariffs plus a leftover `feed_in_mode` |
 | `v5_pre_heat_source/` | synthetic, copy of `v5_pre_scenario_feed_in` (2026-10-31) | `dm5.heat_source` (SUSI P1): `heat_pump_type` `erde` (`profile_a`), missing → `luft` (`profile_b`), `luft` (`profile_c`) |
 | `v5_pre_heating_systems/` | synthetic, `v5_pre_heat_source` after `dm5.heat_source` (2026-11-02, dogfooding state) | `dm5.heating_systems`: heat pump with storage, heating rod and `min_on_quarterhours` (`profile_a`), heat pump with storage (`profile_b`, its ID `heating_profile_b` is already taken in `components.json` → `_2`), gas without storage (`profile_c`) |
+| `v5_pre_house_thermal/` | synthetic, `v5_pre_heating_systems` after `dm5.heating_systems` (2026-11-03) | `dm5.house_thermal`: building fields + `persons` + `absent_mode_enabled` move to the house (`profile_a`), house without heating consumer → `heating_enabled: false` (`profile_b`), legacy absolute `absent_temp_c`, `persons` 3, setback off (`profile_c`) |
 
 Pack files included when present: `config.json`, `house_profiles.json`, `components.json`, `deviation_rules.json`, `backtesting_scenarios.json`, `grid_fees.json`. No `uploads/`, schemas, examples, or private `tariffs.json`.
 

@@ -25,11 +25,46 @@ Die folgenden Hausprofil-Felder wirken nur in der **Live**-Optimierung; der Szen
 | Feld | Ort | Bedeutung |
 | ---- | --- | --------- |
 | `absent_mode` | Profil | Earnie-Schalter „Abwesend / Urlaub“ |
-| `absent_mode_enabled` | Verbraucher | „Inaktiv wenn abwesend“. Bei wirksamem Modus nimmt Earnie alle Verbraucher außer Haus Wärme aus der Live-MILP; Haus Wärme bleibt mit Absenkung in der Planung. |
-| `absent_temp_reduction_c` | Haus Wärme (`thermal_annual`) | Absenkung in K; Live-Soll = `target_temp_c` − Absenkung. Warmwasser (`persons`) ist dann 0. |
+| `absent_mode_enabled` | Verbraucher | „Inaktiv wenn abwesend“. Bei wirksamem Modus nimmt Earnie diese Verbraucher aus der Live-MILP. Die Haus-Wärme hat das Feld nicht, sie wird über `thermal.absent_mode_enabled` abgesenkt. |
+| `thermal.absent_mode_enabled` | Profil (Gebäude / Wärmebedarf) | „Absenken wenn abwesend“. Bei wirksamem Modus bleibt die Haus-Wärme in der Planung, mit abgesenkter Solltemperatur. |
+| `thermal.absent_temp_reduction_c` | Profil (Gebäude / Wärmebedarf) | Absenkung in K; Live-Soll = `target_temp_c` − Absenkung. Warmwasser (`persons`) ist dann 0. |
 | `plant.ehal_bindings.sens_absent_mode` | Plant | Optionales Smarthome-Signal 0/1, per **oder** mit `absent_mode` verknüpft. Live-Lesen über das aktive EHAL-Backend: Loxone-VO/Merker (Default-Name `Earnie_Abwesend`), HA-Entity (`binary_sensor` / `input_boolean` / …), OpenEMS-Kanal als `componentId/ChannelId` |
 
-Der Modus ist wirksam, sobald der Schalter im Hauskonfigurator **oder** das EHAL-Live-Signal aktiv ist (alle Backends). Der Schalter `absent_mode` wirkt dabei **backend-unabhängig**. Verbraucher mit Opt-in außer Haus Wärme nimmt Earnie aus der Live-MILP-Liste. Haus Wärme bleibt mit reduzierter Solltemperatur in der Optimierung.
+Der Modus ist wirksam, sobald der Schalter im Hauskonfigurator **oder** das EHAL-Live-Signal aktiv ist (alle Backends). Der Schalter `absent_mode` wirkt dabei **backend-unabhängig**. Verbraucher mit Opt-in nimmt Earnie aus der Live-MILP-Liste. Die Haus-Wärme bleibt in der Optimierung, mit reduzierter Solltemperatur, wenn „Absenken wenn abwesend“ an ist.
+
+<a id="gebäude--wärmebedarf-hausprofil"></a>
+
+## Gebäude / Wärmebedarf (Hausprofil)
+
+Die wärmetechnischen Eigenschaften gehören zum Haus, nicht zur Heizung. Im Hauskonfigurator stehen sie im Abschnitt **Gebäude / Wärmebedarf** des Hausprofils, vor den Verbrauchern.
+
+**Schalter „Heizung betrachten“** (`heating_enabled`):
+
+- **Aus** (Standard für ein neues Haus): Abschnitt und Verbraucher „Haus Wärme“ sind ausgeblendet, die Heizung wird nicht geplant. Ihr Verbrauch bleibt in der Grundlast. Wer die Heizung nicht betrachten will, gibt hier nichts ein.
+- **An:** Earnie plant die Heizung mit den Gebäudedaten dieses Abschnitts. Den Verbraucher „Haus Wärme“ legt man unter **Verbraucher** an; der Typ ist nur bei eingeschaltetem Schalter wählbar.
+- Ausschalten löscht nichts: Gebäudedaten und Haus-Wärme bleiben gespeichert und sind beim Wiedereinschalten unverändert da. Ein Szenario, das für dieses Haus ein Heizsystem wählt, meldet bei ausgeschaltetem Schalter einen Fehler.
+
+| Feld | Bedeutung |
+| ---- | --------- |
+| `thermal.living_area_m2` | Wohnfläche (m²) |
+| `thermal.building_class` | Gebäudeklasse 1–4 (bestimmt den HWB, wenn kein genauer Wert angegeben ist) |
+| `thermal.hwb_kwh_m2` | Optional: genauer Heizwärmebedarf (kWh/m²a) |
+| `thermal.building_mass` | Bauweise `leicht` / `mittel` / `schwer` (Wärmekapazität nach DIN V 18599-2) |
+| `thermal.target_temp_c` | Solltemperatur (°C) |
+| `thermal.house_tolerance_c` | Heizband-Toleranz (K) um die Solltemperatur |
+| `thermal.heating_limit_c` | Heizgrenze: oberhalb dieser Tagesmitteltemperatur wird nicht geheizt |
+| `thermal.house_heat_loss_kw_per_k` | Optional: Verlustkoeffizient H (kW/K); fehlt er, kalibriert Earnie H aus dem HWB |
+| `thermal.absent_mode_enabled`, `thermal.absent_temp_reduction_c` | Absenkung bei Abwesenheit, siehe [Abwesenheitsmodus](#abwesenheitsmodus-live) |
+| `persons` | Personen im Haushalt (Warmwasserbedarf); steht direkt am Hausprofil |
+
+```json
+{"id": "haus", "heating_enabled": true, "persons": 3,
+ "thermal": {"living_area_m2": 140, "hwb_kwh_m2": 55, "building_mass": "mittel",
+             "target_temp_c": 21.5, "absent_mode_enabled": true},
+ "consumers": [{"id": "wp", "type": "thermal_annual", "heating_system_id": "heating_haus"}]}
+```
+
+Fehlende Felder bekommen die Standardwerte aus `house_profiles.schema.json`. Ein Haus hat höchstens eine Haus-Wärme. Gebäudefelder am Verbraucher lehnt Earnie beim Laden ab; ältere Konfigurationen stellt die [Migration](../einrichtung/betrieb.md) um (`dm5.house_thermal`).
 
 ## Tagesenergie-Ziel
 
@@ -70,7 +105,7 @@ Details: [EHAL-Com](../ui/ehal-com.md), [Loxone-Signale](../referenz/loxone-sign
 
 ## Haus Wärme: Heizsystem (`heating_system_id`)
 
-Der Verbraucher `type: thermal_annual` beschreibt den Wärmebedarf des Gebäudes (Wohnfläche, Gebäudeklasse bzw. HWB, Personen, Temperaturen, Solarthermie) und seine Smarthome-Bindings. Die Wärmeerzeugung steht in einem eigenen Katalog: `heating_systems[]` in `components.json`. Ein Eintrag enthält:
+Der Verbraucher `type: thermal_annual` ist die Heizung des Hauses: Verweis auf das Heizsystem, Solarthermie-Kollektor, Verbrauchsdaten (Zähler-CSV) und Smarthome-Bindings. Die Gebäudedaten nimmt er immer aus dem Hausprofil, siehe [Gebäude / Wärmebedarf](#gebäude--wärmebedarf-hausprofil). Die Wärmeerzeugung steht in einem eigenen Katalog: `heating_systems[]` in `components.json`. Ein Eintrag enthält:
 
 | Feld | Bedeutung |
 | ---- | --------- |
@@ -96,10 +131,11 @@ Der Verbraucher `type: thermal_annual` beschreibt den Wärmebedarf des Gebäudes
 - **Nur Verweis am Verbraucher:** Die Felder der Wärmeerzeugung (`heat_source`, `heat_storage`, `parts`, `nominal_power_kw`, `min_on_quarterhours`) gehören in den Katalog. Stehen sie zusätzlich am Verbraucher, lehnt Earnie die Datei beim Laden ab, statt sie still zu überschreiben.
 - **Hausprofil entfernen:** Das Referenzsystem bleibt im Katalog und ist danach eine gewöhnliche Variante (änderbar, im Szenario wählbar, entfernbar).
 
-Im Formular des Verbrauchers „Haus Wärme“ (Bereich **Hausprofil**) stehen die Felder in zwei Abschnitten:
+Im Formular des Verbrauchers „Haus Wärme“ (Bereich **Hausprofil**, nur bei eingeschaltetem „Heizung betrachten“) stehen:
 
-- **Gebäude / Wärmebedarf:** Wohnfläche, Gebäudeklasse, Bauweise, HWB, Personen, Temperaturen, Verlustkoeffizient, Absenkung bei Abwesenheit und Solarthermie. Sie bleiben am Verbraucher.
+- **Solarthermie-Kollektor:** Fläche, Neigung, Azimut. Sie bleiben am Verbraucher.
 - **Heizsystem (Referenzsystem: …):** Wärmequelle, Nennleistung, Mindestlaufzeit, Wärmespeicher und Heizstab. Sie landen beim Speichern im Katalogeintrag des Referenzsystems.
+- Darunter der geschätzte Strom- bzw. Brennstoffbedarf, gerechnet mit den Gebäudedaten des Hausprofils.
 
 **Heizsystem wechseln:** Das Referenzsystem ändert sich nur hier, im Abschnitt **Heizsystem** des Hauses. Ein anderes Heizsystem aus dem Katalog übernimmt ein Haus nicht; wer eine modellierte Variante eingebaut hat, trägt ihre Werte hier ein. Ändert sich die **Wärmequelle** gegenüber der gespeicherten Datei (z. B. Gas → Wärmepumpe), passen die Verbrauchsdaten des Hauses nicht mehr, denn sie stammen vom bisherigen System. Earnie speichert dann erst nach einer Wahl und zeigt direkt unter der Wärmequelle eine Warnung:
 

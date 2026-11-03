@@ -23,10 +23,7 @@ from ui.form_layout import (
 from ui.house_config_profile_thermal_annual import (  # noqa: F401  (re-exported)
     _live_consumer_for_annual,
     _profile_geo_from_session,
-    _render_thermal_annual_building_fields,
     _render_thermal_annual_fields,
-    _render_thermal_annual_wp_preview,
-    _render_thermal_comfort_fields,
     _render_thermal_solar_fields,
     _render_thermal_storage_fields,
     _render_wp_annual_metric,

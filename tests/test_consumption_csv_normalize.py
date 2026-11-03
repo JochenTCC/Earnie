@@ -250,7 +250,9 @@ def test_serialize_consumer_keeps_use_profile_csv_false() -> None:
         ),
         (
             "thermal_annual",
-            {"thermal": {"living_area_m2": 100.0}, "heating_system_id": "heating_home"},
+            {"thermal": {"solar_thermal_area_m2": 0.0, "solar_thermal_tilt_deg": 18.0,
+                         "solar_thermal_azimuth_deg": 0.0},
+             "heating_system_id": "heating_home"},
         ),
         ("thermal_rc", {"thermal_rc": {"water_volume_liters": 1000.0}}),
     ):

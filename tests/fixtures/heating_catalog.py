@@ -1,8 +1,10 @@
-"""Test helper: inline heat generation on thermal_annual consumers → heating-system catalog.
+"""Test helper: old inline thermal_annual shape → real file shape.
 
-Tests often write a house profile inline in the old shape (``heat_source`` on the consumer).
-``split_inline_heating`` moves those fields into a catalog the way the house configurator
-does (``heating_<profile_id>``), so the loader sees the real file shape.
+Tests often write a house profile inline in the old shape (``heat_source`` and the building
+fields on the consumer). ``split_inline_heating`` moves the generation fields into a catalog
+the way the house configurator does (``heating_<profile_id>``) and the building fields to the
+house profile (``dm5.house_thermal``: ``heating_enabled``, ``thermal``, ``persons``), so the
+loader sees the real file shape.
 """
 from __future__ import annotations
 
@@ -24,9 +26,19 @@ def _profiles(doc: dict) -> list[dict]:
     return list(profiles or [])
 
 
+def _hoist_building_fields(doc: dict) -> dict:
+    from runtime_store.migration.steps.house_thermal import apply
+
+    if not any("heating_enabled" not in p for p in _profiles(doc)):
+        return doc
+    result = apply({"house_profiles.json": doc}, {})
+    assert not result.blockers, result.blockers
+    return result.docs["house_profiles.json"]
+
+
 def split_inline_heating(doc: dict) -> tuple[dict, list[dict[str, Any]]]:
-    """(house document without inline generation fields, raw catalog entries)."""
-    out = copy.deepcopy(doc)
+    """(house document in file shape, raw catalog entries)."""
+    out = _hoist_building_fields(copy.deepcopy(doc))
     entries: list[dict[str, Any]] = []
     taken: set[str] = set()
     for profile in _profiles(out):

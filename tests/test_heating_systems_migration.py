@@ -125,8 +125,11 @@ def test_dogfooding_fixture_migrates_and_loads(tmp_path):
     assert detect(docs)
     result = apply(docs, {})
     assert not result.blockers
-    for name in result.changed_files:
-        (config_dir / name).write_text(json.dumps(result.docs[name]), encoding="utf-8")
+    from runtime_store.migration.steps.house_thermal import apply as apply_house_thermal
+
+    hoisted = apply_house_thermal(result.docs, {})
+    for name in {*result.changed_files, *hoisted.changed_files}:
+        (config_dir / name).write_text(json.dumps(hoisted.docs[name]), encoding="utf-8")
     catalog = {e["id"]: e for e in result.docs["components.json"]["heating_systems"]}
     assert set(catalog) == {"heating_profile_a", "heating_profile_b", "heating_profile_b_2",
                             "heating_profile_c"}

@@ -11,6 +11,7 @@ from ui.house_config_profile_session import (
     _house_profiles_file_stamp,
     _resolve_profile_id,
 )
+from ui.house_config_profile_house_thermal import house_heating_payload
 
 import os
 
@@ -179,6 +180,7 @@ def _perform_house_profile_save(
     resolved: list[dict],
     existing: dict,
     preview_id: str,
+    heating: dict,
     absent_mode: bool = False,
     from_auto: bool = False,
 ) -> str | None:
@@ -222,6 +224,7 @@ def _perform_house_profile_save(
                 "baseload_distribution": hist.get(
                     "baseload_distribution", "equal"
                 ),
+                **house_heating_payload(heating),
             }
         )
     except ValueError as exc:
@@ -255,6 +258,7 @@ def _render_house_profile_save(
     resolved: list[dict],
     existing: dict,
     preview_id: str,
+    heating: dict,
     absent_mode: bool = False,
     held: bool = False,
 ) -> None:
@@ -291,6 +295,7 @@ def _render_house_profile_save(
         "grid_profile_csv": hist.get("grid_profile_csv", ""),
         "historical_csv_source": hist["historical_csv_source"],
         "baseload_distribution": hist.get("baseload_distribution", "equal"),
+        **house_heating_payload(heating),
     }
 
     if is_new:
@@ -317,6 +322,7 @@ def _render_house_profile_save(
             resolved=resolved,
             existing=existing,
             preview_id=preview_id,
+            heating=heating,
             from_auto=True,
         )
         require_saved(saved_id)

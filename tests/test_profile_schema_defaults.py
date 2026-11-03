@@ -7,6 +7,7 @@ from house_config.profile_schema_defaults import (
     consumer_default,
     ev_schedule_default,
     heat_storage_default,
+    house_thermal_default,
     profile_default,
     schema_default,
     thermal_rc_default,
@@ -14,9 +15,12 @@ from house_config.profile_schema_defaults import (
 
 
 def test_getters_read_schema_defaults():
-    assert consumer_default("absent_temp_reduction_c") == 2.5
-    assert consumer_default("living_area_m2") == 120.0
-    assert consumer_default("building_mass") == "mittel"
+    assert house_thermal_default("absent_temp_reduction_c") == 2.5
+    assert house_thermal_default("living_area_m2") == 120.0
+    assert house_thermal_default("building_mass") == "mittel"
+    assert house_thermal_default("absent_mode_enabled") is False
+    assert profile_default("persons") == 2
+    assert profile_default("heating_enabled") is False
     assert profile_default("latitude") == 48.2
     assert profile_default("longitude") == 11.0
     assert thermal_rc_default("setpoint_c") == 36.5
@@ -32,7 +36,7 @@ def test_type_specific_default_wins_over_plain_default():
 
 def test_field_without_default_fails_loud():
     with pytest.raises(KeyError, match="hat keinen"):
-        consumer_default("hwb_kwh_m2")
+        house_thermal_default("hwb_kwh_m2")
 
 
 def test_unknown_field_fails_loud():
@@ -40,30 +44,30 @@ def test_unknown_field_fails_loud():
         schema_default("consumer", "no_such_field")
 
 
-def test_thermal_annual_missing_keys_use_schema_defaults():
-    from house_config.profiles_thermal_annual import _build_thermal_block
+def test_house_thermal_missing_keys_use_schema_defaults():
+    from house_config.house_thermal import normalize_house_thermal
 
-    thermal = _build_thermal_block(
-        {"type": "thermal_annual", "heat_source": {"type": "heat_pump", "heat_pump_type": "luft"}}
-    )
+    thermal = normalize_house_thermal({}, label="p")
     assert thermal["absent_temp_reduction_c"] == 2.5
+    assert thermal["absent_mode_enabled"] is False
+    assert "hwb_kwh_m2" not in thermal
     assert thermal["living_area_m2"] == 120.0
     assert thermal["target_temp_c"] == 21.5
     assert thermal["building_mass"] == "mittel"
     assert thermal["house_tolerance_c"] == 0.5
 
 
-def test_thermal_annual_explicit_zero_area_is_kept():
-    from house_config.profiles_thermal_annual import _build_thermal_block
+def test_house_thermal_explicit_zero_area_is_kept():
+    from house_config.house_thermal import normalize_house_thermal
 
-    raw = {"living_area_m2": 0, "heat_source": {"type": "heat_pump", "heat_pump_type": "luft"}}
-    assert _build_thermal_block(raw)["living_area_m2"] == 0.0
+    assert normalize_house_thermal({"living_area_m2": 0}, label="p")["living_area_m2"] == 0.0
 
 
 def test_saved_absent_reduction_is_kept():
-    from house_config.profiles_thermal_annual import absent_temp_reduction_c
+    from house_config.house_thermal import normalize_house_thermal
 
-    assert absent_temp_reduction_c({"absent_temp_reduction_c": 6.5}, 21.5) == 6.5
+    block = normalize_house_thermal({"absent_temp_reduction_c": 6.5}, label="p")
+    assert block["absent_temp_reduction_c"] == 6.5
 
 
 def test_absent_override_without_reduction_uses_schema_default():

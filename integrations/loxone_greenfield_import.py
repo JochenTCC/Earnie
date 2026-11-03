@@ -276,6 +276,7 @@ def ensure_live_profile(
                     "include_status": ["verordnet"],
                 },
                 "consumers": [],
+                "heating_enabled": False,
             }
         }
         house["profiles"] = profiles
@@ -311,10 +312,8 @@ def _stub_consumer(*, consumer_id: str, label: str, hk_type: str, bindings: dict
         consumer["min_on_quarterhours"] = 4
         consumer["charging_schedule"] = dict(_DEFAULT_EV_SCHEDULE)
     elif hk_type == "thermal_annual":
-        consumer["living_area_m2"] = 0.0
-        consumer["building_class"] = 3
+        # Building fields live at the house (see apply_typed_matches).
         consumer["heat_source"] = {"type": "heat_pump", "heat_pump_type": "luft"}
-        consumer["persons"] = 2
     elif hk_type == "thermal_rc":
         consumer["thermal_rc"] = dict(_DEFAULT_THERMAL_RC)
     return consumer
@@ -417,6 +416,10 @@ def apply_typed_matches(
         taken.add(cid)
         if hk_type in {"thermal_annual", "thermal_rc"}:
             needs_geo = True
+        if hk_type == "thermal_annual":
+            # A heat pump in Loxone: „Heizung betrachten“ on, building data to fill in.
+            profile["heating_enabled"] = True
+            profile.setdefault("thermal", {"living_area_m2": 0.0, "building_class": 3})
         consumer = _stub_consumer(
             consumer_id=cid,
             label=match.label,

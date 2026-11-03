@@ -1656,6 +1656,8 @@ def test_live_scenario_resolves_entity_refs(tmp_path, monkeypatch):
                 "latitude": 48.2,
                 "longitude": 11.0,
                 "netznutzung": {"area_id": "user_no_grid_fee"},
+                "heating_enabled": true,
+                "thermal": {},
                 "consumers": [
                     {
                         "id": "heat",

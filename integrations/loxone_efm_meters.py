@@ -497,10 +497,8 @@ def _new_efm_consumer(*, consumer_id: str, label: str) -> dict[str, Any]:
     if hk_type == "generic":
         consumer["earnie_role"] = "known"
     elif hk_type == "thermal_annual":
-        consumer["living_area_m2"] = 0.0
-        consumer["building_class"] = 3
+        # Building fields live at the house (see apply_consumer_imports).
         consumer["heat_source"] = {"type": "heat_pump", "heat_pump_type": "luft"}
-        consumer["persons"] = 2
     return consumer
 
 
@@ -545,6 +543,10 @@ def apply_consumer_imports(
             )
         else:
             consumer = _new_efm_consumer(consumer_id=cid, label=label)
+            if consumer["type"] == "thermal_annual":
+                # A heat-pump meter: „Heizung betrachten“ on, building data to fill in.
+                profile["heating_enabled"] = True
+                profile.setdefault("thermal", {"living_area_m2": 0.0, "building_class": 3})
         if bind_power and power:
             _bind_meter_power(
                 consumer,

@@ -1,16 +1,17 @@
-"""thermal_annual / EV normalization: ``0`` is kept where valid, invalid persons fail loud."""
+"""thermal_annual / house normalization: ``0`` is kept where valid, invalid persons fail loud."""
 from __future__ import annotations
 
 import pytest
 
+from house_config.house_thermal import default_house_thermal, normalize_persons
 from house_config.profiles_thermal_annual import _build_thermal_block as _build_raw
 from house_config.profiles_thermal_annual import int_or_default
 
 _HEAT_SOURCE = {"heat_source": {"type": "heat_pump", "heat_pump_type": "luft"}}
 
 
-def _build_thermal_block(raw: dict) -> dict:
-    return _build_raw({**_HEAT_SOURCE, **raw})
+def _build_thermal_block(raw: dict, persons: int = 2) -> dict:
+    return _build_raw({**_HEAT_SOURCE, **raw}, default_house_thermal(), persons)
 
 
 def test_int_or_default_keeps_zero() -> None:
@@ -21,14 +22,15 @@ def test_int_or_default_keeps_zero() -> None:
 
 
 def test_persons_default_and_value() -> None:
-    assert _build_thermal_block({})["persons"] == 2
-    assert _build_thermal_block({"persons": 4})["persons"] == 4
+    assert normalize_persons(None, label="p") == 2
+    assert normalize_persons(4, label="p") == 4
+    assert _build_thermal_block({}, persons=4)["persons"] == 4
 
 
 @pytest.mark.parametrize("persons", [0, -1])
 def test_persons_below_one_fails_loud(persons: int) -> None:
     with pytest.raises(ValueError, match="persons muss >= 1 sein"):
-        _build_thermal_block({"persons": persons})
+        normalize_persons(persons, label="p")
 
 
 def test_flat_solar_collector_tilt_is_kept() -> None:

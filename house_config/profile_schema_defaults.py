@@ -58,6 +58,10 @@ def consumer_default(key: str, *, consumer_type: str | None = None):
     return schema_default("consumer", key, consumer_type=consumer_type)
 
 
+def house_thermal_default(key: str):
+    return schema_default("house_thermal", key)
+
+
 def thermal_rc_default(key: str):
     return schema_default("thermal_rc_params", key)
 

@@ -696,11 +696,15 @@ def test_house_profile_hwb_normalization(tmp_path, monkeypatch):
     assert thermal["hwb_kwh_m2"] == 62.0
 
 
+_HEATING_ON = {"heating_enabled": True, "persons": 2, "thermal": None}
+
+
 def test_default_consumer_is_thermal():
     consumer = _default_consumer()
     assert consumer["type"] == "thermal_annual"
     assert consumer["label"] == "Haus Wärme"
-    assert consumer["living_area_m2"] == 120.0
+    # Building fields live in the house section „Gebäude / Wärmebedarf“.
+    assert "living_area_m2" not in consumer
 
 
 def test_default_additional_consumer_is_generic():
@@ -733,14 +737,11 @@ def test_consumer_expander_title_includes_type_label():
     class _Session(dict):
         pass
 
-    session = _Session()
+    session = _Session({"home__house_heating_state": _HEATING_ON})
     consumer = {
         "label": "WP",
         "type": "thermal_annual",
         "nominal_power_kw": 5.0,
-        "living_area_m2": 120.0,
-        "building_class": 3,
-        "persons": 2,
         "heat_source": {"type": "heat_pump", "heat_pump_type": "luft"},
     }
     import ui.house_config_profile_form as form
@@ -787,7 +788,9 @@ def test_live_consumer_for_annual_type_switch_takes_heat_source_select_start():
     class _Session(dict):
         pass
 
-    session = _Session({"home__hc_g0_type_0": "thermal_annual"})
+    session = _Session(
+        {"home__hc_g0_type_0": "thermal_annual", "home__house_heating_state": _HEATING_ON}
+    )
     consumer = {"label": "Wasch", "type": "generic", "nominal_power_kw": 2.0}
     import ui.house_config_profile_form as form
 
@@ -969,18 +972,18 @@ def test_profile_rejects_two_thermal_annual_consumers(tmp_path):
                         "latitude": 48.2,
                         "longitude": 11.0,
                         "netznutzung": {"area_id": "user_no_grid_fee"},
+                        "heating_enabled": True,
+                        "thermal": {"living_area_m2": 100},
                         "consumers": [
                             {
                                 "id": "heat",
                                 "type": "thermal_annual",
                                 "heat_source": {"type": "heat_pump", "heat_pump_type": "luft"},
-                                "living_area_m2": 100,
                             },
                             {
                                 "id": "heat2",
                                 "type": "thermal_annual",
                                 "heat_source": {"type": "heat_pump", "heat_pump_type": "luft"},
-                                "living_area_m2": 80,
                             },
                         ],
                     }
@@ -1015,7 +1018,7 @@ def test_initial_profile_index_prefers_runtime_house_profile_id(monkeypatch):
     assert sess._initial_profile_index(ids) == ids.index("alpha") + 1
 
 
-def test_flatten_consumer_for_edit_merges_thermal():
+def test_flatten_consumer_for_edit_merges_thermal_without_building_fields():
     flattened = _flatten_consumer_for_edit(
         {
             "id": "heat",
@@ -1025,14 +1028,17 @@ def test_flatten_consumer_for_edit_merges_thermal():
                 "living_area_m2": 150.0,
                 "building_class": 2,
                 "hwb_kwh_m2": 55.0,
+                "persons": 3,
+                "solar_thermal_area_m2": 6.0,
                 "latitude": 48.2,
                 "longitude": 11.0,
             },
         }
     )
-    assert flattened["living_area_m2"] == 150.0
-    assert flattened["building_class"] == 2
-    assert flattened["hwb_kwh_m2"] == 55.0
+    # The building fields belong to the house section, the collector to the consumer.
+    for key in ("living_area_m2", "building_class", "hwb_kwh_m2", "persons"):
+        assert key not in flattened
+    assert flattened["solar_thermal_area_m2"] == 6.0
     assert "thermal" not in flattened
     assert "latitude" not in flattened
 

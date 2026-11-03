@@ -321,10 +321,16 @@ def test_profiles_normalize_heat_storage():
         }
     )
     spec: dict = {}
+    from house_config.house_thermal import normalize_house_thermal
+
     normalize_thermal_annual_consumer(
-        {"living_area_m2": 100.0, "building_class": 2, "heating_system_id": "hs"},
+        {"heating_system_id": "hs"},
         spec,
         copy_loxone_binding=lambda _r, _s: None,
         heating_systems=catalog,
+        house_thermal=normalize_house_thermal(
+            {"living_area_m2": 100.0, "building_class": 2}, label="p"
+        ),
+        persons=2,
     )
     assert spec["thermal"]["heat_storage"]["volume_liters"] == 1000.0
