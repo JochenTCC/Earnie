@@ -89,13 +89,13 @@ def test_annual_kwh_only_warns_with_adjust_or_keep() -> None:
     at = _to_gas(_session())
     warnings = _warnings(at)
     assert len(warnings) == 1 and "Jahresverbrauch" in warnings[0]
-    assert {"Jahresverbrauch übernehmen", "Heizsystem beibehalten"} <= _labels(at)
-    assert "Messdaten entfernen" not in _labels(at)
+    assert {"Zu Gas wechseln", "Bei Wärmepumpe bleiben"} <= _labels(at)
+    assert "Messdaten entfernen und zu Gas wechseln" not in _labels(at)
     assert _reference()["heat_source"]["type"] == "heat_pump"  # held
 
     at.number_input(key=_ANNUAL).set_value(150000.0).run(timeout=_TIMEOUT_S)
     assert _reference()["heat_source"]["type"] == "heat_pump"  # still held
-    _button(at, "Jahresverbrauch übernehmen").click().run(timeout=_TIMEOUT_S)
+    _button(at, "Zu Gas wechseln").click().run(timeout=_TIMEOUT_S)
     assert not at.exception
     assert not at.error, [e.value for e in at.error]
     assert _reference()["heat_source"] == {"type": "gas"}
@@ -105,11 +105,28 @@ def test_annual_kwh_only_warns_with_adjust_or_keep() -> None:
 
 def test_keep_restores_the_saved_heating_system() -> None:
     at = _to_gas(_session())
-    _button(at, "Heizsystem beibehalten").click().run(timeout=_TIMEOUT_S)
+    _button(at, "Bei Wärmepumpe bleiben").click().run(timeout=_TIMEOUT_S)
     assert not at.exception
     assert not _warnings(at)
     assert at.selectbox(key=_SOURCE).value == "heat_pump"
     assert _reference()["heat_source"]["type"] == "heat_pump"
+    # The value is sent to the browser (set_value); a popped key left it showing the new type.
+    assert at.selectbox(key=_SOURCE).proto.set_value
+
+
+def test_keep_after_gas_to_heat_pump_restores_gas() -> None:
+    _write_reference(heat_source={"type": "gas"})
+    at = _session()
+    at.selectbox(key=_SOURCE).set_value("heat_pump").run(timeout=_TIMEOUT_S)
+    assert _warnings(at)
+    assert {"Zu Wärmepumpe wechseln", "Bei Gas bleiben"} <= _labels(at)
+    _button(at, "Bei Gas bleiben").click().run(timeout=_TIMEOUT_S)
+    assert not at.exception
+    assert not _warnings(at)
+    assert at.selectbox(key=_SOURCE).value == "gas"
+    assert at.selectbox(key=_SOURCE).proto.set_value
+    assert not [s for s in at.selectbox if s.key == _WP_TYPE]
+    assert _reference()["heat_source"] == {"type": "gas"}
 
 
 def test_measured_csv_warns_with_remove_or_keep(tmp_path) -> None:
@@ -120,11 +137,11 @@ def test_measured_csv_warns_with_remove_or_keep(tmp_path) -> None:
     at = _to_gas(_session())
     warnings = _warnings(at)
     assert len(warnings) == 1 and "CSV-Messdaten" in warnings[0]
-    assert {"Messdaten entfernen", "Heizsystem beibehalten"} <= _labels(at)
-    assert "Jahresverbrauch übernehmen" not in _labels(at)
+    assert {"Messdaten entfernen und zu Gas wechseln", "Bei Wärmepumpe bleiben"} <= _labels(at)
+    assert "Zu Gas wechseln" not in _labels(at)
     assert _reference()["heat_source"]["type"] == "heat_pump"
 
-    _button(at, "Messdaten entfernen").click().run(timeout=_TIMEOUT_S)
+    _button(at, "Messdaten entfernen und zu Gas wechseln").click().run(timeout=_TIMEOUT_S)
     assert not at.exception
     assert not at.error, [e.value for e in at.error]
     assert _reference()["heat_source"] == {"type": "gas"}

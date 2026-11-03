@@ -108,15 +108,38 @@ def _remove_csv_data(
 
 
 def _keep_heating_system(session_scope: str, index: int, old_heat_source: dict) -> None:
-    """Restore the saved heat source in the form (widgets re-seed from the consumer)."""
+    """Restore the saved heat source in the form.
+
+    The widget values are set, not popped: a popped key makes the widget fall back to its
+    start index in Python, while the browser keeps showing the value it had (heat-source
+    select box on the new type, fields of the old one).
+    """
     consumers = st.session_state.get(_SESSION_CONSUMERS_KEY) or []
     if index < len(consumers):
         consumer = consumers[index]
         consumer["heat_source"] = dict(old_heat_source)
         if isinstance(consumer.get("thermal"), dict):
             consumer["thermal"]["heat_source"] = dict(old_heat_source)
+    from ui.house_config_profile_thermal_annual import _heat_source_select_start
+
+    source_type, hp_type = _heat_source_select_start(old_heat_source)
+    efficiency = old_heat_source.get("efficiency")
+    fuel_price = old_heat_source.get("fuel_price")
+    values = {
+        "hc_heat_source_{index}": source_type,
+        "hc_wp_{index}": hp_type,
+        "hc_heat_eff_use_{index}": efficiency not in (None, ""),
+        "hc_heat_eff_{index}": None if efficiency in (None, "") else float(efficiency),
+        "hc_fuel_price_use_{index}": fuel_price not in (None, ""),
+        "hc_fuel_price_{index}": None if fuel_price in (None, "") else float(fuel_price),
+    }
     for pattern in _HEAT_SOURCE_WIDGETS:
-        st.session_state.pop(_scoped_key(session_scope, pattern.format(index=index)), None)
+        key = _scoped_key(session_scope, pattern.format(index=index))
+        value = values[pattern]
+        if value is None:
+            st.session_state.pop(key, None)
+        else:
+            st.session_state[key] = value
 
 
 def render_reference_change_gate(
@@ -160,11 +183,12 @@ def render_reference_change_gate(
         box.warning(
             f"Heizsystem geändert ({old_label} → {new_label}), noch nicht gespeichert: Die "
             f"CSV-Messdaten des Hauses stammen vom bisherigen Heizsystem ({old_label}) und "
-            "passen nicht zum neuen. Messdaten entfernen oder Heizsystem beibehalten."
+            f"passen nicht zum neuen. Messdaten entfernen und zu {new_label} wechseln, oder bei "
+            f"{old_label} bleiben."
         )
         keep_col, change_col = box.columns(2)
         change_col.button(
-            "Messdaten entfernen",
+            f"Messdaten entfernen und zu {new_label} wechseln",
             key=_scoped_key(session_scope, "house_heating_change_remove_csv"),
             on_click=_remove_csv_data,
             args=(
@@ -179,19 +203,20 @@ def render_reference_change_gate(
         box.warning(
             f"Heizsystem geändert ({old_label} → {new_label}), noch nicht gespeichert: Der "
             f"Jahresverbrauch ({_kwh(annual_kwh)} kWh/a) gilt für das bisherige Heizsystem "
-            f"({old_label}). Jahresverbrauch oben an das neue Heizsystem anpassen und "
-            "übernehmen, oder Heizsystem beibehalten. Ist der Wert schon eine Schätzung für "
-            "das neue Heizsystem (z. B. Neubau), ihn unverändert übernehmen."
+            f"({old_label}). Jahresverbrauch oben an das neue Heizsystem anpassen und zu "
+            f"{new_label} wechseln, oder bei {old_label} bleiben. Ist der Wert schon eine "
+            "Schätzung für das neue Heizsystem (z. B. Neubau), ihn unverändert lassen; der "
+            "Wechsel übernimmt den Jahresverbrauch, wie er oben steht."
         )
         keep_col, change_col = box.columns(2)
         change_col.button(
-            "Jahresverbrauch übernehmen",
+            f"Zu {new_label} wechseln",
             key=_scoped_key(session_scope, "house_heating_change_accept_annual"),
             on_click=_accept,
             args=(accept_key, token),
         )
     keep_col.button(
-        "Heizsystem beibehalten",
+        f"Bei {old_label} bleiben",
         key=_scoped_key(session_scope, "house_heating_change_keep"),
         on_click=_keep_heating_system,
         args=(session_scope, index, change["old_heat_source"]),
