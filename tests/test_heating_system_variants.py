@@ -460,3 +460,159 @@ def test_hourly_residual_subtracts_the_measured_rod(monkeypatch, tmp_path):
     series = consumption_profiles._by_consumer_aligned_to_total_csv(profile, str(total), hours=24)
     assert series["baseload"] == [2.0] * 24
     assert "__measured_heating_rod" not in series
+
+
+# --- SE planning uses the scenario's profile (rod bound, thermal contexts) --------------
+
+_GAS_ROD = {**_GAS, "id": "gas_rod", "heat_storage": _STORAGE, "parts": [_ROD]}
+_ROD_ID = "waermepumpe_heating_rod"
+
+
+def _gas_catalog() -> dict:
+    return heating_systems_by_id({"heating_systems": [_GAS, _GAS_ROD]})
+
+
+def _gas_house(system_id: str, *, consumer_id: str = "waermepumpe") -> dict:
+    raw = _house_raw()
+    consumer = raw["profiles"][0]["consumers"][0]
+    consumer.update(id=consumer_id, heating_system_id=system_id)
+    return normalize_house_profiles_document(raw, heating_systems=_gas_catalog())["profiles"][
+        "home"
+    ]
+
+
+def _scenario_params(profile: dict) -> dict:
+    from house_config.planning_flex_bridge import collect_planning_flex_consumers
+
+    return {
+        "_house_profile": profile,
+        "_planning_flex_consumers": collect_planning_flex_consumers(profile),
+    }
+
+
+def _se_rod_plan(monkeypatch, live_profile: dict, scenario_profile: dict) -> tuple[list, float]:
+    """Flex ids and rod energy [kWh] of one SE day: cheap noon, gas house (book has no rod)."""
+    from datetime import date, time
+
+    from optimizer.cbc_solver import solve_with_strict_fallback
+    from optimizer.milp import _add_milp_objective
+    from optimizer.milp_consumers import (
+        _add_consumer_delivery_constraints,
+        filter_feasible_consumers,
+    )
+    from optimizer.milp_horizon import _build_milp_model
+    from optimizer.milp_inputs import _resolve_thermal_flex_contexts
+    from optimizer.scenario_planning_scope import planning_scenario_scope
+    from optimizer.targets import resolve_horizon_consumer_targets_kwh
+    from optimizer.thermal_flex_context import add_thermal_flex_constraints
+    from simulation.engine_scenario import _flexible_consumers_from_scenario
+
+    live = _scenario_params(live_profile)
+    monkeypatch.setattr("config.get_resolved_runtime_settings", lambda: live)
+    # The backtesting fixture adds its own consumers in load_flexible_consumers.
+    monkeypatch.setattr(
+        "config.get_flexible_consumers",
+        lambda optimizer_only=False: list(live["_planning_flex_consumers"]),
+    )
+    monkeypatch.setattr(
+        "data.modeled_climate.ModeledClimateContext.from_scenario",
+        classmethod(lambda cls, _params: None),
+    )
+    scenario = _scenario_params(scenario_profile)
+    day = date(2024, 1, 15)
+    prices = [40.0] * 10 + [2.0] * 4 + [40.0] * 10
+    matrix = [
+        {
+            "hour": hour,
+            "date": day,
+            "slot_datetime": datetime.combine(day, time(hour, 0)),
+            "k_act": price,
+            "price_buy": price / 100.0,
+            "expected_p_act": 0.5,
+            "expected_p_pv": 0.0,
+            "consumption_mode": "profile_spec",
+        }
+        for hour, price in enumerate(prices)
+    ]
+    with planning_scenario_scope(scenario):
+        flex = _flexible_consumers_from_scenario(scenario)
+        book = {str(c["id"]): 0.0 for c in flex}  # resolve_profile_spec_flex_targets books no rod
+        remaining = resolve_horizon_consumer_targets_kwh(matrix, book, flexible_consumers=flex)
+        contexts = _resolve_thermal_flex_contexts(matrix, flex, None)
+    horizon = len(matrix)
+    battery = {
+        "min_soc": 10.0,
+        "max_soc": 10.0001,
+        "max_power_kw": 0.001,
+        "battery_capacity_kwh": 0.01,
+        "efficiency": 0.95,
+    }
+    planned = filter_feasible_consumers(
+        flex, remaining, matrix, list(range(horizon)), False, {}, {}
+    )
+    model = _build_milp_model(matrix, horizon, battery, 10.0, planned, 0.0, remaining, {})
+    _add_milp_objective(model, matrix, 0.0, {}, wear_cent_per_kwh=0.0)
+    _add_consumer_delivery_constraints(model, matrix, remaining, list(range(horizon)), {}, False)
+    add_thermal_flex_constraints(model, matrix, list(range(horizon)), contexts)
+    assert solve_with_strict_fallback(model.prob, msg=False) == "Optimal"
+    rod_on = [
+        var.varValue for var in model.consumer_on.get(_ROD_ID, []) if var.varValue is not None
+    ]
+    rod_kwh = sum(1.0 for value in rod_on if value > 0.5) * 3.0 * float(model.dt_h)
+    return [str(c["id"]) for c in flex], rod_kwh
+
+
+def test_se_variant_with_rod_plans_the_rod_beside_a_reference_without(monkeypatch):
+    live = _gas_house("gas")
+    variant = apply_scenario_heating_systems(
+        live, {"waermepumpe": "gas_rod"}, _gas_catalog(), label="t"
+    )
+    flex_ids, rod_kwh = _se_rod_plan(monkeypatch, live, variant)
+    assert _ROD_ID in flex_ids
+    assert rod_kwh > 0.0
+
+
+def test_se_variant_without_rod_has_no_rod_beside_a_reference_with(monkeypatch):
+    live = _gas_house("gas_rod")
+    variant = apply_scenario_heating_systems(live, {"waermepumpe": "gas"}, _gas_catalog(), label="t")
+    flex_ids, rod_kwh = _se_rod_plan(monkeypatch, live, variant)
+    assert _ROD_ID not in flex_ids
+    assert rod_kwh == 0.0
+
+
+def test_se_rod_bound_and_contexts_read_the_scenario_house(monkeypatch):
+    """Another house (other thermal id) than Live: the rod must not look into the Live house."""
+    live = _gas_house("gas", consumer_id="heizung_live")
+    scenario = _gas_house("gas_rod")
+    flex_ids, rod_kwh = _se_rod_plan(monkeypatch, live, scenario)
+    assert flex_ids == [_ROD_ID]
+    assert rod_kwh > 0.0
+
+
+def test_se_anchor_step_plans_inside_the_scenario_scope(monkeypatch):
+    from optimizer.scenario_planning_scope import planning_runtime_settings
+    from simulation import anchor_step
+
+    scenario = _scenario_params(_gas_house("gas_rod"))
+    seen: list[dict] = []
+
+    def _capture(*_args, **_kwargs):
+        seen.append(planning_runtime_settings())
+        raise RuntimeError("stop")
+
+    monkeypatch.setattr(anchor_step, "_build_anchor_window_plan", _capture)
+    with pytest.raises(RuntimeError, match="stop"):
+        anchor_step._simulate_anchor_step(
+            datetime(2024, 1, 15),
+            50.0,
+            horizon_mode="fixed_24h",
+            cache=None,
+            prices_df=None,
+            scenario_params=scenario,
+            battery_params={},
+            feed_in_settings=None,
+            hours_done=0,
+            collect_cbc=False,
+        )
+    assert seen == [scenario]
+    assert planning_runtime_settings() is not scenario

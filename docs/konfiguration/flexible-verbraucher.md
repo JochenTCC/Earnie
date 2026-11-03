@@ -200,6 +200,8 @@ Ein Szenario kann für die Haus-Wärme ein anderes Heizsystem aus dem Katalog w�
 - **Grundlast bleibt:** Der Jahresverbrauch des Hauses gilt für das eingebaute Heizsystem. Earnie leitet die Grundlast deshalb immer mit dem Referenzsystem ab und tauscht danach nur die Wärmeerzeugung. Ein Gas-System senkt so den Strombedarf um den Anteil der Wärmepumpe und bringt Brennstoffkosten hinzu.
 - **Messdaten:** Hat das Referenzsystem einen eigenen Zähler (Verbrauchs-CSV am Verbraucher), zieht Earnie die gemessenen Werte exakt ab. Ohne eigenen Zähler zieht Earnie das modellierte Profil des Referenzsystems ab; dessen Modellfehler bleibt dann in der Grundlast. Der Szenario-Explorer nennt in den Ergebnissen, welcher Fall vorliegt. Die Variante selbst ist immer modelliert.
 - **Referenzspalte:** Szenarien mit unterschiedlichem Heizsystem bekommen getrennte Referenzwerte, weil sich die Hauslast unterscheidet.
+- **Heizstab:** Der Szenario-Explorer plant mit dem Heizsystem des Szenarios. Eine Variante mit Heizstab setzt ihn auch dann ein, wenn das Referenzsystem keinen hat; eine Variante ohne Heizstab plant keinen, auch wenn das Referenzsystem einen hat.
+- **Verbrauchswarnung:** Die Warnung „Verbrauch weicht >5% von Live-Referenz ab“ entfällt für Szenarien mit einem anderen Heizsystem als die Live-Referenz, weil sich deren Stromverbrauch gewollt ändert. Den Strom des Heizstabs rechnet Earnie vor dem Vergleich heraus.
 - **Live-Szenario:** Das Live-Szenario rechnet immer mit dem Referenzsystem. Eine Auswahl `heating_system_ids` im Live-Szenario lehnt Earnie ab.
 - **Andere Häuser:** Eine Wärmepumpen-Variante ist auf die Heizlast eines Hauses ausgelegt. Earnie erlaubt sie trotzdem für ein anderes Haus und prüft die Auslegung derzeit nicht.
 

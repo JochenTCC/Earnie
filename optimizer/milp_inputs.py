@@ -19,6 +19,7 @@ from .eauto_milp import (
 from .filter_context import resolve_filter_contexts
 from .milp_consumers import filter_feasible_consumers
 from .milp_horizon import EMPTY_MILP_PLAN
+from .scenario_planning_scope import planning_runtime_settings
 from .slot_duration import validate_dt_h
 from .thermal_flex_context import (
     is_heating_rod_consumer,
@@ -132,7 +133,8 @@ def _resolve_thermal_flex_contexts(
         for consumer in consumers
     ):
         return {}
-    settings = config.get_resolved_runtime_settings()
+    # SE: the scenario's profile and climate (``planning_scenario_scope``); Live otherwise.
+    settings = planning_runtime_settings()
     profile = settings.get("_house_profile")
     if not profile:
         return {}

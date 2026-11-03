@@ -474,7 +474,7 @@ def test_heat_fuel_for_result_subtracts_rod_heat(monkeypatch):
         },
         index=index,
     )
-    consumer = _thermal_consumer({"type": "gas"})
+    consumer = {**_thermal_consumer({"type": "gas"}), "heating_system_id": "gas_rod"}
     block = heat_fuel_for_result(df, {"_house_profile": _profile(consumer)})
     expected_fuel = 40.0 - 4.0 / 0.95
     assert block["fuel_kwh"] == pytest.approx(expected_fuel, abs=0.05)
@@ -482,6 +482,8 @@ def test_heat_fuel_for_result_subtracts_rod_heat(monkeypatch):
     assert block["import_kwh"] == pytest.approx(48.0)
     assert block["co2_kg"] == pytest.approx((48.0 * 226 + expected_fuel * 249) / 1000, abs=0.1)
     assert block["carriers"] == ["gas"]
+    assert block["heating_systems"] == {"wp_heating": "gas_rod"}
+    assert block["rod_kwh"] == pytest.approx(4.0)
 
 
 def test_heat_fuel_without_profile_has_only_electricity():

@@ -7,6 +7,10 @@ share of its slots that were booked) minus the heat the heating rod delivered (�
 rod kWh / efficiency of the fuel source). CO2 = grid import × electricity factor + fuel ×
 carrier factor (``share/config/heat_source_defaults.json``). Results without a house
 profile (no model) get only the electricity part.
+
+The block also names the result's heating systems (``heating_systems``: thermal_annual id →
+``heating_system_id``) and the electricity of its heating rods (``rod_kwh``), so the cost
+table can tell a heating variant or rod electricity from a simulation problem.
 """
 from __future__ import annotations
 
@@ -71,6 +75,19 @@ def _rod_kwh(unique: pd.DataFrame, consumer: dict, dt_h: float) -> float:
     return float(unique[column].fillna(0.0).sum()) * dt_h
 
 
+def _thermal_consumers(profile: dict) -> list[dict]:
+    return [c for c in profile.get("consumers") or [] if c.get("type") == "thermal_annual"]
+
+
+def _heating_systems(profile: dict) -> dict[str, str]:
+    from house_config.heating_systems import HEATING_SYSTEM_ID_KEY
+
+    return {
+        str(consumer["id"]): str(consumer[HEATING_SYSTEM_ID_KEY])
+        for consumer in _thermal_consumers(profile)
+    }
+
+
 def heat_fuel_for_result(df: pd.DataFrame, scenario_params: dict | None) -> dict:
     """Fuel / CO2 block of one result series (clipped to the reporting period)."""
     from data.modeled_climate import ModeledClimateContext
@@ -88,8 +105,12 @@ def heat_fuel_for_result(df: pd.DataFrame, scenario_params: dict | None) -> dict
     fuel_kwh = 0.0
     fuel_eur = 0.0
     carriers: list[str] = []
+    heating_systems: dict[str, str] = {}
+    rod_kwh = 0.0
     profile = (scenario_params or {}).get("_house_profile")
     if isinstance(profile, dict):
+        heating_systems = _heating_systems(profile)
+        rod_kwh = sum(_rod_kwh(unique, consumer, dt_h) for consumer in _thermal_consumers(profile))
         consumers = _fuel_consumers(profile)
         if consumers:
             climate = ModeledClimateContext.from_scenario(scenario_params or {})
@@ -112,6 +133,8 @@ def heat_fuel_for_result(df: pd.DataFrame, scenario_params: dict | None) -> dict
         "co2_kg": round(co2_g / 1000.0, 1),
         "import_kwh": round(import_kwh, 1),
         "carriers": carriers,
+        "heating_systems": heating_systems,
+        "rod_kwh": round(rod_kwh, 1),
     }
 
 

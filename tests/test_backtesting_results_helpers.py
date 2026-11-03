@@ -591,6 +591,80 @@ def test_annual_cost_rows_flag_duplicate_and_reference_slot_differences():
     assert rows["Live"]["Speicher-Standby [kWh]"] == "5.0"
 
 
+def _heating_variant_meta() -> dict:
+    """Live (heat pump) beside a gas variant, a gas + rod variant and a same-system run."""
+    live_ref_id = "ref:live"
+    ids = ["live", "gas", "gas_rod", "same_hp"]
+    gas_ref_id = "ref:gas"
+    return {
+        "reference_id": HISTORICAL_REFERENCE_ID,
+        "live_scenario_id": "live",
+        "scenario_ids": [HISTORICAL_REFERENCE_ID, live_ref_id, gas_ref_id, *ids],
+        "labels": {sid: sid for sid in [HISTORICAL_REFERENCE_ID, live_ref_id, gas_ref_id, *ids]},
+        "summary": {
+            "total_eur": {
+                sid: 1000.0 for sid in [HISTORICAL_REFERENCE_ID, live_ref_id, gas_ref_id, *ids]
+            }
+        },
+        "reference_by_scenario": {
+            "live": live_ref_id,
+            "gas": gas_ref_id,
+            "gas_rod": gas_ref_id,
+            "same_hp": live_ref_id,
+        },
+        "booked_consumption": {
+            HISTORICAL_REFERENCE_ID: {"consumption_kwh": 6000.0, "standby_kwh": 0.0},
+            live_ref_id: {"consumption_kwh": 6000.0, "standby_kwh": 0.0},
+            gas_ref_id: {"consumption_kwh": 3500.0, "standby_kwh": 0.0},
+            "live": {"consumption_kwh": 6050.0, "standby_kwh": 0.0},
+            "gas": {"consumption_kwh": 3520.0, "standby_kwh": 0.0},
+            "gas_rod": {"consumption_kwh": 4950.0, "standby_kwh": 0.0},
+            "same_hp": {"consumption_kwh": 6900.0, "standby_kwh": 0.0},
+        },
+        "heat_fuel": {
+            HISTORICAL_REFERENCE_ID: _heating_block("hp"),
+            live_ref_id: _heating_block("hp"),
+            gas_ref_id: _heating_block("gas"),
+            "live": _heating_block("hp"),
+            "gas": _heating_block("gas"),
+            "gas_rod": _heating_block("gas_rod", rod_kwh=1430.0),
+            "same_hp": _heating_block("hp"),
+        },
+    }
+
+
+def _heating_block(system_id: str, *, rod_kwh: float = 0.0) -> dict:
+    return {
+        "fuel_kwh": 0.0,
+        "fuel_eur": 0.0,
+        "co2_kg": 0.0,
+        "heating_systems": {"wp": system_id},
+        "rod_kwh": rod_kwh,
+    }
+
+
+def test_annual_cost_rows_heating_variant_has_no_live_deviation_hint():
+    rows = {row["Szenario"]: row for row in build_annual_cost_rows(_heating_variant_meta())}
+    assert rows["gas"]["Hinweis"] == "—"  # heat pump → gas: −42 % electricity on purpose
+    assert rows["gas_rod"]["Hinweis"] == "—"
+    assert rows["live"]["Hinweis"] == "—"
+    # Same heating system as the Live reference, +15 %: still a simulation problem.
+    assert "Live-Referenz" in rows["same_hp"]["Hinweis"]
+
+
+def test_annual_cost_rows_rod_electricity_comes_off_before_the_check():
+    meta = _heating_variant_meta()
+    for block in meta["heat_fuel"].values():
+        block["heating_systems"] = {"wp": "hp_rod"}
+    meta["booked_consumption"]["live"]["consumption_kwh"] = 6000.0 + 900.0
+    meta["heat_fuel"]["live"]["rod_kwh"] = 900.0
+    meta["booked_consumption"]["same_hp"]["consumption_kwh"] = 6000.0 + 900.0
+    meta["heat_fuel"]["same_hp"]["rod_kwh"] = 200.0
+    rows = {row["Szenario"]: row for row in build_annual_cost_rows(meta)}
+    assert rows["live"]["Hinweis"] == "—"  # +15 % is all rod electricity
+    assert "Live-Referenz" in rows["same_hp"]["Hinweis"]  # +11.7 % without the rod
+
+
 def test_annual_cost_rows_booked_loss_triggers_live_reference_hint():
     """Booked series below the Live reference (>5 %) is no longer hidden behind targets."""
     booked = {

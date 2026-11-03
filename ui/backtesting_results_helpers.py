@@ -190,15 +190,42 @@ def _booked(meta: dict) -> dict:
     return meta.get(BOOKED_CONSUMPTION_KEY) or {}
 
 
-def _live_reference_kwh(meta: dict) -> float | None:
-    """Booked consumption of the Live scenario's reference series."""
+def _live_reference_id(meta: dict) -> str | None:
+    """Result id of the Live scenario's reference series."""
     live_id = _resolve_live_scenario_id(meta)
     if not live_id:
         return None
-    ref_id = (meta.get("reference_by_scenario") or {}).get(live_id)
+    return (meta.get("reference_by_scenario") or {}).get(live_id)
+
+
+def _live_reference_kwh(meta: dict) -> float | None:
+    """Booked consumption of the Live scenario's reference series."""
+    ref_id = _live_reference_id(meta)
     if not ref_id:
         return None
     return jahres_verbrauch_kwh(ref_id, booked_consumption=_booked(meta))
+
+
+def _consumption_vs_live_reference(
+    meta: dict,
+    scenario_id: str,
+    kwh_value: float | None,
+) -> float | None:
+    """Consumption of a scenario to compare with the Live reference; None = not comparable.
+
+    Another heating system than the Live reference (heat pump ↔ gas) changes the
+    electricity on purpose, so there is nothing to compare. The heating rod's electricity
+    replaces heat, so it comes off before the comparison. Both come from the ``heat_fuel``
+    block of each result; logs without it compare the plain consumption.
+    """
+    if kwh_value is None:
+        return None
+    heat_fuel = meta.get("heat_fuel") or {}
+    block = heat_fuel.get(scenario_id) or {}
+    reference_block = heat_fuel.get(_live_reference_id(meta)) or {}
+    if block.get("heating_systems") != reference_block.get("heating_systems"):
+        return None
+    return float(kwh_value) - float(block.get("rod_kwh") or 0.0)
 
 
 def build_scenario_consumption_rows(
@@ -360,7 +387,7 @@ def _annual_cost_hinweis(
     *,
     live_id: str | None,
     ref_id: str,
-    kwh_value: float | None,
+    compare_kwh: float | None,
     live_ref_kwh: float | None,
     booked: dict,
 ) -> str:
@@ -368,7 +395,7 @@ def _annual_cost_hinweis(
     # Live-Referenz and Historisch (Ist-Zähler) are baselines, not optimized runs.
     # Historisch vs model Live-ref often differs when meter ≠ Hausprofil — not a sim bug.
     is_baseline = _is_live_reference_row(scenario_id, live_id) or scenario_id == ref_id
-    if not is_baseline and exceeds_live_reference_rel(kwh_value, live_ref_kwh):
+    if not is_baseline and exceeds_live_reference_rel(compare_kwh, live_ref_kwh):
         hints.append(_CONSUMPTION_DEVIATION_HINT)
     return " · ".join(hints) if hints else _DASH
 
@@ -428,7 +455,7 @@ def build_annual_cost_rows(meta: dict) -> list[dict]:
             scenario_id,
             live_id=live_id,
             ref_id=ref_id,
-            kwh_value=kwh_value,
+            compare_kwh=_consumption_vs_live_reference(meta, scenario_id, kwh_value),
             live_ref_kwh=live_ref_kwh,
             booked=booked,
         )

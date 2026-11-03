@@ -7,12 +7,26 @@ import config
 from data.market_prices import epex_prices_for_slots
 
 
+def _scenario_base_consumers(scenario_params: dict, *, optimizer_only: bool) -> list:
+    """Live consumers to merge under a scenario's own ones.
+
+    A scenario on another house profile than Live (another house, or a heating-system
+    variant of the Live house) plans only its own consumers: the Live consumers come
+    from the Live profile, so merging them would put e.g. the Live heating rod into a
+    variant without one. On the Live profile both lists hold the same consumers.
+    """
+    profile = scenario_params.get("_house_profile")
+    if profile and profile != config.get_resolved_runtime_settings().get("_house_profile"):
+        return []
+    return config.get_flexible_consumers(optimizer_only=optimizer_only)
+
+
 def _flexible_consumers_from_scenario(scenario_params: dict | None) -> list:
     from house_config.planning_flex_bridge import merge_flexible_consumers
 
-    base = config.get_flexible_consumers(optimizer_only=True)
     if not scenario_params:
-        return base
+        return config.get_flexible_consumers(optimizer_only=True)
+    base = _scenario_base_consumers(scenario_params, optimizer_only=True)
     planning = scenario_params.get("_planning_flex_consumers") or []
     return merge_flexible_consumers(base, planning)
 
@@ -27,7 +41,7 @@ def resolved_flexible_consumers(
         return config.get_flexible_consumers(optimizer_only=optimizer_only)
     if optimizer_only:
         return _flexible_consumers_from_scenario(scenario_params)
-    base = config.get_flexible_consumers(optimizer_only=False)
+    base = _scenario_base_consumers(scenario_params, optimizer_only=False)
     planning = scenario_params.get("_planning_flex_consumers") or []
     if not planning:
         return base

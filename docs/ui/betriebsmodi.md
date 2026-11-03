@@ -173,7 +173,7 @@ Die Spalte **Hinweis** zeigt:
 - **Doppelt gebuchte Zeitslots:** Die Reihe enthält Slots mehrfach; im Jahres Verbrauch zählen sie einmal, in den Kosten mehrfach.
 - **Zeitslots ohne Buchung:** Zwischen erstem und letztem Slot fehlen Stunden. Verbrauch und Kosten dieser Stunden fehlen in der Zeile.
 - **Andere Zeitslots als die Referenz:** Die gebuchten Slot-Mengen von Szenario und Referenz weichen ab (z. B. durch Fenster, die nur die Optimierung bucht). Kosten und Verbrauch beider Zeilen stehen dann nicht ganz auf derselben Basis.
-- **Abweichung > 5 % zur Live-Referenz** (`CONSUMPTION_TOLERANCE_REL`): Warnung mit Verweis auf **Info / About**, Bereich Kontakt. Dort ein öffentliches Issue ohne Secrets anlegen; die vollständige Config-ZIP nur privat an `support@earnie-hems.com` senden. Die Zeilen Historisch und Live-Referenz bleiben ohne diese Warnung.
+- **Abweichung > 5 % zur Live-Referenz** (`CONSUMPTION_TOLERANCE_REL`): Warnung mit Verweis auf **Info / About**, Bereich Kontakt. Dort ein öffentliches Issue ohne Secrets anlegen; die vollständige Config-ZIP nur privat an `support@earnie-hems.com` senden. Die Zeilen Historisch und Live-Referenz bleiben ohne diese Warnung. Szenarien mit einem anderen Heizsystem als die Live-Referenz (`heating_system_ids`, z. B. Gas statt Wärmepumpe) prüft Earnie nicht, weil sich ihr Stromverbrauch gewollt ändert. Den Strom eines Heizstabs zieht Earnie vor dem Vergleich ab (Block `heat_fuel` im Lauf-Log: `heating_systems`, `rod_kwh`).
 
 Ältere Läufe ohne `booked_consumption` zeigen „—“ und den Hinweis, den Szenario-Explorer neu zu berechnen.
 

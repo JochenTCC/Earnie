@@ -174,7 +174,9 @@ def resolve_thermal_annual_horizon_kwh(
     """
     if not optimization_matrix:
         return 0.0
-    profile = config.get_resolved_runtime_settings().get("_house_profile")
+    from optimizer.scenario_planning_scope import planning_runtime_settings
+
+    profile = planning_runtime_settings().get("_house_profile")
     if not profile:
         return 0.0
     from house_config.planning_flex_bridge import _house_thermal_consumers
@@ -230,6 +232,7 @@ def resolve_heating_rod_horizon_kwh(
 
     The rod has no delivery target; this only lets the MILP plan it (caps per day in
     ``thermal_flex_context``). Live: 0 until an EHAL binding for the rod exists.
+    SE: the parent comes from the scenario's profile (``planning_scenario_scope``).
     """
     if not optimization_matrix:
         return 0.0
@@ -237,7 +240,10 @@ def resolve_heating_rod_horizon_kwh(
 
     if is_live_thermal_planning(optimization_matrix):
         return 0.0
-    profile = config.get_resolved_runtime_settings().get("_house_profile")
+    from optimizer.scenario_planning_scope import planning_runtime_settings
+
+    # SE: the scenario's profile (heating-system variant, other house), not the Live one.
+    profile = planning_runtime_settings().get("_house_profile")
     if not profile:
         return 0.0
     from house_config.planning_flex_bridge import _house_thermal_consumers

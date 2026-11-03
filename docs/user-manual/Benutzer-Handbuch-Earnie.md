@@ -355,7 +355,7 @@ Die Spalte **Speicher-Standby** zeigt den Eigenverbrauch der Hausbatterie (`stan
 
 Für den Abgleich von Ist und Modell eignen sich der Hauskonfigurator mit der Leistungsprofil-CSV sowie die Tabellen **Gesamtkosten und -Verbrauch** und **Verbrauchsvergleich** im Explorer.
 
-Weicht der Jahresverbrauch einer Zeile um **mehr als 5 %** von der Live-Referenz ab, zeigt die Spalte **Hinweis** eine Warnung. Dahinter kann ein Simulationsproblem stecken, das wir gerne nachvollziehen möchten. Melden Sie es am besten über **Info / About → Kontakt** als öffentliches Issue (ohne Zugangsdaten) oder senden Sie die Config-ZIP privat an `support@earnie-hems.com` – vielen Dank!
+Weicht der Jahresverbrauch einer Zeile um **mehr als 5 %** von der Live-Referenz ab, zeigt die Spalte **Hinweis** eine Warnung. Ausgenommen sind Szenarien mit einem anderen Heizsystem als die Live-Referenz, weil sich ihr Stromverbrauch gewollt ändert; den Strom eines Heizstabs rechnet Earnie vorher heraus. Dahinter kann ein Simulationsproblem stecken, das wir gerne nachvollziehen möchten. Melden Sie es am besten über **Info / About → Kontakt** als öffentliches Issue (ohne Zugangsdaten) oder senden Sie die Config-ZIP privat an `support@earnie-hems.com` – vielen Dank!
 
 Technische Details: [Betriebsmodi – Szenario-Explorer](../ui/betriebsmodi.md#gesamtkosten-und--verbrauch) · [Historische Leistungsprofil-CSV](../konfiguration/verbrauchs-csv.md)
 

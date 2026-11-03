@@ -13,6 +13,7 @@ from optimizer import (
     horizon_end_soc_percent,
     _delivered_flex_kwh_from_rows,
 )
+from optimizer.scenario_planning_scope import planning_scenario_scope
 from optimizer.slot_duration import DEFAULT_DT_H, validate_dt_h
 from optimizer.targets import consumer_column_name
 from simulation.backtesting_horizon import naive_backtesting_slot
@@ -283,24 +284,26 @@ def _simulate_anchor_step(
 ]:
     """Ein Backtesting-Schritt für fixed_24h oder sunrise_window (Book [SA₁, SA₂) je ready_by-Tag)."""
     step_start_soc = float(sim_soc)
-    plan = _build_anchor_window_plan(
-        anchor,
-        step_start_soc,
-        horizon_mode=horizon_mode,
-        cache=cache,
-        prices_df=prices_df,
-        scenario_params=scenario_params,
-        feed_in_settings=feed_in_settings,
-        price_resources=price_resources,
-    )
-    chart_rows = _simulate_plan_horizon(
-        plan,
-        sim_soc,
-        battery_params=battery_params,
-        hours_done=hours_done,
-        collect_cbc=collect_cbc,
-        scenario_params=scenario_params,
-    )
+    # Rod bound and thermal contexts read this scenario's house profile, not the Live one.
+    with planning_scenario_scope(scenario_params):
+        plan = _build_anchor_window_plan(
+            anchor,
+            step_start_soc,
+            horizon_mode=horizon_mode,
+            cache=cache,
+            prices_df=prices_df,
+            scenario_params=scenario_params,
+            feed_in_settings=feed_in_settings,
+            price_resources=price_resources,
+        )
+        chart_rows = _simulate_plan_horizon(
+            plan,
+            sim_soc,
+            battery_params=battery_params,
+            hours_done=hours_done,
+            collect_cbc=collect_cbc,
+            scenario_params=scenario_params,
+        )
     flexible_consumers = _flexible_consumers_from_scenario(scenario_params)
     if horizon_mode == SUNRISE_WINDOW:
         _stash_sunrise_full_horizon_flex(plan.meta, chart_rows, flexible_consumers)
