@@ -92,10 +92,38 @@ def test_scenario_variant_pick_is_saved_and_reseeded() -> None:
     assert "heating_system_ids" not in _scenario()["settings"]
 
 
-def test_live_scenario_has_no_heating_select() -> None:
+def test_live_scenario_names_the_reference_system_without_select() -> None:
     at = _session("Live")
-    assert not [sb for sb in at.selectbox if sb.key == "live__scenario_heating_wp"]
-    assert any("Live-Szenario rechnet immer mit dem Referenzsystem" in c.value for c in at.caption)
+    assert not [sb for sb in at.selectbox if "scenario_heating_wp" in str(sb.key)]
+    label = next(e["label"] for e in _catalog() if e["id"] == "heating_test_home")
+    line = f"Heizsystem: {label} (Referenzsystem, Änderung im Hauskonfigurator)"
+    assert line in [m.value for m in at.markdown]
+
+
+def test_scenario_select_offers_no_other_houses_reference_system() -> None:
+    from house_config.components_store import clear_components_doc_cache
+    from house_config.profiles_store import clear_house_profiles_doc_cache
+
+    doc = json.loads(_components_path().read_text(encoding="utf-8"))
+    other_entry = {**doc["heating_systems"][0], "id": "heating_other", "label": "WP Nachbar"}
+    doc["heating_systems"].append(other_entry)
+    _components_path().write_text(json.dumps(doc), encoding="utf-8")
+    house_path = Path(os.environ["EARNIE_HOUSE_PROFILES_PATH"])
+    house = json.loads(house_path.read_text(encoding="utf-8"))
+    other = json.loads(json.dumps(house["profiles"][0]))
+    other.update(id="nachbar", label="Nachbarhaus")
+    for consumer in other["consumers"]:
+        if consumer.get("type") == "thermal_annual":
+            consumer["heating_system_id"] = "heating_other"
+    house["profiles"].append(other)
+    house_path.write_text(json.dumps(house, ensure_ascii=False), encoding="utf-8")
+    clear_components_doc_cache()
+    clear_house_profiles_doc_cache()
+
+    options = _session().selectbox(key=_PICK_KEY).options
+    assert "WP Nachbar" not in options
+    assert "Gas-Variante" in options
+    assert sum("(Referenzsystem)" in o for o in options) == 1
 
 
 def test_reference_system_is_read_only_and_can_be_copied() -> None:

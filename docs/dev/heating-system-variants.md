@@ -160,17 +160,19 @@ A rod meter for Live (control, visualisation, later balancing) is a separate top
 fields of the `heating_rod` part (*SUSI P1 follow-up — Live control of the heating rod*);
 those bindings stay on the house consumer, not in the catalog entry.
 
-**Implementation gap:** `d5add969` still has the earlier handling (`heating_rod_profile_csv` /
-`heating_rod_annual_kwh` on the consumer and in the serializer, subtracted from the baseload,
-double-count hint in `heating_result_hints_by_scenario`, field in the house configurator) and
-has no warning on a reference-system change in the house configurator. It also offers every
-catalog entry in the scenario select box (including other houses' reference systems), accepts
-an entry as the reference system of two houses, and `reject_inline_heating_fields` checks only
-`heat_source` / `heat_storage` while inline `parts`, `nominal_power_kw` and
-`min_on_quarterhours` on a consumer with `heating_system_id` are overwritten silently. All of
-this is handled by the backlog item *Heating-system variants — align code with the decisions of
-2026-11-03*. Its rejection of `heating_system_ids` in the Live scenario matches the decision and
-stays.
+**Implemented (2026-11-03, backlog item *Heating-system variants — align code with the
+decisions of 2026-11-03*):** the rod measurement fields, their baseload subtraction and the
+double-count hint are gone; the loader rejects `heating_rod_profile_csv` /
+`heating_rod_annual_kwh` with a German message (`reject_measured_rod_fields`).
+`reject_inline_heating_fields` rejects all five `SYSTEM_FIELDS` on a raw consumer.
+`save_house_profiles_document` and the house-configurator save reject an entry referenced by
+two houses (`assert_reference_systems_unshared`). The scenario select box offers the own
+reference system plus variants (`scenario_heating_choices`), resolution rejects another
+house's reference system (`apply_scenario_heating_systems(..., foreign_references=…)`), and
+the Live scenario shows the reference-system text line. The house-configurator warning on a
+`heat_source.type` change lives in `ui/house_config_heating_change.py`
+(`reference_heat_source_changes`, `consumption_data_kind`); "remove the CSV data" clears the
+house load, battery and grid CSVs and the heating consumer's meter CSV, the PV profile stays.
 
 ## Migration
 

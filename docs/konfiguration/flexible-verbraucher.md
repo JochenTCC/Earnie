@@ -92,10 +92,21 @@ Der Verbraucher `type: thermal_annual` beschreibt den Wärmebedarf des Gebäudes
 
 **Referenzsystem:** Der Verbraucher verweist mit `heating_system_id` (Pflicht) auf das eingebaute Heizsystem. Live-Betrieb, Grundlast und die Vorschau im Hauskonfigurator rechnen immer mit diesem System. Der Hauskonfigurator legt den Eintrag beim Speichern an (Kennung `heating_<Hausprofil-ID>`) und ändert ihn direkt im Katalog. Am Verbraucher steht nur der Verweis.
 
+- **Ein Haus je Heizsystem:** Ein Heizsystem ist Referenzsystem höchstens eines Hauses, weil eine Änderung sonst auch die Grundlast des anderen Hauses verschiebt. Verweisen zwei Hausprofile auf denselben Eintrag (z. B. von Hand in `house_profiles.json`), lehnt Earnie das Speichern ab.
+- **Nur Verweis am Verbraucher:** Die Felder der Wärmeerzeugung (`heat_source`, `heat_storage`, `parts`, `nominal_power_kw`, `min_on_quarterhours`) gehören in den Katalog. Stehen sie zusätzlich am Verbraucher, lehnt Earnie die Datei beim Laden ab, statt sie still zu überschreiben.
+- **Hausprofil entfernen:** Das Referenzsystem bleibt im Katalog und ist danach eine gewöhnliche Variante (änderbar, im Szenario wählbar, entfernbar).
+
 Im Formular des Verbrauchers „Haus Wärme“ (Bereich **Hausprofil**) stehen die Felder in zwei Abschnitten:
 
 - **Gebäude / Wärmebedarf:** Wohnfläche, Gebäudeklasse, Bauweise, HWB, Personen, Temperaturen, Verlustkoeffizient, Absenkung bei Abwesenheit und Solarthermie. Sie bleiben am Verbraucher.
 - **Heizsystem (Referenzsystem: …):** Wärmequelle, Nennleistung, Mindestlaufzeit, Wärmespeicher und Heizstab. Sie landen beim Speichern im Katalogeintrag des Referenzsystems.
+
+**Heizsystem wechseln:** Das Referenzsystem ändert sich nur hier, im Abschnitt **Heizsystem** des Hauses. Ein anderes Heizsystem aus dem Katalog übernimmt ein Haus nicht; wer eine modellierte Variante eingebaut hat, trägt ihre Werte hier ein. Ändert sich die **Wärmequelle** gegenüber der gespeicherten Datei (z. B. Gas → Wärmepumpe), passen die Verbrauchsdaten des Hauses nicht mehr, denn sie stammen vom bisherigen System. Earnie speichert dann erst nach einer Wahl und zeigt eine Warnung:
+
+- **Mit CSV-Messdaten** (Lastprofil des Hauses oder Zähler-CSV der Haus-Wärme): **Messdaten entfernen** (Lastprofil, Batterie- und Netz-CSV des Hauses sowie die Zähler-CSV der Haus-Wärme; das PV-Profil bleibt) oder **Heizsystem beibehalten**.
+- **Nur mit Jahresverbrauch:** Jahresverbrauch oben an das neue Heizsystem anpassen und **Jahresverbrauch übernehmen**, oder **Heizsystem beibehalten**. Bei einem Neubau, dessen Jahresverbrauch schon eine Schätzung für das neue Heizsystem ist, den Wert unverändert übernehmen.
+
+Alte Daten und neues Heizsystem zugleich gibt es nicht. WP-Typ, JAZ bzw. Nutzungsgrad, Leistung, Speicher und Heizstab sind Feinabstimmung und speichern ohne Warnung. Wer die Wärmequelle vor dem Speichern zurückstellt, hat nichts geändert. Eine von Hand bearbeitete `house_profiles.json` prüft Earnie nicht.
 
 **Varianten:** Weitere Heizsysteme entstehen im Hauskonfigurator im Bereich **Heizsysteme**, z. B. als Kopie des Referenzsystems. Dort ist das Referenzsystem eines Hauses nur lesbar, weil eine Änderung die Grundlast dieses Hauses verschiebt. Ein Heizsystem, auf das ein Hausprofil oder ein Szenario verweist, lässt sich nicht entfernen. Die Auswahl im Szenario beschreibt [Heizsystem im Szenario](#heizsystem-im-szenario-heating_system_ids).
 
@@ -149,12 +160,11 @@ Ein Heizstab lädt den Wärmespeicher elektrisch mit Wirkungsgrad 1. Er ist ein 
 - **Neben einem Brennstoff:** Jede kWh Heizstab-Wärme spart Brennstoff im Wert von Brennstoffpreis / Nutzungsgrad. Der Optimierer setzt den Heizstab ein, wenn Strom günstiger ist, z. B. bei PV-Überschuss mit niedriger Einspeisevergütung. Höchstens so viel Wärme, wie das Haus am Tag braucht.
 - **Grenzen:** Der Optimierer rechnet mit der Tageswärme des Hauses, nicht mit der freien Kapazität des Speichers. Der Heizstab plant derzeit nur im Szenarien-Explorer. Im Live-Betrieb bleibt er aus, eine Steuerung über ein eigenes Binding folgt später.
 
-**Gemessener Heizstab-Verbrauch:** Lief ein Heizstab im Haus während des Messzeitraums (z. B. über eine PV-Überschussregelung), steckt sein Verbrauch im gemessenen Gesamtverbrauch. Ohne Angabe landet er in der Grundlast, und der Optimierer plant ihn im Szenario ein zweites Mal. Am Verbraucher `thermal_annual` lässt sich deshalb eine der beiden Angaben hinterlegen (Hauskonfigurator: **Gemessener Heizstab-Verbrauch**):
+**Kein fester Verbrauch:** Der Heizstab hat keinen eigenen Verbrauch in den Hausdaten, weder als CSV noch als Jahres-kWh. Der Optimierer entscheidet allein, wann er läuft. So bleibt das Heizsystem im Szenario frei austauschbar.
 
-- **`heating_rod_profile_csv`:** Stundenwerte des Heizstabs in kW (Format wie die Verbrauchs-CSV der Verbraucher). Earnie zieht sie Stunde für Stunde vom Gesamtverbrauch ab.
-- **`heating_rod_annual_kwh`:** Jahresverbrauch des Heizstabs. Earnie zieht ihn als Pauschale von der Grundlast ab, in Stundenreihen gleichmäßig verteilt.
+**Mögliche Doppelzählung:** Lief ein Heizstab im Haus während des Messzeitraums (z. B. über eine PV-Überschussregelung), steckt sein Verbrauch im gemessenen Gesamtverbrauch und damit in der Grundlast. Plant der Optimierer den Heizstab im Szenario zusätzlich, zählt dieser Strom doppelt. Earnie nimmt das in Kauf und zeigt dazu keinen Hinweis. Ein Heizstab-Zähler für den Live-Betrieb ist ein eigenes Thema; dort braucht er eigene Smarthome-Bindings.
 
-Beide Angaben zugleich lehnt Earnie beim Laden ab. Erlaubt sind sie nur, wenn das Referenzsystem einen Heizstab hat. Der Abzug gilt für jedes Szenario, auch wenn es ein Heizsystem ohne Heizstab wählt: Dann fällt der gemessene Heizstab-Verbrauch einfach weg. Fehlt bei einem Haus mit Messdaten beides, zeigt der Szenario-Explorer einen Hinweis auf mögliche Doppelzählung. Für die Live-Steuerung ist das ein eigenes Thema; dort braucht ein Heizstab-Zähler eigene Smarthome-Bindings.
+Ältere Entwicklungsstände kannten `heating_rod_profile_csv` und `heating_rod_annual_kwh` am Verbraucher. Earnie lehnt diese Felder beim Laden ab; das Feld aus `house_profiles.json` entfernen.
 
 <a id="haus-wärme-optionaler-wärmespeicher-heat_storage"></a>
 
@@ -191,7 +201,7 @@ Entwickler-Spec: [thermals-p2.md](../dev/done/thermals-p2.md).
 
 ## Heizsystem im Szenario (`heating_system_ids`)
 
-Ein Szenario kann für die Haus-Wärme ein anderes Heizsystem aus dem Katalog wählen, z. B. Gas statt Wärmepumpe. Im Szenarienkonfigurator steht dafür je Haus-Wärme-Verbraucher die Auswahl **Heizsystem**; Vorgabe ist das Referenzsystem. Gespeichert wird nur eine abweichende Wahl:
+Ein weiteres Szenario kann für die Haus-Wärme ein anderes Heizsystem aus dem Katalog wählen, z. B. Gas statt Wärmepumpe. Im Szenarienkonfigurator steht dafür je Haus-Wärme-Verbraucher die Auswahl **Heizsystem**. Sie bietet das Referenzsystem des eigenen Hauses (Vorgabe) und die Varianten an, also die Heizsysteme, die kein Haus als Referenzsystem nutzt. Das Referenzsystem eines anderen Hauses steht nicht zur Wahl; eine solche Wahl in der Datei lehnt Earnie beim Rechnen ab. Gespeichert wird nur eine abweichende Wahl:
 
 ```json
 "settings": {"house_profile_id": "haus", "heating_system_ids": {"waermepumpe": "gas_variante"}}
@@ -202,7 +212,7 @@ Ein Szenario kann für die Haus-Wärme ein anderes Heizsystem aus dem Katalog w�
 - **Referenzspalte:** Szenarien mit unterschiedlichem Heizsystem bekommen getrennte Referenzwerte, weil sich die Hauslast unterscheidet.
 - **Heizstab:** Der Szenario-Explorer plant mit dem Heizsystem des Szenarios. Eine Variante mit Heizstab setzt ihn auch dann ein, wenn das Referenzsystem keinen hat; eine Variante ohne Heizstab plant keinen, auch wenn das Referenzsystem einen hat.
 - **Verbrauchswarnung:** Die Warnung „Verbrauch weicht >5% von Live-Referenz ab“ entfällt für Szenarien mit einem anderen Heizsystem als die Live-Referenz, weil sich deren Stromverbrauch gewollt ändert. Den Strom des Heizstabs rechnet Earnie vor dem Vergleich heraus.
-- **Live-Szenario:** Das Live-Szenario rechnet immer mit dem Referenzsystem. Eine Auswahl `heating_system_ids` im Live-Szenario lehnt Earnie ab.
+- **Live-Szenario:** Das Live-Szenario rechnet immer mit dem Referenzsystem. Statt der Auswahl zeigt der Szenarienkonfigurator dort die Zeile „Heizsystem: … (Referenzsystem, Änderung im Hauskonfigurator)“. Eine Auswahl `heating_system_ids` im Live-Szenario lehnt Earnie ab.
 - **Andere Häuser:** Eine Wärmepumpen-Variante ist auf die Heizlast eines Hauses ausgelegt. Earnie erlaubt sie trotzdem für ein anderes Haus und prüft die Auslegung derzeit nicht.
 
 ## E-Auto: `charging_schedule`

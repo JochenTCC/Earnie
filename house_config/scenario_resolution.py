@@ -8,6 +8,7 @@ from house_config.planning_flex_bridge import collect_planning_flex_consumers
 from house_config.heating_systems import (
     SCENARIO_HEATING_SYSTEM_IDS_KEY,
     apply_scenario_heating_systems,
+    foreign_reference_ids,
     heating_systems_by_id,
     normalize_scenario_heating_system_ids,
 )
@@ -126,6 +127,7 @@ def resolve_scenario_settings(
                 heating_picks,
                 heating_systems_by_id(components),
                 label=f"Szenario (Hausprofil '{profile_id}')",
+                foreign_references=foreign_reference_ids(profiles_doc, profile_id),
             )
         out["_house_profile"] = profile
         _apply_profile_geo(out, profile)

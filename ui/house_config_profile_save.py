@@ -256,12 +256,14 @@ def _render_house_profile_save(
     existing: dict,
     preview_id: str,
     absent_mode: bool = False,
+    held: bool = False,
 ) -> None:
+    """Auto-save of the house profile; ``held`` while a heating-system change awaits a choice."""
     from ui.auto_persist import auto_persist, require_saved
     from ui.house_config_historical_csv import historical_csv_save_fields
 
     ready = bool(str(label or "").strip()) and location.get("latitude") is not None
-    if not ready:
+    if not ready or held:
         return
     hist = historical_csv_save_fields(preview_id, existing)
     profile_id = _resolve_profile_id(

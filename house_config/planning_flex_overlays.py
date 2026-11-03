@@ -56,8 +56,6 @@ def monthly_residual_baseload_kw(
 
     # Residual of the installed system: a scenario heating variant swaps only the heat load.
     consumers = list(baseload_reference_profile(house_profile).get("consumers", []))
-    from house_config.heating_systems import profile_measured_rod_kw_at
-
     consumer_kw = []
     for ts in timestamps:
         slot_dt = datetime.strptime(ts, "%Y-%m-%d %H:%M:%S")
@@ -66,7 +64,6 @@ def monthly_residual_baseload_kw(
                 float(modeled_consumer_kw_at_datetime(consumer, slot_dt, climate=climate) or 0.0)
                 for consumer in consumers
             )
-            + profile_measured_rod_kw_at(house_profile, slot_dt)
         )
     month_map = monthly_baseload_kw_by_month(timestamps, ist_kw, consumer_kw)
     flat = profile_flat_baseload_kw(house_profile)
@@ -331,10 +328,7 @@ def meter_residual_baseload_kw(
     if not csv_path:
         raise ValueError("meter residual requires total_profile_csv")
     # Hour-floor ZOH via csv_kw_at_datetime (QH slots hold parent clock-hour).
-    from house_config.heating_systems import (
-        baseload_reference_profile,
-        profile_measured_rod_kw_at,
-    )
+    from house_config.heating_systems import baseload_reference_profile
 
     # Residual of the installed system: a scenario heating variant swaps only the heat load.
     peeled = meter_residual_peel_consumers(
@@ -349,7 +343,7 @@ def meter_residual_baseload_kw(
             float(modeled_consumer_kw_at_datetime(consumer, slot_dt, climate=climate) or 0.0)
             for consumer in peeled
         )
-        value = total - peel - profile_measured_rod_kw_at(house_profile, slot_dt)
+        value = total - peel
         if value < 0.0:
             clipped += 1
             value = 0.0

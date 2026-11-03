@@ -50,10 +50,26 @@ def two_profiles():
         latitude=52.52, longitude=13.4, default_pv_tilt=40, default_pv_azimuth=-30,
     )
     doc["profiles"].append(clone)
+    # An entry is the reference system of at most one house: B gets a copy of A's entry.
+    components_path = Path(os.environ["EARNIE_COMPONENTS_PATH"])
+    components = json.loads(components_path.read_text(encoding="utf-8"))
+    for consumer in clone["consumers"]:
+        if consumer.get("type") != "thermal_annual":
+            continue
+        source = next(
+            e for e in components["heating_systems"] if e["id"] == consumer["heating_system_id"]
+        )
+        consumer["heating_system_id"] = f"heating_{_PROFILE_B}"
+        components["heating_systems"].append(
+            {**copy.deepcopy(source), "id": consumer["heating_system_id"]}
+        )
+    components_path.write_text(json.dumps(components, ensure_ascii=False), encoding="utf-8")
     with open(path, "w", encoding="utf-8") as handle:
         json.dump(doc, handle, ensure_ascii=False)
+    from house_config.components_store import clear_components_doc_cache
     from house_config.profiles_store import clear_house_profiles_doc_cache
 
+    clear_components_doc_cache()
     clear_house_profiles_doc_cache()
 
 

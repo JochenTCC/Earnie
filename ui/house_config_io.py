@@ -77,6 +77,7 @@ def merge_inline_heating_systems(doc: dict, *, read_existing: str) -> dict:
     from house_config.components_store import load_components_document
     from house_config.heating_systems import (
         HEATING_SYSTEMS_KEY,
+        assert_reference_systems_unshared,
         merge_inline_reference_systems,
         reference_ids_by_profile,
     )
@@ -94,6 +95,7 @@ def merge_inline_heating_systems(doc: dict, *, read_existing: str) -> dict:
             existing_refs=existing_refs.get(str(profile.get("id") or "")),
         )
         profiles.append(merged)
+    assert_reference_systems_unshared({"profiles": profiles})
     if catalog != before:
         _save_components_document({**components, HEATING_SYSTEMS_KEY: catalog})
     return {**doc, "profiles": profiles}
@@ -167,6 +169,7 @@ def upsert_house_profile(profile: dict) -> None:
     from house_config.components_store import load_components_document
     from house_config.heating_systems import (
         HEATING_SYSTEMS_KEY,
+        assert_reference_systems_unshared,
         heating_systems_by_id,
         merge_inline_reference_systems,
         reference_ids_by_profile,
@@ -202,10 +205,12 @@ def upsert_house_profile(profile: dict) -> None:
         heating_systems=heating_systems_by_id({HEATING_SYSTEMS_KEY: catalog}),
     )
     ensure_baseload_not_over_allocated(normalized["profiles"][profile_id])
-    if catalog != list(components.get(HEATING_SYSTEMS_KEY) or []):
-        _save_components_document({**components, HEATING_SYSTEMS_KEY: catalog})
     profiles = [p for p in profiles if p.get("id") != profile["id"]]
     profiles.append(profile)
+    # Checked again on save; here before the catalog is written.
+    assert_reference_systems_unshared({"profiles": profiles})
+    if catalog != list(components.get(HEATING_SYSTEMS_KEY) or []):
+        _save_components_document({**components, HEATING_SYSTEMS_KEY: catalog})
     payload: dict = {"profiles": profiles}
     plant = raw.get("plant")
     if isinstance(plant, dict) and plant:

@@ -365,7 +365,20 @@ def render_house_profile_tab() -> None:
     preview = _render_baseload_preview(
         annual_kwh, resolved_for_preview, ctx["existing"], preview_id
     )
+    from ui.house_config_heating_change import render_reference_change_gate
+    from ui.house_config_historical_csv import historical_csv_save_fields
+
+    held = render_reference_change_gate(
+        session_scope=ctx["session_scope"],
+        is_new=ctx["is_new"],
+        profile_id=ctx["stable_profile_id"],
+        annual_kwh=annual_kwh,
+        resolved=resolved,
+        hist=historical_csv_save_fields(preview_id, ctx["existing"]),
+        preview_id=preview_id,
+    )
     save_kwargs = {
+        "held": held,
         "session_scope": ctx["session_scope"],
         "is_new": ctx["is_new"],
         "stable_profile_id": ctx["stable_profile_id"],

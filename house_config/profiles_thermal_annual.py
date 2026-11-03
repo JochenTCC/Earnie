@@ -5,8 +5,8 @@ from house_config.heat_source import reject_legacy_heat_pump_type
 from house_config.heating_systems import (
     HEATING_SYSTEM_ID_KEY,
     apply_heating_system,
-    normalize_measured_rod,
     reject_inline_heating_fields,
+    reject_measured_rod_fields,
     resolve_heating_system,
 )
 from house_config.profile_schema_defaults import consumer_default
@@ -126,17 +126,16 @@ def normalize_thermal_annual_consumer(
     """Fill ``spec['thermal']`` and related flex fields for thermal_annual.
 
     The reference heating system (``heating_system_id``) is resolved against the catalog and
-    placed into the spec; generation fields a normalized consumer still carries (round trip
-    through the UI) are replaced by the catalog entry.
+    placed into the spec; inline generation fields and measured-rod fields fail loud.
     """
     reject_inline_heating_fields(raw, label=_label(raw))
+    reject_measured_rod_fields(raw, label=_label(raw))
     system = resolve_heating_system(
         heating_systems, raw.get(HEATING_SYSTEM_ID_KEY), label=_label(raw)
     )
     spec[HEATING_SYSTEM_ID_KEY] = system["id"]
     spec["thermal"] = _build_thermal_block(raw)
     apply_heating_system(spec, system)
-    normalize_measured_rod(raw, spec, label=_label(raw))
     if "optimizer_flex" in raw:
         spec["optimizer_flex"] = bool(raw["optimizer_flex"])
     window = raw.get("thermal_flex_window")

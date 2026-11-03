@@ -409,13 +409,7 @@ def _serialize_thermal_annual_fields(consumer: dict, out: dict) -> None:
     out.update(thermal)
     out["heating_system_id"] = consumer["heating_system_id"]
     # Optional fields the normalizer reads (normalize_thermal_annual_consumer); a save must keep them.
-    for key in (
-        "optimizer_flex",
-        "max_on_quarterhours",
-        "max_pulses_per_day",
-        "heating_rod_profile_csv",
-        "heating_rod_annual_kwh",
-    ):
+    for key in ("optimizer_flex", "max_on_quarterhours", "max_pulses_per_day"):
         if key in consumer:
             out[key] = consumer[key]
     if consumer.get("thermal_flex_window"):

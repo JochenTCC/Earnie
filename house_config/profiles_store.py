@@ -496,6 +496,9 @@ def save_house_profiles_document(path: str, doc: dict) -> None:
     normalized = normalize_house_profiles_document(
         doc, heating_systems=_heating_catalog_for(path, doc)
     )
+    from house_config.heating_systems import assert_reference_systems_unshared
+
+    assert_reference_systems_unshared(normalized)
     serializable = {
         "profiles": [_serialize_profile(p) for p in normalized["profiles"].values()]
     }

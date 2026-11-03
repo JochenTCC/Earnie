@@ -303,6 +303,154 @@ def test_live_scenario_rejects_heating_variants():
         )
 
 
+def _two_houses_raw(second_ref: str = "heating_other") -> dict:
+    raw = _house_raw()
+    other = json.loads(json.dumps(raw["profiles"][0]))
+    other.update(id="other", label="Other")
+    other["consumers"][0]["heating_system_id"] = second_ref
+    raw["profiles"].append(other)
+    return raw
+
+
+_OTHER_HP = {**_HP, "id": "heating_other", "label": "Other WP"}
+
+
+def _two_house_catalog() -> dict:
+    return heating_systems_by_id({"heating_systems": [_HP, _OTHER_HP, _GAS]})
+
+
+def test_shared_reference_entry_fails_loud_on_save(tmp_path):
+    from house_config.profiles_store import save_house_profiles_document
+
+    (tmp_path / "components.json").write_text(
+        json.dumps({"heating_systems": [_HP, _GAS]}), encoding="utf-8"
+    )
+    path = tmp_path / "house_profiles.json"
+    with pytest.raises(ValueError, match="höchstens einem Haus"):
+        save_house_profiles_document(str(path), _two_houses_raw("heating_home"))
+    assert not path.exists()
+
+
+def test_another_houses_reference_system_fails_loud_in_a_scenario():
+    from house_config.heating_systems import foreign_reference_ids
+
+    house = normalize_house_profiles_document(
+        _two_houses_raw(), heating_systems=_two_house_catalog()
+    )
+    profile = house["profiles"]["home"]
+    foreign = foreign_reference_ids(house, "home")
+    assert foreign == {"heating_other"}
+    with pytest.raises(ValueError, match="Referenzsystem eines anderen Hauses"):
+        apply_scenario_heating_systems(
+            profile,
+            {"waermepumpe": "heating_other"},
+            _two_house_catalog(),
+            label="t",
+            foreign_references=foreign,
+        )
+    variant = apply_scenario_heating_systems(
+        profile, {"waermepumpe": "gas"}, _two_house_catalog(), label="t", foreign_references=foreign
+    )
+    assert variant["consumers"][0]["heating_system_id"] == "gas"
+
+
+def test_scenario_choices_are_own_reference_and_variants():
+    from house_config.heating_systems import scenario_heating_choices
+
+    choices = scenario_heating_choices(
+        ["heating_home", "heating_other", "gas"],
+        house_doc=_two_houses_raw(),
+        profile_id="home",
+        consumer_id="waermepumpe",
+    )
+    assert choices == ["heating_home", "gas"]
+
+
+def test_resolution_rejects_another_houses_reference_system(tmp_path, monkeypatch):
+    from house_config import scenario_resolution
+
+    config_dir = tmp_path / "config"
+    config_dir.mkdir(parents=True)
+    (config_dir / "house_profiles.json").write_text(
+        json.dumps(_two_houses_raw()), encoding="utf-8"
+    )
+    (config_dir / "components.json").write_text(
+        json.dumps(
+            {
+                "inverters": [],
+                "batteries": [],
+                "pv_systems": [],
+                "heating_systems": [_HP, _OTHER_HP, _GAS],
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(scenario_resolution, "_attach_tariffs", lambda out, **_kw: None)
+    with pytest.raises(ValueError, match="Referenzsystem eines anderen Hauses"):
+        scenario_resolution.resolve_scenario_settings(
+            {"house_profile_id": "home", "heating_system_ids": {"waermepumpe": "heating_other"}},
+            raw_config={},
+            components_path=str(config_dir / "components.json"),
+            tariffs_path=str(config_dir / "tariffs.json"),
+            house_profiles_path=str(config_dir / "house_profiles.json"),
+        )
+
+
+# --- reference-system change in the house configurator --------------------------------
+
+
+def _form_consumer(source: dict) -> dict:
+    consumer = dict(_house_raw()["profiles"][0]["consumers"][0])
+    consumer.pop("heating_system_id")
+    return {**consumer, "heat_source": source}
+
+
+@pytest.mark.parametrize(
+    "source, changed",
+    [
+        ({"type": "gas"}, True),
+        ({"type": "heat_pump", "heat_pump_type": "luft"}, False),  # heat_pump_type: calibration
+        ({"type": "heat_pump", "heat_pump_type": "erde", "efficiency": 3.1}, False),
+    ],
+)
+def test_reference_change_counts_only_the_heat_source_type(source, changed):
+    from house_config.heating_systems import reference_heat_source_changes
+
+    out = reference_heat_source_changes(
+        [_form_consumer(source)],
+        saved_house_doc=_house_raw(),
+        heating_systems=_catalog(),
+        profile_id="home",
+    )
+    assert bool(out) is changed
+    if changed:
+        assert out[0]["old_heat_source"]["type"] == "heat_pump"
+        assert out[0]["new_type"] == "gas"
+
+
+def test_reference_change_needs_a_saved_house():
+    from house_config.heating_systems import reference_heat_source_changes
+
+    assert reference_heat_source_changes(
+        [_form_consumer({"type": "gas"})],
+        saved_house_doc={"profiles": []},
+        heating_systems=_catalog(),
+        profile_id="home",
+    ) == []
+
+
+def test_consumption_data_kind():
+    from house_config.heating_systems import consumption_data_kind
+
+    consumer = {"id": "waermepumpe", "type": "thermal_annual"}
+    measured = {"annual_kwh": 9000.0, "total_profile_csv": "t.csv", "consumers": [consumer]}
+    assert consumption_data_kind(measured, "waermepumpe") == "csv"
+    metered = {**consumer, "use_profile_csv": True, "profile_csv": "wp.csv"}
+    assert consumption_data_kind({"annual_kwh": 9000.0, "consumers": [metered]}, "waermepumpe") == "csv"
+    assert consumption_data_kind({"annual_kwh": 9000.0, "consumers": [consumer]}, "waermepumpe") == "annual"
+    assert consumption_data_kind({"annual_kwh": 0.0, "consumers": [consumer]}, "waermepumpe") is None
+
+
 def test_reference_fingerprint_separates_heating_variants():
     from house_config.planning_flex_bridge import heating_reference_fingerprint
 
@@ -337,7 +485,7 @@ def test_loaded_profile_reads_catalog_and_reloads_after_catalog_change(tmp_path)
     assert again["nominal_power_kw"] == 2.5
 
 
-# --- measured heating rod (SE baseload) ------------------------------------------------
+# --- heating rod: no measured data (decided 2026-11-03) ----------------------------------
 
 _STORAGE = {"volume_liters": 500.0}
 _ROD = {"id": "heating_rod", "type": "heating_rod", "nominal_power_kw": 3.0}
@@ -354,69 +502,42 @@ def _rod_profile(**consumer_fields) -> dict:
     return normalize_house_profiles_document(raw, heating_systems=_rod_catalog())["profiles"]["home"]
 
 
-def test_measured_rod_fields_are_exclusive_and_need_a_rod():
-    with pytest.raises(ValueError, match="schließen sich aus"):
-        _rod_profile(heating_rod_annual_kwh=300.0, heating_rod_profile_csv="rod.csv")
-    with pytest.raises(ValueError, match="einen Heizstab hat"):
-        normalize_house_profiles_document(
-            _house_raw_with(heating_rod_annual_kwh=300.0), heating_systems=_catalog()
-        )
-    with pytest.raises(ValueError, match="muss > 0"):
-        _rod_profile(heating_rod_annual_kwh=0)
+@pytest.mark.parametrize(
+    "field, value",
+    [("heating_rod_annual_kwh", 300.0), ("heating_rod_profile_csv", "rod.csv")],
+)
+def test_measured_rod_fields_fail_loud_on_load(field, value):
+    with pytest.raises(ValueError, match=f"{field} wird nicht mehr unterstützt — Feld entfernen"):
+        _rod_profile(**{field: value})
 
 
-def _house_raw_with(**consumer_fields) -> dict:
+@pytest.mark.parametrize(
+    "field, value",
+    [
+        ("heat_source", {"type": "gas"}),
+        ("heat_storage", _STORAGE),
+        ("parts", [_ROD]),
+        ("nominal_power_kw", 2.0),
+        ("min_on_quarterhours", 4),
+    ],
+)
+def test_inline_generation_fields_fail_loud_next_to_the_reference(field, value):
     raw = _house_raw()
-    raw["profiles"][0]["consumers"][0].update(consumer_fields)
-    return raw
+    raw["profiles"][0]["consumers"][0][field] = value
+    with pytest.raises(ValueError, match=f"{field} gehört in den Heizsystem-Katalog"):
+        normalize_house_profiles_document(raw, heating_systems=_catalog())
 
 
-def test_measured_rod_fields_survive_save():
-    from house_config.profiles_store import _serialize_consumer
-
-    profile = _rod_profile(heating_rod_annual_kwh=300.0)
-    out = _serialize_consumer(profile["consumers"][0])
-    assert out["heating_rod_annual_kwh"] == 300.0
-    assert "heating_rod_profile_csv" not in out
-
-
-def test_annual_rod_kwh_comes_off_the_baseload_for_every_variant(monkeypatch):
+def test_rod_has_no_demand_of_its_own(monkeypatch):
     from house_config.baseload import profile_baseload_kwh
     from tests.fixtures.open_meteo_mock import install_open_meteo_climate_mock
 
     install_open_meteo_climate_mock(monkeypatch)
-    without = profile_baseload_kwh(_rod_profile())
-    with_rod = _rod_profile(heating_rod_annual_kwh=400.0)
-    assert profile_baseload_kwh(with_rod) == pytest.approx(without - 400.0)
-    gas = apply_scenario_heating_systems(
-        _rod_profile(heating_rod_annual_kwh=400.0), {"waermepumpe": "gas"}, _rod_catalog(), label="t"
+    store_only = heating_systems_by_id({"heating_systems": [{**_HP, "heat_storage": _STORAGE}]})
+    without_rod = normalize_house_profiles_document(_house_raw(), heating_systems=store_only)
+    assert profile_baseload_kwh(_rod_profile()) == pytest.approx(
+        profile_baseload_kwh(without_rod["profiles"]["home"])
     )
-    assert profile_baseload_kwh(gas) == pytest.approx(without - 400.0)
-
-
-def test_measured_rod_kw_from_csv_or_lump_sum(monkeypatch):
-    from data import consumption_profiles
-    from house_config.heating_systems import profile_measured_rod_kw_at
-
-    slot = datetime(2024, 1, 1, 12)
-    lump = _rod_profile(heating_rod_annual_kwh=876.0)
-    assert profile_measured_rod_kw_at(lump, slot) == pytest.approx(0.1)
-    monkeypatch.setattr(consumption_profiles, "csv_kw_at_datetime", lambda _p, _dt: 2.5)
-    measured = _rod_profile(heating_rod_profile_csv="rod.csv")
-    assert profile_measured_rod_kw_at(measured, slot) == 2.5
-    assert profile_measured_rod_kw_at(_rod_profile(), slot) == 0.0
-
-
-def test_double_count_hint_only_with_measured_data_and_no_rod_data(tmp_path):
-    from house_config.heating_systems import heating_rod_double_count_hint
-
-    total = str(tmp_path / "total.csv")
-    assert heating_rod_double_count_hint(_rod_profile()) is None  # profile_spec house
-    hint = heating_rod_double_count_hint(_rod_profile_total(total))
-    assert hint is not None and "doppelt gezählt" in hint
-    assert heating_rod_double_count_hint(
-        _rod_profile_total(total, heating_rod_annual_kwh=300.0)
-    ) is None
 
 
 def _rod_profile_total(total: str, **consumer_fields) -> dict:
@@ -443,7 +564,7 @@ def test_variant_hints_name_exact_or_modeled_subtraction(tmp_path):
     assert heating_variant_hints(_rod_profile()) == []
 
 
-def test_hourly_residual_subtracts_the_measured_rod(monkeypatch, tmp_path):
+def test_hourly_residual_keeps_a_real_rod_in_the_baseload(monkeypatch, tmp_path):
     from data import consumption_profiles
 
     total = tmp_path / "total.csv"
@@ -456,10 +577,11 @@ def test_hourly_residual_subtracts_the_measured_rod(monkeypatch, tmp_path):
         "load_hourly_profile_csv",
         lambda _path: [(f"2024-01-01 {h:02d}:00:00", 3.0) for h in range(24)],
     )
-    profile = _rod_profile_total(str(total), heating_rod_annual_kwh=8760.0)
+    profile = _rod_profile_total(str(total))
     series = consumption_profiles._by_consumer_aligned_to_total_csv(profile, str(total), hours=24)
-    assert series["baseload"] == [2.0] * 24
-    assert "__measured_heating_rod" not in series
+    # Accepted double count (decided 2026-11-03): nothing is subtracted for the rod.
+    assert series["baseload"] == [3.0] * 24
+    assert not any("heating_rod" in key for key in series)
 
 
 # --- SE planning uses the scenario's profile (rod bound, thermal contexts) --------------

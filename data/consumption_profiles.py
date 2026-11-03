@@ -420,19 +420,11 @@ def _reference_series_for_residual(
     """Consumer series the residual subtracts: those of the reference heating systems.
 
     A scenario heating variant (``baseload_reference_consumers``) swaps only the heat load;
-    the baseload stays the residual of the installed system. A measured heating rod of the
-    real house is subtracted as well.
+    the baseload stays the residual of the installed system.
     """
-    from house_config.heating_systems import (
-        BASELOAD_REFERENCE_CONSUMERS_KEY,
-        profile_measured_rod_kw_at,
-    )
+    from house_config.heating_systems import BASELOAD_REFERENCE_CONSUMERS_KEY
 
     out = dict(series)
-    rod_kw = [profile_measured_rod_kw_at(profile, _parse_profile_timestamp(ts)) for ts in timestamps]
-    if any(rod_kw):
-        # Measured heating rod of the real house: not baseload, the MILP plans the rod.
-        out["__measured_heating_rod"] = rod_kw
     reference = profile.get(BASELOAD_REFERENCE_CONSUMERS_KEY)
     if reference is None:
         return out

@@ -159,16 +159,39 @@ def resolve_heating_system(
 
 
 def reject_inline_heating_fields(raw: dict[str, Any], *, label: str) -> None:
-    """Raw consumers carry only ``heating_system_id``; inline generation fields need migration.
+    """Raw consumers carry only ``heating_system_id``; inline generation fields fail loud.
 
-    ``heat_source`` / ``heat_storage`` at the top level exist only in the old file shape (the
-    normalized consumer nests them under ``thermal``). Without ``heating_system_id`` the
-    consumer is in the old shape anyway.
+    Every one of the five ``SYSTEM_FIELDS`` on a raw consumer is rejected, also next to a
+    ``heating_system_id`` (never overwritten silently by the catalog entry). Without
+    ``heating_system_id`` the consumer is in the old file shape and needs the migration.
     """
-    if HEATING_SYSTEM_ID_KEY not in raw or "heat_source" in raw or "heat_storage" in raw:
+    if HEATING_SYSTEM_ID_KEY not in raw:
         raise ValueError(
             f"{label}: Wärmeerzeugung gehört in den Heizsystem-Katalog "
             f"(components.json heating_systems, Verweis heating_system_id) — {_MIGRATE_HINT}."
+        )
+    inline = [key for key in SYSTEM_FIELDS if key in raw]
+    if inline:
+        raise ValueError(
+            f"{label}: {', '.join(inline)} gehört in den Heizsystem-Katalog "
+            f"(components.json heating_systems, Eintrag '{raw[HEATING_SYSTEM_ID_KEY]}'), nicht "
+            "an den Verbraucher. Feld(er) am Verbraucher entfernen und den Wert im "
+            "Hauskonfigurator (Heizsystem) bzw. im Bereich „Heizsysteme“ pflegen."
+        )
+
+
+# Measured heating-rod fields of the earlier design (never released; decided 2026-11-03).
+REMOVED_ROD_FIELDS: tuple[str, ...] = ("heating_rod_profile_csv", "heating_rod_annual_kwh")
+
+
+def reject_measured_rod_fields(raw: dict[str, Any], *, label: str) -> None:
+    """Earnie keeps no measured heating-rod consumption (no CSV, no annual kWh)."""
+    present = [key for key in REMOVED_ROD_FIELDS if key in raw]
+    if present:
+        raise ValueError(
+            f"{label}: {', '.join(present)} wird nicht mehr unterstützt — Feld entfernen. "
+            "Earnie führt keinen gemessenen Heizstab-Verbrauch; der Optimierer plant den "
+            "Heizstab allein (siehe docs/konfiguration/flexible-verbraucher.md)."
         )
 
 
@@ -247,6 +270,55 @@ def reference_ids_by_profile(house_doc: Any) -> dict[str, dict[str, str]]:
         if refs:
             out[str(profile.get("id") or "")] = refs
     return out
+
+
+def assert_reference_systems_unshared(house_doc: Any) -> None:
+    """An entry is the reference system of at most one house (fail loud otherwise).
+
+    The house configurator edits the reference entry in place; a shared entry would move the
+    other house's baseload with it.
+    """
+    owner: dict[str, str] = {}
+    for profile_id, refs in reference_ids_by_profile(house_doc).items():
+        for system_id in refs.values():
+            if system_id in owner and owner[system_id] != profile_id:
+                raise ValueError(
+                    f"Heizsystem '{system_id}' ist Referenzsystem von Hausprofil "
+                    f"'{owner[system_id]}' und '{profile_id}'. Ein Heizsystem gehört zu "
+                    "höchstens einem Haus — für das zweite Haus ein eigenes Heizsystem anlegen "
+                    "(Hauskonfigurator, Abschnitt Heizsystem)."
+                )
+            owner[system_id] = profile_id
+
+
+def foreign_reference_ids(house_doc: Any, profile_id: str) -> set[str]:
+    """Reference systems of every house except ``profile_id``."""
+    target = str(profile_id or "").strip()
+    return {
+        system_id
+        for pid, refs in reference_ids_by_profile(house_doc).items()
+        if pid != target
+        for system_id in refs.values()
+    }
+
+
+def scenario_heating_choices(
+    catalog_ids: Iterable[str],
+    *,
+    house_doc: Any,
+    profile_id: str,
+    consumer_id: str,
+) -> list[str]:
+    """Scenario select box: the house's own reference system first, then the variants.
+
+    Variants are entries that are no house's reference system; another house's reference
+    system is not offered.
+    """
+    own = reference_ids_by_profile(house_doc).get(str(profile_id or "").strip(), {})
+    own_id = own.get(str(consumer_id or ""))
+    references = foreign_reference_ids(house_doc, "") | set(own.values())
+    variants = [sid for sid in catalog_ids if sid not in references]
+    return ([own_id] if own_id else []) + variants
 
 
 def heating_system_usage(
@@ -347,6 +419,82 @@ def merge_inline_reference_systems(
     return out_profile, out_catalog
 
 
+# --- Reference-system change in the house configurator --------------------------------
+# Only a change of ``heat_source.type`` of the referenced entry counts, compared with the
+# saved house file; heat-pump type, efficiency, power, storage and rod are calibration.
+
+
+def _inline_heat_source(consumer: dict[str, Any]) -> dict[str, Any] | None:
+    source = consumer.get("heat_source")
+    if not isinstance(source, dict):
+        thermal = consumer.get("thermal")
+        source = thermal.get("heat_source") if isinstance(thermal, dict) else None
+    return source if isinstance(source, dict) else None
+
+
+def reference_heat_source_changes(
+    edited_consumers: Iterable[dict[str, Any]],
+    *,
+    saved_house_doc: Any,
+    heating_systems: dict[str, dict[str, Any]],
+    profile_id: str,
+) -> list[dict[str, Any]]:
+    """Form consumers whose heat-source type differs from their saved reference entry.
+
+    Each item: ``index``, ``consumer_id``, ``system_id``, ``old_heat_source`` (saved entry)
+    and ``new_type``. A house or consumer not yet in the saved file has no change.
+    """
+    refs = reference_ids_by_profile(saved_house_doc).get(str(profile_id or "").strip(), {})
+    out: list[dict[str, Any]] = []
+    for index, consumer in enumerate(edited_consumers):
+        if not isinstance(consumer, dict) or consumer.get("type") != "thermal_annual":
+            continue
+        consumer_id = str(consumer.get("id") or "")
+        system_id = refs.get(consumer_id)
+        new_source = _inline_heat_source(consumer)
+        if not system_id or new_source is None:
+            continue
+        saved = resolve_heating_system(
+            heating_systems, system_id, label=f"thermal_annual '{consumer_id}'"
+        )
+        old_source = saved["heat_source"]
+        if str(new_source.get("type")) == str(old_source.get("type")):
+            continue
+        out.append(
+            {
+                "index": index,
+                "consumer_id": consumer_id,
+                "system_id": system_id,
+                "old_heat_source": dict(old_source),
+                "new_type": str(new_source.get("type")),
+            }
+        )
+    return out
+
+
+def consumption_data_kind(profile: dict[str, Any], consumer_id: str) -> str | None:
+    """Consumption data a heating-system change invalidates: ``csv``, ``annual`` or None.
+
+    ``csv``: measured house data (``total_profile_csv``) or a meter CSV of the heating
+    consumer itself; ``annual``: only ``annual_kwh``.
+    """
+    if str(profile.get("total_profile_csv") or "").strip():
+        return "csv"
+    consumer = next(
+        (
+            c
+            for c in profile.get("consumers") or []
+            if isinstance(c, dict) and str(c.get("id") or "") == consumer_id
+        ),
+        {},
+    )
+    if consumer.get("use_profile_csv") and str(consumer.get("profile_csv") or "").strip():
+        return "csv"
+    if float(profile.get("annual_kwh") or 0.0) > 0.0:
+        return "annual"
+    return None
+
+
 # --- Scenario variants ---------------------------------------------------------------------
 # A scenario profile with a swapped heating system keeps the reference consumers here: every
 # baseload derivation (annual, monthly and hourly residual) reads them, the heat load and the
@@ -369,13 +517,16 @@ def apply_scenario_heating_systems(
     heating_systems: dict[str, dict[str, Any]],
     *,
     label: str,
+    foreign_references: Iterable[str] = (),
 ) -> dict[str, Any]:
     """Scenario copy of a normalized house profile with the selected heating systems.
 
     ``picks`` maps thermal_annual consumer ids to catalog ids; a consumer without a pick keeps
-    its reference system. Unknown consumers or systems fail loud. Picking the reference
-    system itself changes nothing.
+    its reference system. Unknown consumers or systems and the reference system of another
+    house (``foreign_references``, see ``foreign_reference_ids``) fail loud. Picking the
+    reference system itself changes nothing.
     """
+    foreign = set(foreign_references)
     thermal_ids = {
         str(c.get("id") or ""): c
         for c in profile.get("consumers") or []
@@ -391,6 +542,13 @@ def apply_scenario_heating_systems(
             raise ValueError(
                 f"{label}: heating_system_ids['{consumer_id}'] = '{system_id}' fehlt in "
                 "components.json heating_systems."
+            )
+        if system_id in foreign and system_id != thermal_ids[consumer_id].get(HEATING_SYSTEM_ID_KEY):
+            raise ValueError(
+                f"{label}: heating_system_ids['{consumer_id}'] = '{system_id}' ist das "
+                "Referenzsystem eines anderen Hauses. Im Szenario sind nur das eigene "
+                "Referenzsystem und Varianten wählbar (Variante im Bereich „Heizsysteme“ "
+                "anlegen, z. B. als Kopie)."
             )
     effective = {
         cid: sid
@@ -444,93 +602,6 @@ def assert_heating_system_deletable(system_id: str, *, house_doc: Any, scenarios
         )
 
 
-# --- Measured heating-rod consumption of the real house (SE baseload) --------------------
-# Measured data of the house, not of a heating system: stored on the thermal_annual consumer,
-# subtracted in the baseload step only (reference system), whatever variant a scenario picks.
-ROD_PROFILE_CSV_KEY = "heating_rod_profile_csv"
-ROD_ANNUAL_KWH_KEY = "heating_rod_annual_kwh"
-
-
-def normalize_measured_rod(raw: dict[str, Any], spec: dict[str, Any], *, label: str) -> None:
-    """Copy the optional measured rod fields onto the normalized consumer (fail loud)."""
-    csv_path = str(raw.get(ROD_PROFILE_CSV_KEY) or "").strip()
-    annual_raw = raw.get(ROD_ANNUAL_KWH_KEY)
-    has_annual = annual_raw not in (None, "")
-    if not csv_path and not has_annual:
-        return
-    if csv_path and has_annual:
-        raise ValueError(
-            f"{label}: {ROD_PROFILE_CSV_KEY} und {ROD_ANNUAL_KWH_KEY} schließen sich aus "
-            "(gemessene Heizstab-CSV oder Jahres-kWh, nicht beides)."
-        )
-    from house_config.heat_source import heating_rod_part
-
-    if heating_rod_part(spec) is None:
-        raise ValueError(
-            f"{label}: gemessener Heizstab-Verbrauch nur, wenn das Referenz-Heizsystem "
-            f"'{spec.get(HEATING_SYSTEM_ID_KEY)}' einen Heizstab hat."
-        )
-    if csv_path:
-        spec[ROD_PROFILE_CSV_KEY] = csv_path
-        return
-    annual = float(annual_raw)
-    if annual <= 0.0:
-        raise ValueError(f"{label}: {ROD_ANNUAL_KWH_KEY} muss > 0 sein (ist {annual}).")
-    spec[ROD_ANNUAL_KWH_KEY] = annual
-
-
-def measured_rod_annual_kwh(consumer: dict[str, Any]) -> float:
-    """Measured annual rod kWh of a reference consumer (0 without measured rod data)."""
-    if consumer.get(ROD_ANNUAL_KWH_KEY) is not None:
-        return float(consumer[ROD_ANNUAL_KWH_KEY])
-    path = str(consumer.get(ROD_PROFILE_CSV_KEY) or "").strip()
-    if not path:
-        return 0.0
-    from house_config.consumption_csv import estimate_annual_kwh_from_profile_csv
-
-    return estimate_annual_kwh_from_profile_csv(path)
-
-
-def measured_rod_kw_at(consumer: dict[str, Any], slot_dt: Any) -> float:
-    """Measured rod kW at the calendar hour; the annual kWh is spread evenly (lump sum)."""
-    path = str(consumer.get(ROD_PROFILE_CSV_KEY) or "").strip()
-    if path:
-        from data.consumption_profiles import csv_kw_at_datetime
-
-        return csv_kw_at_datetime(path, slot_dt)
-    if consumer.get(ROD_ANNUAL_KWH_KEY) is not None:
-        return float(consumer[ROD_ANNUAL_KWH_KEY]) / 8760.0
-    return 0.0
-
-
-def profile_measured_rod_kw_at(profile: dict[str, Any], slot_dt: Any) -> float:
-    return sum(
-        measured_rod_kw_at(consumer, slot_dt)
-        for consumer in baseload_reference_profile(profile).get("consumers") or []
-        if consumer.get("type") == "thermal_annual"
-    )
-
-
-def heating_rod_double_count_hint(profile: dict[str, Any]) -> str | None:
-    """German hint when measured data may contain a real rod the MILP plans again."""
-    if not str(profile.get("total_profile_csv") or "").strip():
-        return None
-    from house_config.heat_source import heating_rod_part
-
-    for consumer in baseload_reference_profile(profile).get("consumers") or []:
-        if consumer.get("type") != "thermal_annual" or heating_rod_part(consumer) is None:
-            continue
-        if consumer.get(ROD_PROFILE_CSV_KEY) or consumer.get(ROD_ANNUAL_KWH_KEY) is not None:
-            continue
-        return (
-            f"Heizstab von „{consumer.get('label') or consumer.get('id')}“: Ohne gemessenen "
-            "Heizstab-Verbrauch (CSV oder Jahres-kWh im Hauskonfigurator) steckt ein real "
-            "betriebener Heizstab in der Grundlast und wird im Szenario zusätzlich geplant. "
-            "Er kann doppelt gezählt sein."
-        )
-    return None
-
-
 def heating_variant_hints(profile: dict[str, Any]) -> list[str]:
     """German result hints for swapped heating systems with measured data."""
     hints: list[str] = []
@@ -554,16 +625,13 @@ def heating_variant_hints(profile: dict[str, Any]) -> list[str]:
 
 
 def heating_result_hints_by_scenario(scenarios: dict[str, dict]) -> dict[str, list[str]]:
-    """Scenario id → German result hints (variant subtraction, rod double count)."""
+    """Scenario id → German result hints (variant subtraction)."""
     out: dict[str, list[str]] = {}
     for scenario_id, params in scenarios.items():
         profile = params.get("_house_profile") if isinstance(params, dict) else None
         if not isinstance(profile, dict):
             continue
         hints = heating_variant_hints(profile)
-        rod = heating_rod_double_count_hint(profile)
-        if rod:
-            hints.append(rod)
         if hints:
             out[str(scenario_id)] = hints
     return out
