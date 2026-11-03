@@ -29,7 +29,8 @@
             "heatpump.wp_heating.set_enable": "",
             "heatpump.wp_heating.sens_power_act": ""
           },
-          "heating_system_id": "heating_example_efh"
+          "heating_system_id": "heating_example_efh",
+          "internal_gain_factor": 0.0
         },
         {
           "id": "ev",
@@ -66,7 +67,8 @@
             "set_evcs_mode": "",
             "evcs.ev.set_evcs_max_current": "",
             "ev.ev.sens_power_act": ""
-          }
+          },
+          "internal_gain_factor": 0.0
         },
         {
           "id": "waschmaschine",
@@ -85,7 +87,8 @@
             "mode": "advice",
             "power_source": "manual",
             "default_power_kw": 2.0
-          }
+          },
+          "internal_gain_factor": 0.8
         },
         {
           "id": "trockner",
@@ -104,7 +107,8 @@
             "mode": "advice",
             "power_source": "manual",
             "default_power_kw": 2.5
-          }
+          },
+          "internal_gain_factor": 0.8
         },
         {
           "id": "geschirrspueler",
@@ -123,7 +127,8 @@
             "mode": "advice",
             "power_source": "manual",
             "default_power_kw": 1.2
-          }
+          },
+          "internal_gain_factor": 0.8
         }
       ],
       "thermal": {
@@ -132,11 +137,23 @@
         "target_temp_c": 21.5,
         "heating_limit_c": 15.0,
         "absent_temp_reduction_c": 6.5,
-        "absent_mode_enabled": true
+        "absent_mode_enabled": true,
+        "solar_gains": {
+          "enabled": false,
+          "window_area_m2": {
+            "s": 11.0,
+            "e": 3.5,
+            "w": 3.5,
+            "n": 3.5
+          },
+          "g_value": 0.6,
+          "frame_shading_factor": 0.5
+        }
       },
       "persons": 2,
       "heating_enabled": true,
-      "vat_deductible": false
+      "vat_deductible": false,
+      "baseload_internal_gain_factor": 0.8
     }
   ],
   "plant": {

@@ -69,12 +69,15 @@ Die wärmetechnischen Eigenschaften gehören zum Haus, nicht zur Heizung. Im Hau
 | ---- | --------- |
 | `thermal.living_area_m2` | Wohnfläche (m²) |
 | `thermal.building_class` | Gebäudeklasse 1–4 (bestimmt den HWB, wenn kein genauer Wert angegeben ist) |
-| `thermal.hwb_kwh_m2` | Optional: genauer Heizwärmebedarf (kWh/m²a) |
+| `thermal.hwb_kwh_m2` | Optional: genauer Heizwärmebedarf (kWh/m²a) laut Energieausweis, bezogen auf die Bruttogrundfläche |
+| `thermal.gross_floor_area_m2` | Optional: Bruttogrundfläche BGF (m²). Fehlt sie, rechnet Earnie mit Wohnfläche × 1,25 (siehe [Heizwärme und Gewinne](#heizwaerme-und-gewinne)) |
 | `thermal.building_mass` | Bauweise `leicht` / `mittel` / `schwer` (Wärmekapazität nach DIN V 18599-2) |
 | `thermal.target_temp_c` | Solltemperatur (°C) |
 | `thermal.house_tolerance_c` | Heizband-Toleranz (K) um die Solltemperatur |
-| `thermal.heating_limit_c` | Heizgrenze: oberhalb dieser Tagesmitteltemperatur wird nicht geheizt |
+| `thermal.heating_limit_c` | Heizgrenze: im Live-Speicherplan kein Raumwärmebedarf oberhalb dieser Außentemperatur. Im Jahresmodell nur Startwert der H-Kalibrierung; dort ergibt sich die Heizpause aus den Gewinnen |
 | `thermal.house_heat_loss_kw_per_k` | Optional: Verlustkoeffizient H (kW/K); fehlt er, kalibriert Earnie H aus dem HWB |
+| `thermal.solar_gains` | Solare Gewinne durch die Fenster, siehe [Heizwärme und Gewinne](#heizwaerme-und-gewinne) |
+| `baseload_internal_gain_factor` | Am Hausprofil: Anteil der Grundlast, der das Haus mitheizt (Standard 0,8) |
 | `thermal.absent_mode_enabled`, `thermal.absent_temp_reduction_c` | Absenkung bei Abwesenheit, siehe [Abwesenheitsmodus](#abwesenheitsmodus-live) |
 | `persons` | Personen im Haushalt (Warmwasserbedarf); steht direkt am Hausprofil, im Hauskonfigurator neben dem Jahresverbrauch (siehe [Richtwert Haushaltsstrom](#personen-richtwert-haushaltsstrom)) |
 
@@ -86,6 +89,48 @@ Die wärmetechnischen Eigenschaften gehören zum Haus, nicht zur Heizung. Im Hau
 ```
 
 Fehlende Felder bekommen die Standardwerte aus `house_profiles.schema.json`. Ein Haus hat höchstens eine Haus-Wärme. Gebäudefelder am Verbraucher lehnt Earnie beim Laden ab; ältere Konfigurationen stellt die [Migration](../einrichtung/betrieb.md) um (`dm5.house_thermal`).
+
+<a id="heizwaerme-und-gewinne"></a>
+
+### Heizwärme und Gewinne (SUSI P2)
+
+**Jahres-Heizwärme = HWB × Bruttogrundfläche.** Der HWB im Energieausweis bezieht sich auf die Bruttogrundfläche (BGF), nicht auf die Wohnfläche. Ohne `gross_floor_area_m2` rechnet Earnie wie SUSI mit BGF = Wohnfläche × 1,25. Die Wärmekapazität des Hauses (Bauweise) rechnet weiter mit der Wohnfläche. Ohne genauen HWB gilt der Wert der Gebäudeklasse, ebenfalls je m² BGF.
+
+**Interne Gewinne.** Strom, der im Haus verbraucht wird, wird zum größten Teil zu Raumwärme und senkt den Heizbedarf. Earnie rechnet dafür keine Pauschale in W/m², sondern nimmt die modellierten Verbräuche:
+
+| Quelle | Feld | Standard |
+| ------ | ---- | -------- |
+| Grundlast (Jahresverbrauch minus modellierte Verbraucher) | `baseload_internal_gain_factor` am Hausprofil; im Hauskonfigurator **Grundlast als Wärme im Haus** | 0,8 |
+| Geräte (Typ `generic`) | `internal_gain_factor` am Verbraucher; im Hauskonfigurator **Interner Gewinnanteil** | 0,8 |
+| E-Auto (`ev`), Pool (`thermal_rc`), Poolfilter (`pool_filter`) | `internal_gain_factor` | 0 (außen) |
+| Haus Wärme (`thermal_annual`), Heizstab | `internal_gain_factor` | immer 0: ihre Wärme ist das Hausmodell selbst |
+
+Stündliche interne Gewinne = Σ Verbraucherleistung × Faktor plus Grundlast × Faktor. Ein Haushalt mit hohem Stromverbrauch heizt sich also stärker mit als ein sparsamer. Die interne Gewinne rechnet Earnie für jedes Haus mit „Heizung betrachten“, auch ohne solare Gewinne.
+
+**Solare Gewinne** (`thermal.solar_gains`, im Hauskonfigurator **Solare Gewinne durch Fenster**):
+
+| Feld | Bedeutung | Standard |
+| ---- | --------- | -------- |
+| `enabled` | Fenstergewinne einrechnen | neues Haus: an; nach der Migration: aus |
+| `window_area_m2.s` / `.e` / `.w` / `.n` | Fensterfläche je Himmelsrichtung (m², senkrecht) | Vorschlag nach SUSI |
+| `g_value` | Gesamtenergiedurchlassgrad der Verglasung | 0,6 |
+| `frame_shading_factor` | Abminderung für Rahmen, Laibung, Vorsprünge, Verschmutzung | 0,5 |
+
+Gewinn je Stunde = Σ Fensterfläche × g-Wert × Abminderung × Einstrahlung auf die senkrechte Fläche (Open-Meteo, vier Flächen Süd/Ost/West/Nord). Der Vorschlag im Hauskonfigurator folgt dem SUSI-Quader: BGF über 2 Geschosse, Seitenverhältnis 1,5, Geschosshöhe 2,6 m, Fensteranteil der Fassade Süd 20 %, Ost/West 10 %, Nord 6 %. Die Verschattung durch Gelände und Nachbargebäude ist hier noch nicht enthalten.
+
+```json
+"thermal": {"living_area_m2": 140, "hwb_kwh_m2": 55, "gross_floor_area_m2": 180,
+            "solar_gains": {"enabled": true,
+                            "window_area_m2": {"s": 12, "e": 4, "w": 4, "n": 3.5},
+                            "g_value": 0.6, "frame_shading_factor": 0.5}},
+"baseload_internal_gain_factor": 0.8
+```
+
+**H wird mit den Gewinnen kalibriert.** Der HWB ist bereits ein Netto-Wert nach Gewinnen. Earnie bestimmt den Verlustkoeffizienten H deshalb so, dass die Jahres-Heizwärme nach Abzug der Gewinne wieder HWB × BGF ergibt. Der Jahresbedarf bleibt also gleich, er verteilt sich nur anders: mehr Heizung in kalten Nächten und im Winter, weniger an sonnigen Tagen und in der Übergangszeit. Überschüssige Gewinne heizen das Haus über die Solltemperatur hinaus, höchstens um 3 K (darüber wird gelüftet oder verschattet). Ein fest eingetragenes H (`house_heat_loss_kw_per_k`) bleibt unverändert; dann senken die Gewinne den Jahresbedarf.
+
+Die Live-Planung rechnet mit denselben Gewinnen. Die Fenster-Einstrahlung kommt aus der Open-Meteo-Prognose; fällt sie aus, nimmt Earnie die Werte des Vorjahres und schreibt eine Warnung ins Log. Die Grundlast kommt aus der Verbrauchsprognose, die Geräte aus ihren Zeitplänen. Bei einer Heizsystem-Variante im Szenario bleibt die Grundlast die des eingebauten Systems.
+
+Solare Gewinne brauchen stündliche Wetterdaten. Ohne Open-Meteo-Archiv, also nur mit dem Offline-Klima aus Tageswerten, bricht die Berechnung mit einer Meldung ab.
 
 ## Tagesenergie-Ziel
 

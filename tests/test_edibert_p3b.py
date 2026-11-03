@@ -348,6 +348,7 @@ def test_feed_in_migration_asks_per_flat_scenario(tmp_path):
         "dm5.house_thermal",
         "dm5.heating_power",
         "dm5.vat_deductible",
+        "dm5.house_gains",
     )
     by_id = {q.id: q for q in plan.questions}
     assert set(by_id) == set(FEED_IN_ANSWERS)  # tariff_with_leftover needs no answer
@@ -374,6 +375,7 @@ def test_feed_in_migration_writes_tariffs_and_drops_flat_keys(tmp_path):
         "dm5.house_thermal",
         "dm5.heating_power",
         "dm5.vat_deductible",
+        "dm5.house_gains",
     )
     doc = json.loads((config_dir / "backtesting_scenarios.json").read_text(encoding="utf-8"))
     settings = {s["id"]: s["settings"] for s in doc["scenarios"]}

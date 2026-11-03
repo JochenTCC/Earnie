@@ -18,6 +18,10 @@ from house_config.generic_schedule import (
     generic_annual_kwh,
     normalize_generic_schedule,
 )
+from house_config.house_gains import (
+    INTERNAL_GAIN_FACTOR_KEY,
+    normalize_consumer_gain_factor,
+)
 from house_config.profiles_thermal_annual import normalize_thermal_annual_consumer
 from settings.flexible_consumers import reject_legacy_id
 
@@ -341,6 +345,12 @@ def _normalize_consumer(
         "profile_csv": str(raw.get("profile_csv", "")).strip(),
         "use_profile_csv": bool(raw.get("use_profile_csv", False)),
         "absent_mode_enabled": bool(raw.get("absent_mode_enabled", False)),
+        INTERNAL_GAIN_FACTOR_KEY: normalize_consumer_gain_factor(
+            raw.get(INTERNAL_GAIN_FACTOR_KEY),
+            consumer_type=consumer_type,
+            label=f"profiles '{profile_id}' consumers '{consumer_id}'",
+            consumer_id=consumer_id,
+        ),
     }
     if "id_locked" in raw:
         spec["id_locked"] = bool(raw.get("id_locked"))
@@ -472,6 +482,12 @@ def _serialize_consumer(consumer: dict) -> dict:
         out["profile_csv"] = consumer["profile_csv"]
     out["use_profile_csv"] = bool(consumer.get("use_profile_csv", False))
     out["absent_mode_enabled"] = bool(consumer.get("absent_mode_enabled", False))
+    out[INTERNAL_GAIN_FACTOR_KEY] = normalize_consumer_gain_factor(
+        consumer.get(INTERNAL_GAIN_FACTOR_KEY),
+        consumer_type=consumer["type"],
+        label=f"consumer '{consumer['id']}'",
+        consumer_id=consumer["id"],
+    )
     if consumer["type"] == "generic":
         _serialize_generic_fields(consumer, out)
     elif consumer["type"] == "ev":

@@ -68,10 +68,15 @@ def test_reference_line_and_warning_follow_the_household_electricity() -> None:
     assert "ohne Wärmepumpe" in line
     assert _household_warnings(at)  # 200000 kWh/a is far above the reference
 
-    heating_kwh = float(re.search(r"ohne Wärmepumpe \((\d+) kWh/a\)", line).group(1))
-    at.number_input(key=_ANNUAL).set_value(heating_kwh + 3400.0)
-    at = _run(at)
-    assert "Abweichung +0 %" in _reference_line(at)
+    # The heat pump draw depends on the Jahresverbrauch (internal gains of the Grundlast,
+    # SUSI P2), so the household share is set twice to settle.
+    for _ in range(2):
+        heating_kwh = float(re.search(r"ohne Wärmepumpe \((\d+) kWh/a\)", line).group(1))
+        at.number_input(key=_ANNUAL).set_value(heating_kwh + 3400.0)
+        at = _run(at)
+        line = _reference_line(at)
+    deviation = int(re.search(r"Abweichung ([+-]\d+) %", line).group(1))
+    assert abs(deviation) <= 1, line
     assert not _household_warnings(at)
 
 

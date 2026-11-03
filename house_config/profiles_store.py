@@ -9,6 +9,12 @@ from house_config.baseload import normalize_baseload_distribution
 from house_config.consumption_csv import load_hourly_profile_csv
 from house_config.geo_timezone import timezone_for_land
 from house_config.profile_schema_defaults import profile_default
+from house_config.house_gains import (
+    BASELOAD_GAIN_FACTOR_KEY,
+    INTERNAL_GAINS_KEY,
+    internal_gain_descriptor,
+    normalize_baseload_gain_factor,
+)
 from house_config.house_thermal import (
     HEATING_ENABLED_KEY,
     HOUSE_THERMAL_KEY,
@@ -233,6 +239,9 @@ def _normalize_profile(raw: dict, index: int, *, heating_systems: dict | None) -
         )
     persons = normalize_persons(raw.get(PERSONS_KEY), label=where)
     vat_deductible = normalize_vat_deductible(raw.get(VAT_DEDUCTIBLE_KEY), label=where)
+    baseload_gain = normalize_baseload_gain_factor(
+        raw.get(BASELOAD_GAIN_FACTOR_KEY), label=where
+    )
     if has_thermal and (raw.get("latitude") is None or raw.get("longitude") is None):
         raise ValueError(
             f"profiles '{profile_id}': latitude und longitude sind bei "
@@ -257,6 +266,7 @@ def _normalize_profile(raw: dict, index: int, *, heating_systems: dict | None) -
     inactive = [
         c for c in normalized_consumers if not heating_on and c["type"] == "thermal_annual"
     ]
+    _attach_internal_gains(consumers, annual_kwh=fields["annual_kwh"], factor=baseload_gain)
     # Grundlast (baseload_kwh / consumer_kwh / baseload_min_kwh) is NOT derived here:
     # it needs Open-Meteo weather and thus a built Config. Resolve at the point of use
     # via house_config.baseload.resolve_profile_baseload / profile_baseload_kwh.
@@ -284,6 +294,7 @@ def _normalize_profile(raw: dict, index: int, *, heating_systems: dict | None) -
         HEATING_ENABLED_KEY: heating_on,
         PERSONS_KEY: persons,
         VAT_DEDUCTIBLE_KEY: vat_deductible,
+        BASELOAD_GAIN_FACTOR_KEY: baseload_gain,
     }
     if house_thermal is not None:
         spec[HOUSE_THERMAL_KEY] = house_thermal
@@ -293,6 +304,21 @@ def _normalize_profile(raw: dict, index: int, *, heating_systems: dict | None) -
     if region:
         spec["region"] = region
     return spec
+
+
+def _attach_internal_gains(consumers: list[dict], *, annual_kwh: float, factor: float) -> None:
+    """Internal-gain inputs of the year model on the planned heating consumer (SUSI P2).
+
+    The heating consumer's ``thermal`` gets the Jahresverbrauch, the Grundlast factor and the
+    other planned consumers: the year model derives the Grundlast (fixed point with its own
+    electric draw) and the hourly internal gains from them.
+    """
+    others = [c for c in consumers if c["type"] != "thermal_annual"]
+    for consumer in consumers:
+        if consumer["type"] == "thermal_annual" and consumer.get("thermal"):
+            consumer["thermal"][INTERNAL_GAINS_KEY] = internal_gain_descriptor(
+                annual_kwh=annual_kwh, baseload_factor=factor, consumers=others
+            )
 
 
 def _is_thermal_annual(item: object) -> bool:
@@ -531,6 +557,9 @@ def _serialize_profile(profile: dict) -> dict:
         HEATING_ENABLED_KEY: bool(profile[HEATING_ENABLED_KEY]),
         PERSONS_KEY: int(profile[PERSONS_KEY]),
         VAT_DEDUCTIBLE_KEY: bool(profile[VAT_DEDUCTIBLE_KEY]),
+        BASELOAD_GAIN_FACTOR_KEY: normalize_baseload_gain_factor(
+            profile.get(BASELOAD_GAIN_FACTOR_KEY), label=f"profiles '{profile['id']}'"
+        ),
     }
     if profile.get(HOUSE_THERMAL_KEY):
         out[HOUSE_THERMAL_KEY] = serialize_house_thermal(profile[HOUSE_THERMAL_KEY])

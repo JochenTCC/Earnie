@@ -458,6 +458,7 @@ def render_house_profile_tab() -> None:
         session_scope=ctx["session_scope"],
         existing=ctx["existing"],
         persons=household["persons"],
+        annual_kwh=annual_kwh,
     )
     resolved, resolved_for_preview = _edit_and_sync_consumers(
         ctx["session_scope"], location, heating

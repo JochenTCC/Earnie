@@ -213,25 +213,21 @@ def _thermal_annual_daily_from_archive(consumer: dict) -> list[float] | None:
     params = heating_params_from_thermal(thermal)
     if "hp_electric_kw" not in params:
         params["hp_electric_kw"] = consumer_input_power_kw(consumer)
+    from optimizer.house_gains import thermal_bundle_surfaces, thermal_climate_kwargs
+
     area_m2 = float(params.get("solar_thermal_area_m2", 0.0) or 0.0)
     year = last_full_archive_year()
     timezone = str(thermal.get("timezone_name") or _cfg.get_planning_timezone())
     collector = collector_surface_from_thermal(thermal, {})
-    surfaces = [collector] if area_m2 > 0.0 else []
     bundle = build_open_meteo_climate_bundle_for_year(
         year,
         lat=float(lat),
         lon=float(lon),
         timezone=timezone,
-        surfaces=surfaces,
-    )
-    hourly_wm2 = (
-        bundle.collector_surface_series(collector) if area_m2 > 0.0 else None
+        surfaces=thermal_bundle_surfaces(thermal, collector if area_m2 > 0.0 else None),
     )
     return daily_electric_kwh(
-        **params,
-        hourly_temperature_c=bundle.temperature_c,
-        hourly_collector_wm2=hourly_wm2,
+        **params, **thermal_climate_kwargs(bundle, thermal, collector)
     )
 
 

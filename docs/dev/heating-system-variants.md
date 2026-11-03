@@ -221,8 +221,8 @@ property of the house, the heating only uses them. Decisions (maintainer, 2026-1
 - **Data model** (raw `house_profiles.json`, profile level): `heating_enabled` (switch
   „Heizung betrachten“), `thermal` (building block: `living_area_m2`, `hwb_kwh_m2`,
   `building_class`, `building_mass`, `target_temp_c`, `heating_limit_c`, `house_tolerance_c`,
-  `house_heat_loss_kw_per_k`, `absent_mode_enabled`, `absent_temp_reduction_c`; later SUSI P2
-  `thermal.solar_gains`) and `persons` (the SUSI P6 hoist, done here). Schema definition
+  `house_heat_loss_kw_per_k`, `absent_mode_enabled`, `absent_temp_reduction_c`; SUSI P2 added
+  `gross_floor_area_m2` and `thermal.solar_gains`, see [house-gains.md](house-gains.md)) and `persons` (the SUSI P6 hoist, done here). Schema definition
   `house_thermal`. The `thermal_annual` consumer keeps `heating_system_id`, the solar-thermal
   collector, the meter CSV, flex fields and bindings; building fields on it fail loud.
 - **Loader** (`house_config/house_thermal.py`, `profiles_store._normalize_profile`): the

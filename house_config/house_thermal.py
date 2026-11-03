@@ -38,6 +38,8 @@ HOUSE_THERMAL_FIELDS: tuple[str, ...] = (
     "house_heat_loss_kw_per_k",
     "absent_mode_enabled",
     "absent_temp_reduction_c",
+    "gross_floor_area_m2",
+    "solar_gains",
 )
 # Fields a thermal_annual consumer carried before they moved to the house (dm5.house_thermal).
 # ``absent_mode_enabled`` is a generic consumer field and stays out of this list.
@@ -80,6 +82,12 @@ def _number(block: dict, key: str) -> float:
 
 def normalize_house_thermal(raw: Any, *, label: str) -> dict[str, Any]:
     """Validated house ``thermal`` block (documented schema defaults for missing fields)."""
+    from house_config.house_gains import (
+        GROSS_FLOOR_AREA_KEY,
+        SOLAR_GAINS_KEY,
+        normalize_gross_floor_area,
+        normalize_solar_gains,
+    )
     from optimizer.thermal_house import normalize_building_mass
 
     if not isinstance(raw, dict):
@@ -127,6 +135,10 @@ def normalize_house_thermal(raw: Any, *, label: str) -> dict[str, Any]:
     h_override = raw.get("house_heat_loss_kw_per_k")
     if h_override not in (None, "") and float(h_override) > 0.0:
         out["house_heat_loss_kw_per_k"] = float(h_override)
+    gross = normalize_gross_floor_area(raw.get(GROSS_FLOOR_AREA_KEY), label=label)
+    if gross is not None:
+        out[GROSS_FLOOR_AREA_KEY] = gross
+    out[SOLAR_GAINS_KEY] = normalize_solar_gains(raw.get(SOLAR_GAINS_KEY), label=label)
     return out
 
 
@@ -136,7 +148,9 @@ def default_house_thermal() -> dict[str, Any]:
 
 
 def serialize_house_thermal(block: dict[str, Any]) -> dict[str, Any]:
-    return {key: block[key] for key in HOUSE_THERMAL_FIELDS if key in block}
+    import copy
+
+    return {key: copy.deepcopy(block[key]) for key in HOUSE_THERMAL_FIELDS if key in block}
 
 
 def heating_enabled(raw_profile: dict, *, label: str, has_thermal_consumer: bool) -> bool:

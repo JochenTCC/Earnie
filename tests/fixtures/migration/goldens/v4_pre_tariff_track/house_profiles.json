@@ -27,7 +27,8 @@
                         "sens_temperature_heat_storage": "",
                         "sens_temperature_heat_storage_low": ""
                     },
-                    "heating_system_id": "heating_profile_a"
+                    "heating_system_id": "heating_profile_a",
+                    "internal_gain_factor": 0.0
                 },
                 {
                     "id": "e_auto",
@@ -73,7 +74,8 @@
                         "get_evcs_limit_soc": "",
                         "get_evcs_soc_min_immediate": "",
                         "evcs.e_auto.set_evcs_max_current": ""
-                    }
+                    },
+                    "internal_gain_factor": 0.0
                 },
                 {
                     "id": "pool_swimspa",
@@ -100,7 +102,8 @@
                         "get_temperature_water_setpoint": "",
                         "get_temperature_tolerance_c": "",
                         "sens_heating_active": ""
-                    }
+                    },
+                    "internal_gain_factor": 0.0
                 },
                 {
                     "id": "pool_filter",
@@ -132,7 +135,8 @@
                         }
                     },
                     "signal_type": "binary",
-                    "min_on_quarterhours": 2
+                    "min_on_quarterhours": 2,
+                    "internal_gain_factor": 0.0
                 },
                 {
                     "id": "geschirrspueler",
@@ -157,7 +161,8 @@
                     },
                     "ehal_bindings": {
                         "consumer.geschirrspueler.sens_power_act": ""
-                    }
+                    },
+                    "internal_gain_factor": 0.8
                 },
                 {
                     "id": "kochen",
@@ -177,7 +182,8 @@
                     "ehal_bindings": {
                         "consumer.kochen.sens_power_act": "",
                         "consumer.kochen.sens_energy_total": ""
-                    }
+                    },
+                    "internal_gain_factor": 0.8
                 },
                 {
                     "id": "trockner",
@@ -203,7 +209,8 @@
                     "ehal_bindings": {
                         "consumer.trockner.sens_power_act": "",
                         "consumer.trockner.sens_energy_total": ""
-                    }
+                    },
+                    "internal_gain_factor": 0.8
                 },
                 {
                     "id": "tv",
@@ -223,7 +230,8 @@
                     "ehal_bindings": {
                         "consumer.tv.sens_power_act": "",
                         "consumer.tv.sens_energy_total": ""
-                    }
+                    },
+                    "internal_gain_factor": 0.8
                 },
                 {
                     "id": "waschmaschine",
@@ -249,7 +257,8 @@
                     "ehal_bindings": {
                         "consumer.waschmaschine.sens_power_act": "",
                         "consumer.waschmaschine.sens_energy_total": ""
-                    }
+                    },
+                    "internal_gain_factor": 0.8
                 },
                 {
                     "id": "dev-pc",
@@ -271,7 +280,8 @@
                         "power_source": "manual",
                         "default_power_kw": 0.1,
                         "powerstation_id": "ecoflow_delta_3"
-                    }
+                    },
+                    "internal_gain_factor": 0.8
                 }
             ],
             "land": "AT",
@@ -297,11 +307,23 @@
                 "heating_limit_c": 15.0,
                 "house_tolerance_c": 0.5,
                 "absent_temp_reduction_c": 6.5,
-                "absent_mode_enabled": true
+                "absent_mode_enabled": true,
+                "solar_gains": {
+                    "enabled": false,
+                    "window_area_m2": {
+                        "s": 12.5,
+                        "e": 4.0,
+                        "w": 4.0,
+                        "n": 4.0
+                    },
+                    "g_value": 0.6,
+                    "frame_shading_factor": 0.5
+                }
             },
             "persons": 2,
             "heating_enabled": true,
-            "vat_deductible": false
+            "vat_deductible": false,
+            "baseload_internal_gain_factor": 0.8
         },
         {
             "id": "profile_b",
@@ -330,7 +352,8 @@
                         "sens_temperature_heat_storage": "",
                         "sens_temperature_heat_storage_low": ""
                     },
-                    "heating_system_id": "heating_profile_b"
+                    "heating_system_id": "heating_profile_b",
+                    "internal_gain_factor": 0.0
                 },
                 {
                     "id": "e_auto",
@@ -376,7 +399,8 @@
                         "get_evcs_limit_soc": "",
                         "get_evcs_soc_min_immediate": "",
                         "evcs.e_auto.set_evcs_max_current": ""
-                    }
+                    },
+                    "internal_gain_factor": 0.0
                 },
                 {
                     "id": "pool_swimspa",
@@ -403,7 +427,8 @@
                         "get_temperature_water_setpoint": "",
                         "get_temperature_tolerance_c": "",
                         "sens_heating_active": ""
-                    }
+                    },
+                    "internal_gain_factor": 0.0
                 },
                 {
                     "id": "pool_filter",
@@ -435,7 +460,8 @@
                         }
                     },
                     "signal_type": "binary",
-                    "min_on_quarterhours": 2
+                    "min_on_quarterhours": 2,
+                    "internal_gain_factor": 0.0
                 },
                 {
                     "id": "geschirrspueler",
@@ -460,7 +486,8 @@
                     },
                     "ehal_bindings": {
                         "consumer.geschirrspueler.sens_power_act": ""
-                    }
+                    },
+                    "internal_gain_factor": 0.8
                 },
                 {
                     "id": "kochen",
@@ -480,7 +507,8 @@
                     "ehal_bindings": {
                         "consumer.kochen.sens_power_act": "",
                         "consumer.kochen.sens_energy_total": ""
-                    }
+                    },
+                    "internal_gain_factor": 0.8
                 },
                 {
                     "id": "trockner",
@@ -506,7 +534,8 @@
                     "ehal_bindings": {
                         "consumer.trockner.sens_power_act": "",
                         "consumer.trockner.sens_energy_total": ""
-                    }
+                    },
+                    "internal_gain_factor": 0.8
                 },
                 {
                     "id": "tv",
@@ -526,7 +555,8 @@
                     "ehal_bindings": {
                         "consumer.tv.sens_power_act": "",
                         "consumer.tv.sens_energy_total": ""
-                    }
+                    },
+                    "internal_gain_factor": 0.8
                 },
                 {
                     "id": "waschmaschine",
@@ -552,7 +582,8 @@
                     "ehal_bindings": {
                         "consumer.waschmaschine.sens_power_act": "",
                         "consumer.waschmaschine.sens_energy_total": ""
-                    }
+                    },
+                    "internal_gain_factor": 0.8
                 },
                 {
                     "id": "dev-pc",
@@ -574,7 +605,8 @@
                         "power_source": "manual",
                         "default_power_kw": 0.1,
                         "powerstation_id": "ecoflow_delta_3"
-                    }
+                    },
+                    "internal_gain_factor": 0.8
                 }
             ],
             "land": "AT",
@@ -600,11 +632,23 @@
                 "heating_limit_c": 15.0,
                 "house_tolerance_c": 0.5,
                 "absent_temp_reduction_c": 6.5,
-                "absent_mode_enabled": true
+                "absent_mode_enabled": true,
+                "solar_gains": {
+                    "enabled": false,
+                    "window_area_m2": {
+                        "s": 12.5,
+                        "e": 4.0,
+                        "w": 4.0,
+                        "n": 4.0
+                    },
+                    "g_value": 0.6,
+                    "frame_shading_factor": 0.5
+                }
             },
             "persons": 2,
             "heating_enabled": true,
-            "vat_deductible": false
+            "vat_deductible": false,
+            "baseload_internal_gain_factor": 0.8
         },
         {
             "id": "profile_c",
@@ -633,7 +677,8 @@
                         "sens_temperature_heat_storage": "",
                         "sens_temperature_heat_storage_low": ""
                     },
-                    "heating_system_id": "heating_profile_c"
+                    "heating_system_id": "heating_profile_c",
+                    "internal_gain_factor": 0.0
                 },
                 {
                     "id": "e_auto",
@@ -679,7 +724,8 @@
                         "get_evcs_limit_soc": "",
                         "get_evcs_soc_min_immediate": "",
                         "evcs.e_auto.set_evcs_max_current": ""
-                    }
+                    },
+                    "internal_gain_factor": 0.0
                 },
                 {
                     "id": "pool_swimspa",
@@ -706,7 +752,8 @@
                         "get_temperature_water_setpoint": "",
                         "get_temperature_tolerance_c": "",
                         "sens_heating_active": ""
-                    }
+                    },
+                    "internal_gain_factor": 0.0
                 },
                 {
                     "id": "pool_filter",
@@ -738,7 +785,8 @@
                         }
                     },
                     "signal_type": "binary",
-                    "min_on_quarterhours": 2
+                    "min_on_quarterhours": 2,
+                    "internal_gain_factor": 0.0
                 },
                 {
                     "id": "geschirrspueler",
@@ -763,7 +811,8 @@
                     },
                     "ehal_bindings": {
                         "consumer.geschirrspueler.sens_power_act": ""
-                    }
+                    },
+                    "internal_gain_factor": 0.8
                 },
                 {
                     "id": "kochen",
@@ -783,7 +832,8 @@
                     "ehal_bindings": {
                         "consumer.kochen.sens_power_act": "",
                         "consumer.kochen.sens_energy_total": ""
-                    }
+                    },
+                    "internal_gain_factor": 0.8
                 },
                 {
                     "id": "trockner",
@@ -809,7 +859,8 @@
                     "ehal_bindings": {
                         "consumer.trockner.sens_power_act": "",
                         "consumer.trockner.sens_energy_total": ""
-                    }
+                    },
+                    "internal_gain_factor": 0.8
                 },
                 {
                     "id": "tv",
@@ -829,7 +880,8 @@
                     "ehal_bindings": {
                         "consumer.tv.sens_power_act": "",
                         "consumer.tv.sens_energy_total": ""
-                    }
+                    },
+                    "internal_gain_factor": 0.8
                 },
                 {
                     "id": "waschmaschine",
@@ -855,7 +907,8 @@
                     "ehal_bindings": {
                         "consumer.waschmaschine.sens_power_act": "",
                         "consumer.waschmaschine.sens_energy_total": ""
-                    }
+                    },
+                    "internal_gain_factor": 0.8
                 },
                 {
                     "id": "dev-pc",
@@ -877,7 +930,8 @@
                         "power_source": "manual",
                         "default_power_kw": 0.1,
                         "powerstation_id": "ecoflow_delta_3"
-                    }
+                    },
+                    "internal_gain_factor": 0.8
                 }
             ],
             "land": "AT",
@@ -903,11 +957,23 @@
                 "heating_limit_c": 15.0,
                 "house_tolerance_c": 0.5,
                 "absent_temp_reduction_c": 6.5,
-                "absent_mode_enabled": true
+                "absent_mode_enabled": true,
+                "solar_gains": {
+                    "enabled": false,
+                    "window_area_m2": {
+                        "s": 12.5,
+                        "e": 4.0,
+                        "w": 4.0,
+                        "n": 4.0
+                    },
+                    "g_value": 0.6,
+                    "frame_shading_factor": 0.5
+                }
             },
             "persons": 2,
             "heating_enabled": true,
-            "vat_deductible": false
+            "vat_deductible": false,
+            "baseload_internal_gain_factor": 0.8
         }
     ],
     "plant": {

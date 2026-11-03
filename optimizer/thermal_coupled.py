@@ -231,6 +231,10 @@ def coupled_year_result(
     building_mass: str | None = None,
     house_tolerance_c: float | None = None,
     house_heat_loss_kw_per_k: float | None = None,
+    gross_floor_area_m2: float | None = None,
+    internal_gains: dict | None = None,
+    solar_gains: dict | None = None,
+    hourly_solar_gain_kw: pd.Series | None = None,
     start_house_temp_c: float | None = None,
 ) -> CoupledYearResult:
     """Run coupled store + house RC; return daily electric and hourly temps."""
@@ -263,6 +267,10 @@ def coupled_year_result(
         building_mass=building_mass,
         house_tolerance_c=house_tolerance_c,
         house_heat_loss_kw_per_k=house_heat_loss_kw_per_k,
+        gross_floor_area_m2=gross_floor_area_m2,
+        internal_gains=internal_gains,
+        solar_gains=solar_gains,
+        hourly_solar_gain_kw=hourly_solar_gain_kw,
         start_house_temp_c=start_house_temp_c,
         start_store_temp_c=start_temp_c,
     )

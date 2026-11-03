@@ -25,17 +25,30 @@
                     "ehal_bindings": {
                         "heatpump.wp.set_enable": ""
                     },
-                    "heating_system_id": "heating_test_home"
+                    "heating_system_id": "heating_test_home",
+                    "internal_gain_factor": 0.0
                 }
             ],
             "thermal": {
                 "living_area_m2": 100,
                 "building_class": 3,
-                "absent_mode_enabled": false
+                "absent_mode_enabled": false,
+                "solar_gains": {
+                    "enabled": false,
+                    "window_area_m2": {
+                        "s": 10.0,
+                        "e": 3.5,
+                        "w": 3.5,
+                        "n": 3.0
+                    },
+                    "g_value": 0.6,
+                    "frame_shading_factor": 0.5
+                }
             },
             "persons": 2,
             "heating_enabled": true,
-            "vat_deductible": false
+            "vat_deductible": false,
+            "baseload_internal_gain_factor": 0.8
         }
     ],
     "earnie_data_model": 5,

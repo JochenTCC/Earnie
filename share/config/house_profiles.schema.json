@@ -509,6 +509,13 @@
           "type": "number",
           "exclusiveMinimum": 0,
           "description": "Elektrische Leistung des Heizstabs (η = 1 in den Wärmespeicher)."
+        },
+        "internal_gain_factor": {
+          "default": 0.0,
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0,
+          "description": "Anteil der elektrischen Energie, der als interner Gewinn im beheizten Volumen landet (SUSI P2). Heizstab: immer 0 — seine Wärme geht in den Wärmespeicher und ist dort modelliert."
         }
       }
     },
@@ -552,6 +559,19 @@
         "use_profile_csv": {
           "type": "boolean",
           "description": "true = historisches Profil nutzen und von Basislast abziehen; false = synthetisches Modell/Schedule."
+        },
+        "internal_gain_factor": {
+          "default": 0.8,
+          "x-earnie-type-defaults": {
+            "generic": 0.8,
+            "ev": 0.0,
+            "thermal_annual": 0.0,
+            "thermal_rc": 0.0
+          },
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Anteil der elektrischen Energie dieses Verbrauchers, der als interner Gewinn im beheizten Volumen landet (SUSI P2; senkt den Heizbedarf). Default je Typ: generic 0,8 (Poolfilter pool_filter 0); ev und thermal_rc 0 (außen); thermal_annual immer 0 (die Wärme ist das Hausmodell). Fehlt der Schlüssel, gilt der Typ-Default (Migration dm5.house_gains schreibt ihn aus)."
         },
         "absent_mode_enabled": {
           "type": "boolean",
@@ -687,7 +707,12 @@
         "hwb_kwh_m2": {
           "type": "number",
           "exclusiveMinimum": 0,
-          "description": "Optional: genauer Heizwärmebedarf HWB in kWh/m²a (überschreibt Gebäudeklasse)."
+          "description": "Optional: genauer Heizwärmebedarf HWB in kWh/m²a laut Energieausweis, bezogen auf die Bruttogrundfläche (überschreibt Gebäudeklasse). Jahres-Heizwärme = HWB × Bruttogrundfläche."
+        },
+        "gross_floor_area_m2": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Optional: Bruttogrundfläche BGF in m² (Energieausweis). Fehlt = Wohnfläche × 1,25 (SUSI). Bezugsfläche des HWB; die Wärmekapazität rechnet weiter mit der Wohnfläche."
         },
         "building_class": {
           "default": 3,
@@ -733,6 +758,46 @@
           "type": "number",
           "minimum": 0,
           "description": "Temperaturabsenkung (K) bei aktivem Abwesenheitsmodus (Live) und absent_mode_enabled; effektiv = target_temp_c − Absenkung."
+        },
+        "solar_gains": {
+          "$ref": "#/definitions/solar_gains"
+        }
+      }
+    },
+    "solar_gains": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Solare Gewinne durch die Fenster (SUSI P2). Fehlt der Block, gilt enabled=false (Migration dm5.house_gains schreibt ihn aus; neue Häuser starten mit enabled=true).",
+      "properties": {
+        "enabled": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = Einstrahlung durch die Fenster heizt das Haus mit (verschiebt Heizbedarf aus sonnigen Stunden; H wird so kalibriert, dass die Jahres-Heizwärme beim HWB bleibt)."
+        },
+        "window_area_m2": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Fensterfläche (Glas + Rahmen) je Himmelsrichtung in m², senkrecht. s = Süd, e = Ost, w = West, n = Nord.",
+          "properties": {
+            "s": { "default": 0.0, "type": "number", "minimum": 0 },
+            "e": { "default": 0.0, "type": "number", "minimum": 0 },
+            "w": { "default": 0.0, "type": "number", "minimum": 0 },
+            "n": { "default": 0.0, "type": "number", "minimum": 0 }
+          }
+        },
+        "g_value": {
+          "default": 0.6,
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "description": "Gesamtenergiedurchlassgrad der Verglasung (SUSI-Bereich 0,55–0,65)."
+        },
+        "frame_shading_factor": {
+          "default": 0.5,
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "description": "Abminderung für Rahmenanteil, Laibung, Vorsprünge und Verschmutzung (SUSI-Bereich 0,4–0,65); nicht die Topologie (Horizont)."
         }
       }
     },
@@ -764,6 +829,13 @@
           "type": "integer",
           "minimum": 1,
           "description": "Personen im Haushalt: Warmwasserbedarf der Heizung und Richtwert Haushaltsstrom (SUSI) neben dem Jahresverbrauch."
+        },
+        "baseload_internal_gain_factor": {
+          "default": 0.8,
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Anteil der Grundlast (Jahresverbrauch minus modellierte Verbraucher), der als interner Gewinn im beheizten Volumen landet (SUSI P2). Haushaltsstrom wird fast vollständig zu Raumwärme; Abzug für Außenbeleuchtung, Abluft, Warmwasser im Abfluss."
         },
         "vat_deductible": {
           "default": false,

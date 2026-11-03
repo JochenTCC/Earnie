@@ -138,6 +138,7 @@ def plan_live_store_horizon(
     start_house_temp_c: float | None = None,
     used_measured_eq: bool = False,
     used_measured_low: bool = False,
+    gain_kw_by_hour: list[float] | None = None,
 ) -> LiveStorePlan:
     """Bang-bang floor on T_eq plus optional T_low near-term force; opp headroom."""
     horizon = len(ambient_forecast_c)
@@ -169,6 +170,7 @@ def plan_live_store_horizon(
         jaz_f=jaz_f,
         ww=_ww_kw(persons),
         house=house,
+        gain_kw_by_hour=gain_kw_by_hour,
     )
     forced, electric_by_hour, floor_electric, low_forced = _apply_t_low_near_term_force(
         forced,
@@ -215,8 +217,13 @@ def plan_live_store_for_thermal_consumer(
     ambient_forecast_c: list[float],
     solar_forecast_kw: list[float] | None = None,
     house_doc: dict | None = None,
+    baseload_kw_by_hour: list[float] | None = None,
 ) -> LiveStorePlan | None:
-    """Build Live store plan from a thermal_annual house consumer; None if no store."""
+    """Build Live store plan from a thermal_annual house consumer; None if no store.
+
+    House gains (SUSI P2): Grundlast from ``baseload_kw_by_hour`` (matrix forecast) or, without
+    it, the flat Grundlast of the year model; windows from the forecast.
+    """
     from house_config.heat_source import consumer_heat_source, heat_source_efficiency
 
     thermal = consumer.get("thermal") or consumer
@@ -244,12 +251,22 @@ def plan_live_store_for_thermal_consumer(
     )
     living = float(thermal.get("living_area_m2", 0.0) or 0.0)
     house_h = None
+    gains: list[float] | None = None
     if living > 0.0:
+        from optimizer.thermal_live_gains import live_gain_kw_by_hour
         from optimizer.thermal_parameters import house_thermal_parameters
+        from runtime_store.planning_clock import planning_now
 
         house_h = house_thermal_parameters(
             _thermal_with_nominal(thermal, consumer), house_profile=house_profile
         ).house_heat_loss_kw_per_k
+        gains, _gain_source = live_gain_kw_by_hour(
+            consumer,
+            house_profile,
+            start=planning_now(),
+            horizon=len(ambient_forecast_c),
+            baseload_kw_by_hour=baseload_kw_by_hour,
+        )
     plan = plan_live_store_horizon(
         start_temp_c=readings.temp_eq_c,
         ambient_forecast_c=ambient_forecast_c,
@@ -269,6 +286,7 @@ def plan_live_store_for_thermal_consumer(
         persons=int(thermal.get("persons", 2) or 2),
         used_measured_eq=readings.used_measured_eq,
         used_measured_low=readings.used_measured_low,
+        gain_kw_by_hour=gains,
     )
     return replace(plan, solar_source=solar_source)
 
@@ -300,8 +318,11 @@ def live_store_plan_for_matrix(
         horizon_h,
         matrix_slot_datetime(matrix, 0).isoformat(),
     )
+    from optimizer.thermal_live_gains import matrix_hourly_kw
+
+    baseload = matrix_hourly_kw(matrix, "expected_p_act", horizon_h)
     return cycle_memo(
-        key, lambda: _build_live_store_plan(source, house_profile, horizon_h)
+        key, lambda: _build_live_store_plan(source, house_profile, horizon_h, baseload)
     )
 
 
@@ -330,12 +351,14 @@ def _build_live_store_plan(
     source: dict,
     house_profile: dict,
     horizon_h: int,
+    baseload_kw_by_hour: list[float],
 ) -> LiveStorePlan | None:
     return plan_live_store_for_thermal_consumer(
         source,
         house_profile=house_profile,
         ambient_forecast_c=_live_ambient_forecast(horizon_h),
         house_doc=None,
+        baseload_kw_by_hour=baseload_kw_by_hour,
     )
 
 
@@ -390,11 +413,34 @@ def live_house_plan_for_matrix(
     )
     return cycle_memo(
         key,
-        lambda: plan_live_house_horizon(
+        lambda: _build_live_house_plan(source, house_profile, matrix, horizon_h),
+    )
+
+
+def _build_live_house_plan(
+    source: dict, house_profile: dict, matrix: list, horizon_h: int
+) -> LiveHousePlan:
+    from optimizer.charging_context import matrix_slot_datetime
+    from optimizer.thermal_live_gains import live_gain_kw_by_hour, matrix_hourly_kw
+
+    start = matrix_slot_datetime(matrix, 0)
+    thermal = source.get("thermal") or source
+    gains: list[float] | None = None
+    source_label = SOLAR_SOURCE_NONE
+    if float(thermal.get("living_area_m2", 0.0) or 0.0) > 0.0:
+        gains, source_label = live_gain_kw_by_hour(
             source,
-            house_profile=house_profile,
-            ambient_forecast_c=_live_ambient_forecast(horizon_h),
-        ),
+            house_profile,
+            start=start,
+            horizon=horizon_h,
+            baseload_kw_by_hour=matrix_hourly_kw(matrix, "expected_p_act", horizon_h),
+        )
+    return plan_live_house_horizon(
+        source,
+        house_profile=house_profile,
+        ambient_forecast_c=_live_ambient_forecast(horizon_h),
+        gain_kw_by_hour=gains,
+        gain_source=source_label,
     )
 
 

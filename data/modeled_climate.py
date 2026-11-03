@@ -84,6 +84,16 @@ def _surfaces_for_profile(
             continue
         seen.add(key)
         surfaces.append(surface)
+    from optimizer.house_gains import window_surfaces_for_thermal
+
+    for consumer in profile.get("consumers", []):
+        if consumer.get("type") != "thermal_annual":
+            continue
+        for surface in window_surfaces_for_thermal(consumer.get("thermal") or consumer):
+            key = (round(surface.tilt_deg, 3), round(surface.azimuth_deg, 3))
+            if key not in seen:
+                seen.add(key)
+                surfaces.append(surface)
     return surfaces
 
 
@@ -368,23 +378,16 @@ class ModeledClimateContext:
         params = heating_params_from_thermal(thermal)
         if "hp_electric_kw" not in params:
             params["hp_electric_kw"] = consumer_input_power_kw(consumer)
-        area_m2 = float(params.get("solar_thermal_area_m2", 0.0) or 0.0)
-        hourly_wm2 = None
-        if area_m2 > 0.0:
-            surface = collector_surface_from_thermal(
-                thermal,
-                self.house_profile or {},
-            )
-            hourly_wm2 = bundle.collector_surface_series(surface)
+        from optimizer.house_gains import thermal_climate_kwargs
+
+        climate = thermal_climate_kwargs(
+            bundle, thermal, collector_surface_from_thermal(thermal, self.house_profile or {})
+        )
 
         house_h = self._reference_house_heat_loss(consumer, thermal)
         if house_h is not None and params.get("house_heat_loss_kw_per_k") is None:
             params["house_heat_loss_kw_per_k"] = house_h
-        daily = daily_electric_kwh(
-            **params,
-            hourly_temperature_c=bundle.temperature_c,
-            hourly_collector_wm2=hourly_wm2,
-        )
+        daily = daily_electric_kwh(**params, **climate)
         nominal = float(consumer.get("nominal_power_kw", 0.0) or 0.0)
         if nominal > 0.0:
             profile = thermal_daily_pwm_hourly_profile(
@@ -393,11 +396,7 @@ class ModeledClimateContext:
                 hours_per_year=8760,
             )
         else:
-            weekly = weekly_electric_kwh(
-                **params,
-                hourly_temperature_c=bundle.temperature_c,
-                hourly_collector_wm2=hourly_wm2,
-            )
+            weekly = weekly_electric_kwh(**params, **climate)
             profile = hourly_profile_for_year(weekly, hours_per_year=8760)
         self._thermal_year_profiles[key] = profile
         return profile
@@ -485,12 +484,14 @@ def reference_climate_for_thermal(
         "longitude": lon,
     }
     collector = collector_surface_from_thermal(thermal, profile_stub)
+    from optimizer.house_gains import thermal_bundle_surfaces
+
     bundle = build_open_meteo_climate_bundle_for_year(
         year,
         lat=lat,
         lon=lon,
         timezone=timezone,
-        surfaces=[collector],
+        surfaces=thermal_bundle_surfaces(thermal, collector),
     )
     return bundle, collector
 
@@ -555,12 +556,8 @@ def _thermal_annual_from_archive(
     bundle, collector = reference_climate_for_thermal(
         thermal, house_profile=house_profile, year=year
     )
+    from optimizer.house_gains import thermal_climate_kwargs
+
     params = heating_params_from_thermal(thermal)
-    area_m2 = float(params.get("solar_thermal_area_m2", 0.0) or 0.0)
-    hourly_wm2 = bundle.collector_surface_series(collector) if area_m2 > 0.0 else None
-    daily = daily_fn(
-        **params,
-        hourly_temperature_c=bundle.temperature_c,
-        hourly_collector_wm2=hourly_wm2,
-    )
+    daily = daily_fn(**params, **thermal_climate_kwargs(bundle, thermal, collector))
     return round(sum(daily), 3), year

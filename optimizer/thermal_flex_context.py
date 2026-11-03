@@ -126,18 +126,15 @@ def _thermal_daily_for_date(
         params["hp_electric_kw"] = consumer_input_power_kw(consumer)
     day_index = day.timetuple().tm_yday - 1
     if climate is not None:
-        bundle = climate._bundle_for_calendar_year(day.year)
-        area_m2 = float(params.get("solar_thermal_area_m2", 0.0) or 0.0)
-        hourly_wm2 = None
-        if area_m2 > 0.0:
-            from data.modeled_climate import collector_surface_from_thermal
+        from data.modeled_climate import collector_surface_from_thermal
+        from optimizer.house_gains import thermal_climate_kwargs
 
-            surface = collector_surface_from_thermal(thermal, profile)
-            hourly_wm2 = bundle.collector_surface_series(surface)
+        bundle = climate._bundle_for_calendar_year(day.year)
         daily = daily_fn(
             **params,
-            hourly_temperature_c=bundle.temperature_c,
-            hourly_collector_wm2=hourly_wm2,
+            **thermal_climate_kwargs(
+                bundle, thermal, collector_surface_from_thermal(thermal, profile)
+            ),
         )
         if 0 <= day_index < len(daily):
             return float(daily[day_index])

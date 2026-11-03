@@ -671,7 +671,9 @@ def apply_scenario_heating_systems(
         if consumer_id not in effective:
             continue
         reference_id = consumer[HEATING_SYSTEM_ID_KEY]
+        reference_heating = _reference_heating_params(consumer)
         apply_heating_system(consumer, heating_systems[effective[consumer_id]])
+        _pin_baseload_to_reference(consumer, reference_heating)
         consumer[HEATING_SYSTEM_ID_KEY] = effective[consumer_id]
         # A heat-pump meter CSV measures the reference system: the variant is modeled.
         consumer["use_profile_csv"] = False
@@ -685,6 +687,33 @@ def apply_scenario_heating_systems(
         )
     out[HEATING_VARIANTS_KEY] = variants
     return out
+
+
+def _reference_heating_params(consumer: dict[str, Any]) -> dict[str, Any]:
+    """Generation inputs of the installed system (the Grundlast is derived with them)."""
+    from data.heating_need import heating_params_from_thermal
+
+    params = heating_params_from_thermal(consumer["thermal"])
+    return {
+        "heat_efficiency": params["heat_efficiency"],
+        "heat_electric": params["heat_electric"],
+        "heat_storage": params.get("heat_storage"),
+        "hp_electric_kw": params.get("hp_electric_kw", consumer_input_power_kw(consumer)),
+    }
+
+
+def _pin_baseload_to_reference(consumer: dict[str, Any], reference: dict[str, Any]) -> None:
+    """A variant's internal gains use the Grundlast of the installed system (SUSI P2).
+
+    The Grundlast is Jahresverbrauch minus the modeled consumers *with the reference heating*;
+    the year model of the variant simulates the reference once for that electric draw.
+    """
+    from house_config.house_gains import INTERNAL_GAINS_KEY
+
+    thermal = consumer.get("thermal") or {}
+    gains = thermal.get(INTERNAL_GAINS_KEY)
+    if gains:
+        thermal[INTERNAL_GAINS_KEY] = {**gains, "reference_heating": dict(reference)}
 
 
 def _reference_has_own_meter(profile: dict[str, Any], consumer_id: str) -> bool | None:

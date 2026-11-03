@@ -109,14 +109,17 @@ def _collector_surfaces_for_thermal(
     """Return (surfaces, collector_or_None, area_m2) for Open-Meteo climate fetch."""
     if thermal_annual is None:
         return [], None, 0.0
+    from optimizer.house_gains import window_surfaces_for_thermal
+
     thermal = thermal_annual.get("thermal") or thermal_annual
+    windows = window_surfaces_for_thermal(thermal)
     area_m2 = float(thermal.get("solar_thermal_area_m2", 0.0) or 0.0)
     if area_m2 <= 0.0:
-        return [], None, 0.0
+        return windows, None, 0.0
     from data.modeled_climate import collector_surface_from_thermal
 
     collector = collector_surface_from_thermal(thermal, profile)
-    return [collector], collector, area_m2
+    return [collector, *windows], collector, area_m2
 
 
 def _climate_for_temperature_chart(
@@ -127,12 +130,12 @@ def _climate_for_temperature_chart(
     timezone: str,
     *,
     hours: int,
-) -> tuple[list[float] | None, object | None, object | None]:
-    """Ambient list, hourly temp Series, optional collector wm2 Series."""
+) -> tuple[list[float] | None, object | None, object | None, object | None]:
+    """Ambient list, hourly temp Series, optional collector wm2 and window gain kW Series."""
     import config as cfg
 
     if getattr(cfg, "CONFIG", None) is None:
-        return None, None, None
+        return None, None, None, None
     import pandas as pd
 
     from data.open_meteo_solar_archive import (
@@ -159,7 +162,18 @@ def _climate_for_temperature_chart(
     hourly_wm2 = None
     if area_m2 > 0.0 and collector is not None:
         hourly_wm2 = bundle.collector_surface_series(collector)
-    return ambient, hourly_temp, hourly_wm2
+    solar_gain = None
+    if thermal_annual is not None:
+        from optimizer.house_gains import solar_gain_kw_series
+
+        raw_gain = solar_gain_kw_series(
+            bundle, thermal_annual.get("thermal") or thermal_annual
+        )
+        if raw_gain is not None:
+            # Same naive hourly index as the temperature series above.
+            values = _pad_or_trim([float(v) for v in raw_gain.fillna(0.0).tolist()], hours)
+            solar_gain = pd.Series(values, index=idx)
+    return ambient, hourly_temp, hourly_wm2, solar_gain
 
 
 def _house_year_temps(
@@ -168,6 +182,7 @@ def _house_year_temps(
     hours: int,
     hourly_temperature_c,
     hourly_collector_wm2=None,
+    hourly_solar_gain_kw=None,
 ) -> tuple[list[float] | None, list[float] | None]:
     """Return (house_temps, store_temps); store None when heat_storage disabled."""
     thermal = consumer.get("thermal") or consumer
@@ -184,6 +199,7 @@ def _house_year_temps(
         **params,
         hourly_temperature_c=hourly_temperature_c,
         hourly_collector_wm2=hourly_collector_wm2,
+        hourly_solar_gain_kw=hourly_solar_gain_kw,
     )
     house = _pad_or_trim(result.hourly_house_temp_c, hours)
     store = (
@@ -234,9 +250,10 @@ def build_modeled_temperature_series(
     ambient: list[float] | None = None
     hourly_temp_series = None
     hourly_collector_wm2 = None
+    hourly_solar_gain_kw = None
     if location is not None:
         lat, lon, timezone = location
-        ambient, hourly_temp_series, hourly_collector_wm2 = (
+        ambient, hourly_temp_series, hourly_collector_wm2, hourly_solar_gain_kw = (
             _climate_for_temperature_chart(
                 profile,
                 thermal_annual,
@@ -256,6 +273,7 @@ def build_modeled_temperature_series(
             hours=hours,
             hourly_temperature_c=hourly_temp_series,
             hourly_collector_wm2=hourly_collector_wm2,
+            hourly_solar_gain_kw=hourly_solar_gain_kw,
         )
         if house_ist:
             series[TEMP_HOUSE] = house_ist

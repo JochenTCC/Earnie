@@ -83,46 +83,27 @@ def _derive_house_parameters(
     from data.heating_need import (
         daily_electric_kwh,
         heating_params_from_thermal,
-        specific_heating_kwh_m2,
+        house_year_for_params,
     )
     from data.modeled_climate import reference_climate_for_thermal
-    from optimizer.thermal_coupled import _group_hourly_by_day
-    from optimizer.thermal_house import (
-        _flat_ambient_from_day_rows,
-        resolve_house_heat_loss_kw_per_k,
-    )
+    from optimizer.house_gains import thermal_climate_kwargs
 
     bundle, collector = reference_climate_for_thermal(
         thermal, house_profile=house_profile, year=year
     )
     params = heating_params_from_thermal(thermal)
-    area_m2 = float(params.get("solar_thermal_area_m2", 0.0) or 0.0)
-    hourly_wm2 = bundle.collector_surface_series(collector) if area_m2 > 0.0 else None
-    daily = daily_electric_kwh(
-        **params,
-        hourly_temperature_c=bundle.temperature_c,
-        hourly_collector_wm2=hourly_wm2,
-    )
+    climate = thermal_climate_kwargs(bundle, thermal, collector)
     living = float(params["living_area_m2"])
     if living <= 0.0:
+        daily = daily_electric_kwh(**params, **climate)
         return ThermalParameters(year, round(sum(daily), 3), None, None)
     override = params.get("house_heat_loss_kw_per_k")
-    # Same ambient series and calibration as house_year_result → one H per house.
-    ambient = _flat_ambient_from_day_rows(
-        _group_hourly_by_day(bundle.temperature_c, None, 0.0)
-    )
-    house_h = resolve_house_heat_loss_kw_per_k(
-        override_kw_per_k=override,
-        annual_heat_kwh=living
-        * specific_heating_kwh_m2(params["building_class"], hwb_kwh_m2=params["hwb_kwh_m2"]),
-        ambient_c=ambient,
-        target_temp_c=params["target_temp_c"],
-        heating_limit_c=params["heating_limit_c"],
-    )
+    # H is the one the year simulation calibrated (with gains, SUSI P2) → Live uses the same.
+    result = house_year_for_params(**params, **climate)
     return ThermalParameters(
         year,
-        round(sum(daily), 3),
-        float(house_h),
+        round(sum(result.daily_electric_kwh), 3),
+        float(result.house_heat_loss_kw_per_k),
         SOURCE_OVERRIDE if override is not None else SOURCE_YEAR_SIM,
     )
 

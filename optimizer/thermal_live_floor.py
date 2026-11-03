@@ -9,6 +9,7 @@ from optimizer.thermal_house import (
     house_capacity_kwh_per_k,
     house_requests_heat,
     step_house_hour,
+    vent_house_temp,
 )
 from optimizer.thermal_model import ThermalBand
 
@@ -85,6 +86,7 @@ def _space_heat_demand_kw(
     house: _HouseLiveParams,
     house_temp: float,
     ambient: float,
+    gain_kw: float = 0.0,
 ) -> float:
     """Store draw for space heat: envelope hold / rate-limited climb — not WP dump.
 
@@ -102,12 +104,13 @@ def _space_heat_demand_kw(
         capacity_kwh_per_k=house.house_c,
         heat_loss_kw_per_k=house.house_h,
         band_min_c=house.house_band_min,
+        gain_kw=gain_kw,
     ):
         return 0.0
     loss = house.house_h * (float(house_temp) - float(ambient))
     delta_k = max(0.0, house.house_target_c - float(house_temp))
     climb = min(delta_k, _MAX_HOUSE_CLIMB_K_PER_H) * house.house_c
-    return min(house.max_heat, max(0.0, loss + climb))
+    return min(house.max_heat, max(0.0, loss + climb - float(gain_kw)))
 
 
 def _simulate_store_floor_hours(
@@ -122,8 +125,10 @@ def _simulate_store_floor_hours(
     jaz_f: float,
     ww: float,
     house: _HouseLiveParams,
+    gain_kw_by_hour: list[float] | None = None,
 ) -> tuple[list[bool], list[float], float, list[float]]:
     store_temp = float(start_temp_c)
+    gains = list(gain_kw_by_hour or [])
     house_temp = house.house_temp
     forced: list[bool] = []
     electric_by_hour: list[float] = []
@@ -131,7 +136,8 @@ def _simulate_store_floor_hours(
     floor_electric = 0.0
     for hour, ambient_raw in enumerate(ambient_forecast_c):
         ambient = float(ambient_raw)
-        space_kw = _space_heat_demand_kw(house, house_temp, ambient)
+        gain = float(gains[hour]) if hour < len(gains) else 0.0
+        space_kw = _space_heat_demand_kw(house, house_temp, ambient, gain)
         result = step_coupled_hour(
             store_temp,
             ambient,
@@ -150,12 +156,17 @@ def _simulate_store_floor_hours(
         store_temp = result.temp_c
         store_temps.append(float(store_temp))
         if house.use_house:
-            house_temp = step_house_hour(
-                house_temp,
+            house_temp = vent_house_temp(
+                step_house_hour(
+                    house_temp,
+                    ambient,
+                    heat_in_kw=space_kw,
+                    capacity_kwh_per_k=house.house_c,
+                    heat_loss_kw_per_k=house.house_h,
+                    gain_kw=gain,
+                ),
                 ambient,
-                heat_in_kw=space_kw,
-                capacity_kwh_per_k=house.house_c,
-                heat_loss_kw_per_k=house.house_h,
+                house.house_target_c,
             )
     return forced, electric_by_hour, floor_electric, store_temps
 

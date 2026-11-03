@@ -24,6 +24,8 @@ _STORAGE = {
     "tolerance_c": 5.0,
 }
 _ROD = {"id": "heating_rod", "type": "heating_rod", "nominal_power_kw": 3.0}
+# Normalized: the loader writes the internal-gain factor explicitly (SUSI P2, always 0).
+_ROD_NORMALIZED = {**_ROD, "internal_gain_factor": 0.0}
 
 
 # --- heat_source normalization and defaults ---------------------------------------------
@@ -68,7 +70,7 @@ def test_heat_source_fails_loud(raw, match):
 def test_heating_rod_requires_heat_storage():
     with pytest.raises(ValueError, match="nur mit Wärmespeicher"):
         normalize_parts([_ROD], label="t", has_heat_storage=False)
-    assert normalize_parts([_ROD], label="t", has_heat_storage=True) == [_ROD]
+    assert normalize_parts([_ROD], label="t", has_heat_storage=True) == [_ROD_NORMALIZED]
     with pytest.raises(ValueError, match="unbekannt"):
         normalize_parts([{**_ROD, "type": "filter"}], label="t", has_heat_storage=True)
 
@@ -111,7 +113,7 @@ def test_profile_takes_parts_and_storage_from_the_catalog_entry():
     assert spec["heating_system_id"] == "hs"
     assert spec["thermal"]["heat_source"] == {"type": "gas"}
     assert spec["thermal"]["heat_storage"]["volume_liters"] == _STORAGE["volume_liters"]
-    assert spec["parts"] == [_ROD]
+    assert spec["parts"] == [_ROD_NORMALIZED]
     assert "parts" not in spec["thermal"]
 
 
@@ -171,7 +173,7 @@ def test_profile_save_keeps_flex_fields_and_writes_only_the_reference():
     spec = _normalize_consumer(
         raw, 0, "home", heating_systems=catalog, house_thermal=default_house_thermal(), persons=2
     )
-    assert spec["parts"] == [_ROD]
+    assert spec["parts"] == [_ROD_NORMALIZED]
     assert spec["nominal_power_kw"] == 1.9
     out = _serialize_consumer(spec)
     assert out["heating_system_id"] == "hs"

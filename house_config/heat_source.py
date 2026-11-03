@@ -4,7 +4,8 @@ Stored shape on the consumer (flat, next to ``heat_storage``)::
 
     "heat_source": {"type": "heat_pump", "heat_pump_type": "erde",
                     "efficiency": 4.3, "fuel_price": 10.43},
-    "parts": [{"id": "heating_rod", "type": "heating_rod", "nominal_power_kw": 3.0}]
+    "parts": [{"id": "heating_rod", "type": "heating_rod", "nominal_power_kw": 3.0,
+               "internal_gain_factor": 0.0}]
 
 ``efficiency`` and ``fuel_price`` are optional; missing values come from
 ``share/config/heat_source_defaults.json`` (documented source per value). Efficiency is
@@ -19,6 +20,8 @@ import json
 import os
 from functools import lru_cache
 from typing import Any
+
+from house_config.house_gains import normalize_part_gain_factor
 
 HEAT_SOURCE_TYPES: tuple[str, ...] = (
     "heat_pump",
@@ -195,7 +198,7 @@ def normalize_parts(
         if part_id in seen:
             raise ValueError(f"{where}: id '{part_id}' doppelt.")
         seen.add(part_id)
-        extra = sorted(set(part) - {"id", "type", "nominal_power_kw"})
+        extra = sorted(set(part) - {"id", "type", "nominal_power_kw", "internal_gain_factor"})
         if extra:
             raise ValueError(f"{where}: unbekannte Felder {', '.join(extra)}.")
         if not has_heat_storage:
@@ -209,6 +212,9 @@ def normalize_parts(
                 "type": part_type,
                 "nominal_power_kw": _positive(
                     part.get("nominal_power_kw"), f"{where}.nominal_power_kw"
+                ),
+                "internal_gain_factor": normalize_part_gain_factor(
+                    part.get("internal_gain_factor"), label=where
                 ),
             }
         )

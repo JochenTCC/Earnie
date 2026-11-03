@@ -27,7 +27,8 @@
                         "heatpump.waermepumpe.set_enable": "alias_2",
                         "heatpump.waermepumpe.sens_power_act": "alias_1"
                     },
-                    "heating_system_id": "heating_profile_a"
+                    "heating_system_id": "heating_profile_a",
+                    "internal_gain_factor": 0.0
                 },
                 {
                     "id": "e_auto",
@@ -73,7 +74,8 @@
                         "get_evcs_limit_soc": "alias_13",
                         "get_evcs_soc_min_immediate": "alias_14",
                         "evcs.e_auto.set_evcs_max_current": ""
-                    }
+                    },
+                    "internal_gain_factor": 0.0
                 },
                 {
                     "id": "pool_swimspa",
@@ -100,7 +102,8 @@
                         "sens_heating_active": "alias_20",
                         "pool.pool_swimspa.set_enable": "alias_16",
                         "pool.pool_swimspa.sens_power_act": "alias_15"
-                    }
+                    },
+                    "internal_gain_factor": 0.0
                 },
                 {
                     "id": "pool_filter",
@@ -132,7 +135,8 @@
                         }
                     },
                     "signal_type": "binary",
-                    "min_on_quarterhours": 2
+                    "min_on_quarterhours": 2,
+                    "internal_gain_factor": 0.0
                 },
                 {
                     "id": "geschirrspueler",
@@ -156,7 +160,8 @@
                     },
                     "ehal_bindings": {
                         "consumer.geschirrspueler.sens_power_act": "alias_26"
-                    }
+                    },
+                    "internal_gain_factor": 0.8
                 },
                 {
                     "id": "kochen",
@@ -175,7 +180,8 @@
                     "earnie_role": "known",
                     "ehal_bindings": {
                         "consumer.kochen.sens_power_act": "alias_27"
-                    }
+                    },
+                    "internal_gain_factor": 0.8
                 },
                 {
                     "id": "trockner",
@@ -199,7 +205,8 @@
                     },
                     "ehal_bindings": {
                         "consumer.trockner.sens_power_act": "alias_28"
-                    }
+                    },
+                    "internal_gain_factor": 0.8
                 },
                 {
                     "id": "tv",
@@ -218,7 +225,8 @@
                     "earnie_role": "known",
                     "ehal_bindings": {
                         "consumer.tv.sens_power_act": "alias_29"
-                    }
+                    },
+                    "internal_gain_factor": 0.8
                 },
                 {
                     "id": "waschmaschine",
@@ -242,7 +250,8 @@
                     },
                     "ehal_bindings": {
                         "consumer.waschmaschine.sens_power_act": "alias_30"
-                    }
+                    },
+                    "internal_gain_factor": 0.8
                 }
             ],
             "land": "AT",
@@ -268,11 +277,23 @@
                 "heating_limit_c": 15.0,
                 "house_tolerance_c": 0.5,
                 "absent_temp_reduction_c": 2.5,
-                "absent_mode_enabled": true
+                "absent_mode_enabled": true,
+                "solar_gains": {
+                    "enabled": false,
+                    "window_area_m2": {
+                        "s": 12.5,
+                        "e": 4.0,
+                        "w": 4.0,
+                        "n": 4.0
+                    },
+                    "g_value": 0.6,
+                    "frame_shading_factor": 0.5
+                }
             },
             "persons": 2,
             "heating_enabled": true,
-            "vat_deductible": false
+            "vat_deductible": false,
+            "baseload_internal_gain_factor": 0.8
         }
     ],
     "plant": {

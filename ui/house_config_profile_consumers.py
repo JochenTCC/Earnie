@@ -27,6 +27,7 @@ from house_config.entity_id_lock import (
     ID_PROVISIONAL_LABEL_KEY,
     is_id_locked,
 )
+from house_config.house_gains import INTERNAL_GAIN_FACTOR_KEY, default_consumer_gain_factor
 from house_config.id_slug import slug_id
 from house_config.thermal_labels import CONSUMER_TYPE_LABELS
 from ui.form_layout import (
@@ -280,6 +281,34 @@ def _dispatch_consumer_type_fields(
     )
 
 
+def _render_internal_gain_factor(
+    consumer: dict, c_type: str, index: int, *, session_scope: str
+) -> float:
+    """Share of the consumer's electric energy that heats the house (SUSI P2)."""
+    stored = consumer.get(INTERNAL_GAIN_FACTOR_KEY)
+    same_type = str(consumer.get("type") or "generic") == c_type
+    value = (
+        float(stored)
+        if same_type and stored not in (None, "")
+        else default_consumer_gain_factor(c_type, consumer.get("id"))
+    )
+    return float(
+        labeled_number_input(
+            "Interner Gewinnanteil (0–1)",
+            min_value=0.0,
+            max_value=1.0,
+            value=value,
+            step=0.1,
+            # Type in the key: a type switch starts from the new type's default.
+            key=_scoped_key(session_scope, f"hc_gain_{c_type}_{index}"),
+            help=(
+                "Anteil der elektrischen Energie, der als Wärme im beheizten Haus landet und den "
+                "Heizbedarf senkt. Haushaltsgeräte 0,8; E-Auto, Pool und Geräte außen 0."
+            ),
+        )
+    )
+
+
 def _render_consumer_form_body(
     consumer: dict,
     index: int,
@@ -320,6 +349,10 @@ def _render_consumer_form_body(
                 "Live-Optimierung. Die Heizungs-Absenkung steht im Abschnitt "
                 "„Gebäude / Wärmebedarf“."
             ),
+        )
+    if c_type != "thermal_annual":
+        item[INTERNAL_GAIN_FACTOR_KEY] = _render_internal_gain_factor(
+            consumer, c_type, index, session_scope=session_scope
         )
     provisional = str(consumer.get(ID_PROVISIONAL_LABEL_KEY) or "").strip()
     has_id = bool(str(consumer.get("id") or "").strip())

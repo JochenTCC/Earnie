@@ -31,7 +31,8 @@ class LiveHousePlan:
     electric_by_hour: list[float]
     # Simulated indoor temperature; empty on the legacy path without Wohnfläche.
     house_temp_c: list[float]
-    # Collector credit source (legacy path only); SOLAR_SOURCE_NONE otherwise.
+    # Irradiance source: window gains (SUSI P2) on the RC path, collector credit on the legacy
+    # path; SOLAR_SOURCE_NONE when neither applies.
     solar_source: str
 
 
@@ -41,12 +42,16 @@ def plan_live_house_horizon(
     house_profile: dict,
     ambient_forecast_c: list[float],
     start: datetime | None = None,
+    gain_kw_by_hour: list[float] | None = None,
+    gain_source: str = SOLAR_SOURCE_NONE,
 ) -> LiveHousePlan:
     """House RC + WP over the horizon, same hourly rules as the year sim without store.
 
     Start = target temperature (no indoor sensor; spec section 7 Q2). Envelope H
-    from ``ThermalParameters``. Without Wohnfläche: legacy warm-water need minus
-    a per-day collector credit (forecast irradiance, P3).
+    from ``ThermalParameters`` (calibrated with gains). ``gain_kw_by_hour``: solar + internal
+    gains per hour (``optimizer.thermal_live_gains``, SUSI P2); None only for callers without a
+    house profile context (no gains). Without Wohnfläche: legacy warm-water need minus a per-day
+    collector credit (forecast irradiance, P3).
     """
     from data.heating_need import warm_water_kwh_week
     from house_config.heat_source import consumer_heat_source, heat_source_efficiency
@@ -75,7 +80,8 @@ def plan_live_house_horizon(
     house_temp = target
     electric_by_hour: list[float] = []
     house_temps: list[float] = []
-    for ambient in ambient_forecast_c:
+    gains = list(gain_kw_by_hour or [])
+    for hour, ambient in enumerate(ambient_forecast_c):
         house_temp, electric = _step_hour_direct_wp(
             house_temp=house_temp,
             ambient_c=float(ambient),
@@ -85,10 +91,12 @@ def plan_live_house_horizon(
             max_heat_kw=wp_kw * jaz,
             wp_kw=wp_kw,
             ww_electric_kw=ww_kw / jaz if jaz > 0 else 0.0,
+            gain_kw=float(gains[hour]) if hour < len(gains) else 0.0,
+            target_temp_c=target,
         )
         electric_by_hour.append(float(electric))
         house_temps.append(float(house_temp))
-    return LiveHousePlan(electric_by_hour, house_temps, SOLAR_SOURCE_NONE)
+    return LiveHousePlan(electric_by_hour, house_temps, gain_source)
 
 
 def _plan_live_legacy_ww(

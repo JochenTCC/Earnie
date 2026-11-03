@@ -99,6 +99,7 @@ def test_save_round_trip_keeps_every_value(enabled: bool):
         "label": "wp",
         "type": "thermal_annual",
         "use_profile_csv": False,
+        "internal_gain_factor": 0.0,
         "solar_thermal_area_m2": 4.0,
         "solar_thermal_tilt_deg": 18.0,
         "solar_thermal_azimuth_deg": 0.0,

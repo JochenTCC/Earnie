@@ -8,6 +8,18 @@ from __future__ import annotations
 
 import streamlit as st
 
+from house_config.house_gains import (
+    BASELOAD_GAIN_FACTOR_KEY,
+    GROSS_FLOOR_AREA_KEY,
+    GROSS_TO_LIVING_AREA_FACTOR,
+    INTERNAL_GAINS_KEY,
+    SOLAR_GAINS_KEY,
+    WINDOW_DIRECTIONS,
+    default_solar_gains_for_new_house,
+    internal_gain_descriptor,
+    normalize_baseload_gain_factor,
+    suggested_window_areas_m2,
+)
 from house_config.house_thermal import (
     HEATING_ENABLED_KEY,
     HOUSE_THERMAL_KEY,
@@ -26,6 +38,7 @@ from ui.house_config_profile_session import _scoped_key
 
 # Run-local copy of the section's values for the consumer forms rendered after it.
 _STATE_KEY = "house_heating_state"
+_WINDOW_LABELS = {"s": "Süd", "e": "Ost", "w": "West", "n": "Nord"}
 _MASS_LABELS = {
     "leicht": "Leicht (50 Wh/m²K)",
     "mittel": "Mittel (90 Wh/m²K)",
@@ -48,7 +61,10 @@ def thermal_preview_fields(state: dict) -> dict:
     from house_config.house_thermal import consumer_thermal_from_house
 
     thermal = state.get(HOUSE_THERMAL_KEY) or default_house_thermal()
-    return consumer_thermal_from_house(thermal, int(state[PERSONS_KEY]))
+    out = consumer_thermal_from_house(thermal, int(state[PERSONS_KEY]))
+    if state.get(INTERNAL_GAINS_KEY):
+        out[INTERNAL_GAINS_KEY] = state[INTERNAL_GAINS_KEY]
+    return out
 
 
 def _render_building_fields(stored: dict, *, session_scope: str) -> dict:
@@ -105,7 +121,121 @@ def _render_building_fields(stored: dict, *, session_scope: str) -> dict:
                 key=_scoped_key(session_scope, "house_thermal_hwb"),
             )
         )
+    _render_gross_floor_area(stored, out, session_scope=session_scope)
     return out
+
+
+def _render_gross_floor_area(stored: dict, out: dict, *, session_scope: str) -> None:
+    living = float(out["living_area_m2"])
+    use_gross = labeled_checkbox(
+        "Bruttogrundfläche angeben",
+        value=GROSS_FLOOR_AREA_KEY in stored,
+        key=_scoped_key(session_scope, "house_thermal_gross_use"),
+        help=(
+            "Der HWB im Energieausweis bezieht sich auf die Bruttogrundfläche (BGF). Ohne "
+            "Angabe rechnet Earnie wie SUSI mit Wohnfläche × 1,25."
+        ),
+    )
+    if use_gross:
+        out[GROSS_FLOOR_AREA_KEY] = float(
+            labeled_number_input(
+                "Bruttogrundfläche BGF (m²)",
+                min_value=0.1,
+                value=float(stored.get(GROSS_FLOOR_AREA_KEY) or living * GROSS_TO_LIVING_AREA_FACTOR),
+                step=1.0,
+                key=_scoped_key(session_scope, "house_thermal_gross"),
+            )
+        )
+    else:
+        st.caption(
+            f"Bezugsfläche des HWB: Wohnfläche × 1,25 = "
+            f"{living * GROSS_TO_LIVING_AREA_FACTOR:.0f} m² Bruttogrundfläche."
+        )
+
+
+def _render_solar_gain_fields(stored: dict, out: dict, *, session_scope: str) -> None:
+    """Fenster und solare Gewinne (SUSI P2); bei „aus“ bleiben die Werte gespeichert."""
+    block = dict(stored[SOLAR_GAINS_KEY])
+    windows = dict(block["window_area_m2"])
+    enabled = bool(
+        labeled_checkbox(
+            "Solare Gewinne durch Fenster",
+            value=bool(block["enabled"]),
+            key=_scoped_key(session_scope, "house_solar_enabled"),
+            help=(
+                "Ein: Die Sonne durch die Fenster heizt das Haus mit. Das ändert die "
+                "Ergebnisse: Der Heizbedarf verschiebt sich aus sonnigen Mittagsstunden in "
+                "Nacht und Übergangszeit; der Jahres-Heizwärmebedarf bleibt beim HWB."
+            ),
+        )
+    )
+    if enabled:
+        for direction in WINDOW_DIRECTIONS:
+            windows[direction] = float(
+                labeled_number_input(
+                    f"Fensterfläche {_WINDOW_LABELS[direction]} (m²)",
+                    min_value=0.0,
+                    value=float(windows[direction]),
+                    step=0.5,
+                    key=_scoped_key(session_scope, f"house_window_{direction}"),
+                )
+            )
+        suggestion = suggested_window_areas_m2(
+            float(out["living_area_m2"]), gross_floor_area_m2=out.get(GROSS_FLOOR_AREA_KEY)
+        )
+        st.caption(
+            "Vorschlag nach SUSI (Quader, 2 Geschosse, Fensteranteil S 20 %, O/W 10 %, "
+            "N 6 %): "
+            + ", ".join(
+                f"{_WINDOW_LABELS[d]} {suggestion[d]:g} m²" for d in WINDOW_DIRECTIONS
+            )
+            + "."
+        )
+        block["g_value"] = float(
+            labeled_number_input(
+                "g-Wert Verglasung",
+                min_value=0.05,
+                max_value=1.0,
+                value=float(block["g_value"]),
+                step=0.05,
+                key=_scoped_key(session_scope, "house_solar_g"),
+                help="Gesamtenergiedurchlassgrad (SUSI 0,55–0,65).",
+            )
+        )
+        block["frame_shading_factor"] = float(
+            labeled_number_input(
+                "Abminderung Rahmen / Verschattung",
+                min_value=0.05,
+                max_value=1.0,
+                value=float(block["frame_shading_factor"]),
+                step=0.05,
+                ratios=WIDE_LABEL_RATIOS,
+                key=_scoped_key(session_scope, "house_solar_frame"),
+                help="Rahmenanteil, Laibung, Vorsprünge, Verschmutzung (SUSI 0,4–0,65).",
+            )
+        )
+    block["enabled"] = enabled
+    block["window_area_m2"] = windows
+    out[SOLAR_GAINS_KEY] = block
+
+
+def _render_baseload_gain(value: float, *, session_scope: str) -> float:
+    return float(
+        labeled_number_input(
+            "Grundlast als Wärme im Haus (Anteil)",
+            min_value=0.0,
+            max_value=1.0,
+            value=float(value),
+            step=0.05,
+            ratios=WIDE_LABEL_RATIOS,
+            key=_scoped_key(session_scope, "house_baseload_gain"),
+            help=(
+                "Interne Gewinne: Anteil des Haushaltsstroms (Grundlast), der als Wärme im "
+                "beheizten Volumen landet. Standard 0,8 (Abzug für Außenbeleuchtung, Abluft, "
+                "Warmwasser im Abfluss). Der Anteil je Verbraucher steht beim Verbraucher."
+            ),
+        )
+    )
 
 
 def _render_comfort_fields(stored: dict, out: dict, *, session_scope: str) -> None:
@@ -169,12 +299,16 @@ def _render_comfort_fields(stored: dict, out: dict, *, session_scope: str) -> No
     )
 
 
-def render_house_heating_section(*, session_scope: str, existing: dict, persons: int) -> dict:
+def render_house_heating_section(
+    *, session_scope: str, existing: dict, persons: int, annual_kwh: float
+) -> dict:
     """Switch plus building fields; returns ``heating_enabled``, ``persons``, ``thermal``.
 
     ``persons`` comes from the field „Personen im Haushalt“ next to the Jahresverbrauch (SUSI
     P6). ``thermal`` is ``None`` for a house that never had the section on. With the switch
-    off the stored block passes through unchanged.
+    off the stored block passes through unchanged. The state also carries the profile's
+    ``baseload_internal_gain_factor`` and the internal-gain inputs of the „Haus Wärme“
+    preview (SUSI P2; other consumers as stored, they are auto-saved on every change).
     """
     st.subheader("Gebäude / Wärmebedarf")
     enabled = bool(
@@ -190,6 +324,9 @@ def render_house_heating_section(*, session_scope: str, existing: dict, persons:
         )
     )
     stored_thermal = existing.get(HOUSE_THERMAL_KEY)
+    baseload_gain = normalize_baseload_gain_factor(
+        existing.get(BASELOAD_GAIN_FACTOR_KEY), label="Hausprofil"
+    )
     if not enabled:
         st.caption(
             "Heizung wird nicht betrachtet: kein Verbraucher „Haus Wärme“, der "
@@ -201,21 +338,41 @@ def render_house_heating_section(*, session_scope: str, existing: dict, persons:
             HOUSE_THERMAL_KEY: stored_thermal,
         }
     else:
-        stored = stored_thermal or default_house_thermal()
+        stored = stored_thermal
+        if stored is None:
+            # New building block: solar gains start on with the SUSI window suggestion.
+            stored = default_house_thermal()
+            stored[SOLAR_GAINS_KEY] = default_solar_gains_for_new_house(
+                float(stored["living_area_m2"])
+            )
         thermal = _render_building_fields(stored, session_scope=session_scope)
         _render_comfort_fields(stored, thermal, session_scope=session_scope)
+        _render_solar_gain_fields(stored, thermal, session_scope=session_scope)
+        baseload_gain = _render_baseload_gain(baseload_gain, session_scope=session_scope)
         state = {
             HEATING_ENABLED_KEY: True,
             PERSONS_KEY: int(persons),
             HOUSE_THERMAL_KEY: thermal,
         }
+    state[BASELOAD_GAIN_FACTOR_KEY] = baseload_gain
+    state[INTERNAL_GAINS_KEY] = internal_gain_descriptor(
+        annual_kwh=float(annual_kwh),
+        baseload_factor=baseload_gain,
+        consumers=[
+            c for c in existing.get("consumers") or [] if c.get("type") != "thermal_annual"
+        ],
+    )
     st.session_state[_scoped_key(session_scope, _STATE_KEY)] = state
     return state
 
 
 def house_heating_payload(state: dict) -> dict:
     """Profile keys of the section for the house-profile save."""
-    out = {HEATING_ENABLED_KEY: state[HEATING_ENABLED_KEY], PERSONS_KEY: state[PERSONS_KEY]}
+    out = {
+        HEATING_ENABLED_KEY: state[HEATING_ENABLED_KEY],
+        PERSONS_KEY: state[PERSONS_KEY],
+        BASELOAD_GAIN_FACTOR_KEY: state[BASELOAD_GAIN_FACTOR_KEY],
+    }
     if state.get(HOUSE_THERMAL_KEY) is not None:
         out[HOUSE_THERMAL_KEY] = dict(state[HOUSE_THERMAL_KEY])
     return out
