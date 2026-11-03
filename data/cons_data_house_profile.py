@@ -38,8 +38,11 @@ def total_kw_at_datetime(profile: dict, slot_dt: datetime) -> float:
         by_consumer[_consumer_id(consumer, index)] = modeled_consumer_kw_at_datetime(
             consumer, slot_dt
         )
+    from optimizer.house_cooling import cooling_kw_for_slots
+
     baseload_kw = profile_baseload_kwh(profile) / 8760.0
-    return baseload_kw + sum(by_consumer.values())
+    cooling_kw = cooling_kw_for_slots(profile, [slot_dt])[0]
+    return baseload_kw + sum(by_consumer.values()) + cooling_kw
 
 
 def hourly_kw_by_consumer_for_timestamps(
@@ -93,13 +96,33 @@ def resolve_runtime_house_profile() -> dict | None:
 
 
 def _house_profile_consumer_ids(profile: dict) -> list[str]:
-    """Alle modellierten Verbraucher-IDs — identisch zur Synthese."""
+    """Alle modellierten Verbraucher-IDs des Hausprofils (ohne Klimaanlage)."""
     from data.consumption_profiles import _consumer_id as cid_fn
 
     return [
         cid_fn(consumer, index)
         for index, consumer in enumerate(profile.get("consumers", []))
     ]
+
+
+def _cooling_column_id(profile: dict) -> str | None:
+    """cons_data column id of the air conditioning (``<heating id>_cooling``), None when off."""
+    from house_config.house_cooling import cooling_consumer, cooling_id
+
+    carrier = cooling_consumer(profile)
+    return None if carrier is None else cooling_id(carrier)
+
+
+def cons_data_consumer_ids(profile: dict) -> list[str]:
+    """Verbraucher-Spalten der cons_data-Synthese: Hausprofil-Verbraucher plus Klimaanlage.
+
+    The air conditioning is no consumer of the profile (``cooling`` on the heating consumer)
+    but a fixed load of its own; its column keeps the synthetic total consistent with the
+    Grundlast, which already has it taken out.
+    """
+    ids = _house_profile_consumer_ids(profile)
+    cooling = _cooling_column_id(profile)
+    return ids if cooling is None else [*ids, cooling]
 
 
 # Bump when the synthesis algorithm changes the generated series for unchanged inputs,
@@ -137,6 +160,12 @@ def house_profile_cons_data_fingerprint(
         "total_profile_csv": profile.get("total_profile_csv"),
         "consumers": profile.get("consumers", []),
     }
+    # Only with the switch on, so the fingerprint of houses without cooling is unchanged.
+    if profile.get("cooling_enabled"):
+        payload["cooling"] = {
+            "heating_enabled": profile.get("heating_enabled"),
+            "inactive_consumers": profile.get("inactive_consumers", []),
+        }
     if pv_kwp is not None:
         payload["pv_kwp"] = round(float(pv_kwp), 6)
     encoded = json.dumps(payload, sort_keys=True, ensure_ascii=False, default=str)
@@ -157,7 +186,7 @@ def expected_cons_data_consumer_ids() -> list[str]:
     profile = resolve_runtime_house_profile()
     if not profile:
         return []
-    return _house_profile_consumer_ids(profile)
+    return cons_data_consumer_ids(profile)
 
 
 def consumer_labels_for_ids(consumer_ids: list[str]) -> dict[str, str]:
@@ -178,6 +207,9 @@ def consumer_labels_for_ids(consumer_ids: list[str]) -> dict[str, str]:
         for c in profile.get("consumers", [])
         if c.get("id")
     }
+    cooling = _cooling_column_id(profile)
+    if cooling is not None:
+        by_id[cooling] = "Klimaanlage"
     for cid in consumer_ids:
         if cid not in config_by_runtime_id:
             labels[cid] = by_id.get(cid, labels[cid])
@@ -209,11 +241,20 @@ def build_synthetic_dataframe_from_house_profile(
     consumers = list(profile.get("consumers", []))
     consumer_ids = [_consumer_id(consumer, index) for index, consumer in enumerate(consumers)]
     timestamps = pd.date_range(start_dt, periods=hours, freq="h")
+    # Air conditioning: a column of its own (the Grundlast above has it taken out).
+    cooling_id = _cooling_column_id(profile)
+    cooling_kw: list[float] = []
+    if cooling_id is not None:
+        from optimizer.house_cooling import cooling_kw_for_slots
+
+        cooling_kw = cooling_kw_for_slots(
+            profile, [ts.to_pydatetime() for ts in timestamps], climate=climate
+        )
     # total_profile_csv is for HK Ist-vs-Modell only; SE/cons_data Basislast
     # matches HK Modell + MILP profile_spec (metric flat), not meter residual.
 
     rows: list[dict] = []
-    for ts in timestamps:
+    for hour_index, ts in enumerate(timestamps):
         slot_dt = ts.to_pydatetime()
         flex_vals = {
             cid: modeled_consumer_kw_at_datetime(
@@ -223,6 +264,8 @@ def build_synthetic_dataframe_from_house_profile(
             )
             for index, cid in enumerate(consumer_ids)
         }
+        if cooling_id is not None:
+            flex_vals[cooling_id] = cooling_kw[hour_index]
         flex_sum = sum(flex_vals.values())
         hour_baseload = default_baseload_kw
         total_kw = hour_baseload + flex_sum
@@ -237,7 +280,7 @@ def build_synthetic_dataframe_from_house_profile(
                 "baseload_kw": round(hour_baseload, 3),
                 "pv_kw": pv_kw,
                 "source": source,
-                **{f"{cid}_kw": round(flex_vals[cid], 3) for cid in consumer_ids},
+                **{f"{cid}_kw": round(kw, 3) for cid, kw in flex_vals.items()},
             }
         )
     return pd.DataFrame(rows).set_index("timestamp")

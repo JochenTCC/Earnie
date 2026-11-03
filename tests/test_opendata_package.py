@@ -115,6 +115,37 @@ def test_budget_stops_waiting_and_names_the_last_error():
             session.get_json("https://example.org/a", {})
 
 
+def test_budget_counts_network_time_not_computation_in_between():
+    """A slow page (year simulations, debugger) must not turn into a network error."""
+    session, calls = _session([_Response(200, {"v": 1}), _Response(200, {"v": 2})])
+    clock = [1000.0]
+
+    def monotonic() -> float:
+        return clock[0]
+
+    with patch("opendata.http.time.monotonic", side_effect=monotonic):
+        with opendata.fetch_budget(30.0):
+            assert session.get_json("https://example.org/a", {}) == {"v": 1}
+            clock[0] += 120.0  # two minutes of rendering between the requests
+            assert session.get_json("https://example.org/b", {}) == {"v": 2}
+    assert len(calls) == 2
+
+
+def test_budget_still_counts_the_time_spent_in_requests():
+    def slow_transport(url, params, timeout):
+        clock[0] += 20.0
+        return _Response(200, {})
+
+    clock = [0.0]
+    session = opendata.Session(timeout_s=60.0, transport=slow_transport)
+    with patch("opendata.http.time.monotonic", side_effect=lambda: clock[0]):
+        with opendata.fetch_budget(30.0):
+            session.get_json("https://example.org/a", {})
+            session.get_json("https://example.org/b", {})
+            with pytest.raises(opendata.FetchBudgetExceeded, match="30 s"):
+                session.get_json("https://example.org/c", {})
+
+
 def test_settled_request_is_served_from_disk_on_the_second_call(tmp_path):
     from datetime import date
 

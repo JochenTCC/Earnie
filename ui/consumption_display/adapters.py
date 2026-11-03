@@ -349,11 +349,16 @@ def _cons_data_consumer_ids(df: pd.DataFrame) -> list[str]:
 
 
 def _consumer_labels_from_profile(profile: dict) -> dict[str, str]:
+    from house_config.house_cooling import cooling_consumer, cooling_id
+
     labels: dict[str, str] = {"baseload": "Basislast"}
     for consumer in profile.get("consumers", []):
         cid = consumer.get("id") or consumer.get("label")
         if cid:
             labels[str(cid)] = str(consumer.get("label") or cid)
+    carrier = cooling_consumer(profile)
+    if carrier is not None:
+        labels[cooling_id(carrier)] = "Klimaanlage"
     return labels
 
 

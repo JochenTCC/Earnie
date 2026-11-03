@@ -259,3 +259,74 @@ def test_migration_step_removes_appliance_kind_and_lists_a_todo():
     assert "Klima" in result.manual_todos[0].text_de
     assert not STEP.detect(result.docs)
     assert result.changed_files == ("house_profiles.json",)
+
+
+def test_load_chart_shows_the_cooling_with_heating_off(monkeypatch):
+    """Gesamt-Lastverhalten: the stub profile carries the switch and the parked carrier."""
+    from ui.consumption_display.adapters import bundle_from_modeled_profile
+
+    year = [0.0] * 8760
+    year[5000] = 2.0
+    monkeypatch.setattr(
+        "optimizer.house_cooling._reference_year_hourly_kw", lambda _c, _p: list(year)
+    )
+    monkeypatch.setattr(
+        "ui.consumption_display.adapters.build_modeled_temperature_series",
+        lambda _p, hours: ({}, {}),
+    )
+    carrier = {"id": "wp", "label": "Haus Wärme", "type": "thermal_annual", "cooling": _SPLIT}
+    profile = {
+        "annual_kwh": 4000.0,
+        "baseload_kwh": 3998.0,
+        "consumers": [],
+        "cooling_enabled": True,
+        "heating_enabled": False,
+        "inactive_consumers": [carrier],
+    }
+    bundle = bundle_from_modeled_profile(profile, hours=8760)
+    assert bundle.consumer_series["wp_cooling"][5000] == 2.0
+    assert bundle.consumer_labels["wp_cooling"] == "Klimaanlage"
+    assert sum(bundle.consumer_series["wp_cooling"]) + sum(bundle.baseload) == pytest.approx(4000.0)
+
+
+def test_synthetic_cons_data_has_a_cooling_column(monkeypatch):
+    """SE synthetic consumption: the cooling is a column of its own and part of the total."""
+    from datetime import date
+
+    from data.cons_data_house_profile import (
+        build_synthetic_dataframe_from_house_profile,
+        cons_data_consumer_ids,
+        house_profile_cons_data_fingerprint,
+    )
+
+    monkeypatch.setattr(
+        "optimizer.house_cooling._reference_year_hourly_kw", lambda _c, _p: [1.5] * 8760
+    )
+    monkeypatch.setattr(
+        "data.open_meteo_solar_archive.last_full_archive_year", lambda *a, **k: 2025
+    )
+    carrier = {"id": "wp", "label": "Haus Wärme", "type": "thermal_annual", "cooling": _SPLIT}
+    profile = {
+        "id": "home",
+        "annual_kwh": 8760.0,
+        "baseload_kwh": 8760.0,
+        "consumers": [],
+        "cooling_enabled": True,
+        "heating_enabled": False,
+        "inactive_consumers": [carrier],
+    }
+    assert cons_data_consumer_ids(profile) == ["wp_cooling"]
+    df = build_synthetic_dataframe_from_house_profile(
+        profile,
+        start=date(2025, 7, 1),
+        end=date(2025, 7, 1),
+        kwp=0.0,
+        source="synthetic",
+        pv_kw_at_datetime=lambda _slot: 0.0,
+    )
+    assert (df["wp_cooling_kw"] == 1.5).all()
+    assert (df["total_kw"] == 2.5).all() and (df["baseload_kw"] == 1.0).all()
+    off = {**profile, "cooling_enabled": False}
+    assert cons_data_consumer_ids(off) == []
+    # Synthetic data made before the cooling was switched on is reported as stale.
+    assert house_profile_cons_data_fingerprint(profile) != house_profile_cons_data_fingerprint(off)

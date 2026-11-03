@@ -104,6 +104,7 @@ def _render_gesamtverbraeuche(
         "annual_kwh": annual_kwh,
         "baseload_kwh": preview["baseload_kwh"],
         "consumers": resolved,
+        **preview.get("cooling_profile", {}),
     }
     render_consumption_display(
         ConsumptionDisplayMode.MODELED_PROFILE,

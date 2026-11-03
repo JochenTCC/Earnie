@@ -375,6 +375,14 @@ def build_modeled_kw_for_timestamps(
     for index, consumer in enumerate(profile.get("consumers", [])):
         cid = _consumer_id(consumer, index)
         result[cid] = _modeled_kw_series_for_timestamps(consumer, timestamps)
+    from house_config.house_cooling import cooling_consumer, cooling_id
+    from optimizer.house_cooling import cooling_kw_for_slots
+
+    carrier = cooling_consumer(profile)
+    if carrier is not None:
+        result[cooling_id(carrier)] = cooling_kw_for_slots(
+            profile, [_parse_profile_timestamp(ts) for ts in timestamps]
+        )
     result["baseload"] = [baseload_kw] * len(timestamps)
     return result
 

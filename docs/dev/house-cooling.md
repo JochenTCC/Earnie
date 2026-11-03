@@ -63,7 +63,8 @@ year model without `cooling`, so heating results are unchanged.
 | Grundlast | `resolve_profile_baseload` → `compute_baseload_kwh(cooling_kwh=…)` (reference system) |
 | Live forecast overlay, SE baseload overlay | `thermal_hourly_overlay` adds `cooling_kw_for_slots` (also for a MILP heating or a parked heating consumer) |
 | SE meter residual (path B) | `meter_residual_baseload_kw` peels the cooling |
-| Consumption breakdown | `build_modeled_hourly_kw_by_consumer` series `<heating id>_cooling` |
+| Consumption breakdown, Gesamt-Lastverhalten | `build_modeled_hourly_kw_by_consumer` / `build_modeled_kw_for_timestamps` series `<heating id>_cooling` (label „Klimaanlage“); the Hauskonfigurator chart stubs get the switch via `preview["cooling_profile"]` |
+| SE synthetic `cons_data` | `cons_data_consumer_ids` adds the column `<heating id>_cooling_kw`, included in `total_kw`; the synthesis fingerprint changes when the switch is on (data reported stale) |
 | SE per-year weather | `ModeledClimateContext.cooling_kw_at` (H from the reference year) |
 | Hauskonfigurator | `ui/house_config_profile_cooling.py`: section „Kühlung“, preview kWh/a into Grundlast and household reference |
 | Earnie-Points | `split` 1 heat point; `heat_pump` 1 only when the heating consumer is not counted |

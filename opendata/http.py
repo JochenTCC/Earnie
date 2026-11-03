@@ -3,7 +3,8 @@
 Retries HTTP 429 / 502 / 503 / 504 with exponential backoff (``Retry-After`` wins when the server
 sends it), raises the last error when the attempts are used up, and raises
 :class:`ApiUnreachableError` at the first connection error or timeout (asking again only repeats
-the wait). :func:`fetch_budget` caps all requests inside a block, retries and waits included.
+the wait). :func:`fetch_budget` caps the network time of all requests inside a block (requests,
+retries and waits; computation between the requests does not count).
 :meth:`Session.get_json_cached` serves settled archive days from the disk cache (:mod:`opendata.cache`).
 """
 from __future__ import annotations
@@ -55,31 +56,50 @@ def requests_transport(url: str, params: dict[str, Any], timeout_s: float) -> Re
     return requests.get(url, params=params, timeout=timeout_s)
 
 
-_deadline: ContextVar[tuple[float, float] | None] = ContextVar("opendata_fetch_deadline", default=None)
+class _Budget:
+    """Network seconds left in a :func:`fetch_budget` block (``total`` for the message)."""
+
+    __slots__ = ("remaining", "total")
+
+    def __init__(self, seconds: float) -> None:
+        self.remaining = float(seconds)
+        self.total = float(seconds)
+
+
+_budget: ContextVar[_Budget | None] = ContextVar("opendata_fetch_budget", default=None)
 
 
 @contextmanager
 def fetch_budget(seconds: float) -> Iterator[None]:
-    """Cap all requests inside the block (retries and waits included) at ``seconds``.
+    """Cap the network time of all requests inside the block at ``seconds``.
 
-    Interactive pages use this so a slow or rate-limited service ends in a visible error
-    instead of minutes of retries. Cache hits are unaffected.
+    Counted: each request (until its response or timeout) and each retry wait. Not counted:
+    computation between the requests — a page that renders slowly (year simulations, a
+    debugger) must not turn into a network error. Interactive pages use this so a slow or
+    rate-limited service ends in a visible error instead of minutes of retries. Cache hits
+    are unaffected.
     """
-    token = _deadline.set((time.monotonic() + seconds, seconds))
+    token = _budget.set(_Budget(seconds))
     try:
         yield
     finally:
-        _deadline.reset(token)
+        _budget.reset(token)
 
 
 def _remaining_budget_s() -> float | None:
-    state = _deadline.get()
-    return None if state is None else state[0] - time.monotonic()
+    state = _budget.get()
+    return None if state is None else state.remaining
+
+
+def _spend_budget(seconds: float) -> None:
+    state = _budget.get()
+    if state is not None:
+        state.remaining -= max(0.0, float(seconds))
 
 
 def _budget_exceeded(last_error: Exception | None) -> FetchBudgetExceeded:
-    state = _deadline.get()
-    seconds = state[1] if state is not None else 0.0
+    state = _budget.get()
+    seconds = state.total if state is not None else 0.0
     detail = f" Letzter Fehler: {last_error}" if last_error is not None else ""
     return FetchBudgetExceeded(
         f"Klima- und Marktdaten konnten nicht innerhalb von {seconds:.0f} s geladen werden "
@@ -149,8 +169,12 @@ class Session:
                     raise _budget_exceeded(last_error)
                 timeout = min(timeout, remaining)
             response: Response | None = None
+            started = time.monotonic()
             try:
-                response = self.transport(url, params, timeout)
+                try:
+                    response = self.transport(url, params, timeout)
+                finally:
+                    _spend_budget(time.monotonic() - started)
                 if response.status_code not in RETRY_STATUS:
                     response.raise_for_status()
                     payload = response.json()
@@ -184,3 +208,4 @@ class Session:
         if remaining is not None and seconds >= remaining:
             raise _budget_exceeded(last_error)
         time.sleep(seconds)
+        _spend_budget(seconds)

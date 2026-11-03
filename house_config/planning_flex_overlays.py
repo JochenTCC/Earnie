@@ -162,8 +162,13 @@ def _consumer_ids_with_cons_data(
     *,
     cons_data_consumer_ids: set[str] | None = None,
 ) -> set[str]:
-    """Verbraucher-IDs, deren kWh bereits aus cons_data-Spalten stammen."""
-    house_ids = _house_profile_consumer_ids(house_profile)
+    """Verbraucher-IDs, deren kWh bereits aus cons_data-Spalten stammen (inkl. Klimaanlage)."""
+    from house_config.house_cooling import cooling_consumer, cooling_id
+
+    house_ids = set(_house_profile_consumer_ids(house_profile))
+    carrier = cooling_consumer(house_profile)
+    if carrier is not None:
+        house_ids.add(cooling_id(carrier))
     if cons_data_consumer_ids is not None:
         return house_ids & cons_data_consumer_ids
 
@@ -188,9 +193,14 @@ def thermal_hourly_overlay(
     The air conditioning (``optimizer.house_cooling``) is a fixed load: it is added even when
     the heating consumer itself is MILP flex or its switch is off.
     """
+    from house_config.house_cooling import cooling_consumer, cooling_id
     from optimizer.house_cooling import cooling_kw_for_slots
 
-    cooling = cooling_kw_for_slots(house_profile, slot_datetimes, climate=climate)
+    carrier = cooling_consumer(house_profile)
+    if carrier is not None and cooling_id(carrier) in (skip_consumer_ids or set()):
+        cooling = [0.0] * len(slot_datetimes)
+    else:
+        cooling = cooling_kw_for_slots(house_profile, slot_datetimes, climate=climate)
     thermal_annual = _house_thermal_consumers(house_profile)
     thermal_rc_csv = [
         consumer

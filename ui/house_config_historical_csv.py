@@ -333,6 +333,7 @@ def _render_ist_vs_modell(
             "annual_kwh": annual_kwh,
             "baseload_kwh": preview["baseload_kwh"],
             "consumers": resolved,
+            **preview.get("cooling_profile", {}),
             "total_profile_csv": (
                 active_path if not active_path.startswith("bilanz:") else ""
             ),

@@ -183,6 +183,29 @@ def cooling_preview_kwh(
     return cooling_annual_electric_kwh(stub)
 
 
+def cooling_profile_fields(
+    session_consumers: list[dict], *, heating: dict, cooling: dict, preview_carrier
+) -> dict:
+    """Profile keys the chart stubs (Gesamt-Lastverhalten) need to model the cooling.
+
+    With „Heizung betrachten“ off the „Haus Wärme“ row is not among the preview consumers; it
+    goes in as ``inactive_consumers`` (only the cooling reads it there).
+    """
+    if not cooling.get(COOLING_ENABLED_KEY):
+        return {}
+    out: dict = {
+        COOLING_ENABLED_KEY: True,
+        HEATING_ENABLED_KEY: bool(heating[HEATING_ENABLED_KEY]),
+    }
+    if not heating[HEATING_ENABLED_KEY]:
+        out[INACTIVE_CONSUMERS_KEY] = [
+            preview_carrier(c)
+            for c in with_cooling(session_consumers, cooling)
+            if c.get("type") == "thermal_annual"
+        ]
+    return out
+
+
 def render_cooling_metric(kwh: float) -> None:
     if kwh > 0.0:
         st.caption(f"Klimaanlage im Hausmodell: {kwh:.0f} kWh/a Strom.")

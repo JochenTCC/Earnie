@@ -472,6 +472,7 @@ def render_house_profile_tab() -> None:
     from house_config.house_cooling import COOLING_ENABLED_KEY
     from ui.house_config_profile_cooling import (
         cooling_preview_kwh,
+        cooling_profile_fields,
         render_cooling_metric,
         render_house_cooling_section,
         with_cooling,
@@ -487,9 +488,10 @@ def render_house_profile_tab() -> None:
     )
     resolved = with_cooling(resolved, cooling)
     resolved_for_preview = with_cooling(resolved_for_preview, cooling)
+    session_consumers = list(st.session_state.get(_SESSION_CONSUMERS_KEY, []))
     try:
         cooling_kwh = cooling_preview_kwh(
-            with_cooling(st.session_state.get(_SESSION_CONSUMERS_KEY, []), cooling),
+            with_cooling(session_consumers, cooling),
             heating=heating,
             cooling=cooling,
             preview_carrier=lambda c: {**c, **thermal_preview_fields(heating)},
@@ -500,6 +502,14 @@ def render_house_profile_tab() -> None:
     render_cooling_metric(cooling_kwh)
     preview = _render_baseload_preview(
         annual_kwh, resolved_for_preview, ctx["existing"], preview_id, cooling_kwh=cooling_kwh
+    )
+    # The charts (Gesamt-Lastverhalten) model the cooling from these keys; the preview
+    # Grundlast above already has it taken out.
+    preview["cooling_profile"] = cooling_profile_fields(
+        session_consumers,
+        heating=heating,
+        cooling=cooling,
+        preview_carrier=lambda c: {**c, **thermal_preview_fields(heating)},
     )
     _render_household_reference(
         household, annual_kwh, resolved_for_preview, heating, cooling_kwh=cooling_kwh
