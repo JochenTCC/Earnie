@@ -48,6 +48,26 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 - [ ] **Ledger P10 — `savings_v: 2` for EV sessions and consumers without own meter** `[feat]` *(optional, 1 session, after P9; needs a decision first)*: counterfactual "charge immediately on plug-in" for EV sessions (deadline-bound), and a rule for consumers whose Ist comes from `live_snapshot` without a per-consumer meter (spec § 7 "Open").
 
+- **Epic RuleRef — SE reference ladder with standard rules** *(design 2026-11-03)*: spec [`docs/dev/rule-based-reference.md`](../docs/dev/rule-based-reference.md). Today's SE reference "ohne Optimierung" books `load − PV` without battery or flex control (`simulation/anchor_step.py::_hour_cost_parts_without_optimization`), so SE savings credit Earnie with the inverter's self-consumption benefit and with everything free rules achieve. New ladder: L0 no control (today) → L1 battery in vendor mode → L2 standard rules (evcc PV charging, SG-Ready / P75 price lock, HA cheapest hours) → L3 Earnie. L2 becomes the headline reference; same flex energy per window and consumer as L3, one continuous SoC chain. Basis for the Earnie Points strategy and subscription price studies. Each phase is sized for **one chat session** and ends with green tests and a commit.
+  - **Order:** P0 → P1 → P2 → P3 → P4; P5 can start after P3. Run P0 before the Points / pricing studies.
+  - **Note:** aligning the live ledger's counterfactual with L2 (`savings_v: 2`) is a separate decision under **Ledger P9–P10**, not part of this epic.
+
+- [ ] **RuleRef P0 — Method decisions** `[dev]` *(1 session)*: answer spec § 7 O1–O5. O1 first: does the SE plan with perfect foresight (matrix = booked actuals)? Decide whether L2 − L3 is reported with that caveat or a forecast mode for L3 is needed before the studies (separate item if so). Record the decisions in the spec.
+
+- [ ] **RuleRef P1 — L1 reference: vendor-mode battery on one SoC chain** `[dev]` *(1 session, after P0)*: SE reference runner on the same per-window matrices as the optimized run (`build_historical_window_matrix` / `build_sunrise_window_matrix`), flex at historical timing via `build_matched_flex_kw_per_hour`, battery via `_simulate_single_hour_baseline`, SoC carried across anchors. Output columns as `_REFERENCE_COST_COLUMNS` plus SoC. `reference_fingerprint` includes battery and flex consumers.
+  - **Tests:** energy parity per window and consumer through `validate_window_consumption`; L1 without battery equals L0 slot for slot; SoC never resets between anchors.
+
+- [ ] **RuleRef P2 — L2 rule builder** `[dev]` *(1 session, after P1)*: pure `optimizer/sim_baseline.py::build_rule_based_flex_kw_per_hour` (spec § 4): deferral queue on top of the matched profile, P75 price lock, PV surplus charging with hysteresis, deadline forcing, cheapest-block start for `generic_flex_window` consumers; parameters as one dict. Infeasible window fails loud with the missing kWh.
+  - **Tests:** energy exact per consumer; no rule firing → identical to matched profile; lock defers and catches up; surplus pull reduces later slots; deadline forcing overrides the lock; cheapest block for a generic consumer.
+
+- [ ] **RuleRef P3 — Ladder in the SE, L2 as headline reference** `[feat]` *(1 session, after P2)*: `reference_costs.py` computes L0, L1, L2 per scenario; "Ersparnis" in the SE = L2 − L3; SE invoice and cumulative charts read L2. Golden-master cases that assert SE savings are updated with the method change as justification (regression-triage verdict "intended").
+  - **Tests:** reference tasks per scenario (no sharing across different storage / flex sets); ladder ordering sanity on a fixture (L0 ≥ L1 ≥ L2 in cost for a PV + battery + EV case).
+
+- [ ] **RuleRef P4 — UI ladder and docs** `[feat]` *(1 session, after P3)*: SE results show L2 vs. L3 with the full ladder (L0–L3, rule share `(L0 − L2) / (L0 − L3)`) per spec § 7 O5.
+  - **Docs:** German user docs for the SE reference (what each step contains, which product behaviour the rules imitate, why savings are lower than before); release notes entry in `.github/release-notes/UNRELEASED.md`.
+
+- [ ] **RuleRef P5 — Study export and rule sensitivity** `[dev]` *(1 session, after P3)*: CLI `python -m scripts.run_reference_ladder --scenario … --workers N` writing L0–L3 per day and scenario as CSV; sensitivity over the lock quantile {0.50, 0.66, 0.75, 0.90}, reporting default and best-in-hindsight.
+
 - [ ] **Move public repos to a GitHub organisation** `[dev]` *(decided 2026-11-01; scan of `JochenTCC` references done the same day)*: the organisation (named after the product, e.g. `earnie-hems`) is created first and hosts GitHub Sponsors; moving the repositories is independent of that and follows here. Public repos only: Earnie, Edibert, ha-addon-earnie, repo-stats-public. Server-side and private repos are tracked outside this repo.
   - **Rule:** the personal account `JochenTCC` is **not** renamed. GitHub redirects transferred repos (web, git, archive downloads) until someone else claims the old name; keeping the account prevents that.
   - **Step 1 — before the transfer (one release):**
