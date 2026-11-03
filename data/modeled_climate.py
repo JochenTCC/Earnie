@@ -10,6 +10,7 @@ import config
 from data.heating_need import (
     daily_electric_kwh,
     daily_fuel_kwh,
+    daily_heat_kwh,
     heating_params_from_thermal,
     hourly_profile_for_year,
     thermal_daily_pwm_hourly_profile,
@@ -525,6 +526,21 @@ def thermal_annual_fuel_kwh_from_archive(
         house_profile=house_profile,
         reference_year=reference_year,
         daily_fn=daily_fuel_kwh,
+    )
+
+
+def thermal_annual_heat_kwh_from_archive(
+    thermal: dict,
+    *,
+    house_profile: dict | None = None,
+    reference_year: int | None = None,
+) -> tuple[float, int]:
+    """Wärme der Wärmequelle (kWh_th/a) aus dem Open-Meteo-Archiv, für jede Wärmequelle."""
+    return _thermal_annual_from_archive(
+        thermal,
+        house_profile=house_profile,
+        reference_year=reference_year,
+        daily_fn=daily_heat_kwh,
     )
 
 

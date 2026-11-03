@@ -137,7 +137,9 @@ Im Formular des Verbrauchers „Haus Wärme“ (Bereich **Hausprofil**, nur bei 
 
 - **Solarthermie-Kollektor:** Fläche, Neigung, Azimut. Sie bleiben am Verbraucher.
 - **Heizsystem (Referenzsystem: …):** Wärmequelle, **Heizleistung (kW, thermisch)**, Wärmespeicher und Heizstab; bei Wärmepumpe und Stromheizung zusätzlich die Mindestlaufzeit und darunter die abgeleitete elektrische Leistung („≈ … kW elektrisch bei JAZ …“). Sie landen beim Speichern im Katalogeintrag des Referenzsystems. Dieselben Felder hat das Formular einer Variante im Bereich **Heizsysteme**.
-- Darunter der geschätzte Strom- bzw. Brennstoffbedarf, gerechnet mit den Gebäudedaten des Hausprofils.
+- Darunter die Schätzung für ein Jahr, gerechnet mit den Gebäudedaten des Hausprofils und dem Wetter des letzten vollständigen Jahres am Standort:
+  - **Geschätzter Wärmebedarf (kWh_th/a)** als Hauptzahl: die Wärme, die das Heizsystem liefert (Raumwärme und Warmwasser abzüglich Solarthermie). Sie hängt fast nur vom Gebäude ab. Das Heizsystem wirkt nur über die Heizleistung (reicht sie an kalten Tagen nicht, liefert es weniger Wärme) und über den Verlust des Wärmespeichers.
+  - **Strombedarf mit diesem Heizsystem (kWh/a)** bei Wärmepumpe und Stromheizung bzw. **Brennstoffbedarf mit diesem Heizsystem (kWh/a Endenergie)** bei Brennstoffen und Fernwärme: Wärmebedarf / JAZ bzw. Nutzungsgrad.
 
 **Heizsystem wechseln:** Das Referenzsystem ändert sich nur hier, im Abschnitt **Heizsystem** des Hauses. Ein anderes Heizsystem aus dem Katalog übernimmt ein Haus nicht; wer eine modellierte Variante eingebaut hat, trägt ihre Werte hier ein. Ändert sich die **Wärmequelle** gegenüber der gespeicherten Datei (z. B. Gas → Wärmepumpe), passen die Verbrauchsdaten des Hauses nicht mehr, denn sie stammen vom bisherigen System. Earnie speichert dann erst nach einer Wahl und zeigt direkt unter der Wärmequelle eine Warnung. Die Buttons nennen die beiden Systeme, im Beispiel Gas → Wärmepumpe:
 

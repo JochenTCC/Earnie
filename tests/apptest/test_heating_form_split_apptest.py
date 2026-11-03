@@ -66,6 +66,45 @@ def test_form_shows_building_and_heating_system_sections() -> None:
     assert at.number_input(key=_POWER).label == "Heizleistung (kW, thermisch)"
 
 
+_HEAT_METRIC = "Geschätzter Wärmebedarf (kWh_th/a)"
+
+
+def _metrics(at: AppTest) -> dict[str, float]:
+    """Heating metrics of the „Haus Wärme“ form (the page shows other metrics too)."""
+    labels = [m.label for m in at.metric]
+    start = labels.index(_HEAT_METRIC)
+    return {m.label: float(m.value) for m in list(at.metric)[start : start + 2]}
+
+
+def test_heat_demand_kwh_th_is_the_main_figure() -> None:
+    at = _session()
+    assert list(_metrics(at)) == [
+        _HEAT_METRIC,
+        "Strombedarf mit diesem Heizsystem (kWh/a)",
+    ]
+    metrics = _metrics(at)
+    heat = metrics["Geschätzter Wärmebedarf (kWh_th/a)"]
+    electric = metrics["Strombedarf mit diesem Heizsystem (kWh/a)"]
+    assert heat > 0.0
+    # Heat pump luft, default JAZ 3.5: electricity = heat / JAZ.
+    assert electric == pytest.approx(heat / 3.5, abs=1.0)
+
+
+def test_heat_demand_stays_with_a_fuel_source() -> None:
+    at = _session()
+    heat_pump = _metrics(at)["Geschätzter Wärmebedarf (kWh_th/a)"]
+    at.selectbox(key="test_home__hc_g0_heat_source_0").set_value("gas").run(timeout=_TIMEOUT_S)
+    assert not at.exception
+    metrics = _metrics(at)
+    assert "Strombedarf mit diesem Heizsystem (kWh/a)" not in metrics
+    fuel = metrics["Brennstoffbedarf mit diesem Heizsystem (kWh/a Endenergie)"]
+    heat = metrics["Geschätzter Wärmebedarf (kWh_th/a)"]
+    # Same heating power and no storage: the delivered heat does not depend on the source.
+    assert heat == pytest.approx(heat_pump, abs=1.0)
+    # Gas, default Nutzungsgrad 0.95: fuel = heat / 0.95.
+    assert fuel == pytest.approx(heat / 0.95, abs=1.0)
+
+
 def test_heating_power_is_saved_into_the_reference_system() -> None:
     at = _session()
     at.number_input(key=_POWER).set_value(8.75).run(timeout=_TIMEOUT_S)

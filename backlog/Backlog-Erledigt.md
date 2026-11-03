@@ -2,6 +2,14 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Hauskonfigurator — heat demand in kWh_th (2026-11-03)
+
+- [x] **Heat demand in kWh_th in the Hauskonfigurator** `[feat]` *(decided 2026-11-03; done 2026-11-03; live check by the maintainer open)*: design [heating-system-variants.md](../docs/dev/heating-system-variants.md) § Calculation rule. The „Haus Wärme“ form shows „Geschätzter Wärmebedarf (kWh_th/a)“ as the main figure, below it „Strombedarf / Brennstoffbedarf mit diesem Heizsystem“ (`_render_wp_annual_metric`).
+  - **Calculation:** heat delivered by the heat source = input energy × JAZ / Nutzungsgrad (space heat and hot water minus solar thermal, incl. storage loss), `data.heating_need.daily_heat_kwh`, `data.modeled_climate.thermal_annual_heat_kwh_from_archive`; same year simulation as the electricity / fuel figure, so no change to results.
+  - **Docs:** `docs/konfiguration/flexible-verbraucher.md` (form description).
+  - **Tests:** `tests/test_modeled_climate.py` (heat = input × efficiency; heat pump and gas with the same heating power deliver the same heat), AppTests in `tests/apptest/test_heating_form_split_apptest.py` (metric labels and order; switch to gas keeps the heat figure, shows fuel).
+  - **Not done (optional part):** table with the annual electricity / fuel demand of every catalog variant.
+
 ### Heating system — generic heating power instead of „Nennleistung Wärmepumpe“ (2026-11-03)
 
 - [x] **Heating-system form: generic heating power instead of „Nennleistung Wärmepumpe“** `[feat]` *(dog-fooding 2026-11-03; done 2026-11-03 on `feat/heating-power`; live check by the maintainer open)*: design [heating-system-variants.md](../docs/dev/heating-system-variants.md) § Heating power. Every catalog entry stores `heating_power_kw` (thermal kW, mandatory > 0, no default) for every heat source; the loader derives the input power `nominal_power_kw = heating_power_kw / efficiency` (electric for heat pump / direct electric, the MILP power; fuel power otherwise, caps the year model), so results do not change. `min_on_quarterhours` only for electric sources.

@@ -135,11 +135,13 @@ The calculation functions (`heating_params_from_thermal`, `daily_electric_kwh`,
 `house_year_result`) already depend only on their inputs (building, heating system, climate);
 they get the resolved system passed in, the core stays unchanged.
 
-House-configurator display (**later**, backlog *Heat demand in kWh_th in the Hauskonfigurator*,
-not part of the alignment item): the heat demand in kWh_th as the main figure (nearly
-system-independent; only the power limit and storage losses depend on the system), below it
-"electricity / fuel with the installed system" as today. Optional: a small table with the annual
-demand of every catalog variant. Today only the electricity / fuel figure is shown.
+House-configurator display (**implemented 2026-11-03**, backlog *Heat demand in kWh_th in the
+Hauskonfigurator*): the heat demand in kWh_th as the main figure (nearly system-independent;
+only the power limit and storage losses depend on the system), below it "electricity / fuel
+with this heating system". The heat is the heat delivered by the heat source, input energy ×
+efficiency (`data.heating_need.daily_heat_kwh`,
+`data.modeled_climate.thermal_annual_heat_kwh_from_archive`). Not done (optional): a small
+table with the annual demand of every catalog variant.
 
 ## Heating rod with measured data
 

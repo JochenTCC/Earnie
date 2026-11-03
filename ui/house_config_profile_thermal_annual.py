@@ -214,12 +214,16 @@ def _render_heating_rod_fields(
 
 
 def _render_wp_annual_metric(item: dict, *, location: dict) -> None:
-    from data.modeled_climate import thermal_annual_kwh_from_archive
+    """Heat demand (kWh_th/a) as the main figure, below it electricity / fuel of the system."""
+    from data.modeled_climate import (
+        thermal_annual_fuel_kwh_from_archive,
+        thermal_annual_heat_kwh_from_archive,
+        thermal_annual_kwh_from_archive,
+    )
+    from house_config.heat_source import heat_source_is_electric
 
     latitude = location["latitude"]
     longitude = location["longitude"]
-    from data.modeled_climate import thermal_annual_fuel_kwh_from_archive
-    from house_config.heat_source import heat_source_is_electric
 
     thermal_preview = {**item, "latitude": latitude, "longitude": longitude}
     house_profile = {
@@ -228,16 +232,26 @@ def _render_wp_annual_metric(item: dict, *, location: dict) -> None:
         "default_pv_tilt": location["default_pv_tilt"],
         "default_pv_azimuth": location["default_pv_azimuth"],
     }
+    heat_annual, ref_year = thermal_annual_heat_kwh_from_archive(
+        thermal_preview, house_profile=house_profile
+    )
+    st.metric("Geschätzter Wärmebedarf (kWh_th/a)", f"{heat_annual:.0f}")
+    st.caption(
+        "Wärme, die das Heizsystem liefert: Raumwärme und Warmwasser abzüglich Solarthermie. "
+        "Fast unabhängig vom Heizsystem; nur Heizleistung und Speicherverlust wirken darauf."
+    )
     if heat_source_is_electric(item["heat_source"]):
-        wp_annual, ref_year = thermal_annual_kwh_from_archive(
-            thermal_preview, house_profile=house_profile
+        wp_annual, _ = thermal_annual_kwh_from_archive(
+            thermal_preview, house_profile=house_profile, reference_year=ref_year
         )
-        st.metric("Geschätzter Strombedarf Heizung (kWh/a)", f"{wp_annual:.0f}")
+        st.metric("Strombedarf mit diesem Heizsystem (kWh/a)", f"{wp_annual:.0f}")
     else:
-        fuel_annual, ref_year = thermal_annual_fuel_kwh_from_archive(
-            thermal_preview, house_profile=house_profile
+        fuel_annual, _ = thermal_annual_fuel_kwh_from_archive(
+            thermal_preview, house_profile=house_profile, reference_year=ref_year
         )
-        st.metric("Geschätzter Brennstoffbedarf (kWh/a Endenergie)", f"{fuel_annual:.0f}")
+        st.metric(
+            "Brennstoffbedarf mit diesem Heizsystem (kWh/a Endenergie)", f"{fuel_annual:.0f}"
+        )
     st.caption(
         f"Basis: Open-Meteo-Archiv {ref_year} "
         f"({latitude:.4f}°N, {longitude:.4f}°E)"

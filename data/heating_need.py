@@ -278,6 +278,17 @@ def daily_fuel_kwh(**kwargs) -> list[float]:
     return daily if fuel else [0.0] * len(daily)
 
 
+def daily_heat_kwh(**kwargs) -> list[float]:
+    """Wärme der Wärmequelle pro Kalendertag (kWh_th) = Eingangsenergie × JAZ bzw. Nutzungsgrad.
+
+    Raumwärme und Warmwasser abzüglich Solarthermie, inklusive Speicherverlust; für jede
+    Wärmequelle (elektrisch oder Brennstoff).
+    """
+    daily, _fuel = _daily_input_kwh(**kwargs)
+    efficiency = float(kwargs["heat_efficiency"])
+    return [round(value * efficiency, 3) for value in daily]
+
+
 def _daily_input_kwh(
     *,
     living_area_m2: float,
