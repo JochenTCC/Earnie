@@ -158,7 +158,11 @@ def _climate_for_temperature_chart(
         [float(v) for v in bundle.temperature_c.tolist()], hours
     )
     idx = pd.date_range(f"{year}-01-01", periods=len(ambient), freq="h")
-    hourly_temp = pd.Series(ambient, index=idx)
+    if len(bundle.temperature_c) == hours:
+        # Same object the kWh/a derivation simulates with → one shared year-model cache entry.
+        hourly_temp = bundle.temperature_c
+    else:
+        hourly_temp = pd.Series(ambient, index=idx)
     hourly_wm2 = None
     if area_m2 > 0.0 and collector is not None:
         hourly_wm2 = bundle.collector_surface_series(collector)

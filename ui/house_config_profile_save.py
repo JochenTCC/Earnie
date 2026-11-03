@@ -341,12 +341,19 @@ def _render_house_profile_save(
         )
         require_saved(saved_id)
 
+    # The Profil dropdown lists labels from disk: rerun only when the label changed
+    # (every other auto-save already rendered the new values in this run).
+    label_changed = _label_changed(label, existing)
     wrote = auto_persist(
         state_key=f"house_profile::{session_scope}::{profile_id}",
         payload=payload,
         save=_save,
         ready=ready,
+        rerun_follows=label_changed,
     )
-    # Refresh Profil dropdown labels from disk (auto-save previously skipped st.rerun).
-    if wrote:
+    if wrote and label_changed:
         st.rerun()
+
+
+def _label_changed(label: str, existing: dict) -> bool:
+    return str(label or "").strip() != str(existing.get("label") or "").strip()
