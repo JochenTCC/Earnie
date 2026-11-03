@@ -30,11 +30,17 @@ Heating systems become a catalog, following the pattern of batteries and PV syst
   `heat_source`, `nominal_power_kw`, `min_on_quarterhours`, `heat_storage` and `parts`
   (heating rod). The rule "heating rod only with heat storage" stays checkable inside one entry.
 - **Reference system:** the `thermal_annual` consumer keeps the building demand and its EHAL
-  bindings and gets a mandatory `heating_system_id`: the system actually installed (or, for a
-  new build, the system the user's `annual_kwh` refers to). Live always uses it.
+  bindings and gets a mandatory `heating_system_id`: the system the house's consumption data
+  (`annual_kwh` or measured profiles) refers to. It fixes the baseload and nothing else.
 - **Scenario selection:** `heating_system_ids: {"<consumer_id>": "<heating_system_id>"}` in the
   scenario `settings`. A consumer without an entry uses its reference system. The scenario editor
   offers a select box per `thermal_annual` consumer, as for batteries.
+- **Live scenario = actual state (decided 2026-11-03):** Live plans with the heating system of
+  the Live scenario, like its battery and tariffs; Earnie treats it as the installed system. The
+  user is responsible for keeping the Live scenario in line with the real house; choosing a new
+  system there means a new system was installed. No extra guard. The reference system on the
+  consumer may differ from it (the consumption data was recorded with the old system); the
+  baseload still comes from the reference system.
 
 ### Configuration flow
 
@@ -96,32 +102,22 @@ The heating rod is not part of the baseload calculation today (`heating_rod` app
 its consumption is in the measured total and therefore ends up in the baseload; the MILP then
 plans the rod again in the scenario and counts it twice.
 
-**Decided (2026-11-02, replaces the earlier three-step handling):** the historical rod
-consumption is measured data of the real house, not a property of a heating system. It is
-stored on the `thermal_annual` consumer, never on a catalog entry (a copy of the reference
-system in the variants editor must not carry the house's measurements along):
-
-1. **`heating_rod_profile_csv`:** hourly measured rod consumption (same CSV format as the
-   consumer `profile_csv`); subtracted hour by hour from the measured total before the
-   baseload is derived.
-2. **`heating_rod_annual_kwh`:** user-entered annual rod consumption; subtracted from the
-   baseload as a lump sum.
-3. **Neither:** a visible hint in the scenario results that the rod may be counted twice. No
-   silent correction.
-
-Both fields set → fail loud on load (no silent precedence). Either field is only allowed when
-the reference system has a `heating_rod` part. The subtraction belongs to the baseload step
-and therefore uses the reference system only, independent of the variant a scenario selects:
-a variant with a rod lets the MILP plan it afresh without a double count, a variant without a
-rod simply drops the measured rod consumption. The rod keeps no demand of its own and stays
-out of `cons_data` (as since `73461c4d`); the MILP alone decides when it runs.
+**Decided (2026-11-03, replaces the earlier handling):** no historical measured data for the
+heating rod, neither a CSV nor a user-entered annual kWh, neither on the consumer nor on a
+catalog entry. The heating system must stay freely exchangeable in the scenarios; rod
+measurements would tie the measured data to one installed system. The rod keeps no demand of
+its own and stays out of `cons_data` (as since `73461c4d`); the MILP alone decides when it
+runs. The remaining double count for a house whose real rod ran during the measured period is
+accepted and documented in the German user docs, without a runtime hint.
 
 A rod meter for Live (control, visualisation, later balancing) is a separate topic via EHAL
-fields of the `heating_rod` part (*SUSI P1 follow-up — Live control of the heating rod*); the
-SE fields above need no EHAL binding. Those bindings stay on the house consumer, not in the
-catalog entry.
+fields of the `heating_rod` part (*SUSI P1 follow-up — Live control of the heating rod*);
+those bindings stay on the house consumer, not in the catalog entry.
 
-Houses without measured data (`profile_spec`) get no double-count hint. A user-entered rod value is still subtracted from their annual baseload, because `annual_kwh` (the bill) contains the real rod as well. In hourly residual paths the annual kWh is spread evenly over the hours (implementation 2026-11-02).
+**Implementation gap:** `d5add969` still has the earlier handling (`heating_rod_profile_csv` /
+`heating_rod_annual_kwh` on the consumer, subtracted from the baseload, double-count hint) and
+rejects `heating_system_ids` in the Live scenario. Both are removed by the backlog item
+*Heating-system variants — align code with the decisions of 2026-11-03*.
 
 ## Migration
 
@@ -157,7 +153,7 @@ under `share/config/`.
   scenario editor and components pages under `docs/konfiguration/`.
 - Tests: migration step (fixtures before / after, already-migrated dm5 pack), catalog
   validation (rod without storage, unknown reference, delete guard), baseload order guard,
-  cache key, heating-rod handling 1–3 (CSV, annual kWh, hint; both set and no rod part fail
-  loud; same baseload for a variant with and without rod), rod stays out of `cons_data`,
+  cache key, rod measurement fields rejected on load, rod stays out of `cons_data`, Live plans
+  with the heating system of the Live scenario while the baseload keeps the reference system,
   Streamlit AppTest for the variants editor and the scenario select box; golden masters must stay green (the reference system reproduces today's
   results).
