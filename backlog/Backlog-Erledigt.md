@@ -2,6 +2,19 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix — Szenarien-Explorer: a scenario with a heating variant could not be left (2026-11-03)
+
+- [x] **Szenarien-Explorer: a scenario with a heating variant could not be left** *(found and fixed 2026-11-03 on `main`, `d138f7d6`; verified live by the maintainer 2026-11-03)*: with a scenario selected whose `settings.heating_system_ids` holds a variant, picking another scenario or „— neu —“ jumped back to it. The unsaved-edit check compared the saved baseline (with `heating_system_ids`) against a form snapshot without the heating picks, so the form always looked edited and the switch was held (the „Verwerfen und wechseln“ prompt was easy to miss).
+  - **Fix:** `ui/scenario_form_helpers.py::_scenario_settings_from_session` adds the picks via `ui/scenario_heating_picks.py::heating_picks_from_session` (same rule as the select box: only picks other than the reference system). AppTest `test_scenario_with_variant_switches_to_other_scenarios`.
+
+### SUSI P1 follow-up — Heating systems as scenario variants (2026-11-03)
+
+- [x] **SUSI P1 follow-up — Heating systems as scenario variants** `[feat]` *(decided 2026-10-31; done 2026-11-03 on `main`: `d5add969`, aligned in `7504cc42`, SE fixes `12f21d8a` and `d138f7d6`; verified live by the maintainer)*: design [heating-system-variants.md](../docs/dev/heating-system-variants.md). Heating systems become a catalog `heating_systems[]` in `components.json` (`heat_source`, `nominal_power_kw`, `min_on_quarterhours`, `heat_storage`, `parts`); the `thermal_annual` consumer keeps the building demand and EHAL bindings plus a mandatory `heating_system_id` (reference system = installed system, used by Live); scenarios select per consumer via `heating_system_ids` (variants only, i.e. entries that are no house's reference system). The house configurator creates and edits the reference entry in place (no inline copy); a variants editor adds further variants and shows the reference system read-only; referenced entries cannot be deleted.
+  - **Calculation rule:** baseload, house-configurator preview and over-allocation check always use the reference system; the scenario swaps only the heat load after the baseload is resolved (order-guard test); `heating_system_id` joins the `_thermal_year_profiles` cache key; measured data without a heat-pump meter subtracts the modeled reference profile (hint in the results).
+  - **Heating rod (decided 2026-11-03):** no historical measured data for the rod (neither CSV nor annual kWh); the rod keeps no demand and stays out of `cons_data`, the MILP alone plans it. A real rod that ran during the measured period is an accepted double count, documented in the German user docs, no runtime hint.
+  - **Migration:** data model 5 (2.8 unreleased), new step `dm5.heating_systems` after `dm5.heat_source`, content-based detection so dogfooding packs already on dm5 migrate too; schemas `components` / `house_profiles` / `backtesting_scenarios`, example and minimal packs, German docs `docs/konfiguration/flexible-verbraucher.md` and the scenario editor page.
+  - **Open follow-ups (stay in the backlogs):** generic heating power, heat demand in kWh_th, input lock (Backlog.md); variants editor duplicate entries and autosave, plant auto-save resets the house-profile form (Backlog-Bugfixes.md).
+
 ### Heating-system variants — alignment with the decisions of 2026-11-03 (2026-11-03)
 
 - [x] **Heating-system variants — align code with the decisions of 2026-11-03** `[feat]` *(done 2026-11-03 on `main`; follows `d5add969`, which implemented the earlier design state; 2.8 unreleased, so data model 5 is changed in place)*: design [heating-system-variants.md](../docs/dev/heating-system-variants.md) § Decision, § Configuration flow, § Heating rod with measured data and § Implementation decisions.
