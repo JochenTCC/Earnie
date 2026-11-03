@@ -178,3 +178,59 @@ def test_residual_aligns_consumer_csv_by_timestamp(tmp_path: Path) -> None:
     }
     by_c = build_modeled_hourly_kw_by_consumer(profile, hours=hours)
     assert by_c["flex_a"][0] == 1.0  # synthetic annual, not CSV 9.0
+
+
+def _fake_modeled_kw(consumer, _slot_dt, climate=None):
+    del climate
+    return {"wp": 1.0, "car": 0.5, "pool": 0.25, "herd": 0.125}[consumer["id"]]
+
+
+def _residual_profile(total: Path) -> dict:
+    day = datetime(2025, 1, 6)
+    write_canonical_hourly_csv(
+        str(total),
+        [((day + timedelta(hours=h)).strftime("%Y-%m-%d %H:%M:%S"), 3.0) for h in range(24)],
+    )
+    return {
+        "baseload_kwh": 0.0,
+        "total_profile_csv": str(total),
+        "consumers": [
+            {"id": "wp", "type": "thermal_annual"},
+            {"id": "car", "type": "ev"},
+            {"id": "pool", "type": "thermal_rc"},
+            {"id": "herd", "type": "generic", "annual_kwh": 1095.0},
+        ],
+    }
+
+
+def test_meter_residual_peels_modeled_consumers_that_are_re_added(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """Path B: a modeled heat pump / MILP-flex EV without CSV leave the residual (no double count)."""
+    from data import consumption_profiles
+    from house_config.planning_flex_overlays import meter_residual_baseload_kw
+
+    monkeypatch.setattr(consumption_profiles, "modeled_consumer_kw_at_datetime", _fake_modeled_kw)
+    profile = _residual_profile(tmp_path / "total.csv")
+    slots = [datetime(2025, 1, 6) + timedelta(hours=h) for h in range(24)]
+    residual, clipped = meter_residual_baseload_kw(profile, slots, milp_flex_ids={"car"})
+    # Non-flex thermal_rc and fixed generic without CSV are not stacked again: they stay inside.
+    assert clipped == 0
+    assert residual == [1.5] * 24
+
+
+def test_profile_spec_path_b_keeps_meter_energy_with_modeled_heat_pump(
+    tmp_path: Path, monkeypatch
+) -> None:
+    from data import consumption_profiles
+    from house_config.profile_csv_policy import se_uses_meter_residual_baseload
+    from simulation.matrix_builder import _profile_spec_baseload_kw
+
+    monkeypatch.setattr(consumption_profiles, "modeled_consumer_kw_at_datetime", _fake_modeled_kw)
+    profile = _residual_profile(tmp_path / "total.csv")
+    profile["consumers"] = profile["consumers"][:1]
+    assert se_uses_meter_residual_baseload(profile)
+    slots = [datetime(2025, 1, 6) + timedelta(hours=h) for h in range(24)]
+    baseload_kw, _clipped = _profile_spec_baseload_kw(profile, slots, None, None)
+    # Residual 2.0 + heat pump overlay 1.0 = meter 3.0 (before: 3.0 + 1.0).
+    assert baseload_kw == [3.0] * 24

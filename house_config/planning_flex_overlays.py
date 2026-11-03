@@ -286,18 +286,42 @@ def house_profile_baseload_overlay(
     return [round(g + t, 6) for g, t in zip(generic, thermal)]
 
 
+def meter_residual_peel_consumers(
+    reference_profile: dict,
+    milp_flex_ids: set[str] | None = None,
+) -> list[dict]:
+    """Consumers path B stacks on top of the residual, so the residual must not hold them.
+
+    Every CSV series (fixed overlay or MILP), every thermal_annual (thermal overlay or MILP
+    target, modeled when without CSV) and MILP-flex ev / thermal_rc without CSV (MILP target).
+    Fixed generics without CSV stay inside the residual (no overlay in path B).
+    """
+    flex = milp_flex_ids or set()
+    return [
+        consumer
+        for consumer in reference_profile.get("consumers", [])
+        if consumer_uses_profile_csv(consumer)
+        or consumer.get("type") == "thermal_annual"
+        or (
+            consumer.get("type") in ("ev", "thermal_rc")
+            and str(consumer.get("id") or "") in flex
+        )
+    ]
+
+
 def meter_residual_baseload_kw(
     house_profile: dict,
     slot_datetimes: list[datetime],
     *,
     climate: ModeledClimateContext | None = None,
+    milp_flex_ids: set[str] | None = None,
 ) -> tuple[list[float], int]:
-    """Path B: hourly residual = total_profile_csv − Σ(accounted CSV series).
+    """Path B: hourly residual = total_profile_csv − Σ(re-added consumers of the reference system).
 
-    Controllable CSVs are peeled (MILP re-adds). Known CSV peeled and re-added
-    via fixed overlay. Returns (residual_kw, clipped_hours).
+    See ``meter_residual_peel_consumers``: CSV series as measured, consumers without CSV as
+    modeled. ``milp_flex_ids`` are the MILP flex consumer ids of the run.
+    Returns (residual_kw, clipped_hours).
     """
-    from house_config.profile_csv_policy import accounted_csv_consumers
     from data.consumption_profiles import (
         csv_kw_at_datetime,
         modeled_consumer_kw_at_datetime,
@@ -312,22 +336,19 @@ def meter_residual_baseload_kw(
         profile_measured_rod_kw_at,
     )
 
-    accounted = accounted_csv_consumers(baseload_reference_profile(house_profile))
+    # Residual of the installed system: a scenario heating variant swaps only the heat load.
+    peeled = meter_residual_peel_consumers(
+        baseload_reference_profile(house_profile), milp_flex_ids
+    )
     residual: list[float] = []
     clipped = 0
     for slot_dt in slot_datetimes:
         total = float(csv_kw_at_datetime(csv_path, slot_dt) or 0.0)
-        peel = 0.0
-        for consumer in accounted:
-            if consumer_uses_profile_csv(consumer):
-                peel += float(csv_kw_at_datetime(consumer["profile_csv"], slot_dt) or 0.0)
-            else:
-                peel += float(
-                    modeled_consumer_kw_at_datetime(
-                        consumer, slot_dt, climate=climate
-                    )
-                    or 0.0
-                )
+        # modeled_consumer_kw_at_datetime returns the CSV series when use_profile_csv is set.
+        peel = sum(
+            float(modeled_consumer_kw_at_datetime(consumer, slot_dt, climate=climate) or 0.0)
+            for consumer in peeled
+        )
         value = total - peel - profile_measured_rod_kw_at(house_profile, slot_dt)
         if value < 0.0:
             clipped += 1

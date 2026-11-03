@@ -174,7 +174,7 @@ Pro Verbraucher:
 
 **Basislast im Szenario-Explorer:**
 
-- **Pfad B** (stündlicher Meter-Rest) gilt, wenn eine Gesamt-CSV vorhanden ist und alle Verbraucher der Rollen Gesteuert/Manuell eine aktive CSV haben.
+- **Pfad B** (stündlicher Meter-Rest) gilt, wenn eine Gesamt-CSV vorhanden ist und alle Verbraucher der Rollen Gesteuert/Manuell eine aktive CSV haben. Vom Gesamtverbrauch zieht Earnie jede Stunde alle Verbraucher ab, die es danach wieder als eigene Last rechnet: Verbraucher mit aktiver CSV (gemessen), die Wärmepumpe (`thermal_annual`, ohne CSV modelliert) sowie E-Auto und `thermal_rc`, wenn das MILP sie plant. Feste Verbraucher ohne CSV bleiben im Rest.
 - **Pfad A** gilt in allen anderen Fällen. Bei `baseload_distribution=monthly` verwendet er monatsweise Ist − Modellverbraucher, sonst eine flache `baseload_kwh/8760`.
 
 Die synthetische `cons_data.csv` nutzt die konfigurierte Grundlast (`baseload_kwh / 8760`). Ausnahmen: Der Szenario-Explorer läuft mit Pfad B oder mit Pfad A und Monats-Rest aus dem Hausprofil.

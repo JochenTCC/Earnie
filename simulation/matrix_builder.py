@@ -120,6 +120,7 @@ def _profile_spec_baseload_kw(
             profile,
             slot_datetimes,
             climate=climate,
+            milp_flex_ids={str(consumer["id"]) for consumer in flexible_consumers or []},
         )
         baseload_kw = [round(base + extra, 3) for base, extra in zip(residual, overlay)]
     elif se_uses_monthly_baseload(profile):
