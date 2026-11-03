@@ -438,6 +438,9 @@ def _render_reference_system_fields(
     item["heat_source"] = _render_heat_source_fields(
         thermal, index, session_scope=session_scope
     )
+    from ui.house_config_heating_change import reserve_gate_slot
+
+    reserve_gate_slot(session_scope, index)
     item["nominal_power_kw"] = float(
         labeled_number_input(
             "Nennleistung Wärmepumpe (kW, elektrisch)",

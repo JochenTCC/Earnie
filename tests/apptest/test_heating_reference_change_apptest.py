@@ -132,6 +132,37 @@ def test_measured_csv_warns_with_remove_or_keep(tmp_path) -> None:
     assert not _warnings(at)
 
 
+def _write_reference(**fields) -> None:
+    from house_config.components_store import clear_components_doc_cache
+
+    path = Path(os.environ["EARNIE_COMPONENTS_PATH"])
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    entry = next(e for e in doc["heating_systems"] if e["id"] == "heating_test_home")
+    entry.update(fields)
+    path.write_text(json.dumps(doc, ensure_ascii=False), encoding="utf-8")
+    clear_components_doc_cache()
+
+
+def test_gas_to_heat_pump_with_csv_warns(tmp_path) -> None:
+    csv_path = tmp_path / "total.csv"
+    rows = [f"2024-01-01 {h:02d}:00:00;1.5" for h in range(24)]
+    csv_path.write_text("timestamp;power_kw\n" + "\n".join(rows) + "\n", encoding="utf-8")
+    _write_house(total_profile_csv=str(csv_path))
+    _write_reference(heat_source={"type": "gas"})
+    at = _session()
+    assert at.selectbox(key=_SOURCE).value == "gas"
+    at.selectbox(key=_SOURCE).set_value("heat_pump").run(timeout=_TIMEOUT_S)
+    assert not at.exception
+    warnings = _warnings(at)
+    assert len(warnings) == 1 and "CSV-Messdaten" in warnings[0]
+    assert _reference()["heat_source"]["type"] == "gas"  # held
+    # Shown in the consumer's expander under the heat-source select box, not at the page end.
+    in_expanders = [
+        w.value for exp in at.expander for w in exp.warning if "Heizsystem geändert" in w.value
+    ]
+    assert in_expanders == warnings
+
+
 def test_heat_pump_type_and_parameters_save_without_warning() -> None:
     at = _session()
     at.selectbox(key=_WP_TYPE).set_value("erde").run(timeout=_TIMEOUT_S)

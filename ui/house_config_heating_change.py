@@ -19,6 +19,8 @@ from ui.house_config_historical_csv import session_keys
 from ui.house_config_profile_session import _SESSION_CONSUMERS_KEY, _scoped_key
 
 _ACCEPT_PREFIX = "house_heating_change_ok::"
+# Per-run container under the heat-source select box; the gate renders its warning there.
+_SLOT_PREFIX = "house_heating_change_slot::"
 # Heat-source widgets of the „Heizsystem“ section (ui/house_config_profile_thermal_annual.py).
 _HEAT_SOURCE_WIDGETS = (
     "hc_heat_source_{index}",
@@ -64,6 +66,22 @@ def _pending_change(
         profile_id=profile_id,
     )
     return changes[0] if changes else None
+
+
+def reserve_gate_slot(session_scope: str, index: int) -> None:
+    """Reserve the place for the warning right under the heat-source select box.
+
+    The gate runs after the whole form (it needs the resolved consumers); without this slot
+    the warning would appear far below the changed field and be overlooked.
+    """
+    st.session_state[f"{_SLOT_PREFIX}{session_scope}::{index}"] = st.container()
+
+
+def _take_slots(session_scope: str) -> dict[int, object]:
+    """This run's slots by consumer index; removed so no stale slot survives the run."""
+    prefix = f"{_SLOT_PREFIX}{session_scope}::"
+    keys = [key for key in st.session_state if str(key).startswith(prefix)]
+    return {int(str(key)[len(prefix):]): st.session_state.pop(key) for key in keys}
 
 
 def _accept(accept_key: str, token: str) -> None:
@@ -115,6 +133,7 @@ def render_reference_change_gate(
     from house_config.heating_systems import consumption_data_kind
 
     accept_key = _ACCEPT_PREFIX + session_scope
+    slots = _take_slots(session_scope)
     change = _pending_change(is_new=is_new, profile_id=profile_id, resolved=resolved)
     if change is None:
         st.session_state.pop(accept_key, None)
@@ -130,13 +149,20 @@ def render_reference_change_gate(
     old_label = _type_label(str(change["old_heat_source"].get("type")))
     new_label = _type_label(change["new_type"])
     index = int(change["index"])
+    # The heat-source section of the changed consumer always renders before the gate.
+    if index not in slots:
+        raise RuntimeError(
+            f"Heizsystem-Warnung: kein Platz unter der Wärmequelle von Verbraucher {index} "
+            "reserviert (reserve_gate_slot)."
+        )
+    box = slots[index]
     if kind == "csv":
-        st.warning(
+        box.warning(
             f"Heizsystem geändert ({old_label} → {new_label}), noch nicht gespeichert: Die "
             f"CSV-Messdaten des Hauses stammen vom bisherigen Heizsystem ({old_label}) und "
             "passen nicht zum neuen. Messdaten entfernen oder Heizsystem beibehalten."
         )
-        keep_col, change_col = st.columns(2)
+        keep_col, change_col = box.columns(2)
         change_col.button(
             "Messdaten entfernen",
             key=_scoped_key(session_scope, "house_heating_change_remove_csv"),
@@ -150,14 +176,14 @@ def render_reference_change_gate(
             ),
         )
     else:
-        st.warning(
+        box.warning(
             f"Heizsystem geändert ({old_label} → {new_label}), noch nicht gespeichert: Der "
             f"Jahresverbrauch ({_kwh(annual_kwh)} kWh/a) gilt für das bisherige Heizsystem "
             f"({old_label}). Jahresverbrauch oben an das neue Heizsystem anpassen und "
             "übernehmen, oder Heizsystem beibehalten. Ist der Wert schon eine Schätzung für "
             "das neue Heizsystem (z. B. Neubau), ihn unverändert übernehmen."
         )
-        keep_col, change_col = st.columns(2)
+        keep_col, change_col = box.columns(2)
         change_col.button(
             "Jahresverbrauch übernehmen",
             key=_scoped_key(session_scope, "house_heating_change_accept_annual"),
