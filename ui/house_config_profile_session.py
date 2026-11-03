@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Callable
 
 import streamlit as st
 
@@ -182,6 +183,20 @@ def _house_profiles_file_stamp() -> str:
         return f"{os.path.abspath(path)}:{os.path.getmtime(path)}"
     except OSError:
         return os.path.abspath(path)
+
+def write_house_file_outside_profile_form(write: Callable[[], None]) -> None:
+    """Run ``write`` (a house-file write that leaves every profile as it is) and keep the form.
+
+    ``_sync_profile_session`` re-seeds the profile form when the file stamp differs from
+    the session's. This session's own write must not do that, or the user's unsaved edits
+    are lost. The new stamp is recorded right after the write, with no Streamlit call in
+    between, so a stopped run cannot leave it behind. A file that already changed before
+    the write (another writer) keeps the old stamp, so the next run still re-seeds.
+    """
+    before = _house_profiles_file_stamp()
+    write()
+    if st.session_state.get(_SESSION_FILE_STAMP_KEY) == before:
+        st.session_state[_SESSION_FILE_STAMP_KEY] = _house_profiles_file_stamp()
 
 def _clear_scoped_widget_keys(session_scope: str) -> None:
     prefix = f"{session_scope}__"

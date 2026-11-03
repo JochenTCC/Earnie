@@ -6,11 +6,31 @@ import streamlit as st
 from ui.auto_persist import auto_persist
 from ui.form_layout import labeled_checkbox, labeled_number_input
 from ui.house_config_io import load_house_profiles, save_house_profiles
+from ui.house_config_profile_session import write_house_file_outside_profile_form
 
 _PLANT_EXPORT_KEY = "house_config_plant_max_export_kw"
 _PLANT_EXPORT_ENABLED_KEY = "house_config_plant_max_export_enabled"
 _PLANT_GM_AT_HOUSE_KEY = "house_config_plant_grid_meter_at_house"
 _PLANT_GM_SINGLE_TARIFF_KEY = "house_config_plant_grid_meter_single_tariff"
+
+
+def _save_plant(plant_out: dict) -> None:
+    """Write ``plant`` into the house file; no write when it equals the saved one.
+
+    Every write changes the file stamp and makes other open sessions re-seed their
+    house-profile form, so an unchanged plant is not written again.
+    """
+    from house_config.required_signal_activation import activate_plant_required
+
+    doc = dict(load_house_profiles())
+    plant = activate_plant_required(plant_out) if plant_out else None
+    if plant == doc.get("plant"):
+        return
+    if plant is None:
+        doc.pop("plant", None)
+    else:
+        doc["plant"] = plant
+    write_house_file_outside_profile_form(lambda: save_house_profiles(doc))
 
 
 def _seed_plant_export_widgets(plant: dict) -> None:
@@ -54,8 +74,6 @@ def render_plant_export_limit() -> None:
         )
 
     def _persist() -> None:
-        from house_config.required_signal_activation import activate_plant_required
-
         doc = load_house_profiles()
         plant_out = (
             dict(doc.get("plant") or {})
@@ -66,11 +84,7 @@ def render_plant_export_limit() -> None:
             plant_out["max_export_power_kw"] = round(float(max_kw), 3)
         else:
             plant_out.pop("max_export_power_kw", None)
-        if plant_out:
-            doc["plant"] = activate_plant_required(plant_out)
-        else:
-            doc.pop("plant", None)
-        save_house_profiles(doc)
+        _save_plant(plant_out)
 
     auto_persist(
         state_key="house_config_plant_export",
@@ -118,8 +132,6 @@ def render_plant_grid_meter_assertions() -> None:
     )
 
     def _persist() -> None:
-        from house_config.required_signal_activation import activate_plant_required
-
         doc = load_house_profiles()
         plant_out = (
             dict(doc.get("plant") or {})
@@ -131,8 +143,7 @@ def render_plant_grid_meter_assertions() -> None:
             "single_tariff": bool(single),
         }
         plant_out.pop("pv_covers_all_inverters", None)
-        doc["plant"] = activate_plant_required(plant_out)
-        save_house_profiles(doc)
+        _save_plant(plant_out)
 
     auto_persist(
         state_key="house_config_plant_grid_meter",
