@@ -11,6 +11,7 @@ from runtime_store.savings_ledger import (
     SKIP_NO_POWER,
     SKIP_NOT_MEAN,
     advance_slot,
+    ledger_house_kw,
     shadow_battery_params,
     slot_skip_reason,
 )
@@ -25,6 +26,7 @@ BATTERY = {
 }
 BUY = 30.0
 SELL = 8.0
+COUNTER_SOURCES = {"pv": "counter", "grid": "counter", "battery": "mean", "house": "mean"}
 
 
 def _closed(pv: float, house: float, grid: float, battery: float = 0.0, **extra) -> dict:
@@ -146,9 +148,31 @@ def test_slot_length_scales_the_soc_step():
                 1.0,
                 1.0,
                 0.0,
-                ist_power_source={"pv": "counter", "grid": "mean", "battery": "mean", "house": "mean"},
+                ist_power_source={**COUNTER_SOURCES, "battery": "counter"},
             ),
             SKIP_NOT_MEAN,
+        ),
+        (
+            _closed(
+                1.0,
+                1.0,
+                0.0,
+                ist_power_source={**COUNTER_SOURCES, "house": "counter"},
+            ),
+            SKIP_NOT_MEAN,
+        ),
+        (
+            _closed(
+                1.0,
+                1.0,
+                0.0,
+                ist_power_source={**COUNTER_SOURCES, "pv": "snapshot"},
+            ),
+            SKIP_NOT_MEAN,
+        ),
+        (
+            _closed(1.0, 1.0, 0.0, battery=None, ist_power_source=COUNTER_SOURCES),
+            SKIP_NO_POWER,
         ),
         (_closed(1.0, 1.0, 0.0, ist_power_source=None), SKIP_NOT_MEAN),
         (_closed(1.0, None, 0.0), SKIP_NO_POWER),
@@ -169,6 +193,38 @@ def test_invalid_slot_is_skipped_on_both_sides(closed, reason):
 
 def test_valid_slot_has_no_skip_reason():
     assert slot_skip_reason(_closed(1.0, 1.0, 0.0)) is None
+
+
+def test_mean_slot_keeps_the_logged_house_load():
+    # house differs from the balance on purpose: a mean slot must not be recomputed.
+    closed = _closed(pv=1.0, house=1.8, grid=1.0)
+
+    assert ledger_house_kw(closed) == 1.8
+    assert _step(closed, 10.0).import_kwh_without == pytest.approx(0.8 * 0.25)
+
+
+def test_counter_slot_counts_with_the_house_load_from_the_balance():
+    closed = _closed(pv=1.0, house=1.8, grid=1.0, battery=0.25, ist_power_source=COUNTER_SOURCES)
+
+    assert slot_skip_reason(closed) is None
+    assert ledger_house_kw(closed) == pytest.approx(2.25)
+
+
+@pytest.mark.parametrize(
+    "sources",
+    [
+        COUNTER_SOURCES,
+        {**COUNTER_SOURCES, "grid": "mean"},
+        {**COUNTER_SOURCES, "pv": "mean"},
+    ],
+)
+def test_counter_slot_has_no_phantom_saving(sources):
+    # Real battery idle, shadow battery at min_soc: both plants draw the same from the
+    # grid. The sample mean 1.8 kW does not fit the counters; booking it would show a saving.
+    slot = _step(_closed(pv=1.0, house=1.8, grid=1.0, ist_power_source=sources), 10.0)
+
+    assert slot.counted
+    assert slot.saving_eur == pytest.approx(0.0)
 
 
 def test_multi_ess_is_aggregated_like_the_baseline():

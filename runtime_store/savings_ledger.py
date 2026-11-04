@@ -28,8 +28,11 @@ from runtime_store.power_interval_sampler import MIN_SAMPLE_COUNT_FOR_MEAN
 
 SAVINGS_V = 1
 
-# Plant channels that must be slot means for a slot to count (spec § 4).
-_REQUIRED_MEAN_CHANNELS = ("pv", "grid", "battery", "house")
+# Sources a slot may have per plant channel (spec § 4): energy counters exist for pv and grid only.
+_SOURCE_MEAN = "mean"
+_SOURCE_COUNTER = "counter"
+_MEAN_OR_COUNTER_CHANNELS = ("pv", "grid")
+_MEAN_ONLY_CHANNELS = ("battery", "house")
 _REQUIRED_POWER_KEYS = ("pv_kw", "grid_kw", "house_kw")
 
 SKIP_MISSING = "missing"
@@ -61,14 +64,41 @@ class LedgerSlot:
         return self.cost_without_eur - self.cost_with_eur
 
 
+def _has_counter_source(closed: dict[str, Any]) -> bool:
+    sources = closed["ist_power_source"]
+    return any(sources[channel] == _SOURCE_COUNTER for channel in _MEAN_OR_COUNTER_CHANNELS)
+
+
+def _sources_allowed(sources: Any) -> bool:
+    if not isinstance(sources, dict):
+        return False
+    return all(
+        sources.get(channel) in (_SOURCE_MEAN, _SOURCE_COUNTER)
+        for channel in _MEAN_OR_COUNTER_CHANNELS
+    ) and all(sources.get(channel) == _SOURCE_MEAN for channel in _MEAN_ONLY_CHANNELS)
+
+
+def ledger_house_kw(closed: dict[str, Any]) -> float:
+    """House load the ledger books for a counted slot (spec § 4).
+
+    All means: the logged ``house_kw``. With an energy counter on pv or grid the logged
+    value is a sample mean that no longer fits the counter deltas, and the shadow
+    plant would see another load than the real one. The balance
+    ``pv + grid + battery`` keeps the load equal on both sides.
+    """
+    if _has_counter_source(closed):
+        return float(closed["pv_kw"]) + float(closed["grid_kw"]) + float(closed["battery_kw"])
+    return float(closed["house_kw"])
+
+
 def slot_skip_reason(closed: dict[str, Any] | None) -> str | None:
     """Why a ``closed_interval`` does not count, or ``None`` when it does.
 
     A slot counts when it is present, has at least ``MIN_SAMPLE_COUNT_FOR_MEAN``
-    samples (same bar as "Ist bisher"), all four plant channels are slot means
-    (not energy counters, which would break the ``house = pv + grid + battery``
-    balance) and pv, grid and house powers are present. A slot whose plant
-    powers all read exactly zero is a meter outage (``is_dead_telemetry_snapshot``,
+    samples (same bar as "Ist bisher"), pv and grid are slot means or energy
+    counters, battery and house are slot means, and the powers the slot needs are
+    present (``battery_kw`` too with a counter, see ``ledger_house_kw``). A slot whose
+    plant powers all read exactly zero is a meter outage (``is_dead_telemetry_snapshot``,
     as the history chart treats it) and does not count either.
     """
     if not isinstance(closed, dict) or not closed:
@@ -79,12 +109,12 @@ def slot_skip_reason(closed: dict[str, Any] | None) -> str | None:
         return SKIP_FEW_SAMPLES
     if samples < MIN_SAMPLE_COUNT_FOR_MEAN:
         return SKIP_FEW_SAMPLES
-    sources = closed.get("ist_power_source")
-    if not isinstance(sources, dict):
+    if not _sources_allowed(closed.get("ist_power_source")):
         return SKIP_NOT_MEAN
-    if any(sources.get(channel) != "mean" for channel in _REQUIRED_MEAN_CHANNELS):
-        return SKIP_NOT_MEAN
-    for key in _REQUIRED_POWER_KEYS:
+    required = _REQUIRED_POWER_KEYS
+    if _has_counter_source(closed):
+        required = (*_REQUIRED_POWER_KEYS, "battery_kw")
+    for key in required:
         value = closed.get(key)
         if value is None or isinstance(value, bool):
             return SKIP_NO_POWER
@@ -146,7 +176,7 @@ def advance_slot(
         )
     assert closed is not None
     pv_kw = float(closed["pv_kw"])
-    house_kw = float(closed["house_kw"])
+    house_kw = ledger_house_kw(closed)
     grid_kw = float(closed["grid_kw"])
     load_kw = house_kw + bat.standby_power_kw(battery_params)
     soc_next, batt_kw = bat.vendor_mode_step(
@@ -420,7 +450,7 @@ def _slot_row(inp: LedgerInput, slot: LedgerSlot, dt_h: float) -> dict[str, Any]
     }
     if slot.counted:
         closed = inp.closed or {}
-        row["house_kwh"] = float(closed["house_kw"]) * dt_h
+        row["house_kwh"] = ledger_house_kw(closed) * dt_h
         row["flex_planned_kwh"] = {
             str(cid): float(kw) * dt_h for cid, kw in (inp.planned_flex_kw or {}).items()
         }
@@ -583,5 +613,6 @@ def lifetime_summary(rows: list[dict[str, Any]], chain_start: datetime) -> dict[
         "chain_start": key,
         "days": len(chain),
         "incomplete_days": sum(1 for r in chain if r.get("incomplete")),
+        "slots_present": sum(int(r["slots_present"]) for r in chain),
         "saving_adjusted_eur": round(sum(float(r["saving_adjusted_eur"]) for r in chain), 4),
     }
