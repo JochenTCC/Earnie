@@ -82,22 +82,31 @@ flash of the plant writers that the extra rerun had been hiding.
 |---|---|
 | 0.30 s | consumer forms (F5) — widget floor, grows with consumers |
 | 0.17 s | one house RC year simulation (legitimate: Grundlast gain changed) |
-| 0.35 s | Gesamt-Lastverhalten: bundle 0.06 s, monthly chart 0.12 s, week chart 0.08 s, navigation 0.03 s, plotly serialisation |
+| 0.35 s | Gesamt-Lastverhalten: bundle 0.06 s, monthly chart 0.12 s, week chart 0.08 s, navigation 0.03 s, plotly serialisation (before O1; after O1 ≈ 0.25 s, the rest is plotly) |
 | 0.10 s | identity / heating / cooling sections, baseload preview, household reference |
+
+### O1 + O2, done (2026-11-04, same branch)
+
+| change | files | effect (section trees, same machine state) |
+|---|---|---|
+| O1 — month keys sliced from the ISO string once per bundle instead of parsed per hour and per consumer; ISO-week membership parsed once per calendar day; hourly timestamp strings formatted once per (reference year, hours) | `ui/consumption_display/aggregation.py`, `period.py`, `adapters.py` | monthly chart 0.12 s → 0.05 s; week slicing and bundle timestamps ≈ 0.05 s less |
+| O2 — `THERMAL_PARAMETERS_CACHE` keyed on the year-model parameters (`heating_params_from_thermal`) instead of the whole consumer dict | `optimizer/thermal_parameters.py` | the HK form, the saved profile and the preview carry the same building with different `label` / `id` / `ehal_bindings` / `timezone_name`; before: 3 derivations per run (each loads the climate bundle, rebuilds the parameters, copies the year result), after: 1. Misses over the harness: 27 → 9 |
+
+A/B in one time window (two runs each, example profile): edit 1.18–1.42 s → 0.95–1.18 s, warm
+rerun 0.91–1.11 s → 0.72–0.77 s. The sandbox CPU drifted by ±0.2 s between runs that day, so
+the section trees above are the reliable evidence; the totals show the direction. Tests:
+`test_house_parameters_key_ignores_fields_the_derivation_does_not_read`,
+`test_month_keys_fast_path_matches_parsing`, `test_indices_in_iso_week_window_match_hourly_parsing`.
+
+The O2 described originally (one `consumer_annual_kwh` call passed down instead of two call
+sites) is *not* worth doing: with the shared key the second site is a cache hit, and the title
+needs the number before the widgets render either way.
 
 ## 4. Further options
 
-Ordered by value per risk. O1–O3 are local optimisations; O4–O6 change *when* things are
-computed and need the validity concept in section 5.
+Ordered by value per risk. O3 is a local optimisation; O4–O6 change *when* things are computed
+and need the validity concept in section 5.
 
-- **O1 — vectorise the chart aggregation** (`monthly_kwh_from_series`, `indices_in_window`):
-  numpy on the 8760-vectors instead of `parse_timestamp` per hour. ≈ 0.15 s per run, no
-  behaviour change.
-- **O2 — avoid the year simulation for the expander title** when only the title needs it:
-  `_consumer_expander_title` calls `consumer_annual_kwh` for „Haus Wärme“, which runs the full
-  RC year. The number is the same the baseload preview needs a few lines later, so one call,
-  passed down, instead of two call sites (today the second is a cache hit, but every miss is paid
-  before the first widget of the consumer renders).
 - **O3 — seed the auto-persist fingerprint from disk** on first render (F7): no write and no
   rerun on open. Needs a check that the first save is not relied on to normalise old files.
 - **O4 — `st.fragment` for „Gesamt-Lastverhalten“**: the section becomes its own fragment that

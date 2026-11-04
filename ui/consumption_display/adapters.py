@@ -1,6 +1,7 @@
 """Datenadapter für die drei Verbrauchs-UI-Modi."""
 from __future__ import annotations
 
+import functools
 from dataclasses import replace
 
 import pandas as pd
@@ -363,12 +364,17 @@ def _consumer_labels_from_profile(profile: dict) -> dict[str, str]:
 
 
 def _hourly_timestamps(hours: int) -> list[str]:
-    from datetime import timedelta
-
     from data.consumption_profiles import modeled_profile_ref_start
 
-    start = modeled_profile_ref_start()
-    return [
+    return list(_hourly_timestamps_from(modeled_profile_ref_start(), hours))
+
+
+@functools.lru_cache(maxsize=4)
+def _hourly_timestamps_from(start, hours: int) -> tuple[str, ...]:
+    """Formatted once per (reference year, hours): every bundle build reuses it."""
+    from datetime import timedelta
+
+    return tuple(
         (start + timedelta(hours=index)).strftime("%Y-%m-%d %H:%M:%S")
         for index in range(hours)
-    ]
+    )

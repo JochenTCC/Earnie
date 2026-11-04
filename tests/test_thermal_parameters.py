@@ -178,3 +178,37 @@ def test_live_store_plan_uses_parameter_h(mock_readings, monkeypatch):
     assert seen["house_profile"] is profile
     # Same parameter key as baseload: consumer-level WP kW copied onto thermal.
     assert seen["thermal"]["nominal_power_kw"] == 1.9
+
+
+def test_house_parameters_key_ignores_fields_the_derivation_does_not_read(monkeypatch):
+    """HK form, saved profile and Live pass the same building with different ``label`` /
+    ``id`` / ``ehal_bindings`` / ``timezone_name``: one derivation, not three."""
+    import data.modeled_climate as modeled_climate
+
+    install_open_meteo_climate_mock(monkeypatch)
+    calls = {"n": 0}
+    original = modeled_climate.build_open_meteo_climate_bundle_for_year
+
+    def _count(*args, **kwargs):
+        calls["n"] += 1
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(modeled_climate, "build_open_meteo_climate_bundle_for_year", _count)
+    first = house_thermal_parameters(_thermal(), reference_year=2024)
+    second = house_thermal_parameters(
+        _thermal(
+            id="wp_heating",
+            label="Wärmepumpe",
+            type="thermal_annual",
+            ehal_bindings={"heatpump.wp.sens_power_act": ""},
+            use_profile_csv=False,
+            profile_csv="",
+        ),
+        reference_year=2024,
+    )
+    assert second == first
+    assert calls["n"] == 1
+    # A field the simulation reads still misses.
+    third = house_thermal_parameters(_thermal(living_area_m2=130.0), reference_year=2024)
+    assert third != first
+    assert calls["n"] == 2
