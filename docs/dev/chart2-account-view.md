@@ -54,7 +54,7 @@ The panel only checks that both sides were computed with the same consumption; i
 - **Data.** Left of *Jetzt*: optimized = logged `house_kw`, baseline = the same logged `house_kw`. Right of *Jetzt*: the plan's `hourly_optimized_consumption_kwh` and `hourly_matched_baseline_consumption_kwh`, the same costed series as the money panel.
 - **Limit of the check.** In `savings_v: 1` the shadow reuses the logged load, so the line is flat left of *Jetzt* by construction. Only the part right of *Jetzt* can reveal a real mismatch.
 - **No standby option.** The shadow plant's cost includes `standby_power_kw` (`savings-ledger.md` § 3), but this panel leaves it out and offers no switch: it would only add a steady drift that says nothing about consumption, and it proved confusing in the prototype.
-- **Experiment.** The prototype can show the derivative instead: mean power per bucket, and a cost rate in €/h for the money side. Neither is part of this design unless the maintainer decides so.
+- **Rejected.** Showing the derivative instead (mean power, and a cost rate in €/h on the money side) was tried in the prototype and did not help.
 
 ## 6. Open
 
