@@ -49,6 +49,7 @@ def auto_persist(
     save: Callable[[], Any],
     ready: bool = True,
     success_caption: str = "Gespeichert",
+    rerun_follows: bool = True,
 ) -> bool:
     """
     Persist ``payload`` when it differs from the last saved fingerprint.
@@ -59,7 +60,10 @@ def auto_persist(
     skips writes without crashing.
 
     Success captions survive one ``st.rerun()`` via a session flash key so
-    callers that rerun after write still show ``Gespeichert``.
+    callers that rerun after write still show ``Gespeichert``. A caller that does
+    **not** rerun after the write passes ``rerun_follows=False``: the caption is
+    shown in this run only, and no flash is left for the next run (which may be
+    a different user action, e.g. a rejected edit).
     """
     flash_key = f"_auto_persist_flash::{state_key}"
     pending_flash = st.session_state.pop(flash_key, None)
@@ -89,6 +93,7 @@ def auto_persist(
         return False
     st.session_state[last_key] = fingerprint
     # Flash for post-rerun; caption now for callers that do not rerun.
-    st.session_state[flash_key] = success_caption
+    if rerun_follows:
+        st.session_state[flash_key] = success_caption
     st.caption(success_caption)
     return True

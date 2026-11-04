@@ -113,3 +113,34 @@ def test_auto_persist_flash_survives_simulated_rerun(monkeypatch):
     assert calls == [1]
     assert captions == ["Gespeichert"]
     assert "_auto_persist_flash::battery" not in session
+
+
+def test_auto_persist_without_rerun_leaves_no_flash(monkeypatch, tmp_path):
+    """``rerun_follows=False``: caption now, no flash that a later run would pop."""
+    session: dict = {}
+    captions: list[str] = []
+    monkeypatch.setenv("EARNIE_CONFIG_PATH", str(tmp_path / "config"))
+    monkeypatch.delenv("EARNIE_SHADOW", raising=False)
+    monkeypatch.setattr(ap.st, "session_state", session)
+    monkeypatch.setattr(ap.st, "caption", lambda msg: captions.append(msg))
+
+    wrote = ap.auto_persist(
+        state_key="house_profile::x",
+        payload={"annual_kwh": 1.0},
+        save=lambda: None,
+        rerun_follows=False,
+    )
+    assert wrote is True
+    assert captions == ["Gespeichert"]
+    assert "_auto_persist_flash::house_profile::x" not in session
+
+    # The next run (a different user action) must not show a stale „Gespeichert“.
+    captions.clear()
+    wrote2 = ap.auto_persist(
+        state_key="house_profile::x",
+        payload={"annual_kwh": 1.0},
+        save=lambda: None,
+        rerun_follows=False,
+    )
+    assert wrote2 is False
+    assert captions == []
