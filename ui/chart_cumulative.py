@@ -506,7 +506,7 @@ def add_achieved_savings_trace(
     axis: ChartSlotAxis,
     achieved_savings_cumulative_euro: list[float],
 ) -> None:
-    """Plan-based Ersparnis bisher (gray/history only; NaN gaps stop the line)."""
+    """Ersparnis bisher from the savings ledger (gray only; NaN stops the line)."""
     if not achieved_savings_cumulative_euro:
         return
     length = len(axis.starts)

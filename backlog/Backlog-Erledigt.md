@@ -2,6 +2,15 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Ledger P7 — Chart 2 grey zone from the ledger, chart back on (2026-11-04)
+
+- [x] **Ledger P7 — Chart 2 grey zone from the ledger, chart back on** `[feat]`: spec [`docs/dev/savings-ledger.md`](../docs/dev/savings-ledger.md) § 5.
+  - "Ersparnis bisher" = cumulated `cost_without − cost_with` of the open SA-day's ledger slots (`ui/chart_ledger_savings.py`); the SoC correction is a label next to it, as its change against the previous day. The UI reads the files without touching them (`savings_ledger_store.peek_state`): moving an unreadable state aside stays the daemon's call.
+  - The slot-0 plan path is removed (`_overlay_history_plan_costs`, `_slot_plan_increments_from_snapshots`, `slot_planned_*`, `achieved_savings_cumulative_euro`). On a running day BL Ziel, Optimiert and "Ersparnis erwartet" therefore cover the rest of the day. An elapsed day shows only its ledger row (line for the open day only, closed days have no slot series).
+  - Chart 2 is on by default: `chart2_enabled()`, `EARNIE_UI_CHART2`, its test and the env row in `betrieb.md` are gone. Without a usable ledger there is no savings line and a short hint below the chart, no zero line.
+  - Annotation sign follows the spec: "Ersparnis" = BL Ziel − Optimiert, positive = saved and green. It was Optimiert − BL Ziel, the opposite of the ledger line; this also changes the sign in the Scenario Explorer.
+  - Tests: `tests/test_chart_ledger_savings.py`, `tests/apptest/test_chart2_ledger_apptest.py`, `tests/test_chart_day_costs.py`. Docs: `docs/ui/charts.md` § Chart 2.
+
 ### Cycle recorder tests and dev image workflow (2026-11-04)
 
 - [x] **`tests/test_cycle_recorder.py`: three tests failed from 2026-11-04 on, on every machine** *(fixed 2026-11-04)*: the tests recorded a cycle dated `2026-10-28`, and `finish_cycle` → `prune_old_segments()` deleted that segment relative to the real clock. They now derive the cycle date from `now()`; assertions unchanged.
@@ -151,6 +160,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
   - **Done run (dry run) on the maintainer's plant:** `--since 2026-07-01` finds no log data before 2026-09-16 (one rotated month file); 46 SA-days to 2026-11-01, 10 incomplete, lifetime −2.63 € at path efficiency 0.94. Results and notes in the private repo.
   - **Hand check of the 2026-11-01 SA-day** (full coverage): the row is consistent with its slots: saving −0.60 €, SoC correction +0.15 € (actual 15 % vs shadow 5 % at the day end), adjusted −0.45 €. The loss comes from two grid-charging cycles of the real battery (08–15 h at 37.5–40.8 ct → discharge 16–20 h at 42–44 ct; 23–05 h at ~36 ct → discharge 06–07 h at 44–48 ct) while the shadow battery sat at its minimum; spreads of 5–8 ct do not cover the round-trip loss at ~37 ct. The earlier expectation "35 ct → 48 ct shows as a saving" was wrong: 48 ct only occurred in the last hour with 0.2 kWh discharged. Follow-up in "Battery efficiency calibration from the log".
   - **Not written yet:** production runs 2.7.0 without ledger code; the live ledger is kept by the 2.8 Shadow instance (P5). Its own history gives the same chain start and the same 2026-11-01 row (46 SA-days, 11 incomplete, −3.02 €). `--rebuild` into the Shadow runtime runs after the P5 live check with the Shadow container stopped, and again into production at the 2.8 deploy (tracker). The CLI's daemon guard only checks this machine's own runtime folder, not a `--runtime-dir` on a share.
+  - **Note (2026-11-04):** `--rebuild` ran on the Shadow runtime at path efficiency 0.94: 48 SA-days from 2026-09-16, 11 incomplete, 0 errors, adjusted −4.23 €. The daemon continues the chain (first booked slot reproduced exactly at 0.94). The CLI takes the battery from the local config, the daemon from its own, so both must give the same path efficiency. Production is still at 0.912 (decision: 0.94 for the ledger); its `--rebuild` follows at the 2.8 deploy.
 
 ### Release image without dev-only replay and Shadow code (2026-11-02)
 

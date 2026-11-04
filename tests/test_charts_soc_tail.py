@@ -485,7 +485,7 @@ def test_cost_summary_annotations_include_totals_and_savings_sign():
     assert len(annotations) == 3
     assert annotations[0]["text"] == "BL Ziel: 12.34 €"
     assert annotations[1]["text"] == "Optimiert: 11.50 €"
-    assert annotations[2]["text"] == "Ersparnis: -0.84 €"
+    assert annotations[2]["text"] == "Ersparnis: +0.84 €"
     assert annotations[2]["font"]["color"] == COLOR_COST_SAVINGS
     assert annotations[0]["xref"] == "paper"
     assert annotations[0]["xanchor"] == "left"

@@ -59,10 +59,6 @@ class ChartHistoryResult:
     window_start: datetime
     window_end_exclusive: datetime
     slot_deviation_events: tuple[tuple[Any, ...], ...] = ()
-    # Plan costs/savings from each hour's savings_snapshot[0] (for Chart 2 Ersparnis bisher)
-    slot_planned_matched_cost_euro: tuple[float, ...] = ()
-    slot_planned_optimized_cost_euro: tuple[float, ...] = ()
-    slot_planned_savings_euro: tuple[float, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -197,72 +193,6 @@ def _snapshot_entry_for_hour(
     return entry
 
 
-# First release whose MILP matrix (and so every savings_snapshot list) is quarter-hourly.
-# Logs from 1.98–2.4 hold hourly lists (≤ 50 entries), 2.5.0+ quarter-hour lists (≥ 97).
-_QUARTER_HOUR_SNAPSHOT_SINCE = (2, 5)
-
-
-def _snapshot_is_hourly(entry: dict[str, Any]) -> bool:
-    """True for log entries written by an app version with an hourly MILP matrix.
-
-    Entries without ``written_by_app_version`` come from the current writer (every
-    production entry since 1.98 carries the field) and are quarter-hourly.
-    """
-    version = str(entry.get("written_by_app_version") or "").strip()
-    if not version:
-        return False
-    head = version.split("-", 1)[0].split(".")
-    try:
-        major_minor = (int(head[0]), int(head[1]))
-    except (IndexError, ValueError) as exc:
-        raise ValueError(
-            f"optimization_history: unreadable written_by_app_version {version!r}"
-        ) from exc
-    return major_minor < _QUARTER_HOUR_SNAPSHOT_SINCE
-
-
-def _snapshot_first_value(entry: dict[str, Any], snapshot_key: str) -> float:
-    snapshot = _entry_savings_snapshot(entry)
-    assert snapshot is not None
-    values = snapshot.get(snapshot_key) or []
-    return float(values[0]) if values else 0.0
-
-
-def _slot_plan_increments_from_snapshots(
-    by_slot: dict[datetime, dict[str, Any]],
-    slot_starts: list[datetime] | tuple[datetime, ...],
-    snapshot_key: str,
-) -> tuple[float, ...]:
-    """Planned slot-0 value of the cycle that ran in each quarter-hour slot.
-
-    Quarter-hour snapshots (2.5.0+): slot ``i`` takes ``savings_snapshot[key][0]`` of the
-    log entry of exactly that slot, so the sum over the slots equals the sum over the
-    cycles. Hourly snapshots (before 2.5.0): ``[key][0]`` covers a whole clock hour; the
-    last entry of the hour is spread evenly over that hour's slots.
-    """
-    from collections import defaultdict
-
-    from data.planning_window import normalize_hour_slot
-
-    out = [0.0] * len(slot_starts)
-    hour_indices: dict[datetime, list[int]] = defaultdict(list)
-    for index, slot in enumerate(slot_starts):
-        hour_indices[normalize_hour_slot(slot)].append(index)
-        entry = by_slot.get(_coerce_slot_start(slot))
-        if entry is None or _entry_savings_snapshot(entry) is None:
-            continue
-        if not _snapshot_is_hourly(entry):
-            out[index] = _snapshot_first_value(entry, snapshot_key)
-    for hour_start, indices in hour_indices.items():
-        entry = _snapshot_entry_for_hour(by_slot, hour_start)
-        if entry is None or not _snapshot_is_hourly(entry):
-            continue
-        share = _snapshot_first_value(entry, snapshot_key) / len(indices)
-        for index in indices:
-            out[index] = share
-    return tuple(out)
-
-
 def _projected_hourly_savings_from_slots(
     by_slot: dict[datetime, dict[str, Any]],
     slot_starts: list[datetime],
@@ -353,9 +283,7 @@ def _empty_chart_history(
 def _chart_history_cost_metrics(
     rows: list[dict[str, Any]],
     qualities: tuple[str, ...],
-    by_slot: dict,
-    slot_starts: tuple[datetime, ...],
-) -> tuple[list[float], list[float], tuple[float, ...], tuple[float, ...], tuple[float, ...]]:
+) -> tuple[list[float], list[float]]:
     sell_price_cent = config.get_push_price_cent()
     slot_costs = [
         0.0 if quality == SLOT_MISSING else _slot_cost_euro(row, sell_price_cent)
@@ -365,16 +293,7 @@ def _chart_history_cost_metrics(
         0.0 if quality == SLOT_MISSING else _slot_consumption_kwh(row)
         for row, quality in zip(rows, qualities)
     ]
-    planned_matched = _slot_plan_increments_from_snapshots(
-        by_slot, slot_starts, "hourly_matched_baseline_cost_euro"
-    )
-    planned_optimized = _slot_plan_increments_from_snapshots(
-        by_slot, slot_starts, "hourly_optimized_cost_euro"
-    )
-    planned_savings = _slot_plan_increments_from_snapshots(
-        by_slot, slot_starts, "hourly_savings_euro"
-    )
-    return slot_costs, slot_kwh, planned_matched, planned_optimized, planned_savings
+    return slot_costs, slot_kwh
 
 
 def build_chart_history(
@@ -406,9 +325,7 @@ def build_chart_history(
         qualities,
         closed_by_interval=closed_by,
     )
-    slot_costs, slot_kwh, planned_matched, planned_optimized, planned_savings = (
-        _chart_history_cost_metrics(rows, qualities, by_slot, slot_starts)
-    )
+    slot_costs, slot_kwh = _chart_history_cost_metrics(rows, qualities)
     return ChartHistoryResult(
         rows=rows,
         slot_starts=slot_starts,
@@ -423,9 +340,6 @@ def build_chart_history(
         window_start=window_start,
         window_end_exclusive=window_end_exclusive,
         slot_deviation_events=deviation_events,
-        slot_planned_matched_cost_euro=planned_matched,
-        slot_planned_optimized_cost_euro=planned_optimized,
-        slot_planned_savings_euro=planned_savings,
     )
 
 

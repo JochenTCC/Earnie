@@ -1,4 +1,4 @@
-"""Ledger P1: Chart 2 maps quarter-hour plan values per exact slot (Σ chart = Σ snapshot)."""
+"""Ledger P1: Chart 2 maps quarter-hour plan values per exact slot."""
 
 from __future__ import annotations
 
@@ -8,8 +8,6 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from data.planning_window import compute_ui_chart_window
-from runtime_store.history_chart_rows import _coerce_slot_start
-from runtime_store.history_timeline import _slot_plan_increments_from_snapshots
 from ui.chart_context import align_hourly_increments_to_display_slots
 
 TZ = "Europe/Vienna"
@@ -62,56 +60,3 @@ def test_quarter_matrix_does_not_spread_the_full_hour_row():
     increments = align_hourly_increments_to_display_slots(values, matrix, _chart(), slots)
 
     assert increments == pytest.approx([2.0, 0.0, 0.0, 0.0])
-
-
-def _log_entry(version: str, **lists: list[float]) -> dict:
-    return {"written_by_app_version": version, "savings_snapshot": dict(lists)}
-
-
-def test_history_quarter_snapshots_take_slot_zero_of_each_cycle():
-    slots = [_dt(10, 0) + QUARTER * index for index in range(8)]
-    cycle_values = [0.11, 0.12, 0.13, 0.14, -0.2, 0.0, 0.3, 0.05]
-    by_slot = {
-        _coerce_slot_start(slot): _log_entry(
-            "2.7.0-beta.3", hourly_savings_euro=[value, 9.0, 9.0]
-        )
-        for slot, value in zip(slots, cycle_values)
-    }
-
-    planned = _slot_plan_increments_from_snapshots(by_slot, slots, "hourly_savings_euro")
-
-    assert planned == pytest.approx(cycle_values)
-    assert sum(planned) == pytest.approx(sum(cycle_values))
-
-
-def test_history_quarter_snapshot_missing_cycle_leaves_slot_empty():
-    slots = [_dt(10, 0) + QUARTER * index for index in range(4)]
-    by_slot = {
-        _coerce_slot_start(slots[0]): _log_entry("2.7.0", hourly_savings_euro=[0.4]),
-        _coerce_slot_start(slots[2]): _log_entry("2.7.0", hourly_savings_euro=[0.2]),
-    }
-
-    planned = _slot_plan_increments_from_snapshots(by_slot, slots, "hourly_savings_euro")
-
-    assert planned == pytest.approx([0.4, 0.0, 0.2, 0.0])
-
-
-def test_history_hourly_snapshots_before_2_5_spread_over_the_hour():
-    slots = [_dt(10, 0) + QUARTER * index for index in range(4)]
-    by_slot = {
-        _coerce_slot_start(slots[1]): _log_entry("2.4.0", hourly_savings_euro=[0.8]),
-        _coerce_slot_start(slots[3]): _log_entry("2.4.0", hourly_savings_euro=[1.2]),
-    }
-
-    planned = _slot_plan_increments_from_snapshots(by_slot, slots, "hourly_savings_euro")
-
-    # last entry of the hour carries the hour's value
-    assert planned == pytest.approx([0.3, 0.3, 0.3, 0.3])
-
-
-def test_history_unreadable_version_fails_loud():
-    slot = _dt(10, 0)
-    by_slot = {_coerce_slot_start(slot): _log_entry("x.y", hourly_savings_euro=[0.1])}
-
-    with pytest.raises(ValueError, match="written_by_app_version"):
-        _slot_plan_increments_from_snapshots(by_slot, [slot], "hourly_savings_euro")

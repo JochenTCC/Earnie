@@ -23,14 +23,10 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 
 - **Epic Ledger — realised savings from logged actuals (savings ledger)** *(design 2026-11-02; Chart 2 hidden in 2.7, archive: [Backlog-Erledigt.md](Backlog-Erledigt.md) "Chart 2 hidden for the 2.7 release")*: spec [`docs/dev/savings-ledger.md`](../docs/dev/savings-ledger.md). Replaces the plan-vs-plan "Ersparnis bisher" of Chart 2 with a per-SA-day ledger built from `closed_interval` actuals: shadow plant with the same load, PV and prices, battery in vendor mode on one continuous SoC chain, SoC value correction at every day close. Each phase below is sized for **one chat session** and ends with green tests and a commit.
-  - **Order:** P1–P6 are done (archive). P7 → P8 is the feature chain; P0 (method decisions) is done, see the spec § 9. P9–P10 (`savings_v: 2`) are optional and start only after P8 has run live for a while.
+  - **Order:** P1–P7 are done (archive). P8 is the rest of the feature chain; P0 (method decisions) is done, see the spec § 9. P9–P10 (`savings_v: 2`) are optional and start only after P8 has run live for a while.
   - **Note:** usage-ping schema v3 and the `earnie-server` KPI (spec § 6, WP 6–7) stay under **Version 2.+1** "Simple Savings KPI" until the privacy decision; they read the lifetime figure that P4 writes.
 
-- [ ] **Ledger P7 — Chart 2 grey zone from the ledger, chart back on** `[feat]` *(1 session, after P5)*: "Ersparnis bisher" = cumulated `cost_without − cost_with` of the open SA-day's ledger slots, SoC correction as the last point or a label; the slot-0 plan-difference path (`_overlay_history_plan_costs`, savings use of `_slot_plan_increments_from_snapshots`) is removed. Chart 2 is shown again by default: remove `ui/live_mode.py::chart2_enabled()`, the `EARNIE_UI_CHART2` flag and its test, and the env row in `betrieb.md`.
-  - **Tests:** AppTest of the Monitor with a ledger state fixture; without ledger state the chart shows "Ist bisher" without a savings trace and a short hint instead of a zero line.
-  - **Docs:** `docs/ui/charts.md` § Chart 2 (German) describes the new grey zone and drops the "ausgeblendet" note.
-
-- [ ] **Ledger P8 — Cockpit KPI and method note** `[feat]` *(1 session, after P5; best after P6)*: cockpit tile "Mit Earnie gespart: X € seit <date> (<n> Tage)" from the ledger lifetime total, help text with the counterfactual of spec § 3; incomplete days (coverage < 0.8) are counted and named in the help text and marked "unvollständig" in the day view.
+- [ ] **Ledger P8 — Cockpit KPI and method note** `[feat]` *(1 session)*: cockpit tile "Mit Earnie gespart: X € seit <date> (<n> Tage)" from the ledger lifetime total, help text with the counterfactual of spec § 3; incomplete days (coverage < 0.8) are counted and named in the help text and marked "unvollständig" in the day view.
   - **Docs:** German method note in the user manual (one sentence: gleicher Verbrauch, gleiche PV, Batterie im Herstellermodus, gleiche Preise; plus the v1 limits: flex timing as logged; powerstation supply is not valued, their charging counts at its actual time), `.github/release-notes/UNRELEASED.md` entry (Chart 2 is back with realised savings).
   - **Done:** tile and Chart 2 agree on the current SA-day; spec status set to "implemented (v1)".
 

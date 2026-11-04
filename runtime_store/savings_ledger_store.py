@@ -87,6 +87,28 @@ def load_state(path: str | None = None, *, now: datetime | None = None) -> Loade
         return LoadedState(None, CHAIN_STATE_UNREADABLE)
 
 
+def peek_state(path: str | None = None) -> LoadedState:
+    """Read the state without touching the file, for readers other than the daemon.
+
+    Same reasons as :func:`load_state`, but an unreadable file stays in place: moving
+    it aside starts a new chain, and that is the daemon's call alone.
+    """
+    path = path or savings_ledger_state_file()
+    if not os.path.isfile(path):
+        return LoadedState(None, CHAIN_FIRST_RUN)
+    try:
+        with open(path, encoding="utf-8") as handle:
+            raw = json.load(handle)
+        if not isinstance(raw, dict):
+            raise ValueError("state root must be an object")
+        if int(raw.get("savings_v", -1)) != SAVINGS_V:
+            return LoadedState(None, CHAIN_SAVINGS_V_CHANGED)
+        return LoadedState(LedgerState.from_dict(raw), None)
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        logger.warning("savings ledger: state unreadable (%s).", exc)
+        return LoadedState(None, CHAIN_STATE_UNREADABLE)
+
+
 def save_state(state: LedgerState, path: str | None = None) -> None:
     """Write the state atomically (temp file + ``os.replace``)."""
     path = path or savings_ledger_state_file()

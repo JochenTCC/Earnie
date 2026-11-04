@@ -21,6 +21,7 @@ from data.planning_window import (
     ui_chart_zones,
 )
 from runtime_store import optimization_history
+from ui.chart_ledger_savings import load_ledger_chart_savings
 from optimizer.deviation_eval import DeviationEvent
 from optimizer.deviation_timeline import empty_deviation_series
 from runtime_store.history_timeline import (
@@ -585,40 +586,16 @@ def build_display_savings_series(
         view[key] = align_hourly_increments_to_display_slots(
             values, matrix, chart, slots
         )
-    _overlay_history_plan_costs(view, display_ctx)
     actual_cost, actual_kwh = _actual_slot_increments(display_ctx)
     view["slot_actual_cost_euro"] = actual_cost
     view["slot_actual_consumption_kwh"] = actual_kwh
-    return view
-
-
-def _overlay_history_plan_costs(
-    view: dict,
-    display_ctx: ChartDisplayContext,
-) -> None:
-    """Replace gray-zone MILP fills with planned costs from the productivity log.
-
-    Current MILP only covers now→SA₂; history slots would otherwise stay 0.0 and
-    Chart 2 **Ersparnis bisher** would always read 0.
-    """
-    history = display_ctx.history_result
-    hist = display_ctx.history_slot_count
-    if history is None or hist <= 0:
-        return
-    mapping = (
-        ("hourly_matched_baseline_cost_euro", history.slot_planned_matched_cost_euro),
-        ("hourly_optimized_cost_euro", history.slot_planned_optimized_cost_euro),
-        ("hourly_savings_euro", history.slot_planned_savings_euro),
+    view["ledger_savings"] = load_ledger_chart_savings(
+        slots,
+        display_ctx.history_slot_count,
+        window_start=chart.start,
+        window_end=chart.end,
     )
-    for key, planned in mapping:
-        if not planned:
-            continue
-        series = view.get(key)
-        if not series:
-            continue
-        limit = min(hist, len(series), len(planned))
-        for index in range(limit):
-            series[index] = float(planned[index])
+    return view
 
 
 def align_hourly_values_to_chart_slots(

@@ -43,7 +43,7 @@ class _CumulativeSeries:
     optimized_consumption_kwh: list[float] | None
     actual_cost_euro: list[float] | None
     actual_consumption_kwh: list[float] | None
-    savings_euro: list[float] | None
+    ledger_savings: dict | None
     history_slot_count: int | None
 
     @property
@@ -75,7 +75,6 @@ def _add_s2_split_traces(
     df: pd.DataFrame,
     axis: ChartSlotAxis,
     series: _CumulativeSeries,
-    chart_window: UiChartWindow | None,
 ) -> None:
     add_cumulative_s2_split_traces(
         fig,
@@ -89,19 +88,10 @@ def _add_s2_split_traces(
         hourly_matched_baseline_consumption_kwh=series.matched_consumption_kwh or [],
         hourly_optimized_consumption_kwh=series.optimized_consumption_kwh or [],
     )
-    if not series.savings_euro or chart_window is None:
-        return
-    from ui.chart_day_costs import achieved_savings_cumulative_euro
-
-    achieved = achieved_savings_cumulative_euro(
-        list(axis.starts),
-        series.savings_euro,
-        history_slot_count=series.history_slot_count,
-        sa0=chart_window.sa0,
-        sa1=chart_window.sa1,
-        sa2=chart_window.sa2,
-    )
-    add_achieved_savings_trace(fig, df["Uhrzeit"], axis, achieved)
+    if series.ledger_savings:
+        add_achieved_savings_trace(
+            fig, df["Uhrzeit"], axis, series.ledger_savings["cumulative_euro"]
+        )
 
 
 def _add_cumulative_traces(
@@ -109,11 +99,10 @@ def _add_cumulative_traces(
     df: pd.DataFrame,
     axis: ChartSlotAxis,
     series: _CumulativeSeries,
-    chart_window: UiChartWindow | None,
 ) -> None:
     extrap_start, extrap_end = _extrapolation_bounds(df)
     if series.split_mode:
-        _add_s2_split_traces(fig, df, axis, series, chart_window)
+        _add_s2_split_traces(fig, df, axis, series)
         return
     if series.show_costs:
         add_cumulative_cost_traces(
@@ -185,6 +174,10 @@ def _render_cumulative_figure(
         plotly_kwargs["key"] = chart_key
     st.plotly_chart(fig, **plotly_kwargs)
     render_collapsible_legend_from_figure(fig)
+    if series.split_mode:
+        hint = (series.ledger_savings or {}).get("hint")
+        if hint:
+            st.caption(hint)
 
 
 def render_cumulative_cost_chart(
@@ -197,7 +190,7 @@ def render_cumulative_cost_chart(
     matched_baseline_cost_euro: float | None = None,
     optimized_cost_euro: float | None = None,
     cost_summary_days=None,
-    hourly_savings_euro: list[float] | None = None,
+    ledger_savings: dict | None = None,
     chart_window: UiChartWindow | None = None,
     chart_now: datetime | None = None,
     chart_zones=None,
@@ -214,7 +207,7 @@ def render_cumulative_cost_chart(
         optimized_consumption_kwh=hourly_optimized_consumption_kwh,
         actual_cost_euro=slot_actual_cost_euro,
         actual_consumption_kwh=slot_actual_consumption_kwh,
-        savings_euro=hourly_savings_euro,
+        ledger_savings=ledger_savings,
         history_slot_count=history_slot_count,
     )
     axis = ChartSlotAxis.from_dataframe(df)
@@ -223,7 +216,7 @@ def render_cumulative_cost_chart(
     if chart_zones is not None:
         _add_zone_backgrounds(fig, chart_zones, axis, range_start=range_start)
     _add_missing_slot_backgrounds(fig, axis, slot_qualities)
-    _add_cumulative_traces(fig, df, axis, series, chart_window)
+    _add_cumulative_traces(fig, df, axis, series)
 
     show_cost_summary = bool(cost_summary_days) or (
         series.show_costs
@@ -257,7 +250,7 @@ def render_price_savings_chart(
     matched_baseline_cost_euro: float | None = None,
     optimized_cost_euro: float | None = None,
     cost_summary_days=None,
-    hourly_savings_euro: list[float] | None = None,
+    ledger_savings: dict | None = None,
     chart_window: UiChartWindow | None = None,
     chart_now: datetime | None = None,
     chart_zones=None,
@@ -277,7 +270,7 @@ def render_price_savings_chart(
         matched_baseline_cost_euro=matched_baseline_cost_euro,
         optimized_cost_euro=optimized_cost_euro,
         cost_summary_days=cost_summary_days,
-        hourly_savings_euro=hourly_savings_euro,
+        ledger_savings=ledger_savings,
         chart_window=chart_window,
         chart_now=chart_now,
         chart_zones=chart_zones,

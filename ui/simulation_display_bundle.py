@@ -273,6 +273,7 @@ def _resolve_bundle_headers(
             view.get("hourly_matched_baseline_cost_euro") or [],
             view.get("hourly_optimized_cost_euro") or [],
             history_slot_count=int(history_slot_count or 0),
+            ledger=view.get("ledger_savings"),
         )
         if len(cost_summary_days) == 1:
             matched_cost = cost_summary_days[0].matched_baseline_cost_euro

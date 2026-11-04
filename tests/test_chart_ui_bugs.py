@@ -579,8 +579,8 @@ def test_chart2_s2_split_mode_shows_cost_summary_annotations(monkeypatch):
         label="SA₀→SA₁ · 15.06.",
         matched_baseline_cost_euro=2.50,
         optimized_cost_euro=1.80,
-        achieved_matched_cost_euro=0.90,
-        achieved_optimized_cost_euro=0.60,
+        achieved_saving_euro=0.30,
+        achieved_soc_correction_euro=-0.05,
         show_split_savings=True,
     )
     render_cumulative_cost_chart(
@@ -589,7 +589,10 @@ def test_chart2_s2_split_mode_shows_cost_summary_annotations(monkeypatch):
         hourly_optimized_cost_euro=[0.08] * slot_count,
         hourly_matched_baseline_consumption_kwh=[0.5] * slot_count,
         hourly_optimized_consumption_kwh=[0.45] * slot_count,
-        hourly_savings_euro=[0.02] * slot_count,
+        ledger_savings={
+            "cumulative_euro": [0.1, 0.2, 0.3] + [float("nan")] * (slot_count - 3),
+            "hint": None,
+        },
         cost_summary_days=(day,),
         history_slot_count=history_slot_count,
         slot_actual_cost_euro=[0.05] * history_slot_count,

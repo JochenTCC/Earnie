@@ -1,4 +1,4 @@
-"""SA-day cost KPI totals and plan-based achieved-savings series for Chart 2."""
+"""SA-day cost KPI totals for Chart 2."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -6,35 +6,32 @@ from datetime import datetime
 from typing import Sequence
 
 from data.planning_window import UiChartWindow
+from ui.chart_ledger_savings import ledger_figures_for_day
 
 
 @dataclass(frozen=True)
 class DayCostTotals:
     """BL/Optimiert/Ersparnis for one sunrise→sunrise day in the visible window.
 
-    When ``show_split_savings`` is True (running day with gray history), annotations
-    show both achieved (SA→now) and expected full-day savings (through day end).
+    ``savings_euro`` is positive when the plan is cheaper than BL Ziel. On a running
+    day (``show_split_savings``) the plan values cover the rest of the day, and the
+    realised part comes from the savings ledger. A fully elapsed day
+    (``history_only``) has no plan values, only its ledger figure.
     """
 
     label: str
     matched_baseline_cost_euro: float
     optimized_cost_euro: float
-    achieved_matched_cost_euro: float | None = None
-    achieved_optimized_cost_euro: float | None = None
     show_split_savings: bool = False
+    history_only: bool = False
+    achieved_saving_euro: float | None = None
+    achieved_soc_correction_euro: float | None = None
+    closed_saving_euro: float | None = None
+    closed_incomplete: bool = False
 
     @property
     def savings_euro(self) -> float:
-        return self.optimized_cost_euro - self.matched_baseline_cost_euro
-
-    @property
-    def achieved_savings_euro(self) -> float | None:
-        if (
-            self.achieved_matched_cost_euro is None
-            or self.achieved_optimized_cost_euro is None
-        ):
-            return None
-        return self.achieved_optimized_cost_euro - self.achieved_matched_cost_euro
+        return self.matched_baseline_cost_euro - self.optimized_cost_euro
 
 
 def _day_label(day_start: datetime, segment_tag: str) -> str:
@@ -104,19 +101,27 @@ def _build_day_totals(
     label: str,
     matched: float,
     optimized: float,
-    achieved_matched: float | None,
-    achieved_optimized: float | None,
+    day_start: datetime,
     day_slots: int,
     history_in_day: int,
+    ledger: dict | None,
 ) -> DayCostTotals:
     running = day_slots > 0 and 0 < history_in_day < day_slots
+    history_only = day_slots > 0 and history_in_day == day_slots
+    figures = ledger_figures_for_day(ledger, day_start)
+    closed_saving = figures["closed_saving_euro"]
+    if history_only and figures["saving_euro"] is not None:
+        closed_saving = figures["saving_euro"] + figures["soc_correction_euro"]
     return DayCostTotals(
         label=label,
         matched_baseline_cost_euro=matched,
         optimized_cost_euro=optimized,
-        achieved_matched_cost_euro=achieved_matched if running else None,
-        achieved_optimized_cost_euro=achieved_optimized if running else None,
         show_split_savings=running,
+        history_only=history_only,
+        achieved_saving_euro=figures["saving_euro"] if running else None,
+        achieved_soc_correction_euro=figures["soc_correction_euro"] if running else None,
+        closed_saving_euro=closed_saving if history_only else None,
+        closed_incomplete=bool(figures["incomplete"]) if history_only else False,
     )
 
 
@@ -125,6 +130,7 @@ def _segment_day_totals(
     hourly_matched: Sequence[float],
     hourly_optimized: Sequence[float],
     hist: int,
+    ledger: dict | None,
 ) -> DayCostTotals:
     """Totals for a single SA segment (whole series belongs to one day)."""
     tag = "SA₀→SA₁" if chart.segment_index == 0 else "SA₁→SA₂"
@@ -132,19 +138,14 @@ def _segment_day_totals(
     limit = min(
         len(chart.slot_datetimes), len(hourly_matched), len(hourly_optimized)
     )
-    hist_end = min(hist, limit)
     return _build_day_totals(
         label=_day_label(day_start, tag),
         matched=sum(float(hourly_matched[i] or 0.0) for i in range(limit)),
         optimized=sum(float(hourly_optimized[i] or 0.0) for i in range(limit)),
-        achieved_matched=sum(
-            float(hourly_matched[i] or 0.0) for i in range(hist_end)
-        ),
-        achieved_optimized=sum(
-            float(hourly_optimized[i] or 0.0) for i in range(hist_end)
-        ),
+        day_start=day_start,
         day_slots=limit,
-        history_in_day=hist_end,
+        history_in_day=min(hist, limit),
+        ledger=ledger,
     )
 
 
@@ -154,6 +155,7 @@ def _full_span_day_totals(
     hourly_optimized: Sequence[float],
     hist: int,
     day: tuple[int, str, datetime],
+    ledger: dict | None,
 ) -> DayCostTotals:
     """Totals for one SA-day of a full SA₀→SA₂ span."""
     day_index, tag, day_start = day
@@ -166,14 +168,6 @@ def _full_span_day_totals(
         day_index=day_index,
         **bounds,
     )
-    achieved_matched, achieved_optimized = _sum_hourly_for_day(
-        slots,
-        hourly_matched,
-        hourly_optimized,
-        day_index=day_index,
-        index_end=hist,
-        **bounds,
-    )
     day_slots, history_in_day = _day_slot_counts(
         slots,
         day_index=day_index,
@@ -184,10 +178,10 @@ def _full_span_day_totals(
         label=_day_label(day_start, tag),
         matched=matched,
         optimized=optimized,
-        achieved_matched=achieved_matched,
-        achieved_optimized=achieved_optimized,
+        day_start=day_start,
         day_slots=day_slots,
         history_in_day=history_in_day,
+        ledger=ledger,
     )
 
 
@@ -197,48 +191,19 @@ def day_cost_totals_for_chart(
     hourly_optimized: Sequence[float],
     *,
     history_slot_count: int = 0,
+    ledger: dict | None = None,
 ) -> tuple[DayCostTotals, ...]:
-    """Sum aligned hourly costs per SA-day; one day on segment, two on full span.
+    """Sum aligned plan costs per SA-day; one day on segment, two on full span.
 
-    On a partially elapsed (running) day, sets ``show_split_savings`` with achieved
-    totals for history slots so annotations can show bisher vs erwartet.
+    ``ledger`` is ``savings_view["ledger_savings"]``; it supplies the realised savings
+    of a running or fully elapsed day.
     """
     if not chart.slot_datetimes or not hourly_matched or not hourly_optimized:
         return ()
     hist = max(0, int(history_slot_count))
     if chart.span != "full":
-        return (_segment_day_totals(chart, hourly_matched, hourly_optimized, hist),)
+        return (_segment_day_totals(chart, hourly_matched, hourly_optimized, hist, ledger),)
     return tuple(
-        _full_span_day_totals(chart, hourly_matched, hourly_optimized, hist, day)
+        _full_span_day_totals(chart, hourly_matched, hourly_optimized, hist, day, ledger)
         for day in ((0, "SA₀→SA₁", chart.sa0), (1, "SA₁→SA₂", chart.sa1))
     )
-
-
-def achieved_savings_cumulative_euro(
-    slot_starts: Sequence[datetime],
-    hourly_savings: Sequence[float],
-    *,
-    history_slot_count: int,
-    sa0: datetime,
-    sa1: datetime,
-    sa2: datetime,
-) -> list[float]:
-    """Plan-based cumsum of hourly_savings in gray/history only; reset at SA₁.
-
-    Values outside the history region are NaN so the trace stops at the gray boundary.
-    Positive increment = Optimiert günstiger als BL Ziel (same as hourly_savings_euro).
-    """
-    length = len(slot_starts)
-    series = [float("nan")] * length
-    if history_slot_count <= 0 or length == 0 or not hourly_savings:
-        return series
-
-    day_running = [0.0, 0.0]
-    hist_end = min(history_slot_count, length, len(hourly_savings))
-    for index in range(hist_end):
-        day_index = _slot_day_index(slot_starts[index], sa0, sa1, sa2)
-        if day_index is None:
-            continue
-        day_running[day_index] += float(hourly_savings[index] or 0.0)
-        series[index] = day_running[day_index]
-    return series

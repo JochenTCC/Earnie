@@ -148,18 +148,16 @@ Die kompakten Buttons stehen in einer Zeile **ohne** Fließtext dazwischen (mobi
 
 ## Chart 2: Kumulierte Kosten & Verbrauch
 
-> **In Version 2.7 ausgeblendet.** Die Ersparniswerte dieses Charts sind nicht belastbar (Vergleichslauf startet je Zyklus vom Ist-SoC, Stundenraster auf Viertelstunden-Matrix). Im Monitor erscheint das Chart nur mit `EARNIE_UI_CHART2=1` (Entwicklung). Der Szenario-Explorer ist nicht betroffen. Korrigierte Fassung mit realisierter Ersparnis aus Ist-Daten: Version 2.8, Entwurf `docs/dev/savings-ledger.md`.
-
 **Überschrift** mit **?** (Ist vs. Prognose, orange Lücken). Im Sunset-2-Sunset-Fenster sind Ist und Prognose getrennte Kurven:
 
 | Bereich | Kurven |
 |---------|--------|
-| Grau (Log) | **Ist bisher:** kumuliert aus dem Produktiv-Log. **Ersparnis bisher:** geplante Differenz BL−Opt der abgelaufenen Slots (pro SA-Tag, Neustart bei SA₁). |
+| Grau (Log) | **Ist bisher:** kumuliert aus dem Produktiv-Log. **Ersparnis bisher:** aus dem Ersparnis-Buch: Kosten ohne Earnie minus Ist-Kosten der gebuchten Slots des laufenden SA-Tags. Positiv heißt gespart. Ohne Buch fehlt die Linie, und unter dem Chart steht ein kurzer Hinweis. |
 | Neutral/Grün | **Prognose:** BL Ziel / optimiert ab der Log-Grenze (an die Ist-Kurve angeschlossen) |
 
 Fehlende Log-Slots sind orange markiert; die Ist-Kurven haben dort Lücken.
 
-Die Kennzahlen **BL Ziel** und **Optimiert** (Annotationen) beziehen sich **pro SA-Tag**: mobil nur auf den sichtbaren Tag, am Desktop (SA₀→SA₂) auf zwei Spalten (SA₀→SA₁ | SA₁→SA₂). Am **laufenden Tag** kommen **Ersparnis bisher** (SA bis Jetzt, geplante Differenz der abgelaufenen Slots) und **Ersparnis erwartet** (ganzer SA-Tag bis SA₁ bzw. SA₂) hinzu. Der MILP-Matching-Horizont (Jetzt → SA₂) bleibt davon unberührt, siehe [Energievergleich](#expander-energievergleich-baseline-vs-optimierung). Linienfarben: `_HSL_COST_*` in `ui/chart_colors.py`.
+Die Kennzahlen stehen **pro SA-Tag** im Chart: mobil nur für den sichtbaren Tag, am Desktop (SA₀→SA₂) in zwei Spalten (SA₀→SA₁ | SA₁→SA₂). Am **laufenden Tag** gelten **BL Ziel**, **Optimiert** und **Ersparnis erwartet** für den Rest des Tages; **Ersparnis bisher** kommt aus dem Ersparnis-Buch und nennt zusätzlich die **SoC-Korrektur** (Unterschied im Speicherstand gegenüber der Vergleichsbatterie, bewertet zum mittleren Bezugspreis). **Abgelaufene Tage** zeigen nur das Ergebnis aus dem Buch, ohne Linie und ohne Planwerte; Tage mit weniger als 80 % gebuchten Slots sind als „unvollständig“ markiert. Bei allen Ersparnis-Werten heißt ein positiver Betrag gespart.
 
 ## Expander: Simulations-Details
 

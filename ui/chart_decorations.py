@@ -59,12 +59,14 @@ _CHART2_S2_TITLE = "Kumulierte Kosten & Verbrauch (Sonnenaufgang→Sonnenaufgang
 
 _CHART2_S2_HELP = (
     "Grauer Bereich: **Ist bisher** (blau, kumuliert aus Produktiv-Log) und "
-    "**Ersparnis bisher** (geplante BL−Opt-Differenz der abgelaufenen Slots, "
-    "pro SA-Tag). Neutral/Grün: **Prognose** (BL Ziel / optimiert, an Ist an der "
-    "Log-Grenze angeschlossen). Kennzahlen BL Ziel / Optimiert: **pro SA-Tag** "
-    "(Mobil: sichtbarer Tag; Desktop SA₀→SA₂: zwei Spalten). Am laufenden Tag "
-    "zusätzlich **Ersparnis bisher** (SA→Jetzt) und **Ersparnis erwartet** "
-    "(ganzer SA-Tag). Fehlende Log-Slots: orange, Lücken in Ist-Kurven."
+    "**Ersparnis bisher** (aus dem Ersparnis-Buch: Kosten ohne Earnie minus Ist-Kosten "
+    "des laufenden SA-Tags). Neutral/Grün: **Prognose** (BL Ziel / optimiert, an Ist "
+    "an der Log-Grenze angeschlossen). Kennzahlen **pro SA-Tag** (Mobil: sichtbarer "
+    "Tag; Desktop SA₀→SA₂: zwei Spalten). Am laufenden Tag gelten BL Ziel, Optimiert "
+    "und **Ersparnis erwartet** für den Rest des Tages; **Ersparnis bisher** nennt "
+    "zusätzlich die SoC-Korrektur (Unterschied im Speicherstand, bewertet). "
+    "Abgelaufene Tage zeigen nur das Ergebnis aus dem Buch. "
+    "Fehlende Log-Slots: orange, Lücken in Ist-Kurven."
 )
 
 
@@ -326,9 +328,9 @@ _COST_SUMMARY_COLUMN_X = (0.01, 0.52)
 
 
 def _savings_annotation_color(savings_euro: float) -> str:
-    if savings_euro < 0:
-        return COLOR_COST_SAVINGS
     if savings_euro > 0:
+        return COLOR_COST_SAVINGS
+    if savings_euro < 0:
         return COLOR_COST_SAVINGS_NEGATIVE
     return COLOR_COST_BASELINE
 
@@ -391,6 +393,13 @@ def _cost_summary_head_lines(
     return lines, line_index
 
 
+def _achieved_savings_text(saving_euro: float, soc_correction_euro: float | None) -> str:
+    text = f"Ersparnis bisher: {saving_euro:+.2f} €"
+    if soc_correction_euro is not None:
+        text += f" · SoC-Korrektur {soc_correction_euro:+.2f} €"
+    return text
+
+
 def _append_cost_summary_savings(
     lines: list[dict],
     base: dict,
@@ -398,49 +407,42 @@ def _append_cost_summary_savings(
     *,
     line_index: int,
     savings_euro: float,
-    achieved_savings_euro: float | None,
+    show_split_savings: bool,
+    achieved_saving_euro: float | None,
+    achieved_soc_correction_euro: float | None,
 ) -> None:
-    """Single Ersparnis row, or bisher + erwartet when an achieved value is given."""
-    if achieved_savings_euro is not None:
-        line_index = _append_summary_line(
-            lines,
-            base,
-            summary_font,
-            text=f"Ersparnis bisher: {achieved_savings_euro:+.2f} €",
-            line_index=line_index,
-            color=_savings_annotation_color(achieved_savings_euro),
-        )
+    """Ersparnis row; on a running day bisher (if the ledger has it) + erwartet."""
+    if not show_split_savings:
         _append_summary_line(
             lines,
             base,
             summary_font,
-            text=f"Ersparnis erwartet: {savings_euro:+.2f} €",
+            text=f"Ersparnis: {savings_euro:+.2f} €",
             line_index=line_index,
             color=_savings_annotation_color(savings_euro),
         )
         return
+    if achieved_saving_euro is not None:
+        line_index = _append_summary_line(
+            lines,
+            base,
+            summary_font,
+            text=_achieved_savings_text(achieved_saving_euro, achieved_soc_correction_euro),
+            line_index=line_index,
+            color=_savings_annotation_color(achieved_saving_euro),
+        )
     _append_summary_line(
         lines,
         base,
         summary_font,
-        text=f"Ersparnis: {savings_euro:+.2f} €",
+        text=f"Ersparnis erwartet: {savings_euro:+.2f} €",
         line_index=line_index,
         color=_savings_annotation_color(savings_euro),
     )
 
 
-def _cost_summary_column_annotations(
-    matched_baseline_cost_euro: float,
-    optimized_cost_euro: float,
-    *,
-    x: float = 0.01,
-    label: str | None = None,
-    achieved_savings_euro: float | None = None,
-    show_split_savings: bool = False,
-) -> list[dict]:
-    """One KPI column (optional day label + BL / Optimiert / Ersparnis)."""
-    summary_font = dict(size=_COST_SUMMARY_FONT_SIZE)
-    base = dict(
+def _cost_summary_base(x: float, summary_font: dict) -> dict:
+    return dict(
         xref="paper",
         yref="y domain",
         x=x,
@@ -450,6 +452,21 @@ def _cost_summary_column_annotations(
         yanchor="top",
         font=summary_font,
     )
+
+
+def _cost_summary_column_annotations(
+    matched_baseline_cost_euro: float,
+    optimized_cost_euro: float,
+    *,
+    x: float = 0.01,
+    label: str | None = None,
+    show_split_savings: bool = False,
+    achieved_saving_euro: float | None = None,
+    achieved_soc_correction_euro: float | None = None,
+) -> list[dict]:
+    """One KPI column (optional day label + BL / Optimiert / Ersparnis)."""
+    summary_font = dict(size=_COST_SUMMARY_FONT_SIZE)
+    base = _cost_summary_base(x, summary_font)
     lines, line_index = _cost_summary_head_lines(
         base,
         summary_font,
@@ -462,11 +479,39 @@ def _cost_summary_column_annotations(
         base,
         summary_font,
         line_index=line_index,
-        savings_euro=optimized_cost_euro - matched_baseline_cost_euro,
-        achieved_savings_euro=(
-            achieved_savings_euro if show_split_savings else None
-        ),
+        savings_euro=matched_baseline_cost_euro - optimized_cost_euro,
+        show_split_savings=show_split_savings,
+        achieved_saving_euro=achieved_saving_euro,
+        achieved_soc_correction_euro=achieved_soc_correction_euro,
     )
+    return lines
+
+
+def _history_day_annotations(day, *, x: float, label: str | None) -> list[dict]:
+    """Fully elapsed SA-day: no plan values, only the ledger result."""
+    summary_font = dict(size=_COST_SUMMARY_FONT_SIZE)
+    base = _cost_summary_base(x, summary_font)
+    lines: list[dict] = []
+    line_index = 0
+    if label:
+        line_index = _append_summary_line(
+            lines,
+            base,
+            summary_font,
+            text=label,
+            line_index=line_index,
+            color=COLOR_COST_BASELINE,
+        )
+    if day.closed_saving_euro is not None:
+        suffix = " (unvollständig)" if day.closed_incomplete else ""
+        _append_summary_line(
+            lines,
+            base,
+            summary_font,
+            text=f"Ersparnis: {day.closed_saving_euro:+.2f} €{suffix}",
+            line_index=line_index,
+            color=_savings_annotation_color(day.closed_saving_euro),
+        )
     return lines
 
 
@@ -481,14 +526,19 @@ def _cost_summary_annotations(
         annotations: list[dict] = []
         for index, day in enumerate(days[:2]):
             x = _COST_SUMMARY_COLUMN_X[min(index, len(_COST_SUMMARY_COLUMN_X) - 1)]
+            label = day.label if len(days) > 1 else None
+            if day.history_only:
+                annotations.extend(_history_day_annotations(day, x=x, label=label))
+                continue
             annotations.extend(
                 _cost_summary_column_annotations(
                     day.matched_baseline_cost_euro,
                     day.optimized_cost_euro,
                     x=x,
-                    label=day.label if len(days) > 1 else None,
-                    achieved_savings_euro=day.achieved_savings_euro,
+                    label=label,
                     show_split_savings=bool(day.show_split_savings),
+                    achieved_saving_euro=day.achieved_saving_euro,
+                    achieved_soc_correction_euro=day.achieved_soc_correction_euro,
                 )
             )
         return annotations
