@@ -353,18 +353,19 @@ def test_finish_stores_push_reads_and_active_reserves(tmp_path, monkeypatch):
 
     _cfg(tmp_path, monkeypatch)
     inbox.reset_memory_for_tests()
+    now = datetime.now().replace(microsecond=0)
     token = cycle_recorder.begin_cycle(
         optimization_matrix=_sample_matrix(),
         planning_window=_sample_window(),
         soc_percent=50.0,
-        timestamp=datetime(2026, 10, 30, 12, 55, 9),
+        timestamp=now,
     )
     inbox.read_push_value("evcs.e_auto.sens_evcs_connected")
     reserves = [{"powerstation_id": "virtual_gs", "state": "charging", "refill_kwh": 0.38}]
     cycle_recorder.record_active_reserves(token, reserves)
     cycle_recorder.finish_cycle(token, mode=1, target_power_kw=4.979, battery_plan_kw=4.979)
     entry = cycle_recorder.read_segment_cycles(
-        cycle_recorder.segment_path_for_day(datetime(2026, 10, 30).date())
+        cycle_recorder.segment_path_for_day(now.date())
     )[0]
     push_reads = entry["start_state"]["push_reads"]
     assert "evcs.e_auto.sens_evcs_connected" in push_reads["value"]
@@ -377,11 +378,12 @@ def test_record_active_reserves_ignores_missing_token():
 
 def test_finish_stores_export_and_ess_limits(tmp_path, monkeypatch):
     _cfg(tmp_path, monkeypatch)
+    now = datetime.now().replace(microsecond=0)
     token = cycle_recorder.begin_cycle(
         optimization_matrix=_sample_matrix(),
         planning_window=_sample_window(),
         soc_percent=50.0,
-        timestamp=datetime(2026, 10, 31, 14, 14, 52),
+        timestamp=now,
     )
     cycle_recorder.record_ess_limits(
         token,
@@ -401,7 +403,7 @@ def test_finish_stores_export_and_ess_limits(tmp_path, monkeypatch):
     )
     cycle_recorder.finish_cycle(token, mode=2, target_power_kw=0.0, battery_plan_kw=0.0)
     entry = cycle_recorder.read_segment_cycles(
-        cycle_recorder.segment_path_for_day(datetime(2026, 10, 31).date())
+        cycle_recorder.segment_path_for_day(now.date())
     )[0]
     assert entry["start_state"]["ess_limits"] == {
         "home": {
