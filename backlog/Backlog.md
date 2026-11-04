@@ -44,6 +44,23 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 - [ ] **Ledger P10 — `savings_v: 2` for EV sessions and consumers without own meter** `[feat]` *(optional, 1 session, after P9; needs a decision first)*: counterfactual "charge immediately on plug-in" for EV sessions (deadline-bound), and a rule for consumers whose Ist comes from `live_snapshot` without a per-consumer meter (spec § 7 "Open").
 
+- **Epic Account view — Chart 2 as an account view** *(design 2026-11-04, follows Ledger P7)*: spec [`docs/dev/chart2-account-view.md`](../docs/dev/chart2-account-view.md). Replaces the former Chart 2 presentation: baseline and optimized as balance lines over the whole window (falling = paying), meeting at *Jetzt* by default, with a switch to a common start; below it a consumption control showing baseline minus optimized, zero at the horizon end. Each phase is sized for **one chat session** and ends with green tests and a commit.
+  - **Order:** P1 → P2 → P3; P4 is optional.
+  - **Note:** the prototype with the accepted presentation lives outside the repo because it reads private data; the spec is the reference.
+  - **Note:** Ledger P9 "Chart 1 baseline from the shadow chain" would start the forecast baseline from the shadow SoC. Spec § 4 ("the baseline changes its definition at *Jetzt*") and the help text must then be revisited.
+
+- [ ] **Account view P1 — Slot series of closed SA-days** `[feat]` *(1 session)*: the ledger keeps slot rows only for the open day (`savings_ledger_state.json`). Persist them per closed SA-day in a slot file next to `savings_ledger.jsonl` (cost with and without, counted flag, house energy), written at the day close, plus a backfill from `optimization_history.jsonl` through the existing engine so that old days are covered. The chart never replays the log.
+  - **Tests:** the sum of a closed day's slots equals its ledger row; backfill and daemon write the same rows; a missing or broken slot file fails loud (`no-implicit-fallbacks.mdc`).
+
+- [ ] **Account view P2 — Monitor shows the account view** `[feat]` *(1 session, after P1)*: two SA-days (last closed, open, plan up to the horizon end). Money panel with anchoring switch "Ist bei Jetzt" / "Gemeinsamer Start", gap colouring and labels, SoC correction as its own label, skipped slots orange; consumption control below with zero at the horizon end and no absolute energies, no standby option. Remove the former traces and the annotations with the old sign. Mobile and paging: the anchor is *Jetzt*, clamped to the window. Decide spec § 6 "Plan energy difference".
+  - **Tests:** both anchor modes differ by the saving so far; the lines meet at *Jetzt*; consumption gap is zero at the horizon end and flat left of *Jetzt*; window fully in the past; AppTest for the switch state (`streamlit-ui-state.mdc`).
+  - **Docs:** `docs/ui/charts.md` § Chart 2 (German), **?** help text with the baseline's change of definition at *Jetzt*, `.github/release-notes/UNRELEASED.md`.
+
+- [ ] **Account view P3 — Longer periods on the analysis page** `[feat]` *(1 session, after P2)*: same presentation on "Analyse Verbrauch & Kosten" (`ui/pages/page_consumer_analysis.py`) with selectable periods. Decide spec § 6 "Long windows" (gap panel, since the total cost dominates the scale) and "Axis label".
+  - **Docs:** German user manual section of the analysis page.
+
+- [ ] **Account view P4 — Budget** `[feat]` *(optional, after P2)*: the user sets an amount for electricity, the axis shows what is left. First decide the budget's period and whether falling below 0 € is flagged (spec § 6).
+
 - **Epic RuleRef — SE reference ladder with standard rules** *(design 2026-11-03)*: spec [`docs/dev/rule-based-reference.md`](../docs/dev/rule-based-reference.md). Today's SE reference "ohne Optimierung" books `load − PV` without battery or flex control (`simulation/anchor_step.py::_hour_cost_parts_without_optimization`), so SE savings credit Earnie with the inverter's self-consumption benefit and with everything free rules achieve. New ladder: L0 no control (today) → L1 battery in vendor mode → L2 standard rules (evcc PV charging, SG-Ready / P75 price lock, HA cheapest hours) → L3 Earnie. L2 becomes the headline reference; same flex energy per window and consumer as L3, one continuous SoC chain. Basis for the Earnie Points strategy and subscription price studies. Each phase is sized for **one chat session** and ends with green tests and a commit.
   - **Order:** P0 → P1 → P2 → P3 → P4; P5 can start after P3. Run P0 before the Points / pricing studies.
   - **Note:** aligning the live ledger's counterfactual with L2 (`savings_v: 2`) is a separate decision under **Ledger P9–P10**, not part of this epic.
