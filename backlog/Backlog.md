@@ -46,7 +46,6 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 - **Epic Account view — Chart 2 as an account view** *(design 2026-11-04, follows Ledger P7)*: spec [`docs/dev/chart2-account-view.md`](../docs/dev/chart2-account-view.md). Replaces the former Chart 2 presentation: baseline and optimized as balance lines over the whole window (falling = paying), meeting at *Jetzt* by default, with a switch to a common start; below it a consumption control showing baseline minus optimized, zero at the horizon end. Each phase is sized for **one chat session** and ends with green tests and a commit.
   - **Order:** P1 → P2 → P3; P4 is optional.
-  - **Note:** the prototype with the accepted presentation lives outside the repo because it reads private data; the spec is the reference.
   - **Note:** Ledger P9 "Chart 1 baseline from the shadow chain" would start the forecast baseline from the shadow SoC. Spec § 4 ("the baseline changes its definition at *Jetzt*") and the help text must then be revisited.
 
 - [ ] **Account view P1 — Slot series of closed SA-days** `[feat]` *(1 session)*: the ledger keeps slot rows only for the open day (`savings_ledger_state.json`). Persist them per closed SA-day in a slot file next to `savings_ledger.jsonl` (cost with and without, counted flag, house energy), written at the day close, plus a backfill from `optimization_history.jsonl` through the existing engine so that old days are covered. The chart never replays the log.
