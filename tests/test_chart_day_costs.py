@@ -72,6 +72,21 @@ def test_day_cost_totals_running_day_takes_bisher_from_the_ledger():
     assert not any(t.startswith("Ergebnis:") for t in texts)
 
 
+def test_day_that_has_not_started_is_labelled_plan():
+    now = _dt(2026, 6, 15, 14, 0)
+    anchors = compute_sunrise_anchors(now, LAT, LON, TZ)
+    chart = compute_ui_s2_chart_window(anchors, segment_index=0, span="segment")
+    n = len(chart.slot_datetimes)
+    days = day_cost_totals_for_chart(
+        chart, [1.0] * n, [0.4] * n, history_slot_count=0, ledger=_ledger(chart.sa0 + timedelta(days=3))
+    )
+
+    texts = [ann["text"] for ann in _cost_summary_annotations(days=days)]
+
+    assert any(t.startswith("Plan: ") and t.endswith(" € gespart") for t in texts)
+    assert not any(t.startswith(("Ergebnis:", "Bisher:", "Erwartet:")) for t in texts)
+
+
 def test_day_cost_totals_running_day_without_ledger_shows_only_erwartet():
     now = _dt(2026, 6, 15, 14, 0)
     anchors = compute_sunrise_anchors(now, LAT, LON, TZ)

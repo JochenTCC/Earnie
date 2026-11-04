@@ -389,7 +389,10 @@ def _live_optimization_chart1_fragment(current_soc: float) -> None:
 
 @st.fragment(run_every=CHARTS_FRAGMENT_RUN_EVERY)
 def _live_optimization_chart2_fragment() -> None:
-    render_ledger_kpi(live_now())
     bundle = st.session_state.get(SESSION_LIVE_DISPLAY_BUNDLE)
+    # The running day's figures are the ones Chart 2 draws below.
+    render_ledger_kpi(
+        live_now(), bundle.savings_view.get("ledger_savings") if bundle is not None else None
+    )
     if bundle is not None:
         render_optimization_chart2(bundle)

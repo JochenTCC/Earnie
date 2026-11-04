@@ -1,8 +1,9 @@
 """Monitor tile "Mit Earnie gespart" from the savings ledger (spec ``docs/dev/savings-ledger.md`` § 5).
 
-The main figure is the lifetime total of the closed SA-days of the chain. The running
-day stays apart ("Heute bisher") with the same figures as Chart 2, because its SoC
-correction is provisional until the day closes.
+The main figure is the lifetime total of the closed SA-days of the chain, read from the
+ledger files. The running day stays apart ("Heute bisher"), because its SoC correction
+is provisional until the day closes. Its figures come from the dict Chart 2 draws
+(``savings_view["ledger_savings"]``), so both show the same values of the same moment.
 
 Reads only: the daemon owns the ledger files (``savings_ledger_store.peek_state``).
 """
@@ -18,7 +19,6 @@ import streamlit as st
 import config
 from runtime_store import savings_ledger as sl
 from runtime_store import savings_ledger_store as store
-from ui.chart_ledger_savings import open_day_figures
 from ui.saving_text import euro_amount, saving_is_loss, saving_text, soc_correction_text
 
 logger = logging.getLogger(__name__)
@@ -47,8 +47,6 @@ class LedgerKpi:
     days: int
     incomplete_days: int
     total_euro: float | None
-    today_saving_euro: float | None
-    today_correction_euro: float | None
 
 
 @dataclass(frozen=True)
@@ -59,33 +57,20 @@ class LedgerKpiNotice:
     is_warning: bool = False
 
 
-def build_ledger_kpi(
-    state: sl.LedgerState,
-    battery_params: dict,
-    rows: Sequence[dict[str, Any]],
-    *,
-    now: datetime,
-) -> LedgerKpi:
-    """Lifetime figures of the state's chain and the running day. Pure."""
+def build_ledger_kpi(state: sl.LedgerState, rows: Sequence[dict[str, Any]]) -> LedgerKpi:
+    """Lifetime figures of the state's chain. Pure."""
     summary = sl.lifetime_summary(list(rows), state.chain_start)
-    running = bool(state.slots) and state.day_start <= now < state.day_end
-    today_saving, today_correction = (
-        open_day_figures(state, battery_params) if running else (None, None)
-    )
     return LedgerKpi(
         chain_start=state.chain_start,
         days=summary["days"],
         incomplete_days=summary["incomplete_days"],
         total_euro=summary["saving_adjusted_eur"] if summary["slots_present"] else None,
-        today_saving_euro=today_saving,
-        today_correction_euro=today_correction,
     )
 
 
-def load_ledger_kpi(now: datetime) -> LedgerKpi | LedgerKpiNotice:
+def load_ledger_kpi() -> LedgerKpi | LedgerKpiNotice:
     """Figures from the runtime files, or the notice why there are none."""
-    batteries = config.get_battery_params_list()
-    if not batteries:
+    if not config.get_battery_params_list():
         return LedgerKpiNotice(NOTICE_NO_BATTERY)
     loaded = store.peek_state()
     if loaded.restart_reason == sl.CHAIN_STATE_UNREADABLE:
@@ -93,9 +78,7 @@ def load_ledger_kpi(now: datetime) -> LedgerKpi | LedgerKpiNotice:
     if loaded.state is None:
         return LedgerKpiNotice(NOTICE_NOT_RUNNING)
     try:
-        return build_ledger_kpi(
-            loaded.state, sl.shadow_battery_params(batteries), store.read_rows(), now=now
-        )
+        return build_ledger_kpi(loaded.state, store.read_rows())
     except (ValueError, KeyError, TypeError) as exc:
         logger.warning("savings ledger: the Monitor tile cannot read the ledger (%s).", exc)
         return LedgerKpiNotice(NOTICE_UNREADABLE, is_warning=True)
@@ -118,13 +101,20 @@ def tile_help(kpi: LedgerKpi) -> str:
     return f"{_METHOD_HELP}\n\n{_incomplete_text(kpi.incomplete_days)}"
 
 
-def today_text(kpi: LedgerKpi) -> str | None:
-    """Running day as Chart 2 labels it, or ``None`` without booked slots of today."""
-    if kpi.today_saving_euro is None or kpi.today_correction_euro is None:
+def today_text(ledger: dict[str, Any] | None, now: datetime) -> str | None:
+    """Running day as Chart 2 shows it; ``None`` without figures or once the day has ended.
+
+    ``ledger`` is ``savings_view["ledger_savings"]``, ``None`` without a display bundle.
+    """
+    if not ledger or ledger["saving_euro"] is None or ledger["soc_correction_euro"] is None:
+        return None
+    day_start = datetime.fromisoformat(ledger["open_day_start"])
+    day_end = datetime.fromisoformat(ledger["open_day_end"])
+    if not day_start <= now < day_end:
         return None
     return (
-        f"Heute bisher: {saving_text(kpi.today_saving_euro)} · "
-        f"SoC-Korrektur: {soc_correction_text(kpi.today_correction_euro)}"
+        f"Heute bisher: {saving_text(ledger['saving_euro'])} · "
+        f"SoC-Korrektur: {soc_correction_text(ledger['soc_correction_euro'])}"
     )
 
 
@@ -146,9 +136,9 @@ def _render_figures(kpi: LedgerKpi) -> None:
         st.caption(f"seit {_since_text(kpi)} ({_days_text(kpi.days)})")
 
 
-def render_ledger_kpi(now: datetime) -> None:
+def render_ledger_kpi(now: datetime, ledger: dict[str, Any] | None) -> None:
     """Tile above Chart 2; a missing result is named, not shown as a figure."""
-    kpi = load_ledger_kpi(now)
+    kpi = load_ledger_kpi()
     if isinstance(kpi, LedgerKpiNotice):
         if kpi.is_warning:
             st.warning(kpi.text)
@@ -156,6 +146,6 @@ def render_ledger_kpi(now: datetime) -> None:
             st.caption(kpi.text)
         return
     _render_figures(kpi)
-    today = today_text(kpi)
+    today = today_text(ledger, now)
     if today:
         st.caption(today)

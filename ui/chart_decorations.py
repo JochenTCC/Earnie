@@ -66,7 +66,8 @@ _CHART2_S2_HELP = (
     "Tag; Desktop SA₀→SA₂: zwei Spalten). Am laufenden Tag gelten BL Ziel, Optimiert "
     "und **Erwartet** für den Rest des Tages; **Bisher** kommt aus dem Buch, darunter "
     "steht als **SoC** die SoC-Korrektur (Unterschied im Speicherstand, bewertet). "
-    "Abgelaufene Tage zeigen nur das Ergebnis aus dem Buch. Beträge stehen ohne "
+    "Abgelaufene Tage zeigen nur das **Ergebnis** aus dem Buch, Tage ohne Ist-Werte "
+    "als **Plan** die geplante Ersparnis. Beträge stehen ohne "
     "Vorzeichen, die Bedeutung als Wort dabei; nur die Kurve ist unter 0, wenn mehr "
     "ausgegeben wurde. "
     "Fehlende Log-Slots: orange, Lücken in Ist-Kurven."
@@ -409,13 +410,13 @@ def _append_cost_summary_savings(
     achieved_saving_euro: float | None,
     achieved_soc_correction_euro: float | None,
 ) -> None:
-    """Ersparnis row; on a running day bisher (if the ledger has it) + erwartet."""
+    """Ersparnis row: plan only, or on a running day bisher (if the ledger has it) + erwartet."""
     if not show_split_savings:
         _append_summary_line(
             lines,
             base,
             summary_font,
-            text=f"Ergebnis: {saving_text(savings_euro)}",
+            text=f"Plan: {saving_text(savings_euro)}",
             line_index=line_index,
             color=_savings_annotation_color(savings_euro),
         )

@@ -120,7 +120,7 @@ Details: [Charts & Panels](charts.md).
 
 ### Kennzahlen-Horizont
 
-**Chart 2** zeigt die Kosten-Annotationen **BL Ziel**, **Optimiert** und **Ergebnis** **pro SA-Tag**. Mobil gilt das nur für den sichtbaren Tag, am Desktop für SA₀→SA₂ in zwei Spalten. Am laufenden Tag erscheinen **Bisher** (SA bis jetzt) und **Erwartet** (Rest des Tages). Im grauen Bereich zeigt das Chart zusätzlich die Kurve **Ersparnis bisher**.
+**Chart 2** zeigt die Kosten-Annotationen **BL Ziel**, **Optimiert** und **Plan** **pro SA-Tag**. Mobil gilt das nur für den sichtbaren Tag, am Desktop für SA₀→SA₂ in zwei Spalten. Am laufenden Tag erscheinen statt **Plan** die Werte **Bisher** (SA bis jetzt) und **Erwartet** (Rest des Tages). Abgelaufene Tage zeigen nur das **Ergebnis** aus dem Ersparnis-Buch. Im grauen Bereich zeigt das Chart zusätzlich die Kurve **Ersparnis bisher**.
 
 Der **Energievergleich** und das MILP-Matching beziehen sich weiterhin auf **Jetzt → SA₂**, also den vollen Planungshorizont. Die Chart-Fenster dienen nur der Darstellung: Kumulierte Kurven darin sind Ausschnitte und bilden keine eigene Matching-Periode.
 

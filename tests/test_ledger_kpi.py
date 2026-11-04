@@ -8,7 +8,7 @@ import pytest
 
 from runtime_store import savings_ledger as sl
 from ui import ledger_kpi as kpi_mod
-from ui.chart_ledger_savings import build_ledger_chart_savings
+from ui.chart_ledger_savings import _no_ledger, build_ledger_chart_savings, ledger_figures_for_day
 from ui.chart_decorations import _savings_annotation_color
 from ui.chart_colors import COLOR_COST_BASELINE
 from ui.ledger_kpi import LedgerKpi, LedgerKpiNotice, build_ledger_kpi, load_ledger_kpi, tile_help, today_text
@@ -95,7 +95,7 @@ def test_total_counts_closed_days_of_the_current_chain_only():
     other_chain = CHAIN - timedelta(days=30)
     rows = [_row(1.0), _row(0.5, incomplete=True), _row(99.0, chain=other_chain)]
 
-    kpi = build_ledger_kpi(_state(), BATTERY, rows, now=NOW)
+    kpi = build_ledger_kpi(_state(), rows)
 
     assert kpi.total_euro == pytest.approx(1.5)
     assert kpi.days == 2
@@ -103,77 +103,120 @@ def test_total_counts_closed_days_of_the_current_chain_only():
     assert kpi.chain_start == CHAIN
 
 
-def test_running_day_stays_out_of_the_total():
-    state = _state(_slot(DAY_START + timedelta(minutes=6), with_eur=0.1, without_eur=0.3))
-
-    kpi = build_ledger_kpi(state, BATTERY, [_row(1.0)], now=NOW)
-
-    assert kpi.total_euro == pytest.approx(1.0)
-    assert kpi.today_saving_euro == pytest.approx(0.2)
+def _chart_ledger(state: sl.LedgerState, *, rows=(), window_start=DAY_START, window_end=DAY_END, slots=()):
+    return build_ledger_chart_savings(
+        list(slots), len(slots), state, BATTERY, list(rows),
+        window_start=window_start, window_end=window_end,
+    )
 
 
-def test_tile_and_chart2_agree_on_the_current_sa_day():
+def _two_slot_state() -> sl.LedgerState:
     start = DAY_START + timedelta(minutes=6)
-    state = _state(
+    return _state(
         _slot(start, with_eur=0.1, without_eur=0.3),
         _slot(start + timedelta(minutes=15), with_eur=0.3, without_eur=0.05),
         prev_correction=0.4,
     )
-    slots = [start, start + timedelta(minutes=15)]
 
-    kpi = build_ledger_kpi(state, BATTERY, [_row(1.0)], now=NOW)
-    chart = build_ledger_chart_savings(
-        slots, 2, state, BATTERY, [], window_start=DAY_START, window_end=DAY_END
+
+def test_running_day_stays_out_of_the_total():
+    state = _state(_slot(DAY_START + timedelta(minutes=6), with_eur=0.1, without_eur=0.3))
+
+    assert build_ledger_kpi(state, [_row(1.0)]).total_euro == pytest.approx(1.0)
+
+
+def test_tile_and_chart2_read_the_same_figures_of_the_current_sa_day():
+    """Same dict, same words: the today line and Chart 2 cannot show different amounts."""
+    ledger = _chart_ledger(_two_slot_state())
+    figures = ledger_figures_for_day(ledger, DAY_START)
+
+    assert figures["saving_euro"] == ledger["saving_euro"]
+    assert figures["soc_correction_euro"] == ledger["soc_correction_euro"]
+    assert today_text(ledger, NOW) == (
+        f"Heute bisher: {saving_text(figures['saving_euro'])} · "
+        f"SoC-Korrektur: {soc_correction_text(figures['soc_correction_euro'])}"
     )
 
-    assert kpi.today_saving_euro == chart["saving_euro"]
-    assert kpi.today_correction_euro == chart["soc_correction_euro"]
-    assert kpi.today_saving_euro == pytest.approx(chart["cumulative_euro"][-1])
+
+def test_open_day_figures_do_not_depend_on_the_paged_window():
+    """Paging Chart 2 back builds the dict for another window; the today line stays."""
+    state = _two_slot_state()
+    closed = {
+        **_row(0.7),
+        "day_start": (DAY_START - timedelta(days=1)).isoformat(),
+        "day_end": DAY_START.isoformat(),
+    }
+    earlier_start = DAY_START - timedelta(days=1)
+    today = _chart_ledger(state, rows=[closed], slots=[DAY_START + timedelta(minutes=6)])
+    earlier = _chart_ledger(
+        state,
+        rows=[closed],
+        window_start=earlier_start,
+        window_end=DAY_START,
+        slots=[earlier_start + timedelta(minutes=15)],
+    )
+
+    for key in ("open_day_start", "open_day_end", "saving_euro", "soc_correction_euro"):
+        assert today[key] == earlier[key]
+    assert today_text(earlier, NOW) == today_text(today, NOW)
 
 
-def test_no_today_figures_without_booked_slots_or_after_the_day_ended():
-    slot = _slot(DAY_START + timedelta(minutes=6), with_eur=0.1, without_eur=0.3)
+def test_no_today_line_without_a_bundle_without_figures_or_outside_the_day():
+    ledger = _chart_ledger(_state(_slot(DAY_START + timedelta(minutes=6), with_eur=0.1, without_eur=0.3)))
 
-    without_slots = build_ledger_kpi(_state(), BATTERY, [_row(1.0)], now=NOW)
-    after_the_day = build_ledger_kpi(_state(slot), BATTERY, [_row(1.0)], now=DAY_END)
+    assert today_text(None, NOW) is None
+    assert today_text(_no_ledger(0, "Hinweis"), NOW) is None
+    assert today_text(_chart_ledger(_state()), NOW) is None
+    assert today_text(ledger, DAY_END) is None
+    assert today_text(ledger, DAY_START - timedelta(minutes=1)) is None
 
-    assert without_slots.today_saving_euro is None
-    assert today_text(without_slots) is None
-    assert after_the_day.today_saving_euro is None
+
+def test_chart2_invents_no_figures_before_the_first_booked_slot():
+    ledger = _chart_ledger(_state())
+
+    assert ledger["saving_euro"] is None
+    assert ledger["soc_correction_euro"] is None
+    assert ledger["open_day_start"] == DAY_START.isoformat()
 
 
 def test_today_text_uses_the_words_of_chart2():
-    kpi = LedgerKpi(CHAIN, 1, 0, 1.0, -0.97, 0.78)
+    ledger = {
+        **_chart_ledger(_two_slot_state()),
+        "saving_euro": -0.97,
+        "soc_correction_euro": 0.78,
+    }
 
-    assert today_text(kpi) == "Heute bisher: 0.97 € mehr ausgegeben · SoC-Korrektur: 0.78 € gutgeschrieben"
+    assert today_text(ledger, NOW) == (
+        "Heute bisher: 0.97 € mehr ausgegeben · SoC-Korrektur: 0.78 € gutgeschrieben"
+    )
 
 
 def test_no_result_when_no_slot_was_ever_counted():
     rows = [_row(0.0, slots_present=0, incomplete=True)]
 
-    assert build_ledger_kpi(_state(), BATTERY, rows, now=NOW).total_euro is None
+    assert build_ledger_kpi(_state(), rows).total_euro is None
 
 
 def test_help_states_the_counterfactual_limits_and_incomplete_days():
-    text = tile_help(LedgerKpi(CHAIN, 45, 3, 1.0, None, None))
+    text = tile_help(LedgerKpi(CHAIN, 45, 3, 1.0))
 
     for part in ("gleicher Verbrauch", "gleiche PV", "Herstellermodus", "gleiche Preise",
                  "Powerstations", "Wirkungsgrad", "Unvollständige Tage: 3"):
         assert part in text
-    assert "Unvollständige Tage: keine" in tile_help(LedgerKpi(CHAIN, 45, 0, 1.0, None, None))
+    assert "Unvollständige Tage: keine" in tile_help(LedgerKpi(CHAIN, 45, 0, 1.0))
 
 
 def test_load_names_a_missing_battery(monkeypatch):
     monkeypatch.setattr("config.get_battery_params_list", lambda: [])
 
-    assert load_ledger_kpi(NOW) == LedgerKpiNotice(kpi_mod.NOTICE_NO_BATTERY)
+    assert load_ledger_kpi() == LedgerKpiNotice(kpi_mod.NOTICE_NO_BATTERY)
 
 
 def test_load_names_a_ledger_that_is_not_running(tmp_path, monkeypatch):
     monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path))
     monkeypatch.setattr("config.get_battery_params_list", lambda: [BATTERY])
 
-    assert load_ledger_kpi(NOW) == LedgerKpiNotice(kpi_mod.NOTICE_NOT_RUNNING)
+    assert load_ledger_kpi() == LedgerKpiNotice(kpi_mod.NOTICE_NOT_RUNNING)
 
 
 def test_load_warns_about_an_unreadable_state_and_leaves_the_file(tmp_path, monkeypatch):
@@ -182,7 +225,7 @@ def test_load_warns_about_an_unreadable_state_and_leaves_the_file(tmp_path, monk
     path = tmp_path / "savings_ledger_state.json"
     path.write_text("{broken", encoding="utf-8")
 
-    assert load_ledger_kpi(NOW) == LedgerKpiNotice(kpi_mod.NOTICE_UNREADABLE, is_warning=True)
+    assert load_ledger_kpi() == LedgerKpiNotice(kpi_mod.NOTICE_UNREADABLE, is_warning=True)
     assert path.exists()
 
 
@@ -194,4 +237,4 @@ def test_load_warns_about_a_broken_ledger_file(tmp_path, monkeypatch):
     store.save_state(_state(), str(tmp_path / "savings_ledger_state.json"))
     (tmp_path / "savings_ledger.jsonl").write_text("not json\n", encoding="utf-8")
 
-    assert load_ledger_kpi(NOW) == LedgerKpiNotice(kpi_mod.NOTICE_UNREADABLE, is_warning=True)
+    assert load_ledger_kpi() == LedgerKpiNotice(kpi_mod.NOTICE_UNREADABLE, is_warning=True)

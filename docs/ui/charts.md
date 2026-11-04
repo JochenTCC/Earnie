@@ -158,15 +158,15 @@ Die kompakten Buttons stehen in einer Zeile **ohne** Fließtext dazwischen (mobi
 
 Fehlende Log-Slots sind orange markiert; die Ist-Kurven haben dort Lücken.
 
-Die Kennzahlen stehen **pro SA-Tag** im Chart: mobil nur für den sichtbaren Tag, am Desktop (SA₀→SA₂) in zwei Spalten (SA₀→SA₁ | SA₁→SA₂). Am **laufenden Tag** gelten **BL Ziel**, **Optimiert** und **Erwartet** für den Rest des Tages; **Bisher** kommt aus dem Ersparnis-Buch, darunter steht als **SoC** die SoC-Korrektur (Unterschied im Speicherstand gegenüber der Vergleichsbatterie, bewertet zum mittleren Bezugspreis). **Abgelaufene Tage** zeigen nur das **Ergebnis** aus dem Buch, ohne Linie und ohne Planwerte; Tage mit weniger als 80 % gebuchten Slots sind als „unvollständig“ markiert.
+Die Kennzahlen stehen **pro SA-Tag** im Chart: mobil nur für den sichtbaren Tag, am Desktop (SA₀→SA₂) in zwei Spalten (SA₀→SA₁ | SA₁→SA₂). Am **laufenden Tag** gelten **BL Ziel**, **Optimiert** und **Erwartet** für den Rest des Tages; **Bisher** kommt aus dem Ersparnis-Buch, darunter steht als **SoC** die SoC-Korrektur (Unterschied im Speicherstand gegenüber der Vergleichsbatterie, bewertet zum mittleren Bezugspreis). **Abgelaufene Tage** zeigen nur das **Ergebnis** aus dem Buch, ohne Linie und ohne Planwerte; Tage mit weniger als 80 % gebuchten Slots sind als „unvollständig“ markiert. Ein **Tag, der noch nicht begonnen hat**, zeigt als **Plan** die geplante Ersparnis. Der Szenario-Explorer nennt seine Ersparnis ebenfalls **Plan**.
 
 Beträge stehen ohne Vorzeichen, die Bedeutung als Wort dabei: „gespart“ oder „mehr ausgegeben“, bei der SoC-Korrektur „gutgeschrieben“ oder „abgezogen“. Nur die Kurve **Ersparnis bisher** braucht die Achse und liegt unter 0, wenn mehr ausgegeben wurde.
 
 ### Kachel „Mit Earnie gespart“
 
-Über Chart 2 zeigt der Monitor das Ergebnis aller abgeschlossenen SA-Tage seit Beginn der Zählung, mit Datum und Anzahl der Tage. War Earnie insgesamt teurer, heißt die Kachel „Mit Earnie mehr ausgegeben“. **Heute bisher** nennt den laufenden Tag mit denselben Zahlen wie Chart 2; er geht erst mit seinem Abschluss in die Summe ein, weil seine SoC-Korrektur bis dahin vorläufig ist. Der **?**-Hilfetext nennt den Vergleich, seine Grenzen und die Anzahl der unvollständigen Tage ([Handbuch](../user-manual/Benutzer-Handbuch-Earnie.md#monitor)).
+Über Chart 2 zeigt der Monitor das Ergebnis aller abgeschlossenen SA-Tage seit Beginn der Zählung, mit Datum und Anzahl der Tage. War Earnie insgesamt teurer, heißt die Kachel „Mit Earnie mehr ausgegeben“. **Heute bisher** nennt den laufenden Tag mit denselben Zahlen wie **Bisher** und **SoC** in Chart 2, beide stammen aus demselben Stand. Der Tag geht erst mit seinem Abschluss in die Summe ein, weil seine SoC-Korrektur bis dahin vorläufig ist. Die Zeile fehlt, solange der Tag keine gebuchte Viertelstunde hat oder Chart 2 noch keine Daten zeigt, und sobald der Tag zu Ende ist. Der **?**-Hilfetext nennt den Vergleich, seine Grenzen und die Anzahl der unvollständigen Tage ([Handbuch](../user-manual/Benutzer-Handbuch-Earnie.md#monitor)).
 
-Die Kachel bleibt beim Blättern in frühere Tage gleich. Fehlt ein Ergebnis, steht dort kein Betrag, sondern der Grund: Das Buch läuft noch nicht, es gibt keine Hausbatterie, noch keinen abgeschlossenen Tag oder keine gebuchte Viertelstunde. Ein unlesbares Buch erscheint als Warnung.
+Die Kachel und ihre Zeile **Heute bisher** bleiben beim Blättern in frühere Tage gleich. Fehlt ein Ergebnis, steht dort kein Betrag, sondern der Grund: Das Buch läuft noch nicht, es gibt keine Hausbatterie, noch keinen abgeschlossenen Tag oder keine gebuchte Viertelstunde. Ein unlesbares Buch erscheint als Warnung.
 
 ## Expander: Simulations-Details
 

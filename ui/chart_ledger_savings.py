@@ -89,8 +89,15 @@ def build_ledger_chart_savings(
     window_start: datetime,
     window_end: datetime,
 ) -> dict[str, Any]:
-    """Slot series and day figures of one chart window. Pure."""
-    saving, soc_correction = open_day_figures(state, battery_params)
+    """Slot series and day figures of one chart window. Pure.
+
+    The ``open_day_*``, ``saving_euro`` and ``soc_correction_euro`` fields depend on the
+    state alone, not on the window, so the Monitor tile can read them on every page.
+    Without a booked slot they are ``None``: there is nothing to report yet.
+    """
+    saving, soc_correction = (
+        open_day_figures(state, battery_params) if state.slots else (None, None)
+    )
     series = _cumulative_on_slots(slot_starts, history_slot_count, state)
     closed_days = [
         {
