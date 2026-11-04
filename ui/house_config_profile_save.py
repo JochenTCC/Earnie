@@ -276,7 +276,13 @@ def _render_house_profile_save(
     held: bool = False,
 ) -> None:
     """Auto-save of the house profile; ``held`` while a heating-system change awaits a choice."""
-    from ui.auto_persist import auto_persist, require_saved
+    from ui.auto_persist import (
+        auto_persist,
+        persisted_state_known,
+        require_saved,
+        seed_persisted,
+    )
+    from ui.house_config_io import house_profile_write_pending
     from ui.house_config_historical_csv import historical_csv_save_fields
 
     ready = bool(str(label or "").strip()) and location.get("latitude") is not None
@@ -341,14 +347,39 @@ def _render_house_profile_save(
         )
         require_saved(saved_id)
 
+    state_key = f"house_profile::{session_scope}::{profile_id}"
+    success_caption = "Gespeichert"
+    if not is_new and not persisted_state_known(state_key):
+        # First render of this profile in the session: opening the page must not
+        # rewrite the file. Only a file that does not yet hold the normalised form
+        # is written, and that write is named. A dry run that fails leaves the
+        # error to the save below (same message, same place).
+        from house_config.own_grid_fee import stored_own_grid_fee
+
+        try:
+            pending = house_profile_write_pending(
+                {
+                    **payload,
+                    "netznutzung": stored_own_grid_fee(
+                        payload["netznutzung"], profile_id=profile_id
+                    ),
+                }
+            )
+        except ValueError:
+            pending = True
+        if not pending:
+            seed_persisted(state_key, payload)
+            return
+        success_caption = "Gespeichert – Datei auf das aktuelle Format gebracht"
     # The Profil dropdown lists labels from disk: rerun only when the label changed
     # (every other auto-save already rendered the new values in this run).
     label_changed = _label_changed(label, existing)
     wrote = auto_persist(
-        state_key=f"house_profile::{session_scope}::{profile_id}",
+        state_key=state_key,
         payload=payload,
         save=_save,
         ready=ready,
+        success_caption=success_caption,
         rerun_follows=label_changed,
     )
     if wrote and label_changed:

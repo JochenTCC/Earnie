@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-from ui.auto_persist import auto_persist
+from ui.auto_persist import auto_persist, persisted_state_known, seed_persisted
 from ui.form_layout import labeled_checkbox, labeled_number_input
 from ui.house_config_io import load_house_profiles, save_house_profiles
 from ui.house_config_profile_session import write_house_file_outside_profile_form
@@ -14,16 +14,36 @@ _PLANT_GM_AT_HOUSE_KEY = "house_config_plant_grid_meter_at_house"
 _PLANT_GM_SINGLE_TARIFF_KEY = "house_config_plant_grid_meter_single_tariff"
 
 
+def _plant_to_store(plant_out: dict) -> dict | None:
+    from house_config.required_signal_activation import activate_plant_required
+
+    return activate_plant_required(plant_out) if plant_out else None
+
+
+def _plant_write_pending(plant_out: dict) -> bool:
+    """Would ``_save_plant`` change the house file? (dry run)"""
+    return _plant_to_store(plant_out) != load_house_profiles().get("plant")
+
+
+def _seed_plant_persist(state_key: str, payload: dict, plant_out: dict) -> bool:
+    """First render: record the on-disk plant as saved instead of writing (or claiming to).
+
+    Returns True when seeded; the caller then skips ``auto_persist`` for this run.
+    """
+    if persisted_state_known(state_key) or _plant_write_pending(plant_out):
+        return False
+    seed_persisted(state_key, payload)
+    return True
+
+
 def _save_plant(plant_out: dict) -> None:
     """Write ``plant`` into the house file; no write when it equals the saved one.
 
     Every write changes the file stamp and makes other open sessions re-seed their
     house-profile form, so an unchanged plant is not written again.
     """
-    from house_config.required_signal_activation import activate_plant_required
-
     doc = dict(load_house_profiles())
-    plant = activate_plant_required(plant_out) if plant_out else None
+    plant = _plant_to_store(plant_out)
     if plant == doc.get("plant"):
         return
     if plant is None:
@@ -73,7 +93,7 @@ def render_plant_export_limit() -> None:
             )
         )
 
-    def _persist() -> None:
+    def _plant_out() -> dict:
         doc = load_house_profiles()
         plant_out = (
             dict(doc.get("plant") or {})
@@ -84,12 +104,15 @@ def render_plant_export_limit() -> None:
             plant_out["max_export_power_kw"] = round(float(max_kw), 3)
         else:
             plant_out.pop("max_export_power_kw", None)
-        _save_plant(plant_out)
+        return plant_out
 
+    payload = {"enabled": enabled, "max_kw": max_kw}
+    if _seed_plant_persist("house_config_plant_export", payload, _plant_out()):
+        return
     auto_persist(
         state_key="house_config_plant_export",
-        payload={"enabled": enabled, "max_kw": max_kw},
-        save=_persist,
+        payload=payload,
+        save=lambda: _save_plant(_plant_out()),
         rerun_follows=False,
     )
 
@@ -132,7 +155,7 @@ def render_plant_grid_meter_assertions() -> None:
         help="plant.grid_meter.single_tariff",
     )
 
-    def _persist() -> None:
+    def _plant_out() -> dict:
         doc = load_house_profiles()
         plant_out = (
             dict(doc.get("plant") or {})
@@ -144,14 +167,14 @@ def render_plant_grid_meter_assertions() -> None:
             "single_tariff": bool(single),
         }
         plant_out.pop("pv_covers_all_inverters", None)
-        _save_plant(plant_out)
+        return plant_out
 
+    payload = {"at_house": bool(at_house), "single": bool(single)}
+    if _seed_plant_persist("house_config_plant_grid_meter", payload, _plant_out()):
+        return
     auto_persist(
         state_key="house_config_plant_grid_meter",
-        payload={
-            "at_house": bool(at_house),
-            "single": bool(single),
-        },
-        save=_persist,
+        payload=payload,
+        save=lambda: _save_plant(_plant_out()),
         rerun_follows=False,
     )

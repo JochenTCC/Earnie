@@ -40,6 +40,14 @@ def own_base_cent_kwh(catalog: dict[str, Any], profile_id: str) -> float | None:
     return float(area["base_cent_kwh"]["unmetered_power"])
 
 
+def stored_own_grid_fee(netznutzung: dict[str, Any], *, profile_id: str) -> dict[str, Any]:
+    """``netznutzung`` as ``persist_own_grid_fee`` stores it, without writing the user area."""
+    out = {key: value for key, value in netznutzung.items() if key != OWN_BASE_KEY}
+    if netznutzung.get("area_id") == OWN_AREA:
+        out["area_id"] = own_area_id(profile_id)
+    return out
+
+
 def persist_own_grid_fee(
     netznutzung: dict[str, Any],
     *,
