@@ -18,6 +18,8 @@ python -m scripts.build_container --target all --push
 
 Dockerfile: `docker/Dockerfile` · Entrypoint: `docker/entrypoint.sh`
 
+Dev-Image bauen und per SSH auf die NAS laden (VS-Code-Tasks und einmalige Einrichtung): [`DEVELOPER.md`](../DEVELOPER.md), Abschnitt „Dev build and transfer to the NAS“.
+
 ## Compose-Stacks
 
 Jeder Stack hat **einen** Service (Streamlit + Auto-Start von `main.py` via `EARNIE_AUTO_START_MAIN=1`). Prod und Alpha sind **getrennte Compose-Dateien** (nicht parallel im selben File).

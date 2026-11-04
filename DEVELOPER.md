@@ -83,6 +83,65 @@ Windows wrapper: `.\docker\build-container.ps1`
 
 Local `build_container` default tags from `version.py`: every version → `:next` and `:<version>`; official also `:latest`; SemVer pre-release omits `:latest`. Legacy `ernie-energy` aliases follow the same rule. **CI** (tag → `release-publish.yml`): candidate is `:<version>` only; `:next` / `:latest` only after job `promote` (see the release bullets below).
 
+### Dev build and transfer to the NAS
+
+Dev images reach the NAS over SSH, without a registry. Only `scripts/build_container.py` adds the Shadow client to a `-dev` image. A plain `docker build`, including *Build Image* in the VS Code Docker extension, leaves it out, and that image refuses to start with `EARNIE_SHADOW=1`.
+
+VS Code tasks (*Terminal → Run Task…*, defined in `.vscode/tasks.json`):
+
+| Task | What it does |
+|------|--------------|
+| `docker: build earnie` | Builds locally for `linux/amd64` |
+| `docker: build + load NAS (ssh earnie-nas)` | Builds locally, then loads the image on the NAS with `docker save` / `docker load` |
+| `docker: build + push earnie` | Builds and pushes `:<version>` to GHCR with `--versioned-only`; `:next` stays where it is |
+
+Do not push a `-dev` version without `--versioned-only`: `:next` would then point at the dev image and reach everyone who follows that tag.
+
+The load task does not touch the running container. To switch, recreate the container in Container Manager with the tag from `version.py`. A rebuild under an unchanged tag also needs the container recreated.
+
+**One-time setup** (Synology, Windows dev machine). Keep the real host and user name out of this repo; the task only knows the SSH alias.
+
+1. Create a key with a passphrase and add it to the agent. Starting the service needs an elevated PowerShell:
+
+   ```powershell
+   ssh-keygen -t ed25519 -f $HOME/.ssh/earnie_nas
+   Set-Service ssh-agent -StartupType Automatic; Start-Service ssh-agent
+   ssh-add $HOME/.ssh/earnie_nas
+   ```
+
+2. Enable SSH and the user home service in DSM, then install the public key on the NAS:
+
+   ```powershell
+   Get-Content $HOME/.ssh/earnie_nas.pub | ssh <user>@<nas-host> "mkdir -p ~/.ssh; cat >> ~/.ssh/authorized_keys; chmod 700 ~/.ssh; chmod 600 ~/.ssh/authorized_keys; chmod go-w ~"
+   ```
+
+3. Add the alias to `~/.ssh/config` (no file extension, no BOM):
+
+   ```text
+   Host earnie-nas
+       HostName <nas-host>
+       User <user>
+       IdentityFile ~/.ssh/earnie_nas
+   ```
+
+4. Allow `docker load` without a password. Run `id -u` on the NAS and use that number as `<uid>`; a numeric ID also avoids trouble with non-ASCII user names. DSM has no `visudo`, so the file gets its owner and mode before it moves into place. `sudo -l` must then list the `NOPASSWD` rule.
+
+   ```powershell
+   ssh -t earnie-nas "echo '#<uid> ALL=(root) NOPASSWD: /usr/local/bin/docker load' > /tmp/earnie-docker && sudo chown root:root /tmp/earnie-docker && sudo chmod 440 /tmp/earnie-docker && sudo mv /tmp/earnie-docker /etc/sudoers.d/earnie-docker; sudo rm -f /tmp/earnie-docker; sudo -l"
+   ```
+
+5. Check the setup. No prompt may appear. An error about empty input or a missing `repositories` file is the expected result, because Docker ran and had nothing to load:
+
+   ```powershell
+   ssh -o BatchMode=yes earnie-nas "sudo -n /usr/local/bin/docker load < /dev/null"
+   ```
+
+Notes:
+
+- Docker access amounts to root on the NAS, so the rule allows `docker load` only. Keep the passphrase on the key.
+- A DSM update may remove the `sudoers.d` file; `sudo: a password is required` then means repeating step 4. If a bad file breaks `sudo`, remove it with a one-time DSM Task Scheduler task running as `root`.
+- Outside the task, run the pipe through `cmd /c`. PowerShell 5.1 can corrupt binary data piped between native commands.
+
 ### Release (tag → GitHub Actions)
 
 **Primary path:** bump `version.py` (user approval only), commit + push `main`, then push an annotated tag. CI (`.github/workflows/release-publish.yml`) builds a release candidate (multi-arch image to GHCR, draft GitHub Release) and publishes it after your approval. Per-release checklist: [docs/workflow/release-checklist.md](docs/workflow/release-checklist.md).
