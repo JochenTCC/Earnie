@@ -66,7 +66,8 @@ def test_day_cost_totals_running_day_takes_bisher_from_the_ledger():
     assert day.savings_euro == pytest.approx(float(n) - 0.4 * n)
     annotations = _cost_summary_annotations(days=days)
     texts = [ann["text"] for ann in annotations]
-    assert "Ersparnis bisher: +0.50 € · SoC-Korrektur -0.10 €" in texts
+    assert "Ersparnis bisher: +0.50 €" in texts
+    assert "SoC-Korrektur: -0.10 €" in texts
     assert any(t.startswith("Ersparnis erwartet: +") for t in texts)
     assert not any(t.startswith("Ersparnis:") for t in texts)
 

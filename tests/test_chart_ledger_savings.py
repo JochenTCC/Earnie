@@ -13,6 +13,7 @@ from runtime_store import savings_ledger as sl
 from runtime_store import savings_ledger_store as store
 from ui import chart_ledger_savings as cls
 from ui.chart_cumulative_render import render_cumulative_cost_chart
+from ui.chart_decorations import _cost_summary_column_annotations
 
 _TZ = ZoneInfo("Europe/Vienna")
 _QUARTER = timedelta(minutes=15)
@@ -259,3 +260,37 @@ def test_chart_without_ledger_has_no_zero_line_and_shows_the_hint(monkeypatch):
     assert "Ist bisher" in " ".join(str(name) for name in names)
     assert "Ersparnis bisher" not in names
     assert cls.HINT_NOT_RUNNING in captions
+
+
+def test_soc_correction_has_its_own_row_so_it_stays_out_of_the_second_column():
+    """On one line with "Ersparnis bisher" it covered the second day column on narrow windows."""
+    lines = _cost_summary_column_annotations(
+        8.0,
+        5.5,
+        show_split_savings=True,
+        achieved_saving_euro=-0.97,
+        achieved_soc_correction_euro=0.78,
+    )
+
+    texts = [line["text"] for line in lines]
+    assert texts == [
+        "BL Ziel: 8.00 €",
+        "Optimiert: 5.50 €",
+        "Ersparnis bisher: -0.97 €",
+        "SoC-Korrektur: +0.78 €",
+        "Ersparnis erwartet: +2.50 €",
+    ]
+    shifts = [line.get("yshift", 0) for line in lines]
+    assert len(set(shifts)) == len(shifts)
+
+
+def test_no_soc_correction_row_without_a_correction():
+    lines = _cost_summary_column_annotations(
+        8.0,
+        5.5,
+        show_split_savings=True,
+        achieved_saving_euro=-0.97,
+        achieved_soc_correction_euro=None,
+    )
+
+    assert not any("SoC-Korrektur" in line["text"] for line in lines)

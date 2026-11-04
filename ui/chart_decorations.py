@@ -393,13 +393,6 @@ def _cost_summary_head_lines(
     return lines, line_index
 
 
-def _achieved_savings_text(saving_euro: float, soc_correction_euro: float | None) -> str:
-    text = f"Ersparnis bisher: {saving_euro:+.2f} €"
-    if soc_correction_euro is not None:
-        text += f" · SoC-Korrektur {soc_correction_euro:+.2f} €"
-    return text
-
-
 def _append_cost_summary_savings(
     lines: list[dict],
     base: dict,
@@ -427,10 +420,20 @@ def _append_cost_summary_savings(
             lines,
             base,
             summary_font,
-            text=_achieved_savings_text(achieved_saving_euro, achieved_soc_correction_euro),
+            text=f"Ersparnis bisher: {achieved_saving_euro:+.2f} €",
             line_index=line_index,
             color=_savings_annotation_color(achieved_saving_euro),
         )
+        # Own row: on one line with the figure above it ran into the second day column.
+        if achieved_soc_correction_euro is not None:
+            line_index = _append_summary_line(
+                lines,
+                base,
+                summary_font,
+                text=f"SoC-Korrektur: {achieved_soc_correction_euro:+.2f} €",
+                line_index=line_index,
+                color=COLOR_COST_BASELINE,
+            )
     _append_summary_line(
         lines,
         base,
