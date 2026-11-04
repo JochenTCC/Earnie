@@ -12,8 +12,10 @@ Aufruf:
 from __future__ import annotations
 
 import argparse
+import shutil
 import subprocess
 import sys
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -29,6 +31,7 @@ TARGET_PLATFORMS = {
     "all": MULTIARCH_PLATFORM,
 }
 REPO_ROOT = Path(__file__).resolve().parents[1]
+SHADOW_CLIENT_STAGE = "shadow-client"
 
 
 def _run_deploy_tariff_gate() -> None:
@@ -57,6 +60,21 @@ def _run_deploy_tariff_gate() -> None:
 def is_prerelease_version(version: str) -> bool:
     """True for SemVer pre-releases (e.g. 2.2.0-alpha.1, 2.6.1-beta.1, 2.2.0-rc.1)."""
     return "-" in version
+
+
+def is_dev_version(version: str) -> bool:
+    """True for dev builds (2.8.0-dev.4): they carry the Shadow client, all others do not."""
+    return "-dev" in version
+
+
+def stage_shadow_client(dest: Path) -> None:
+    """Copy the Shadow client (left out by ``.dockerignore``) to *dest* for a dev build."""
+    from runtime_store.shadow.hooks import CLIENT_FILES
+
+    for rel in CLIENT_FILES:
+        target = dest / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(REPO_ROOT / rel, target)
 
 
 def default_tags(version: str | None = None) -> list[str]:
@@ -134,6 +152,7 @@ def build_command(
     build_date: str | None = None,
     revision: str | None = None,
     version: str | None = None,
+    shadow_client_dir: Path | None = None,
 ) -> list[str]:
     if not tags:
         raise ValueError("Mindestens ein Image-Tag ist erforderlich.")
@@ -155,6 +174,8 @@ def build_command(
     if version:
         # Read back by the LoxBerry plugin (update check against :latest / :next).
         build_arg.extend(["--label", f"org.opencontainers.image.version={version}"])
+    if shadow_client_dir is not None:
+        build_arg.extend(["--build-context", f"{SHADOW_CLIENT_STAGE}={shadow_client_dir}"])
 
     if is_multiarch(platform):
         cmd = ["docker", "buildx", "build", "--platform", platform, "-f", str(dockerfile)]
@@ -267,17 +288,24 @@ def main(argv: list[str] | None = None) -> int:
         if args.push:
             _run_deploy_tariff_gate()
         platform = resolve_platform(args.target, args.platform)
-        cmd = build_command(
-            tags=tags,
-            platform=platform,
-            dockerfile=args.dockerfile,
-            context=args.context,
-            no_cache=args.no_cache,
-            push=args.push,
-            revision=args.revision,
-            version=normalize_for_image_build(__version__),
-        )
-        run_build(cmd)
+        with tempfile.TemporaryDirectory() as tmp:
+            shadow_client_dir = None
+            if is_dev_version(__version__):
+                shadow_client_dir = Path(tmp)
+                stage_shadow_client(shadow_client_dir)
+                print(f"Dev-Build {__version__}: Shadow-Client ist im Image enthalten.")
+            cmd = build_command(
+                tags=tags,
+                platform=platform,
+                dockerfile=args.dockerfile,
+                context=args.context,
+                no_cache=args.no_cache,
+                push=args.push,
+                revision=args.revision,
+                version=normalize_for_image_build(__version__),
+                shadow_client_dir=shadow_client_dir,
+            )
+            run_build(cmd)
         if args.push and not is_multiarch(platform):
             run_push(tags)
     except (FileNotFoundError, ValueError) as exc:

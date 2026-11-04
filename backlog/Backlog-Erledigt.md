@@ -155,6 +155,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
   - **Tests:** `tests/test_stripped_release_image.py` (`.dockerignore` vs `CLIENT_FILES`, AST scan of shipped code, Prod package imports with the left-out modules blocked, Shadow refusal). Local image build smoke-tested: left-out files absent, 355 Prod modules import, Shadow exits 1, Streamlit setup page renders.
   - **Not picked to `release/2.7`** (maintainer decision 2026-11-02): no user-facing effect in 2.7 (the tools are never loaded at runtime, Shadow is off unless the env var is set); the hotfix playbook keeps chores off the release line.
   - Docs: `DEVELOPER.md` § "Shadow client is not in the release image", `docker/README.md`.
+  - **Note (2026-11-04):** the exclusion also hit local dev images, so the NAS Shadow on such an image refused to start. `scripts/build_container.py` now adds the client for `-dev` versions through the `shadow-client` build context; other versions and CI images stay without it. Alternating dev and plain builds with the cache on: client files 7/7 and 0/7.
 
 ### Bugfix — Heating rod lost on save (2026-11-02)
 

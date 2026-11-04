@@ -185,6 +185,7 @@ The release image ships only the Shadow core that Prod needs to record the feed:
 
 - Code outside `runtime_store/shadow/` reaches client functions **only** through `runtime_store.shadow.hooks` (`mode`, `errors`, `transport`, `feed` may be imported directly). `ui.shadow_banner` is imported lazily inside an `is_shadow_mode()` branch.
 - `EARNIE_SHADOW=1` on an image without the client refuses to start (`refuse_shadow_startup_or_exit`, `shadow_migration_mode_refusal`); it never runs as Prod.
+- **Dev builds carry the client:** for a `-dev` version in `version.py`, `scripts/build_container.py` passes the client files as `--build-context shadow-client=<dir>`, which replaces the empty `shadow-client` stage of `docker/Dockerfile`. All other versions and the CI images (`release-publish.yml`) build without it.
 - [`tests/test_stripped_release_image.py`](tests/test_stripped_release_image.py) checks `.dockerignore` against the list, scans shipped code for imports of left-out modules, and imports the Prod packages in a subprocess where those modules cannot be imported.
 - The offline replay and regression tools (`runtime_store/recorder_replay.py`, `scripts/run_regression.py`, `scripts/run_regression_r0_study.py`, `scripts/replay_debug_dump.py`) are left out the same way; the cycle recorder and `runtime_store/push_read_replay.py` stay.
 

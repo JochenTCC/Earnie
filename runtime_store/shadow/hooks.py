@@ -6,7 +6,8 @@ The package has two parts:
   ``errors``, ``superset``. Prod uses them to record the shadow feed (off unless
   ``shadow_feed_enabled``).
 - **Client** (``EARNIE_SHADOW=1`` only): the modules in :data:`CLIENT_FILES`.
-  The release image leaves them out (``.dockerignore``).
+  The release image leaves them out (``.dockerignore``); dev builds of
+  ``scripts/build_container.py`` add them back.
 
 Code outside the package imports client functions only through this module.
 Prod answers come from here without importing the client; Shadow delegates to

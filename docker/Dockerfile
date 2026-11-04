@@ -7,6 +7,15 @@ FROM python:3.14-slim AS deps-list
 COPY pyproject.toml /tmp/pyproject.toml
 RUN python -c "import tomllib; d = tomllib.load(open('/tmp/pyproject.toml','rb'))['project']['dependencies']; open('/tmp/deps.txt','w').write('\n'.join(d)+'\n')"
 
+# A dev build replaces this stage: scripts/build_container.py passes
+# --build-context shadow-client=<dir> for -dev versions. Release and CI images stay without
+# the Shadow client (.dockerignore), also in their layers.
+# Not empty on purpose: COPY from an empty stage shares its build-cache entry with the dev
+# build's COPY, so a plain build could get the client from the cache (and the other way round).
+# The file is the one the final stage copies anyway, so this adds nothing to the image.
+FROM scratch AS shadow-client
+COPY logger_config.py /logger_config.py
+
 FROM python:3.14-slim
 
 RUN apt-get update && apt-get install -y \
@@ -45,6 +54,7 @@ COPY opendata/ opendata/
 # not only share/config/. Omitting share/ehal breaks live EHAL JSON Schema validation.
 COPY share/ share/
 COPY logger_config.py app.py main.py config.py ./
+COPY --from=shadow-client / ./
 RUN mkdir -p earnie_env/runtime
 COPY earnie_env/runtime/local_settings.example.json earnie_env/runtime/
 COPY .env.example ./

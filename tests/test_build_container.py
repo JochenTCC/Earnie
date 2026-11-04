@@ -24,6 +24,52 @@ def test_default_tags_follow_version_py():
         assert "ghcr.io/jochentcc/ernie-energy:latest" in tags
 
 
+def test_is_dev_version_only_for_dev_builds():
+    assert bc.is_dev_version("2.8.0-dev.4") is True
+    for version in ("2.8.0", "2.8.0-alpha.1", "2.8.0-beta.1", "2.8.0-rc.1"):
+        assert bc.is_dev_version(version) is False
+
+
+def test_stage_shadow_client_copies_every_client_file(tmp_path: Path):
+    from runtime_store.shadow.hooks import CLIENT_FILES
+
+    bc.stage_shadow_client(tmp_path)
+
+    staged = {p.relative_to(tmp_path).as_posix() for p in tmp_path.rglob("*") if p.is_file()}
+    assert staged == set(CLIENT_FILES)
+
+
+@pytest.mark.parametrize("platform", ["linux/amd64", bc.MULTIARCH_PLATFORM])
+def test_build_command_passes_shadow_client_context_only_when_given(platform: str, tmp_path: Path):
+    common = {
+        "tags": ["img:1"],
+        "platform": platform,
+        "dockerfile": bc.REPO_ROOT / "docker" / "Dockerfile",
+        "context": bc.REPO_ROOT,
+        "no_cache": False,
+        "push": True,
+    }
+
+    assert "--build-context" not in bc.build_command(**common)
+
+    cmd = bc.build_command(**common, shadow_client_dir=tmp_path)
+    assert cmd[cmd.index("--build-context") + 1] == f"shadow-client={tmp_path}"
+
+
+def test_dockerfile_default_shadow_client_stage_has_no_client_and_is_not_empty():
+    """Without the build context (release, CI) the stage adds no client file.
+
+    It must not be empty: BuildKit then reuses the dev build's cached COPY layer, and a
+    plain build ends up with the Shadow client.
+    """
+    text = (bc.REPO_ROOT / "docker" / "Dockerfile").read_text(encoding="utf-8")
+    assert (
+        f"FROM scratch AS {bc.SHADOW_CLIENT_STAGE}\n"
+        "COPY logger_config.py /logger_config.py\n"
+    ) in text
+    assert f"COPY --from={bc.SHADOW_CLIENT_STAGE} / ./\n" in text
+
+
 def test_is_prerelease_version():
     assert bc.is_prerelease_version("2.2.0-alpha.1") is True
     assert bc.is_prerelease_version("2.6.1-beta.1") is True
