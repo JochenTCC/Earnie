@@ -48,9 +48,6 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - **Order:** P1 → P2 → P3; P4 is optional.
   - **Note:** Ledger P9 "Chart 1 baseline from the shadow chain" would start the forecast baseline from the shadow SoC. Spec § 4 ("the baseline changes its definition at *Jetzt*") and the help text must then be revisited.
 
-- [ ] **Account view P1 — Slot series of closed SA-days** `[feat]` *(1 session)*: the ledger keeps slot rows only for the open day (`savings_ledger_state.json`). Persist them per closed SA-day in a slot file next to `savings_ledger.jsonl` (cost with and without, counted flag, house energy), written at the day close, plus a backfill from `optimization_history.jsonl` through the existing engine so that old days are covered. The chart never replays the log.
-  - **Tests:** the sum of a closed day's slots equals its ledger row; backfill and daemon write the same rows; a missing or broken slot file fails loud (`no-implicit-fallbacks.mdc`).
-
 - [ ] **Account view P2 — Monitor shows the account view** `[feat]` *(1 session, after P1)*: two SA-days (last closed, open, plan up to the horizon end). Money panel with anchoring switch "Ist bei Jetzt" / "Gemeinsamer Start", gap colouring and labels, SoC correction as its own label, skipped slots orange; consumption control below with zero at the horizon end and no absolute energies, no standby option. Remove the former traces and the annotations with the old sign. Mobile and paging: the anchor is *Jetzt*, clamped to the window. Decide spec § 6 "Plan energy difference".
   - **Tests:** both anchor modes differ by the saving so far; the lines meet at *Jetzt*; consumption gap is zero at the horizon end and flat left of *Jetzt*; window fully in the past; AppTest for the switch state (`streamlit-ui-state.mdc`).
   - **Docs:** `docs/ui/charts.md` § Chart 2 (German), **?** help text with the baseline's change of definition at *Jetzt*, `.github/release-notes/UNRELEASED.md`.

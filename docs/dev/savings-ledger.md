@@ -6,6 +6,8 @@
 **Decision 2026-11-02 (Ledger P0):** `p_ref`, partial days and powerstations are decided (§ 3, § 4, § 9).
 **Implemented 2026-11-04 (Ledger P7):** Chart 2 reads "Ersparnis bisher" from the ledger (`ui/chart_ledger_savings.py`) and is shown again; `chart2_enabled()` and `EARNIE_UI_CHART2` are gone. On a running day BL Ziel, Optimiert and "Ersparnis erwartet" cover the rest of the day; an elapsed day shows only its ledger row. The SoC correction is a label, as the change against the previous day (`saving_adjusted − saving`).
 
+**Implemented 2026-11-04 (Account view P1):** slot series of closed SA-days in `savings_ledger_slots.jsonl` (§ 4).
+
 **Decision 2026-11-02:** not in 2.7 — Chart 2 is hidden for the 2.7 release (`ui/live_mode.py::chart2_enabled()`, shown only with `EARNIE_UI_CHART2=1`) (known limitation in the release notes); the corrected chart ships with 2.8 (`backlog/Backlog.md` Version 2.7 / 2.8).
 **Trigger:** debug dump `debug_dump_20261102_062129` ("Kumulierte Kosten - Anzeige unplausibel"), analysed on `release/2.7` (2.7.0-beta.3).
 **Related:** [`../ui/charts.md`](../ui/charts.md) § Chart 2, [`done/ui-sunset2sunset.md`](done/ui-sunset2sunset.md), [`done/planning-horizon-sunset.md`](done/planning-horizon-sunset.md), [`../workflow/usage-ping.md`](../workflow/usage-ping.md), [`../workflow/earnie-points.md`](../workflow/earnie-points.md), backlog item "Simple Savings KPI as additional payload of the UsagePing" (`backlog/Backlog.md`, Version 2.+1).
@@ -121,6 +123,26 @@ Rules:
 - A day with no counted slot (or no actual SoC) carries the previous day's SoC correction unchanged (`p_ref_basis: "carried"`), so its correction terms cancel and the telescoping sum stays intact. Calendar days without any closed slot get no row.
 - Lifetime total = Σ `saving_adjusted_eur` over all closed days of the chain. Shown together with its start date, the day count and the number of incomplete days.
 - **Backfill:** `optimization_history.jsonl` (and rotated files) already hold every `closed_interval` with prices; a one-off CLI (`python -m scripts.build_savings_ledger --since <date>`) can build the ledger retroactively. The dump's log reaches back to July. It replays every closed slot from `--since` as one chain (`chain_start_reason: backfill`), writes the rows and the state with the open day, and keeps the newest entry's prices as `pending_slot` so the daemon continues the chain. An existing ledger or state file is only replaced with `--rebuild` (no merge with live rows); `--dry-run` prints the day table only. The daemon must be stopped while it writes (it holds the state in memory); the CLI refuses when it finds the local daemon running.
+
+**Slot file.** `savings_ledger_slots.jsonl` holds the slot series of closed days for the account view ([`chart2-account-view.md`](chart2-account-view.md) § 4), one JSON line per closed SA-day, append-only:
+
+```json
+{
+  "savings_v": 1,
+  "chain_start": "2026-09-16T00:00:00+02:00",
+  "day_start": "2026-11-01T07:04:38+01:00",
+  "day_end": "2026-11-02T07:06:08+01:00",
+  "slots": [
+    {"slot_start": "2026-11-01T07:15:00+01:00", "counted": true, "skip_reason": null, "cost_with_eur": 0.0312, "cost_without_eur": 0.0287, "house_kwh": 0.11}
+  ]
+}
+```
+
+- Values are unrounded, so the slots of a day sum to its ledger row (`cost_with_eur`, `cost_without_eur` after the row's rounding; number of counted slots = `slots_present`). A skipped slot is zero, also in `house_kwh`. `house_kwh` is the logged `house_kw`, without the shadow battery's standby.
+- The daemon writes the line right after the day's row, from the same slot rows the state holds. A failed slot write does not stop the chain, since raising would close the day a second time on the next slot: it logs a warning that names the repair, and the day stays without slots.
+- Readers use `savings_ledger_store.closed_day_slots(rows)`, which raises `SlotFileError` when the file is missing or broken, a day is missing or repeated, or the slots do not add up to the row. There is no fallback to the log.
+- **Backfill for existing ledgers:** `python -m scripts.build_savings_ledger --since <date> --slots-only` replays the log and writes only the slot file, replacing an existing one. It refuses unless the replay adds up to every ledger row and closes no other day, so `--since` must be the date the chain was built from. A chain the daemon started itself, or a ledger with several chains, cannot be reproduced from one replay; that fails loud, and only `--rebuild` then gives a slot file. `--rebuild` always writes the slot file too.
+- **Upgrade:** the slots of a day still open when the version changes have no `house_kwh`, so that one day closes without slots and with the warning. Run the `--slots-only` backfill after that first close.
 
 Where it runs: in `main.py` after the cycle's `closed_interval` is written (one shadow step per cycle, O(1)); SA-day close when the first slot after SA₂ is closed. The prices of a slot come from the cycle that ran in it; the hook keeps them in the state until the slot is closed one cycle later, so the log is never re-read. Failure is loud (logged warning, the slot booked as skipped `error`, counted in the row's `errors`), never a silent zero.
 

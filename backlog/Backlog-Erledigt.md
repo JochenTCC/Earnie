@@ -2,6 +2,14 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Account view P1 — Slot series of closed SA-days (2026-11-04)
+
+- [x] **Account view P1 — Slot series of closed SA-days** `[feat]`: spec [`docs/dev/chart2-account-view.md`](../docs/dev/chart2-account-view.md) § 4, file format [`docs/dev/savings-ledger.md`](../docs/dev/savings-ledger.md) § 4.
+  - `savings_ledger_slots.jsonl`, one line per closed SA-day (`slot_start`, `counted`, `skip_reason`, `cost_with_eur`, `cost_without_eur`, `house_kwh`), written by the daemon right after the day's row. A failed slot write warns with the repair command and does not stop the chain.
+  - Reader `savings_ledger_store.closed_day_slots(rows)` raises `SlotFileError` on a missing or broken file, a missing or repeated day, or slots that do not add up to the row.
+  - Backfill through the engine: `--rebuild` writes the slot file too; new `--slots-only` writes only that file and refuses unless the replay matches every ledger row. The chart is unchanged (Account view P2).
+  - Tests `tests/test_savings_ledger_slots.py`, `tests/test_savings_ledger_daemon.py`, `tests/test_build_savings_ledger.py`. Docs: `docs/einrichtung/betrieb.md` file table.
+
 ### Ledger P7 — Chart 2 grey zone from the ledger, chart back on (2026-11-04)
 
 - [x] **Ledger P7 — Chart 2 grey zone from the ledger, chart back on** `[feat]`: spec [`docs/dev/savings-ledger.md`](../docs/dev/savings-ledger.md) § 5.

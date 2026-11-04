@@ -2,8 +2,9 @@
 
 ``main.py`` calls ``on_cycle`` once per cycle, after the cycle's log entry is
 written. Per call: book the slot whose ``closed_interval`` this cycle finalised
-(with the prices the previous cycle stored for it), append a row when that slot
-closes an SA-day, remember this cycle's prices for its own slot, save the state.
+(with the prices the previous cycle stored for it), append a row and the day's
+slots when that slot closes an SA-day, remember this cycle's prices for its own
+slot, save the state.
 O(1): the production log is never re-read.
 
 The shadow chain starts once, at the actual SoC of the first booked slot, and
@@ -90,6 +91,25 @@ def _book_error_slot(closed_interval: dict[str, Any] | None) -> None:
         logger.warning("savings ledger: error slot not recorded (%s).", exc)
 
 
+def _write_day_slots(closing: sl.LedgerState) -> None:
+    """Append the slots of the day ``closing`` holds open; a failure must not stop the chain.
+
+    The row is already written: raising here would close the day a second time on the
+    next slot. The day stays without slots, the warning names the repair, and readers
+    fail loud on the missing day (``savings_ledger_store.closed_day_slots``).
+    """
+    try:
+        store.append_day_slots(sl.day_slots_record(closing))
+    except Exception as exc:  # noqa: BLE001 — see above
+        logger.warning(
+            "savings ledger: slots of day %s not written (%r); rebuild with: "
+            "python -m scripts.build_savings_ledger --since %s --slots-only",
+            closing.day_start.isoformat(),
+            exc,
+            closing.chain_start.date().isoformat(),
+        )
+
+
 def _on_cycle(
     closed_interval: dict[str, Any] | None,
     run_payload: dict[str, Any],
@@ -132,6 +152,7 @@ def _on_cycle(
                 # Append before taking the new state: if the write fails, the next
                 # slot closes the same day again instead of losing the row.
                 store.append_row(row)
+                _write_day_slots(_state)
                 logger.info(
                     "savings ledger: day %s closed, saving %.2f EUR (adjusted %.2f EUR, coverage %.2f).",
                     row["day_start"],

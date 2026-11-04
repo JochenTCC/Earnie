@@ -397,6 +397,7 @@ def record_error_slot(state: LedgerState, slot_start: datetime) -> LedgerState:
         "export_kwh_without": 0.0,
         "k_act_cent": None,
         "shadow_soc_end": state.shadow_soc,
+        "house_kwh": 0.0,
     }
     return replace(state, last_slot_start=slot_start, slots=state.slots + (row,))
 
@@ -414,9 +415,12 @@ def _slot_row(inp: LedgerInput, slot: LedgerSlot, dt_h: float) -> dict[str, Any]
         "export_kwh_without": slot.export_kwh_without,
         "k_act_cent": inp.k_act_cent,
         "shadow_soc_end": slot.shadow_soc_next,
+        # A skipped slot counts as zero, like its costs; a counted one has its load (``slot_skip_reason``).
+        "house_kwh": 0.0,
     }
     if slot.counted:
         closed = inp.closed or {}
+        row["house_kwh"] = float(closed["house_kw"]) * dt_h
         row["flex_planned_kwh"] = {
             str(cid): float(kw) * dt_h for cid, kw in (inp.planned_flex_kw or {}).items()
         }
@@ -527,6 +531,47 @@ def close_day(
     if state.days_closed == 0:
         row["chain_start_reason"] = state.chain_start_reason
     return row
+
+
+# --- Slot series of closed days (Account view P1) -----------------------------
+
+_DAY_SLOT_FIELDS = (
+    "slot_start",
+    "counted",
+    "skip_reason",
+    "cost_with_eur",
+    "cost_without_eur",
+    "house_kwh",
+)
+
+
+def day_slots_record(state: LedgerState) -> dict[str, Any]:
+    """Slot file record for the open day of ``state`` (the state before ``advance`` closed it).
+
+    A slot row without one of ``_DAY_SLOT_FIELDS`` raises ``KeyError``: the slots
+    an older version left in the state have no ``house_kwh``.
+    """
+    return {
+        "savings_v": state.savings_v,
+        "chain_start": state.chain_start.isoformat(),
+        "day_start": state.day_start.isoformat(),
+        "day_end": state.day_end.isoformat(),
+        "slots": [{key: slot[key] for key in _DAY_SLOT_FIELDS} for slot in state.slots],
+    }
+
+
+def check_day_slots(row: dict[str, Any], record: dict[str, Any]) -> None:
+    """Raise ``ValueError`` unless the slots of ``record`` add up to the ledger ``row``."""
+    slots = record["slots"]
+    counted = sum(1 for slot in slots if slot["counted"])
+    if counted != row["slots_present"]:
+        raise ValueError(
+            f"day {row['day_start']}: {counted} counted slots, the ledger row has {row['slots_present']}"
+        )
+    for key in ("cost_with_eur", "cost_without_eur"):
+        total = round(sum(float(slot[key]) for slot in slots), 4)
+        if total != float(row[key]):
+            raise ValueError(f"day {row['day_start']}: slots sum {key} {total}, the ledger row has {row[key]}")
 
 
 def lifetime_summary(rows: list[dict[str, Any]], chain_start: datetime) -> dict[str, Any]:

@@ -234,6 +234,10 @@ def savings_ledger_file() -> str:
     return runtime_path("savings_ledger.jsonl")
 
 
+def savings_ledger_slots_file() -> str:
+    return runtime_path("savings_ledger_slots.jsonl")
+
+
 def savings_ledger_state_file() -> str:
     return runtime_path("savings_ledger_state.json")
 

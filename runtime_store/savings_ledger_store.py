@@ -1,6 +1,7 @@
 """Savings ledger files and log pairing (spec ``docs/dev/savings-ledger.md`` § 4).
 
 - ``savings_ledger.jsonl``: append-only, one row per closed SA-day.
+- ``savings_ledger_slots.jsonl``: append-only, the slot series of one closed SA-day per line.
 - ``savings_ledger_state.json``: shadow chain and the open day, written atomically.
 
 The engine itself is ``runtime_store.savings_ledger`` (pure). This module reads and
@@ -27,8 +28,10 @@ from runtime_store.history_chart_rows import (
 )
 from runtime_store.persist_paths_base import (
     savings_ledger_file,
+    savings_ledger_slots_file,
     savings_ledger_state_file,
 )
+from runtime_store import savings_ledger as sl
 from runtime_store.savings_ledger import (
     CHAIN_FIRST_RUN,
     CHAIN_SAVINGS_V_CHANGED,
@@ -41,6 +44,8 @@ from runtime_store.savings_ledger import (
 from runtime_store.slot_ist_powers import index_closed_intervals_by_start
 
 logger = logging.getLogger(__name__)
+
+_SLOT_BACKFILL_HINT = "rebuild it with: python -m scripts.build_savings_ledger --since <chain date> --slots-only"
 
 
 @dataclass(frozen=True)
@@ -150,6 +155,99 @@ def read_rows(path: str | None = None) -> list[dict[str, Any]]:
                 raise ValueError(f"savings ledger: line {number} of {path} is not an object")
             rows.append(row)
     return rows
+
+
+class SlotFileError(ValueError):
+    """The slot file is missing, broken or does not match the ledger."""
+
+
+def append_day_slots(record: dict[str, Any], path: str | None = None) -> None:
+    """Append the slot record of one closed SA-day to the slot file."""
+    path = path or savings_ledger_slots_file()
+    parent = os.path.dirname(path)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+    with open(path, "a", encoding="utf-8", newline="\n") as handle:
+        handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+
+def _check_record_shape(record: Any) -> None:
+    if not isinstance(record, dict):
+        raise ValueError("not an object")
+    if not isinstance(record.get("day_start"), str):
+        raise ValueError("day_start missing")
+    slots = record.get("slots")
+    if not isinstance(slots, list):
+        raise ValueError("slots must be a list")
+    for slot in slots:
+        if not isinstance(slot, dict) or not isinstance(slot.get("slot_start"), str):
+            raise ValueError("slot without slot_start")
+        if not isinstance(slot.get("counted"), bool):
+            raise ValueError(f"slot {slot['slot_start']}: counted must be true or false")
+        values = (slot.get("cost_with_eur"), slot.get("cost_without_eur"), slot.get("house_kwh"))
+        if any(not isinstance(v, (int, float)) or isinstance(v, bool) for v in values):
+            raise ValueError(f"slot {slot['slot_start']}: cost or house energy is not a number")
+        if not slot["counted"] and any(values):
+            raise ValueError(f"slot {slot['slot_start']}: a skipped slot must be zero")
+
+
+def read_day_slots(path: str | None = None) -> dict[str, dict[str, Any]]:
+    """Slot records by ``day_start``; a missing file or a broken line raises ``SlotFileError``."""
+    path = path or savings_ledger_slots_file()
+    if not os.path.isfile(path):
+        raise SlotFileError(f"savings ledger: slot file {path} is missing; {_SLOT_BACKFILL_HINT}")
+    records: dict[str, dict[str, Any]] = {}
+    with open(path, encoding="utf-8") as handle:
+        for number, line in enumerate(handle, start=1):
+            if not line.strip():
+                continue
+            try:
+                record = json.loads(line)
+                _check_record_shape(record)
+            except ValueError as exc:
+                raise SlotFileError(
+                    f"savings ledger: line {number} of {path} is broken ({exc}); {_SLOT_BACKFILL_HINT}"
+                ) from exc
+            if record["day_start"] in records:
+                raise SlotFileError(
+                    f"savings ledger: line {number} of {path} repeats day {record['day_start']}; "
+                    f"{_SLOT_BACKFILL_HINT}"
+                )
+            records[record["day_start"]] = record
+    return records
+
+
+def check_rows_against_slots(
+    rows: list[dict[str, Any]],
+    records: dict[str, dict[str, Any]],
+) -> dict[str, list[dict[str, Any]]]:
+    """Slots of every ledger row by ``day_start``; raises ``SlotFileError`` on any mismatch."""
+    slots: dict[str, list[dict[str, Any]]] = {}
+    for row in rows:
+        record = records.get(row["day_start"])
+        if record is None:
+            raise SlotFileError(f"savings ledger: no slots for day {row['day_start']}; {_SLOT_BACKFILL_HINT}")
+        try:
+            sl.check_day_slots(row, record)
+        except ValueError as exc:
+            raise SlotFileError(f"savings ledger: {exc}; {_SLOT_BACKFILL_HINT}") from exc
+        slots[row["day_start"]] = record["slots"]
+    return slots
+
+
+def closed_day_slots(
+    rows: list[dict[str, Any]],
+    path: str | None = None,
+) -> dict[str, list[dict[str, Any]]]:
+    """Slot series of the given closed-day ledger rows, by ``day_start``, for readers such as the chart.
+
+    Without rows there is nothing to read (no day has closed yet, so no file is
+    expected). With rows, a missing or broken file, a missing day or slots that do
+    not add up to the row raise ``SlotFileError``.
+    """
+    if not rows:
+        return {}
+    return check_rows_against_slots(rows, read_day_slots(path))
 
 
 def sunrise_day_bounds(latitude: float, longitude: float, timezone_name: str) -> DayBounds:

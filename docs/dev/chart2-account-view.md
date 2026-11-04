@@ -66,4 +66,4 @@ The panel only checks that both sides were computed with the same consumption; i
 
 ## 7. Effect on Ledger P7
 
-P7 is on `main` (`a68d2aec`): Chart 2 is visible again in the former presentation, with "Ersparnis bisher" from the ledger. This account view replaces that presentation. It also needs the slot series of closed SA-days, which the ledger does not store yet (§ 4). Not implemented yet.
+P7 is on `main` (`a68d2aec`): Chart 2 is visible again in the former presentation, with "Ersparnis bisher" from the ledger. This account view replaces that presentation. The slot series of closed SA-days it needs (§ 4) exist since Account view P1 (`savings_ledger_slots.jsonl`, [`savings-ledger.md`](savings-ledger.md) § 4); the chart itself is not implemented yet.

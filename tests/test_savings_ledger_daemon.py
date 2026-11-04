@@ -37,12 +37,68 @@ def ledger(tmp_path, monkeypatch):
     rows_path = tmp_path / "savings_ledger.jsonl"
     monkeypatch.setattr(store, "savings_ledger_state_file", lambda: str(state_path))
     monkeypatch.setattr(store, "savings_ledger_file", lambda: str(rows_path))
+    monkeypatch.setattr(store, "savings_ledger_slots_file", lambda: str(tmp_path / "savings_ledger_slots.jsonl"))
     monkeypatch.setattr(store, "sunrise_day_bounds", lambda *_a: _day_bounds)
     monkeypatch.setattr("config.get_planning_timezone", lambda: "Europe/Vienna")
     monkeypatch.setattr("config.get_battery_params_list", lambda: [dict(BATTERY)])
     hook.reset()
     yield state_path, rows_path
     hook.reset()
+
+
+def _close_one_day() -> dict:
+    _cycle("2026-11-02T06:45:03", _closed("2026-11-02T06:30:00"))
+    _cycle("2026-11-02T07:00:02", _closed("2026-11-02T06:45:00"))
+    return _cycle("2026-11-02T07:15:04", _closed("2026-11-02T07:00:00"))
+
+
+def test_day_close_writes_the_slots_of_the_closed_day(ledger):
+    row = _close_one_day()
+
+    slots = store.closed_day_slots([row])[row["day_start"]]
+
+    assert [s["counted"] for s in slots] == [False, True]
+    assert slots[1]["house_kwh"] == pytest.approx(0.25)
+    assert slots[1]["cost_with_eur"] == pytest.approx(row["cost_with_eur"])
+
+
+def test_failed_slot_write_keeps_the_row_warns_and_readers_fail_loud(ledger, monkeypatch, caplog):
+    _, rows_path = ledger
+
+    def fail(_record):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(store, "append_day_slots", fail)
+    with caplog.at_level(logging.WARNING):
+        row = _close_one_day()
+
+    assert store.read_rows(str(rows_path)) == [row]
+    assert "disk full" in caplog.text
+    assert "--since 2026-11-02 --slots-only" in caplog.text
+    # the chain went on: the next cycle does not close the same day again
+    assert _cycle("2026-11-02T07:30:02", _closed("2026-11-02T07:15:00")) is None
+    assert len(store.read_rows(str(rows_path))) == 1
+    with pytest.raises(store.SlotFileError):
+        store.closed_day_slots([row])
+
+
+def test_open_day_of_an_older_state_closes_without_slots_and_warns(ledger, caplog):
+    state_path, rows_path = ledger
+    _cycle("2026-11-02T06:45:03", _closed("2026-11-02T06:30:00"))
+    saved = json.loads(state_path.read_text(encoding="utf-8"))
+    for slot in saved["slots"]:
+        del slot["house_kwh"]
+    state_path.write_text(json.dumps(saved), encoding="utf-8")
+    hook.reset()
+
+    with caplog.at_level(logging.WARNING):
+        _cycle("2026-11-02T07:00:02", _closed("2026-11-02T06:45:00"))
+        row = _cycle("2026-11-02T07:15:04", _closed("2026-11-02T07:00:00"))
+
+    assert store.read_rows(str(rows_path)) == [row]
+    assert "--slots-only" in caplog.text
+    with pytest.raises(store.SlotFileError, match="is missing"):
+        store.closed_day_slots([row])
 
 
 def _closed(start: str, soc0: float = 50.0, soc1: float = 50.0) -> dict:

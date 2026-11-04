@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 import pytest
 
 from runtime_store import savings_ledger as sl
+from runtime_store import savings_ledger_daemon as hook
 from runtime_store import savings_ledger_store as store
 from scripts import build_savings_ledger as cli
 
@@ -140,6 +141,162 @@ def test_dry_run_prints_the_table_and_writes_nothing(env, tmp_path, capsys):
     out = capsys.readouterr().out
     assert "dry run: nothing written" in out
     assert "2026-11-01" in out
+
+
+def _history(runtime) -> None:
+    _write_history(runtime, datetime(2026, 10, 30, 12, 0), datetime(2026, 11, 2, 9, 0))
+
+
+def test_backfill_writes_slots_that_add_up_to_every_row(env, tmp_path):
+    _history(tmp_path)
+
+    assert _run(tmp_path) == 0
+
+    rows = store.read_rows(str(tmp_path / cli.LEDGER_FILENAME))
+    slots = store.closed_day_slots(rows, str(tmp_path / cli.SLOTS_FILENAME))
+    assert list(slots) == [r["day_start"] for r in rows]
+    assert len(slots[rows[1]["day_start"]]) == 96
+    assert slots[rows[1]["day_start"]][0]["house_kwh"] == pytest.approx(0.25)
+
+
+def test_backfill_and_daemon_write_the_same_rows(env, tmp_path, monkeypatch):
+    backfill = tmp_path / "backfill"
+    backfill.mkdir()
+    _history(backfill)
+    assert _run(backfill) == 0
+
+    live = tmp_path / "live"
+    monkeypatch.setattr(store, "savings_ledger_file", lambda: str(live / cli.LEDGER_FILENAME))
+    monkeypatch.setattr(store, "savings_ledger_slots_file", lambda: str(live / cli.SLOTS_FILENAME))
+    monkeypatch.setattr(store, "savings_ledger_state_file", lambda: str(live / cli.STATE_FILENAME))
+    hook.reset()
+    try:
+        entries = []
+        for path in (backfill / ARCHIVE, backfill / "optimization_history.jsonl"):
+            entries += [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+        since = datetime(2026, 10, 31)
+        for entry in entries:
+            completed = datetime.fromisoformat(entry["completed_at"])
+            if completed < since:
+                continue
+            # the replay starts with the slot from --since, so must the daemon
+            closed = entry["closed_interval"] if completed >= since + timedelta(minutes=15) else None
+            hook.on_cycle(closed, entry, now=completed)
+    finally:
+        hook.reset()
+
+    live_slots = (live / cli.SLOTS_FILENAME).read_text(encoding="utf-8")
+    assert live_slots
+    assert live_slots == (backfill / cli.SLOTS_FILENAME).read_text(encoding="utf-8")
+    drop_reason = lambda rows: [{k: v for k, v in r.items() if k != "chain_start_reason"} for r in rows]  # noqa: E731
+    assert drop_reason(store.read_rows(str(live / cli.LEDGER_FILENAME))) == drop_reason(
+        store.read_rows(str(backfill / cli.LEDGER_FILENAME))
+    )
+
+
+def test_existing_slot_file_alone_also_blocks_writing(env, tmp_path):
+    _history(tmp_path)
+    (tmp_path / cli.SLOTS_FILENAME).write_text("{}\n", encoding="utf-8")
+
+    assert _run(tmp_path) == 2
+    assert not (tmp_path / cli.LEDGER_FILENAME).exists()
+
+
+def test_slots_only_covers_old_days_and_leaves_ledger_and_state_alone(env, tmp_path, capsys):
+    _history(tmp_path)
+    assert _run(tmp_path) == 0
+    ledger = tmp_path / cli.LEDGER_FILENAME
+    state = tmp_path / cli.STATE_FILENAME
+    slots = tmp_path / cli.SLOTS_FILENAME
+    before = ledger.read_bytes(), state.read_bytes(), slots.read_text(encoding="utf-8")
+    slots.unlink()
+
+    assert _run(tmp_path, "--slots-only") == 0
+
+    assert (ledger.read_bytes(), state.read_bytes()) == before[:2]
+    assert slots.read_text(encoding="utf-8") == before[2]
+    assert "replay matches all 3 ledger rows" in capsys.readouterr().out
+
+
+def test_slots_only_repairs_a_broken_slot_file(env, tmp_path):
+    _history(tmp_path)
+    assert _run(tmp_path) == 0
+    slots = tmp_path / cli.SLOTS_FILENAME
+    slots.write_text("{broken\n", encoding="utf-8")
+
+    assert _run(tmp_path, "--slots-only") == 0
+
+    rows = store.read_rows(str(tmp_path / cli.LEDGER_FILENAME))
+    assert len(store.closed_day_slots(rows, str(slots))) == 3
+
+
+def test_slots_only_refuses_a_replay_that_differs_from_the_ledger(env, tmp_path, capsys):
+    _history(tmp_path)
+    assert _run(tmp_path) == 0
+    ledger = tmp_path / cli.LEDGER_FILENAME
+    slots = tmp_path / cli.SLOTS_FILENAME
+    rows = store.read_rows(str(ledger))
+    rows[1]["cost_with_eur"] += 1.0
+    ledger.write_text("".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
+    slots.unlink()
+
+    assert _run(tmp_path, "--slots-only") == 1
+
+    assert not slots.exists()
+    assert "Slot file not written" in capsys.readouterr().err
+
+
+def test_slots_only_refuses_days_the_ledger_does_not_have(env, tmp_path, capsys):
+    _history(tmp_path)
+    assert _run(tmp_path) == 0
+    ledger = tmp_path / cli.LEDGER_FILENAME
+    slots = tmp_path / cli.SLOTS_FILENAME
+    rows = store.read_rows(str(ledger))
+    ledger.write_text("".join(json.dumps(r) + "\n" for r in rows[:-1]), encoding="utf-8")
+    slots.unlink()
+
+    assert _run(tmp_path, "--slots-only") == 1
+
+    assert not slots.exists()
+    assert "does not have" in capsys.readouterr().err
+
+
+def test_slots_only_refuses_without_a_ledger(env, tmp_path, capsys):
+    _history(tmp_path)
+
+    assert _run(tmp_path, "--slots-only") == 1
+
+    assert not (tmp_path / cli.SLOTS_FILENAME).exists()
+    assert "no ledger rows" in capsys.readouterr().err
+
+
+def test_slots_only_dry_run_checks_and_writes_nothing(env, tmp_path, capsys):
+    _history(tmp_path)
+    assert _run(tmp_path) == 0
+    slots = tmp_path / cli.SLOTS_FILENAME
+    slots.unlink()
+
+    assert _run(tmp_path, "--slots-only", "--dry-run") == 0
+
+    assert not slots.exists()
+    out = capsys.readouterr().out
+    assert "replay matches all 3 ledger rows" in out
+    assert "dry run: nothing written" in out
+
+
+def test_slots_only_cannot_be_combined_with_rebuild(env, tmp_path):
+    with pytest.raises(SystemExit):
+        _run(tmp_path, "--slots-only", "--rebuild")
+
+
+def test_slots_only_refuses_while_the_daemon_runs(env, tmp_path, monkeypatch, capsys):
+    _history(tmp_path)
+    monkeypatch.setattr(cli, "_daemon_running", lambda _dir: True)
+
+    assert _run(tmp_path, "--slots-only") == 2
+
+    assert not (tmp_path / cli.SLOTS_FILENAME).exists()
+    assert "stop it" in capsys.readouterr().err
 
 
 def test_malformed_log_line_is_reported(env, tmp_path, capsys):
