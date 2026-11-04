@@ -62,13 +62,45 @@
       }
     },
     {
-      "type": "docker-build",
       "label": "docker: build earnie",
-      "dockerBuild": {
-        "tag": "energyoptimizer:latest",
-        "dockerfile": "${workspaceFolder}/docker/Dockerfile",
-        "context": "${workspaceFolder}",
-        "pull": true
+      "type": "shell",
+      "command": "& '${workspaceFolder}\\.venv\\Scripts\\python.exe' -m scripts.build_container --target synology",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "showReuseMessage": false
+      }
+    },
+    {
+      "label": "docker: build + push earnie",
+      "type": "shell",
+      "command": "& '${workspaceFolder}\\.venv\\Scripts\\python.exe' -m scripts.build_container --target synology --push --versioned-only",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "showReuseMessage": false
+      }
+    },
+    {
+      "label": "docker: build + load NAS (ssh earnie-nas)",
+      "type": "shell",
+      "command": "$v = & '${workspaceFolder}\\.venv\\Scripts\\python.exe' -c 'from version import __version__; print(__version__)'; & '${workspaceFolder}\\.venv\\Scripts\\python.exe' -m scripts.build_container --target synology; if ($LASTEXITCODE -eq 0) { cmd /c ('docker save ghcr.io/jochentcc/earnie-energy:' + $v + ' | ssh -o BatchMode=yes earnie-nas sudo /usr/local/bin/docker load') }; exit $LASTEXITCODE",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "showReuseMessage": false
       }
     }
   ]
