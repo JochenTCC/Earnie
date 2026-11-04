@@ -61,25 +61,40 @@ def format_month_label(month_key: str) -> str:
     return f"{month_str}/{year_str}"
 
 
-def monthly_kwh_from_series(values: list[float], timestamps: list[str]) -> dict[str, float]:
+def _month_key(ts_raw: str) -> str:
+    """``YYYY-MM`` of one timestamp; ISO strings are sliced, anything else parsed."""
+    if len(ts_raw) >= 7 and ts_raw[4] == "-" and ts_raw[:4].isdigit() and ts_raw[5:7].isdigit():
+        return ts_raw[:7]
+    ts = parse_timestamp(ts_raw)
+    return f"{ts.year}-{ts.month:02d}"
+
+
+def month_keys(timestamps: list[str]) -> list[str]:
+    """``YYYY-MM`` per timestamp (computed once per bundle, shared by all series)."""
+    return [_month_key(ts_raw) for ts_raw in timestamps]
+
+
+def _monthly_sum(values: list[float], keys: list[str]) -> dict[str, float]:
     monthly: dict[str, float] = defaultdict(float)
-    for ts_raw, power_kw in zip(timestamps, values):
-        ts = parse_timestamp(ts_raw)
-        key = f"{ts.year}-{ts.month:02d}"
+    for key, power_kw in zip(keys, values):
         monthly[key] += float(power_kw)
     return dict(sorted(monthly.items()))
+
+
+def monthly_kwh_from_series(values: list[float], timestamps: list[str]) -> dict[str, float]:
+    return _monthly_sum(values, month_keys(timestamps))
 
 
 def monthly_kwh_by_consumer(
     bundle: ConsumptionSeriesBundle,
 ) -> dict[str, dict[str, float]]:
     """Monat → Verbraucher-ID → kWh."""
+    keys = month_keys(bundle.timestamps)
     result: dict[str, dict[str, float]] = defaultdict(dict)
     for consumer_id, series in bundle.consumer_series.items():
-        for month, kwh in monthly_kwh_from_series(series, bundle.timestamps).items():
+        for month, kwh in _monthly_sum(series, keys).items():
             result[month][consumer_id] = kwh
-    baseload_monthly = monthly_kwh_from_series(bundle.baseload, bundle.timestamps)
-    for month, kwh in baseload_monthly.items():
+    for month, kwh in _monthly_sum(bundle.baseload, keys).items():
         result[month]["baseload"] = kwh
     return {month: dict(values) for month, values in sorted(result.items())}
 

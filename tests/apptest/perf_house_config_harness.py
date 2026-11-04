@@ -74,6 +74,8 @@ def _install_render_profiler(monkeypatch):
 
 
 def _short(key, depth=0):
+    if os.environ.get("PROFILE_FULL_KEYS"):
+        return repr(key)
     if isinstance(key, tuple):
         return "(" + ", ".join(_short(k, depth + 1) for k in key) + ")"
     s = repr(key)
