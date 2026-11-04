@@ -2,6 +2,11 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Cycle recorder tests and dev image workflow (2026-11-04)
+
+- [x] **`tests/test_cycle_recorder.py`: three tests failed from 2026-11-04 on, on every machine** *(fixed 2026-11-04)*: the tests recorded a cycle dated `2026-10-28`, and `finish_cycle` → `prune_old_segments()` deleted that segment relative to the real clock. They now derive the cycle date from `now()`; assertions unchanged.
+- [x] **Dev image build and transfer to the NAS** `[qual]` *(2026-11-04)*: the VS Code task `docker: build earnie` runs `scripts.build_container` instead of a plain `docker build` that left out the Shadow client. New tasks `docker: build + push earnie` (version tags only) and `docker: build + load NAS (ssh earnie-nas)`. Workflow and one-time setup: `DEVELOPER.md`, section "Dev build and transfer to the NAS".
+
 ### Hauskonfigurator — profiling and per-edit rework removal (2026-11-04)
 
 - [x] **Hauskonfigurator: profiling session and per-edit rework removal (A–D, O1, O2)** `[qual]` *(2026-11-03/04, `main` 67459d0 + d9c69bd)*: report [hk-page-profiling.md](../docs/dev/hk-page-profiling.md), harness `tests/apptest/perf_house_config_harness.py` (AppTest + pyinstrument in the script thread, fixture and example profile, cold / warm / edits / tabs). One field edit on the example profile cost 2.4 s in two script runs; after the changes ≈ 1.0 s in one run, cold open 2.6 s → 1.5 s (sandbox numbers, ratios matter).
