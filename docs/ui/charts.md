@@ -68,6 +68,7 @@ PV, Last, Netz, Batterieflüsse und **Flex-Verbraucher** zeigen im grauen Bereic
 - **Nutzung der Mittelwerte:** Chart 1, Verbrauch & Kosten und die Ist-Seite von Soll/Ist nutzen diese Mittelwerte, sobald `sample_count ≥ 3`. Andernfalls dient die Probe am Entscheidungspunkt (`consumption_snapshot`) als Fallback. Ältere Log-Zeilen ohne `closed_interval` bleiben Punktproben.
 - **Loxone-Zähler (optional, VO-Push):** Sind die Energie-Felder aktiviert (`sens_pv_energy` / `sens_grid_energy_*` bzw. `consumer.*.sens_energy_total`), liest der Sampler die vom Miniserver gepushten Zählerstände aus der Inbox. Für diese Kanäle setzt er die mittlere Slot-Leistung aus ΔkWh / 0,25 h (`ist_power_source`: `counter`). Veraltete oder fehlende Zähler (kein Push bzw. älter als 3 × VO-Repeat) lassen den Kanal auf dem Leistungsmittel. Dasselbe gilt für gemeinsame Zähler mit `subtract_consumer_ids`.
 - **HA-Energiezähler (optional):** Zusätzliche Entities `sens_pv_energy` / `sens_grid_energy_import` / `sens_grid_energy_export` in `plant.ehal_bindings` (`device_class=energy`, bevorzugt `state_class=total_increasing`). Für PV und Netz gilt derselbe Vertrag ΔE / 0,25 h; Batterie und Flex bleiben auf dem Leistungsmittel.
+- **Zähler im Ersparnis-Buch:** Stammt PV oder Netz einer Viertelstunde aus einem Zähler, rechnet das Ersparnis-Buch die Hauslast aus der Bilanz PV + Netz + Batterie. So haben beide Seiten des Vergleichs denselben Verbrauch.
 - **Batterie:** Die Aufteilung in Laden und Einspeisung ergibt sich aus der gemessenen Batterieleistung (`Ist Batterie-Leistung (kW)`), nicht aus `battery_plan_kw`. Widerspricht das Ist-Vorzeichen dem SoC-Schritt zum nächsten Log-Slot und fehlt ein brauchbares Slot-Mittel, leitet Earnie die Batterieleistung für die Balken aus dem SoC-Delta ab.
 
 **PV im grauen Bereich:** Eine Prognose-Linie läuft über alle Zonen. Sie zeigt den Forecast.Solar-Wert **vor** dem Live-Overlay (Feld `forecast_pv_kw` im Log). Die PV-Balken (Rauf-Seite der Energiebilanz) nutzen im Log dagegen den **Ist**-Wert (`PV-Ist (kW)` aus `consumption_snapshot.pv_kw`). Die Abweichung ist ab dem nächsten Worker-Lauf nach dem Fix sichtbar. Ältere Log-Einträge können identische Werte haben, weil früher der Ist-Wert fälschlich als Prognose geloggt wurde.
@@ -157,7 +158,15 @@ Die kompakten Buttons stehen in einer Zeile **ohne** Fließtext dazwischen (mobi
 
 Fehlende Log-Slots sind orange markiert; die Ist-Kurven haben dort Lücken.
 
-Die Kennzahlen stehen **pro SA-Tag** im Chart: mobil nur für den sichtbaren Tag, am Desktop (SA₀→SA₂) in zwei Spalten (SA₀→SA₁ | SA₁→SA₂). Am **laufenden Tag** gelten **BL Ziel**, **Optimiert** und **Ersparnis erwartet** für den Rest des Tages; **Ersparnis bisher** kommt aus dem Ersparnis-Buch und nennt zusätzlich die **SoC-Korrektur** (Unterschied im Speicherstand gegenüber der Vergleichsbatterie, bewertet zum mittleren Bezugspreis). **Abgelaufene Tage** zeigen nur das Ergebnis aus dem Buch, ohne Linie und ohne Planwerte; Tage mit weniger als 80 % gebuchten Slots sind als „unvollständig“ markiert. Bei allen Ersparnis-Werten heißt ein positiver Betrag gespart.
+Die Kennzahlen stehen **pro SA-Tag** im Chart: mobil nur für den sichtbaren Tag, am Desktop (SA₀→SA₂) in zwei Spalten (SA₀→SA₁ | SA₁→SA₂). Am **laufenden Tag** gelten **BL Ziel**, **Optimiert** und **Erwartet** für den Rest des Tages; **Bisher** kommt aus dem Ersparnis-Buch, darunter steht als **SoC** die SoC-Korrektur (Unterschied im Speicherstand gegenüber der Vergleichsbatterie, bewertet zum mittleren Bezugspreis). **Abgelaufene Tage** zeigen nur das **Ergebnis** aus dem Buch, ohne Linie und ohne Planwerte; Tage mit weniger als 80 % gebuchten Slots sind als „unvollständig“ markiert.
+
+Beträge stehen ohne Vorzeichen, die Bedeutung als Wort dabei: „gespart“ oder „mehr ausgegeben“, bei der SoC-Korrektur „gutgeschrieben“ oder „abgezogen“. Nur die Kurve **Ersparnis bisher** braucht die Achse und liegt unter 0, wenn mehr ausgegeben wurde.
+
+### Kachel „Mit Earnie gespart“
+
+Über Chart 2 zeigt der Monitor das Ergebnis aller abgeschlossenen SA-Tage seit Beginn der Zählung, mit Datum und Anzahl der Tage. War Earnie insgesamt teurer, heißt die Kachel „Mit Earnie mehr ausgegeben“. **Heute bisher** nennt den laufenden Tag mit denselben Zahlen wie Chart 2; er geht erst mit seinem Abschluss in die Summe ein, weil seine SoC-Korrektur bis dahin vorläufig ist. Der **?**-Hilfetext nennt den Vergleich, seine Grenzen und die Anzahl der unvollständigen Tage ([Handbuch](../user-manual/Benutzer-Handbuch-Earnie.md#monitor)).
+
+Die Kachel bleibt beim Blättern in frühere Tage gleich. Fehlt ein Ergebnis, steht dort kein Betrag, sondern der Grund: Das Buch läuft noch nicht, es gibt keine Hausbatterie, noch keinen abgeschlossenen Tag oder keine gebuchte Viertelstunde. Ein unlesbares Buch erscheint als Warnung.
 
 ## Expander: Simulations-Details
 

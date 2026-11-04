@@ -22,6 +22,7 @@ from ui.history_navigation import (
     render_s2_nav_buttons,
 )
 from ui.help_hint import render_status_with_help
+from ui.ledger_kpi import render_ledger_kpi
 from ui.main_py_sync import MAIN_PY_SYNC_HELP, main_py_sync_status_message
 from ui.runtime_config import reload_runtime_config, simulation_settings_fingerprint
 from ui.chart_debug_capture import render_chart_debug_capture_controls
@@ -388,6 +389,7 @@ def _live_optimization_chart1_fragment(current_soc: float) -> None:
 
 @st.fragment(run_every=CHARTS_FRAGMENT_RUN_EVERY)
 def _live_optimization_chart2_fragment() -> None:
+    render_ledger_kpi(live_now())
     bundle = st.session_state.get(SESSION_LIVE_DISPLAY_BUNDLE)
     if bundle is not None:
         render_optimization_chart2(bundle)

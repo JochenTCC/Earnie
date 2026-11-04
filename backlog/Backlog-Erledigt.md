@@ -2,6 +2,14 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Ledger P8 — Cockpit KPI and method note (2026-11-04)
+
+- [x] **Ledger P8 — Cockpit KPI and method note** `[feat]`: spec [`docs/dev/savings-ledger.md`](../docs/dev/savings-ledger.md) § 4, § 5, § 9 item 6.
+  - Monitor tile above Chart 2 (`ui/ledger_kpi.py`): "Mit Earnie gespart" or "Mit Earnie mehr ausgegeben" with the lifetime total of the closed days of the current chain, start date and day count. "Heute bisher" shows the open day with the same figures as Chart 2 (`open_day_figures`) and stays out of the total. Help text: counterfactual, v1 limits, count of incomplete days. Without a result the tile names the reason (no ledger, no battery, no closed day, no counted slot) and an unreadable ledger is a warning, never 0.00 €.
+  - Amounts without a sign (`ui/saving_text.py`, maintainer decision): Chart 2 annotations read "Ergebnis", "Bisher", "Erwartet" and "SoC" with the amount and "gespart" / "mehr ausgegeben" or "gutgeschrieben" / "abgezogen", also in the Scenario Explorer. The cumulated line keeps negative values. Rendered at a narrow width: "unvollständig" moved to its own row because behind the figure it ran into the second day column.
+  - Energy-counter slots count (spec § 9 item 6, also HA, not only Loxone): with `counter` on pv or grid the ledger books the house load from the balance `pv + grid + battery`, so both sides have the same consumption. All-mean slots are unchanged to the cent, so `savings_v` stays 1.
+  - Tests: `tests/test_ledger_kpi.py`, `tests/apptest/test_ledger_kpi_apptest.py`, `tests/test_savings_ledger_slot.py`, `tests/test_chart_day_costs.py`, Monitor wiring in `tests/apptest/test_page_cockpit_apptest.py`. Docs: handbook § Monitor, `docs/ui/charts.md`, `docs/ui/betriebsmodi.md`, `.github/release-notes/UNRELEASED.md`.
+
 ### Account view P1 — Slot series of closed SA-days (2026-11-04)
 
 - [x] **Account view P1 — Slot series of closed SA-days** `[feat]`: spec [`docs/dev/chart2-account-view.md`](../docs/dev/chart2-account-view.md) § 4, file format [`docs/dev/savings-ledger.md`](../docs/dev/savings-ledger.md) § 4.

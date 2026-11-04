@@ -456,7 +456,14 @@ Der Monitor unter **Live-Cockpit → Monitor** (Sunset-2-Sunset) zeigt Vergangen
 
 **Abwesenheitsmodus:** Ist er wirksam (Earnie-Schalter und/oder Smarthome-Signal `sens_absent_mode`), erscheint oben der Hinweis „Abwesenheitsmodus aktiv“ mit der Quelle. Verbraucher mit der Option „Inaktiv wenn abwesend“ fallen dann aus der Live-Optimierung – außer der Haus-Wärme, die mit abgesenkter Temperatur weiterläuft.
 
-**Ersparnis in Chart 2:** Die Kennzahlen gelten **je Sonnenaufgangs-Tag** (Smartphone: der sichtbare Tag; Desktop: zwei Spalten für SA₀→SA₁ und SA₁→SA₂). Am laufenden Tag zeigt Chart 2 die **Ersparnis bisher** (seit Sonnenaufgang) und die **Ersparnis erwartet** (bis zum nächsten Sonnenaufgang). Der Energievergleich im Expander bezieht sich dagegen auf den vollen Planungshorizont (jetzt bis übernächster Sonnenaufgang).
+**Mit Earnie gespart:** Die Kachel über Chart 2 zeigt das Ergebnis aller abgeschlossenen Sonnenaufgangs-Tage seit Beginn der Zählung, mit Datum und Anzahl der Tage. Darunter steht der laufende Tag („Heute bisher“) mit denselben Zahlen wie in Chart 2. War Earnie insgesamt teurer, heißt die Kachel „Mit Earnie mehr ausgegeben“.
+
+- **Vergleich:** gleicher Verbrauch, gleiche PV, Batterie im Herstellermodus (Eigenverbrauch), gleiche Preise. Grundlage sind die gemessenen Werte, keine Planwerte.
+- **Grenzen:** Verbraucher laufen im Vergleich zur selben Zeit wie gemessen, das Verschieben von Verbrauch ist also nicht bewertet. Was Powerstations aus ihrem Speicher liefern, ist nicht bewertet; ihr Laden zählt zur tatsächlichen Zeit.
+- **Genauigkeit:** Das Ergebnis hängt vom eingestellten Batterie-Wirkungsgrad ab und ist keine Stromrechnung. Einzelne Tage schwanken, aussagekräftig sind längere Zeiträume.
+- **Unvollständige Tage:** Tage mit weniger als 80 % gebuchten Viertelstunden zählen mit. Der Hilfetext der Kachel nennt ihre Anzahl, Chart 2 markiert sie mit „unvollständig“.
+
+**Ersparnis in Chart 2:** Die Kennzahlen gelten **je Sonnenaufgangs-Tag** (Smartphone: der sichtbare Tag; Desktop: zwei Spalten für SA₀→SA₁ und SA₁→SA₂). Beträge stehen ohne Vorzeichen, die Bedeutung als Wort dabei („gespart“, „mehr ausgegeben“). Am laufenden Tag zeigt Chart 2 **Bisher** (seit Sonnenaufgang) und **Erwartet** (bis zum nächsten Sonnenaufgang). Der Energievergleich im Expander bezieht sich dagegen auf den vollen Planungshorizont (jetzt bis übernächster Sonnenaufgang).
 
 #### Chart 1: SoC-Linien (Plausibilität)
 

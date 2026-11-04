@@ -1,12 +1,14 @@
 # Savings ledger — realised savings from logged actuals
 
-**Status:** design proposal, not implemented (2026-11-02). Language: English (docs/dev).
+**Status:** implemented (v1), 2026-11-04. Flex re-timing (`savings_v: 2`, § 7) and the usage ping (§ 6) are open. Language: English (docs/dev).
 **Fixed 2026-11-02:** D2 (Ledger P1) and D3 (Ledger P2); D1 is replaced by the ledger.
 **Implemented 2026-11-02:** slot engine and day close `runtime_store/savings_ledger.py` (Ledger P3, P4), files `runtime_store/savings_ledger_store.py` (P4), daemon hook `runtime_store/savings_ledger_daemon.py` (P5), backfill CLI `scripts/build_savings_ledger.py` (P6).
 **Decision 2026-11-02 (Ledger P0):** `p_ref`, partial days and powerstations are decided (§ 3, § 4, § 9).
 **Implemented 2026-11-04 (Ledger P7):** Chart 2 reads "Ersparnis bisher" from the ledger (`ui/chart_ledger_savings.py`) and is shown again; `chart2_enabled()` and `EARNIE_UI_CHART2` are gone. On a running day BL Ziel, Optimiert and "Ersparnis erwartet" cover the rest of the day; an elapsed day shows only its ledger row. The SoC correction is a label, as the change against the previous day (`saving_adjusted − saving`).
 
 **Implemented 2026-11-04 (Account view P1):** slot series of closed SA-days in `savings_ledger_slots.jsonl` (§ 4).
+
+**Implemented 2026-11-04 (Ledger P8):** Monitor tile (`ui/ledger_kpi.py`, § 5), amounts without a sign (`ui/saving_text.py`, § 5), energy-counter slots count (§ 4, § 9 item 6).
 
 **Decision 2026-11-02:** not in 2.7 — Chart 2 is hidden for the 2.7 release (`ui/live_mode.py::chart2_enabled()`, shown only with `EARNIE_UI_CHART2=1`) (known limitation in the release notes); the corrected chart ships with 2.8 (`backlog/Backlog.md` Version 2.7 / 2.8).
 **Trigger:** debug dump `debug_dump_20261102_062129` ("Kumulierte Kosten - Anzeige unplausibel"), analysed on `release/2.7` (2.7.0-beta.3).
@@ -117,7 +119,7 @@ Multi-ESS: v1 aggregates house batteries with `aggregate_battery_params_for_load
 
 Rules:
 
-- A slot counts when its `closed_interval` is present, has at least `MIN_SAMPLE_COUNT_FOR_MEAN` samples (the bar "Ist bisher" uses) and `ist_power_source` is `mean` for pv, grid, battery and house. A slot whose plant powers all read exactly 0 (meter outage) and a slot without its own log entry or `k_push_act` (no price) are skipped too. Missing slots are skipped on both sides (same slots, same prices), so a gap only understates the saving, it never distorts it. `coverage` and the skipped slots per reason (`slots_skipped`) are stored per row.
+- A slot counts when its `closed_interval` is present, has at least `MIN_SAMPLE_COUNT_FOR_MEAN` samples (the bar "Ist bisher" uses) and `ist_power_source` is `mean` or `counter` for pv and grid and `mean` for battery and house. With a counter on pv or grid the ledger books the house load as `pv_kw + grid_kw + battery_kw` instead of the logged `house_kw`, in the shadow plant and in the slot file's `house_kwh` (§ 9 item 6). A slot whose plant powers all read exactly 0 (meter outage) and a slot without its own log entry or `k_push_act` (no price) are skipped too. Missing slots are skipped on both sides (same slots, same prices), so a gap only understates the saving, it never distorts it. `coverage` and the skipped slots per reason (`slots_skipped`) are stored per row.
 - **Every closed day counts in the lifetime total**, whatever its coverage *(decided 2026-11-02, Ledger P0)*. Dropping a day would also drop its SoC corrections and break the telescoping sum of § 3. Days with `coverage < 0.8` are flagged `"incomplete": true` and shown as "unvollständig" in the UI. On 43 days of the maintainer's plant 37 reach 0.8; the others are restart or gap days.
 - Shadow SoC is **never** reset from the live SoC. It starts once (first ledger run) at the live SoC of that moment and then only follows the shadow rule. If the ledger state is missing or `savings_v` changes, a new chain starts and the UI shows the start date. An unreadable state file is moved aside (`savings_ledger_state.json.broken-<timestamp>`) with a warning; the new chain's first row names the reason (`chain_start_reason`: `first_run`, `savings_v_changed`, `state_unreadable`, `backfill`).
 - A day with no counted slot (or no actual SoC) carries the previous day's SoC correction unchanged (`p_ref_basis: "carried"`), so its correction terms cancel and the telescoping sum stays intact. Calendar days without any closed slot get no row.
@@ -156,6 +158,10 @@ Where it runs: in `main.py` after the cycle's `closed_interval` is written (one 
 | New KPI | — | Cockpit tile "Mit Earnie gespart: X € seit <date> (<n> Tage)" with a help text stating the counterfactual (§ 3) |
 
 The method note (German, user docs) must say in one sentence what "ohne Earnie" means: *gleicher Verbrauch, gleiche PV, Batterie im Herstellermodus (Eigenverbrauch), gleiche Preise.*
+
+**Tile (Ledger P8).** The main figure is the lifetime total of § 4, closed days of the current chain only: it stays stable through the day and is the value the ping would send (§ 6). "Heute bisher" shows the open day apart, with the same figures as Chart 2 (`chart_ledger_savings.open_day_figures`), because its SoC correction is provisional until the day closes. Without a result the tile names the reason and shows no amount.
+
+**Amounts without a sign** *(decided 2026-11-04)*. Savings and SoC corrections show the absolute amount and say what it means in words: "gespart" / "mehr ausgegeben", "gutgeschrieben" / "abgezogen" (`ui/saving_text.py`). A result that rounds to 0.00 € counts as saved. Only the cumulated line keeps negative values, because it needs the axis. The rule also covers the account view. The decimal separator is a separate item (`backlog/Backlog.md`).
 
 ## 6. Usage ping and server
 
@@ -196,7 +202,7 @@ Open: EV sessions (deadline-bound; counterfactual = "charge immediately on plug-
 
 WP 1–2 are independent bug fixes and can ship on `release/2.7`. WP 3–5 are one feature; WP 6–7 wait for the privacy decision; WP 8 is optional.
 
-**Backlog phases:** `backlog/Backlog.md` Version 2.8 splits these into epic **Ledger** P0–P10, one chat session each: P0 decisions (§ 9 items 1–3, done 2026-11-02), P1 = WP 1, P2 = WP 2, P3–P5 = WP 3 (slot engine, day close + files, daemon hook), P6 = WP 4, P7–P8 = WP 5 (chart, cockpit KPI), P9–P10 = WP 8. WP 6–7 stay under Version 2.+1 "Simple Savings KPI".
+**Backlog phases:** `backlog/Backlog.md` Version 2.8 splits these into epic **Ledger** P0–P11, one chat session each: P0 decisions (§ 9 items 1–3, done 2026-11-02), P1 = WP 1, P2 = WP 2, P3–P5 = WP 3 (slot engine, day close + files, daemon hook), P6 = WP 4, P7–P8 = WP 5 (chart, cockpit KPI), P9–P10 = WP 8, P11 = Chart 1 baseline from the shadow chain (no WP, found later). WP 6–7 stay under Version 2.+1 "Simple Savings KPI".
 
 ## 9. Open decisions
 
@@ -205,4 +211,4 @@ WP 1–2 are independent bug fixes and can ship on `release/2.7`. WP 3–5 are o
 3. ~~Powerstations~~ **Decided 2026-11-02 (Ledger P0):** not part of the shadow plant in v1; neutral because `house_kw` is the pv + grid + battery balance (§ 3).
 4. Privacy: ship `savings_eur` in the ping at all; if yes, rounding granularity (0.1 € vs 1 €) and whether `savings_days` is needed.
 5. Does D1's "Ersparnis bisher" disappear before the ledger exists (hide the trace), or stay with a warning label until WP 5 lands? Proposal: hide; a wrong number is worse than none.
-6. Energy counters: when the Loxone energy counters are configured, pv and grid of a slot come from the counters (`ist_power_source` = `counter`) while battery and house stay means, so `house = pv + grid + battery` no longer holds exactly. v1 skips those slots, which means such a plant never gets ledger rows. Options: accept counter slots and recompute `house_kw` from the balance, or keep v1 as is. Decide before P5 goes live.
+6. ~~Energy counters~~ **Decided 2026-11-04 (Ledger P8):** with the plant energy counters configured (Loxone and HA), pv and grid of a slot come from the counters (`ist_power_source` = `counter`) while battery and house stay means, so `house = pv + grid + battery` no longer holds exactly. Booking the logged `house_kw` would give the shadow plant another load than the real one and show a saving that does not exist. Counter slots therefore count with the house load from the balance (§ 4). All-mean slots are unchanged to the cent, so this stays `savings_v: 1` and no chain restarts. The result only differs on plants with counters, whose slots were all skipped before; 2.8 is not released, so no released ledger changes. A ledger built before this change does not replay with `--slots-only` if it holds counter slots (the CLI refuses); `--rebuild` then applies.

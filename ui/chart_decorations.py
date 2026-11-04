@@ -10,6 +10,7 @@ import pandas as pd
 import plotly.graph_objects as go
 
 from ui.chart_consumer_stack import _chart_flex_consumers
+from ui.saving_text import saving_text, soc_correction_text
 from optimizer.deviation_eval import DeviationEvent
 from runtime_store.history_timeline import SLOT_MISSING
 from ui.chart_colors import (
@@ -63,9 +64,11 @@ _CHART2_S2_HELP = (
     "des laufenden SA-Tags). Neutral/Grün: **Prognose** (BL Ziel / optimiert, an Ist "
     "an der Log-Grenze angeschlossen). Kennzahlen **pro SA-Tag** (Mobil: sichtbarer "
     "Tag; Desktop SA₀→SA₂: zwei Spalten). Am laufenden Tag gelten BL Ziel, Optimiert "
-    "und **Ersparnis erwartet** für den Rest des Tages; **Ersparnis bisher** nennt "
-    "zusätzlich die SoC-Korrektur (Unterschied im Speicherstand, bewertet). "
-    "Abgelaufene Tage zeigen nur das Ergebnis aus dem Buch. "
+    "und **Erwartet** für den Rest des Tages; **Bisher** kommt aus dem Buch, darunter "
+    "steht als **SoC** die SoC-Korrektur (Unterschied im Speicherstand, bewertet). "
+    "Abgelaufene Tage zeigen nur das Ergebnis aus dem Buch. Beträge stehen ohne "
+    "Vorzeichen, die Bedeutung als Wort dabei; nur die Kurve ist unter 0, wenn mehr "
+    "ausgegeben wurde. "
     "Fehlende Log-Slots: orange, Lücken in Ist-Kurven."
 )
 
@@ -328,9 +331,11 @@ _COST_SUMMARY_COLUMN_X = (0.01, 0.52)
 
 
 def _savings_annotation_color(savings_euro: float) -> str:
-    if savings_euro > 0:
+    # By the shown cents, so 0.00 € is neither green nor red.
+    cents = round(savings_euro, 2)
+    if cents > 0:
         return COLOR_COST_SAVINGS
-    if savings_euro < 0:
+    if cents < 0:
         return COLOR_COST_SAVINGS_NEGATIVE
     return COLOR_COST_BASELINE
 
@@ -410,7 +415,7 @@ def _append_cost_summary_savings(
             lines,
             base,
             summary_font,
-            text=f"Ersparnis: {savings_euro:+.2f} €",
+            text=f"Ergebnis: {saving_text(savings_euro)}",
             line_index=line_index,
             color=_savings_annotation_color(savings_euro),
         )
@@ -420,7 +425,7 @@ def _append_cost_summary_savings(
             lines,
             base,
             summary_font,
-            text=f"Ersparnis bisher: {achieved_saving_euro:+.2f} €",
+            text=f"Bisher: {saving_text(achieved_saving_euro)}",
             line_index=line_index,
             color=_savings_annotation_color(achieved_saving_euro),
         )
@@ -430,7 +435,7 @@ def _append_cost_summary_savings(
                 lines,
                 base,
                 summary_font,
-                text=f"SoC-Korrektur: {achieved_soc_correction_euro:+.2f} €",
+                text=f"SoC: {soc_correction_text(achieved_soc_correction_euro)}",
                 line_index=line_index,
                 color=COLOR_COST_BASELINE,
             )
@@ -438,7 +443,7 @@ def _append_cost_summary_savings(
         lines,
         base,
         summary_font,
-        text=f"Ersparnis erwartet: {savings_euro:+.2f} €",
+        text=f"Erwartet: {saving_text(savings_euro)}",
         line_index=line_index,
         color=_savings_annotation_color(savings_euro),
     )
@@ -506,15 +511,24 @@ def _history_day_annotations(day, *, x: float, label: str | None) -> list[dict]:
             color=COLOR_COST_BASELINE,
         )
     if day.closed_saving_euro is not None:
-        suffix = " (unvollständig)" if day.closed_incomplete else ""
-        _append_summary_line(
+        line_index = _append_summary_line(
             lines,
             base,
             summary_font,
-            text=f"Ersparnis: {day.closed_saving_euro:+.2f} €{suffix}",
+            text=f"Ergebnis: {saving_text(day.closed_saving_euro)}",
             line_index=line_index,
             color=_savings_annotation_color(day.closed_saving_euro),
         )
+        # Own row: behind the figure it ran into the second day column.
+        if day.closed_incomplete:
+            _append_summary_line(
+                lines,
+                base,
+                summary_font,
+                text="unvollständig",
+                line_index=line_index,
+                color=COLOR_COST_BASELINE,
+            )
     return lines
 
 

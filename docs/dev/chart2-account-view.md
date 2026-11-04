@@ -36,7 +36,8 @@ Chart 2 only shows "Ist bisher" left of *Jetzt*. Baseline and optimized trajecto
 - **Slot series for closed days.** The ledger holds one row per closed SA-day, the slot series only for the open day. The Monitor needs the series of the last closed day, the analysis page those of all closed days: a slot file next to the ledger, filled by a backfill from `optimization_history.jsonl`, so the chart does not replay the log on each render. A read-only replay reproduces the ledger's day rows exactly, so the backfill can use the existing engine.
 - **Skipped slots** count as zero on both sides, as in the ledger, and are marked orange.
 - **SoC correction.** Reserve built so far is in neither gap: it shows as extra cost on the left, while the forecast baseline starts from the live SoC and inherits it. It stays a separate label.
-- **Sign.** The whole view uses the ledger's sign: positive = saving (`cost_without − cost_with`). The annotations' old sign (`optimized − matched`) goes away.
+- **Sign.** The whole view computes with the ledger's sign: positive = saving (`cost_without − cost_with`). Labels show amounts without a sign and name the meaning in words (`ui/saving_text.py`, [`savings-ledger.md`](savings-ledger.md) § 5). The annotations' old sign (`optimized − matched`) goes away.
+- **Incomplete days.** A closed day with `coverage < 0.8` stays marked "unvollständig" when the annotations are replaced.
 
 ## 5. Axis and layout
 

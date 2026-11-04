@@ -22,3 +22,9 @@ def test_renders_without_exception():
 def test_title_present():
     at = AppTest.from_file(str(_SCRIPT)).run()
     assert at.title[0].value == "🔋 Monitor"
+
+
+def test_savings_tile_is_wired_into_the_monitor():
+    at = AppTest.from_file(str(_SCRIPT)).run()
+    texts = [item.value for item in at.caption] + [item.label for item in at.metric]
+    assert any("Mit Earnie" in text for text in texts)

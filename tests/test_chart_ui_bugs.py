@@ -605,8 +605,8 @@ def test_chart2_s2_split_mode_shows_cost_summary_annotations(monkeypatch):
     ]
     assert any("BL Ziel: 2.50" in text for text in texts)
     assert any("Optimiert: 1.80" in text for text in texts)
-    assert any("Ersparnis bisher:" in text for text in texts)
-    assert any("Ersparnis erwartet:" in text for text in texts)
+    assert any(text.startswith("Bisher:") for text in texts)
+    assert any(text.startswith("Erwartet:") for text in texts)
     trace_names = [trace.name for trace in captured["fig"].data]
     assert "Ersparnis bisher" in trace_names
 

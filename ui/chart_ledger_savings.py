@@ -72,6 +72,13 @@ def _cumulative_on_slots(
     return series
 
 
+def open_day_figures(state: sl.LedgerState, battery_params: dict) -> tuple[float, float]:
+    """Saving of the open SA-day so far and its SoC correction, as if the day closed now."""
+    row = sl.close_day(state, battery_params, app_version="")
+    saving = float(row["saving_eur"])
+    return saving, float(row["saving_adjusted_eur"]) - saving
+
+
 def build_ledger_chart_savings(
     slot_starts: Sequence[datetime],
     history_slot_count: int,
@@ -83,8 +90,7 @@ def build_ledger_chart_savings(
     window_end: datetime,
 ) -> dict[str, Any]:
     """Slot series and day figures of one chart window. Pure."""
-    row = sl.close_day(state, battery_params, app_version="")
-    saving = float(row["saving_eur"])
+    saving, soc_correction = open_day_figures(state, battery_params)
     series = _cumulative_on_slots(slot_starts, history_slot_count, state)
     closed_days = [
         {
@@ -103,7 +109,7 @@ def build_ledger_chart_savings(
         "open_day_start": state.day_start.isoformat(),
         "open_day_end": state.day_end.isoformat(),
         "saving_euro": saving,
-        "soc_correction_euro": float(row["saving_adjusted_eur"]) - saving,
+        "soc_correction_euro": soc_correction,
         "closed_days": closed_days,
         "hint": None if has_line or closed_days else HINT_NO_DATA,
     }

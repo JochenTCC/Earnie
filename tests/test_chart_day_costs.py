@@ -66,10 +66,10 @@ def test_day_cost_totals_running_day_takes_bisher_from_the_ledger():
     assert day.savings_euro == pytest.approx(float(n) - 0.4 * n)
     annotations = _cost_summary_annotations(days=days)
     texts = [ann["text"] for ann in annotations]
-    assert "Ersparnis bisher: +0.50 €" in texts
-    assert "SoC-Korrektur: -0.10 €" in texts
-    assert any(t.startswith("Ersparnis erwartet: +") for t in texts)
-    assert not any(t.startswith("Ersparnis:") for t in texts)
+    assert "Bisher: 0.50 € gespart" in texts
+    assert "SoC: 0.10 € abgezogen" in texts
+    assert any(t.startswith("Erwartet: ") and t.endswith(" € gespart") for t in texts)
+    assert not any(t.startswith("Ergebnis:") for t in texts)
 
 
 def test_day_cost_totals_running_day_without_ledger_shows_only_erwartet():
@@ -81,8 +81,8 @@ def test_day_cost_totals_running_day_without_ledger_shows_only_erwartet():
         chart, [1.0] * n, [0.4] * n, history_slot_count=n // 3
     )
     texts = [ann["text"] for ann in _cost_summary_annotations(days=days)]
-    assert any(t.startswith("Ersparnis erwartet:") for t in texts)
-    assert not any("bisher" in t for t in texts)
+    assert any(t.startswith("Erwartet:") for t in texts)
+    assert not any(t.startswith("Bisher:") for t in texts)
 
 
 def test_day_cost_totals_elapsed_day_shows_only_the_ledger_result():
@@ -106,7 +106,39 @@ def test_day_cost_totals_elapsed_day_shows_only_the_ledger_result():
     )
     assert days[0].history_only is True
     texts = [ann["text"] for ann in _cost_summary_annotations(days=days)]
-    assert texts == ["Ersparnis: +0.42 € (unvollständig)"]
+    assert texts == ["Ergebnis: 0.42 € gespart", "unvollständig"]
+
+
+def test_full_span_marks_only_the_incomplete_elapsed_day():
+    """Desktop span SA₀→SA₂: the marker belongs to the incomplete day alone."""
+    now = _dt(2026, 6, 15, 14, 0)
+    anchors = compute_sunrise_anchors(now, LAT, LON, TZ)
+    chart = compute_ui_s2_chart_window(anchors, segment_index=0, span="full")
+    n = len(chart.slot_datetimes)
+    closed = [
+        {
+            "day_start": chart.sa0.isoformat(),
+            "day_end": chart.sa1.isoformat(),
+            "saving_adjusted_eur": -0.42,
+            "incomplete": True,
+        },
+        {
+            "day_start": chart.sa1.isoformat(),
+            "day_end": chart.sa2.isoformat(),
+            "saving_adjusted_eur": 0.3,
+            "incomplete": False,
+        },
+    ]
+    ledger = {**_ledger(chart.sa2 + timedelta(days=3)), "closed_days": closed}
+
+    days = day_cost_totals_for_chart(
+        chart, [0.0] * n, [0.0] * n, history_slot_count=n, ledger=ledger
+    )
+
+    texts = [ann["text"] for ann in _cost_summary_annotations(days=days)]
+    assert "Ergebnis: 0.42 € mehr ausgegeben" in texts
+    assert "Ergebnis: 0.30 € gespart" in texts
+    assert texts.count("unvollständig") == 1
 
 
 def test_day_cost_totals_elapsed_day_without_ledger_invents_no_figure():
@@ -147,5 +179,5 @@ def test_day_cost_totals_full_span_two_columns():
     assert xs == {0.01, 0.52}
     assert any("SA₀→SA₁" in ann["text"] for ann in annotations)
     assert any("SA₁→SA₂" in ann["text"] for ann in annotations)
-    assert any("Ersparnis bisher:" in ann["text"] for ann in annotations)
-    assert any("Ersparnis erwartet:" in ann["text"] for ann in annotations)
+    assert any(ann["text"].startswith("Bisher:") for ann in annotations)
+    assert any(ann["text"].startswith("Erwartet:") for ann in annotations)

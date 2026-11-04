@@ -263,7 +263,7 @@ def test_chart_without_ledger_has_no_zero_line_and_shows_the_hint(monkeypatch):
 
 
 def test_soc_correction_has_its_own_row_so_it_stays_out_of_the_second_column():
-    """On one line with "Ersparnis bisher" it covered the second day column on narrow windows."""
+    """On one line with "Bisher" it covered the second day column on narrow windows."""
     lines = _cost_summary_column_annotations(
         8.0,
         5.5,
@@ -276,9 +276,9 @@ def test_soc_correction_has_its_own_row_so_it_stays_out_of_the_second_column():
     assert texts == [
         "BL Ziel: 8.00 €",
         "Optimiert: 5.50 €",
-        "Ersparnis bisher: -0.97 €",
-        "SoC-Korrektur: +0.78 €",
-        "Ersparnis erwartet: +2.50 €",
+        "Bisher: 0.97 € mehr ausgegeben",
+        "SoC: 0.78 € gutgeschrieben",
+        "Erwartet: 2.50 € gespart",
     ]
     shifts = [line.get("yshift", 0) for line in lines]
     assert len(set(shifts)) == len(shifts)
