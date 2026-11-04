@@ -42,6 +42,22 @@ def payload_fingerprint(payload: Any) -> str:
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
+def persisted_state_known(state_key: str) -> bool:
+    """True once ``auto_persist`` (or ``seed_persisted``) recorded a fingerprint for ``state_key``."""
+    return f"_auto_persist_fp::{state_key}" in st.session_state
+
+
+def seed_persisted(state_key: str, payload: Any) -> None:
+    """Record ``payload`` as the saved state without writing.
+
+    For a form whose widgets were just seeded from disk and whose file already
+    holds what a save would write: the next ``auto_persist`` then writes only
+    after a real edit. Callers must have checked the file (dry run) first — a
+    seed from widget values alone would swallow an edit made during the first run.
+    """
+    st.session_state[f"_auto_persist_fp::{state_key}"] = payload_fingerprint(payload)
+
+
 def auto_persist(
     *,
     state_key: str,

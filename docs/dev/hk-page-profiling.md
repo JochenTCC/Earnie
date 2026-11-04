@@ -102,13 +102,49 @@ The O2 described originally (one `consumer_annual_kwh` call passed down instead 
 sites) is *not* worth doing: with the shared key the second site is a cache hit, and the title
 needs the number before the widgets render either way.
 
+### O3, done (2026-11-04, same branch): opening the page no longer rewrites the file
+
+Before: `auto_persist` knew no fingerprint on the first render of a profile, so every open wrote
+`house_profiles.json` (and through the save path `components.json`), changed the file stamp and
+showed „Gespeichert“ three times (profile plus the two plant writers) although the user had
+changed nothing.
+
+Now (`ui/house_config_profile_save.py`, `ui/house_config_plant.py`, `ui/house_config_io.py`,
+`house_config/profiles_store.py`, `ui/auto_persist.py`):
+
+- First render of an existing profile: a **dry run** (`house_profile_write_pending`) builds the
+  document the save would write (`serialize_house_profiles_document`, same normalisation, own
+  grid area resolved by `stored_own_grid_fee`) and compares it with the file. Equal → the
+  payload is recorded as saved (`seed_persisted`), nothing is written, no caption. Different
+  (file not yet in the normalised form, or the heating catalog would change) → written once as
+  before, with the caption „Gespeichert – Datei auf das aktuelle Format gebracht“ so the
+  normalisation is visible, not silent.
+- The two plant writers seed the same way from the on-disk `plant` (they never wrote an unchanged
+  plant, but claimed „Gespeichert“).
+- The seed is taken only after the file comparison, never from widget values alone: a seed from
+  widgets would swallow an edit made while the first run is still going (the lost-edit class of
+  bug from the backlog). An edit in the first run makes the dry run report a pending write and
+  the save runs.
+- Deferred, not dropped: `sync_powerstation_attached_from_consumers` and the catalog merge run
+  on the first real edit instead of on open; an inconsistent components file stays as it was
+  until then, exactly as before the page was opened.
+
+AppTests: `tests/apptest/test_house_profile_open_no_write_apptest.py` (first open normalises
+once and says so, second open leaves the file byte-identical without „Gespeichert“, an edit after
+a clean open is still saved).
+
+Cost, measured: the dry run is the save without the write (normalise, serialise, read the
+file), ≈ 0.34 s on the example profile in the sandbox. On a normalised file the open therefore
+costs the same as before but writes nothing; the first open of a not-yet-normalised file costs
+once ≈ 0.3 s more (dry run plus the write). O3 is a correctness and file-hygiene change, not a
+speed-up. A cheaper dry run (compare against the loader's cached, already normalised document
+instead of re-normalising) is possible if the 0.3 s matter.
+
 ## 4. Further options
 
-Ordered by value per risk. O3 is a local optimisation; O4–O6 change *when* things are computed
-and need the validity concept in section 5.
+Ordered by value per risk. O4–O6 change *when* things are computed and need the validity
+concept in section 5.
 
-- **O3 — seed the auto-persist fingerprint from disk** on first render (F7): no write and no
-  rerun on open. Needs a check that the first save is not relied on to normalise old files.
 - **O4 — `st.fragment` for „Gesamt-Lastverhalten“**: the section becomes its own fragment that
   reruns on its own buttons (week navigation, period jump) without the form, and the form's
   reruns skip the charts until the inputs that feed them changed. Streamlit fragments rerun with

@@ -165,7 +165,12 @@ def load_tariffs_catalog_meta() -> dict:
         meta["catalog_as_of"] = doc["catalog_as_of"]
     return meta
 
-def upsert_house_profile(profile: dict) -> None:
+def _house_profiles_payload(profile: dict) -> dict:
+    """Everything ``upsert_house_profile`` derives before it writes (no write, no side effect).
+
+    Keys: ``path``, ``payload`` (the document to save), ``components``, ``catalog``,
+    ``catalog_changed`` (components.json would be rewritten), ``consumers``.
+    """
     from house_config.components_store import load_components_document
     from house_config.heating_systems import (
         HEATING_SYSTEMS_KEY,
@@ -209,18 +214,48 @@ def upsert_house_profile(profile: dict) -> None:
     profiles.append(profile)
     # Checked again on save; here before the catalog is written.
     assert_reference_systems_unshared({"profiles": profiles})
-    if catalog != list(components.get(HEATING_SYSTEMS_KEY) or []):
-        _save_components_document({**components, HEATING_SYSTEMS_KEY: catalog})
     payload: dict = {"profiles": profiles}
     plant = raw.get("plant")
     if isinstance(plant, dict) and plant:
         payload["plant"] = dict(plant)
     if "earnie_data_model" in raw:
         payload["earnie_data_model"] = raw["earnie_data_model"]
-    save_house_profiles_document(path, payload)
+    return {
+        "path": path,
+        "payload": payload,
+        "components": components,
+        "catalog": catalog,
+        "catalog_changed": catalog != list(components.get(HEATING_SYSTEMS_KEY) or []),
+        "consumers": consumers,
+    }
+
+
+def house_profile_write_pending(profile: dict) -> bool:
+    """Would ``upsert_house_profile(profile)`` change a file? (dry run, nothing written)
+
+    False when ``house_profiles.json`` already holds exactly what the save would
+    write (normalised form) and the heating catalog is unchanged. Used on the
+    first render of a profile so that opening the page does not rewrite the file.
+    """
+    from house_config.profiles_store import serialize_house_profiles_document
+
+    built = _house_profiles_payload(profile)
+    if built["catalog_changed"] or not os.path.isfile(built["path"]):
+        return True
+    would_write = serialize_house_profiles_document(built["path"], built["payload"])
+    return would_write != read_json_document(built["path"])
+
+
+def upsert_house_profile(profile: dict) -> None:
+    from house_config.heating_systems import HEATING_SYSTEMS_KEY
+
+    built = _house_profiles_payload(profile)
+    if built["catalog_changed"]:
+        _save_components_document({**built["components"], HEATING_SYSTEMS_KEY: built["catalog"]})
+    save_house_profiles_document(built["path"], built["payload"])
     from ui.house_config_entities_io import sync_powerstation_attached_from_consumers
 
-    sync_powerstation_attached_from_consumers(consumers)
+    sync_powerstation_attached_from_consumers(built["consumers"])
 
 
 def _scenario_ids_using_house_profile(profile_id: str) -> tuple[list[str], bool]:

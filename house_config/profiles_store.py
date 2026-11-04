@@ -601,12 +601,9 @@ def _serialize_profile(profile: dict) -> dict:
     return out
 
 
-def save_house_profiles_document(path: str, doc: dict) -> None:
+def serialize_house_profiles_document(path: str, doc: dict) -> dict:
+    """The JSON object ``save_house_profiles_document`` would write for ``doc`` (no write)."""
     from runtime_store.data_model import stamp_data_model
-    from runtime_store.shadow.mode import is_shadow_config_readonly
-
-    if is_shadow_config_readonly():
-        _refuse_shadow_config_write(path)
 
     normalized = normalize_house_profiles_document(
         doc, heating_systems=_heating_catalog_for(path, doc)
@@ -620,6 +617,16 @@ def save_house_profiles_document(path: str, doc: dict) -> None:
     if normalized.get("plant"):
         serializable["plant"] = dict(normalized["plant"])
     stamp_data_model(serializable)
+    return serializable
+
+
+def save_house_profiles_document(path: str, doc: dict) -> None:
+    from runtime_store.shadow.mode import is_shadow_config_readonly
+
+    if is_shadow_config_readonly():
+        _refuse_shadow_config_write(path)
+
+    serializable = serialize_house_profiles_document(path, doc)
     target = os.path.abspath(path)
     os.makedirs(os.path.dirname(target) or ".", exist_ok=True)
     tmp = target + ".tmp"
