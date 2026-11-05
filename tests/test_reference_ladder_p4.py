@@ -9,6 +9,7 @@ from ui.backtesting_ladder import (
     rule_share_text,
 )
 from ui.backtesting_results_helpers import build_annual_cost_rows
+from ui.saving_text import saving_text
 
 
 def _meta() -> dict:
@@ -73,7 +74,7 @@ def test_end_soc_term_counts_in_saving_and_share_like_the_table():
     assert summary.saving_eur == pytest.approx(101.35)
     assert summary.rule_share == pytest.approx((1500.0 - 1001.35) / 600.0)
     row = next(row for row in build_annual_cost_rows(meta) if row["Szenario"] == "Live")
-    assert row["Ersparnis vs. Standard-Regeln [€]"] == f"{summary.saving_eur:+.2f} €"
+    assert row["Ersparnis vs. Standard-Regeln [€]"] == saving_text(summary.saving_eur)
 
 
 def test_fuel_counts_on_every_step():

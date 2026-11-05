@@ -532,8 +532,8 @@ def test_annual_cost_rows_add_fuel_to_jahres_kosten():
         },
     }
     row = build_annual_cost_rows(meta)[0]
-    assert row["Jahres Kosten [€]"] == "2250.00 €"
-    assert row["Brennstoffkosten [€]"] == "1250.00 €"
+    assert row["Jahres Kosten [€]"] == "2250,00 €"
+    assert row["Brennstoffkosten [€]"] == "1250,00 €"
     assert row["CO2 [kg]"] == "4000"
 
 

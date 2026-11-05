@@ -483,9 +483,9 @@ def test_horizon_soc_tail_kept_when_current_hour_ramp_active():
 def test_cost_summary_annotations_include_totals_and_the_plan_in_words():
     annotations = _cost_summary_annotations(12.34, 11.50)
     assert len(annotations) == 3
-    assert annotations[0]["text"] == "BL Ziel: 12.34 €"
-    assert annotations[1]["text"] == "Optimiert: 11.50 €"
-    assert annotations[2]["text"] == "Plan: 0.84 € gespart"
+    assert annotations[0]["text"] == "BL Ziel: 12,34 €"
+    assert annotations[1]["text"] == "Optimiert: 11,50 €"
+    assert annotations[2]["text"] == "Plan: 0,84 € gespart"
     assert annotations[2]["font"]["color"] == COLOR_COST_SAVINGS
     assert annotations[0]["xref"] == "paper"
     assert annotations[0]["xanchor"] == "left"
