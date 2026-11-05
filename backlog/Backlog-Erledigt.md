@@ -2,6 +2,16 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### RuleRef P0 — Method decisions (2026-11-05)
+
+- [x] **RuleRef P0 — Method decisions** `[dev]`: spec [`docs/dev/rule-based-reference.md`](../docs/dev/rule-based-reference.md) § 7, O1–O5 decided by the maintainer. No production code.
+  - O1: the SE plans with perfect foresight of PV, load and prices; the existing `--price-strategy` books at planned prices and does not fix this. New item **SE forecast mode**, required before final study figures, not blocking RuleRef P1–P5.
+  - O2: surplus to the consumer before the battery; battery first in the sensitivity (8 runs per scenario).
+  - O3: price lock strictly above P75 of the available horizon on the end-customer price.
+  - O4: rule per consumer type with thermal surplus boost. Real per-consumer timing as starting profile, because SE matrices have no `expected_flex_kw` and targets were spread flat. Nominal from window start where there is no shape. Heating rod 0 kWh in L1 / L2, flagged in the study export.
+  - O5: UI headline L2 vs. L3, ladder in an expander.
+  - Scope changes in RuleRef P1, P2, P4 and P5, recorded in those items.
+
 ### Ledger P8 — Cockpit KPI and method note (2026-11-04)
 
 - [x] **Ledger P8 — Cockpit KPI and method note** `[feat]`: spec [`docs/dev/savings-ledger.md`](../docs/dev/savings-ledger.md) § 4, § 5, § 9 item 6.
