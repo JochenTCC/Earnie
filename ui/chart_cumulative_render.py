@@ -32,6 +32,7 @@ from ui.chart_legend_mobile import (
 from ui.chart_slot_axis import ChartSlotAxis, _chart_xaxis_config
 from ui.chart_trace_segments import _extrapolation_bounds
 from ui.help_hint import render_title_with_help
+from ui.number_format import plotly_separators
 
 
 @dataclass(frozen=True)
@@ -144,6 +145,7 @@ def _cumulative_chart_layout(
         title=plotly_title,
         xaxis=_chart_xaxis_config(axis, range_start=range_start),
         yaxis=dict(title="Kosten (€, kumuliert)"),
+        separators=plotly_separators(),
         **_collapsible_chart_layout(top_margin=top_margin),
     )
     if series.show_consumption:

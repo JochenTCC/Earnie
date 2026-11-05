@@ -66,8 +66,8 @@ def test_day_cost_totals_running_day_takes_bisher_from_the_ledger():
     assert day.savings_euro == pytest.approx(float(n) - 0.4 * n)
     annotations = _cost_summary_annotations(days=days)
     texts = [ann["text"] for ann in annotations]
-    assert "Bisher: 0.50 € gespart" in texts
-    assert "SoC: 0.10 € abgezogen" in texts
+    assert "Bisher: 0,50 € gespart" in texts
+    assert "SoC: 0,10 € abgezogen" in texts
     assert any(t.startswith("Erwartet: ") and t.endswith(" € gespart") for t in texts)
     assert not any(t.startswith("Ergebnis:") for t in texts)
 
@@ -121,7 +121,7 @@ def test_day_cost_totals_elapsed_day_shows_only_the_ledger_result():
     )
     assert days[0].history_only is True
     texts = [ann["text"] for ann in _cost_summary_annotations(days=days)]
-    assert texts == ["Ergebnis: 0.42 € gespart", "unvollständig"]
+    assert texts == ["Ergebnis: 0,42 € gespart", "unvollständig"]
 
 
 def test_full_span_marks_only_the_incomplete_elapsed_day():
@@ -151,8 +151,8 @@ def test_full_span_marks_only_the_incomplete_elapsed_day():
     )
 
     texts = [ann["text"] for ann in _cost_summary_annotations(days=days)]
-    assert "Ergebnis: 0.42 € mehr ausgegeben" in texts
-    assert "Ergebnis: 0.30 € gespart" in texts
+    assert "Ergebnis: 0,42 € mehr ausgegeben" in texts
+    assert "Ergebnis: 0,30 € gespart" in texts
     assert texts.count("unvollständig") == 1
 
 

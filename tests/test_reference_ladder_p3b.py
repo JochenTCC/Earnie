@@ -141,19 +141,19 @@ def _live_row(meta: dict) -> dict:
 
 def test_saving_column_includes_the_soc_term_and_names_it():
     row = _live_row(_meta(1.35))
-    assert row["Ersparnis vs. Standard-Regeln [€]"] == "+101.35 €"
-    assert "1.35 € gutgeschrieben (80 % gegen 30 %)" in row["Hinweis"]
+    assert row["Ersparnis vs. Standard-Regeln [€]"] == "101,35 € gespart"
+    assert "1,35 € gutgeschrieben (80 % gegen 30 %)" in row["Hinweis"]
 
 
 def test_deducted_term_lowers_the_saving_in_words():
     row = _live_row(_meta(-1.35))
-    assert row["Ersparnis vs. Standard-Regeln [€]"] == "+98.65 €"
-    assert "1.35 € abgezogen" in row["Hinweis"]
+    assert row["Ersparnis vs. Standard-Regeln [€]"] == "98,65 € gespart"
+    assert "1,35 € abgezogen" in row["Hinweis"]
 
 
 def test_log_before_this_valuation_says_so():
     row = _live_row(_meta(None))
-    assert row["Ersparnis vs. Standard-Regeln [€]"] == "+100.00 €"
+    assert row["Ersparnis vs. Standard-Regeln [€]"] == "100,00 € gespart"
     assert "nicht bewertet" in row["Hinweis"]
 
 
@@ -351,4 +351,4 @@ def test_chart_2_names_the_baseline():
         add_cumulative_cost_traces(fig, frame["Uhrzeit"], axis, [1.0] * 4, [0.5] * 4)
         texts = [a["text"] for a in _cost_summary_annotations(4.0, 2.0)]
     assert "Kosten Standard-Regeln" in {trace.name for trace in fig.data}
-    assert "Standard-Regeln: 4.00 €" in texts
+    assert "Standard-Regeln: 4,00 €" in texts

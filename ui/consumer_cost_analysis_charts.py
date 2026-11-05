@@ -39,6 +39,7 @@ from ui.consumer_cost_battery_metrics import (
     build_battery_period_metrics,
 )
 from ui.consumption_display.period import TimeWindow, format_window_label
+from ui.number_format import format_euro
 
 
 def _label(labels: Mapping[str, str], consumer_id: str) -> str:
@@ -367,12 +368,12 @@ def render_period_kpis(
     c1, c2 = st.columns(2)
     c1.metric(
         format_window_label(window),
-        f"{selected.cost_euro:.2f} €",
+        format_euro(selected.cost_euro),
         help=f"{selected.energy_kwh:.1f} kWh · {selected.slot_count} Slots",
     )
     c2.metric(
         "Letzte 365 Tage",
-        f"{trailing_year.cost_euro:.2f} €",
+        format_euro(trailing_year.cost_euro),
         help=(
             f"{trailing_year.energy_kwh:.1f} kWh · {trailing_year.slot_count} Slots "
             "(nur vorhandene Log-Daten)"

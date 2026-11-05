@@ -11,6 +11,7 @@ import plotly.graph_objects as go
 
 from ui.chart_baseline_label import baseline_label
 from ui.chart_consumer_stack import _chart_flex_consumers
+from ui.number_format import format_euro
 from ui.saving_text import saving_text, soc_correction_text
 from optimizer.deviation_eval import DeviationEvent
 from runtime_store.history_timeline import SLOT_MISSING
@@ -385,7 +386,7 @@ def _cost_summary_head_lines(
         lines,
         base,
         summary_font,
-        text=f"{baseline_label()}: {matched_baseline_cost_euro:.2f} €",
+        text=f"{baseline_label()}: {format_euro(matched_baseline_cost_euro)}",
         line_index=line_index,
         color=COLOR_COST_BASELINE,
     )
@@ -393,7 +394,7 @@ def _cost_summary_head_lines(
         lines,
         base,
         summary_font,
-        text=f"Optimiert: {optimized_cost_euro:.2f} €",
+        text=f"Optimiert: {format_euro(optimized_cost_euro)}",
         line_index=line_index,
         color=COLOR_COST_OPTIMIZED,
     )

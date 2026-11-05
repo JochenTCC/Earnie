@@ -28,6 +28,7 @@ from ui.house_config_profile_thermal_annual import (  # noqa: F401  (re-exported
     _render_thermal_storage_fields,
     _render_wp_annual_metric,
 )
+from ui.number_format import format_cent_kwh
 
 
 _PASSTHROUGH_CONSUMER_KEYS = (
@@ -250,7 +251,7 @@ def _show_nne_spec_caption(config: dict, catalog: dict) -> None:
         for item in fee.skipped
     )
     st.caption(
-        f"Basis-Arbeitspreis: **{fee.base_cent_kwh:.2f} Cent/kWh** netto · "
+        f"Basis-Arbeitspreis: **{format_cent_kwh(fee.base_cent_kwh)}** netto · "
         f"aktive Zeitregeln: **{active}**"
         + (f" · übersprungen: {skipped}" if skipped else "")
     )

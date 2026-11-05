@@ -19,6 +19,8 @@ from ui.backtesting_results_helpers import (
     _soc_correction_block,
     _totals_with_fuel,
 )
+from ui.number_format import format_euro
+from ui.saving_text import saving_text
 
 STEP_L0 = "l0"
 STEP_L3 = "l3"
@@ -133,12 +135,12 @@ def ladder_table_rows(summaries: list[LadderSummary]) -> list[dict]:
                     "Szenario": summary.label,
                     "Stufe": _STEP_NAMES[step],
                     "Inhalt": _STEP_CONTENT[step],
-                    "Kosten [€]": f"{summary.costs[step]:.2f} €",
+                    "Kosten [€]": format_euro(summary.costs[step]),
                     "Ladestand am Periodenende [€]": (
-                        f"{correction:+.2f} €" if correction is not None else _DASH
+                        format_euro(correction, signed=True) if correction is not None else _DASH
                     ),
                     "Ersparnis zur Stufe davor [€]": (
-                        f"{previous - adjusted:+.2f} €" if previous is not None else _DASH
+                        saving_text(previous - adjusted) if previous is not None else _DASH
                     ),
                 }
             )
@@ -158,7 +160,7 @@ def render_ladder_headline(meta: dict) -> None:
         for column, summary in zip(st.columns(_METRICS_PER_ROW), chunk):
             column.metric(
                 summary.label,
-                f"{summary.saving_eur:+.2f} €",
+                saving_text(summary.saving_eur),
                 delta=rule_share_text(summary.rule_share),
                 delta_color="off",
                 delta_arrow="off",

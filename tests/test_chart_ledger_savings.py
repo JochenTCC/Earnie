@@ -109,7 +109,7 @@ def test_series_leaves_slots_of_other_days_empty():
 def test_soc_correction_is_the_day_rows_change_against_the_previous_day():
     slots = [_slot(8)]
     state = _state(_booked(slots[0], with_eur=0.5, without_eur=0.7), soc_actual_end=30.0, prev=0.25)
-    # (30 − 20) % · 15 kWh · 0.94 at 40 ct = 0.564 €; minus the 0.25 € carried in.
+    # (30 − 20) % · 15 kWh · 0.94 at 40 ct = 0,564 €; minus the 0,25 € carried in.
     ledger = _build(state, slots, history=1)
 
     assert ledger["saving_euro"] == pytest.approx(0.2)
@@ -274,11 +274,11 @@ def test_soc_correction_has_its_own_row_so_it_stays_out_of_the_second_column():
 
     texts = [line["text"] for line in lines]
     assert texts == [
-        "BL Ziel: 8.00 €",
-        "Optimiert: 5.50 €",
-        "Bisher: 0.97 € mehr ausgegeben",
-        "SoC: 0.78 € gutgeschrieben",
-        "Erwartet: 2.50 € gespart",
+        "BL Ziel: 8,00 €",
+        "Optimiert: 5,50 €",
+        "Bisher: 0,97 € mehr ausgegeben",
+        "SoC: 0,78 € gutgeschrieben",
+        "Erwartet: 2,50 € gespart",
     ]
     shifts = [line.get("yshift", 0) for line in lines]
     assert len(set(shifts)) == len(shifts)

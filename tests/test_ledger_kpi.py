@@ -69,11 +69,11 @@ def _row(saving: float, *, incomplete: bool = False, slots_present: int = 90, ch
 @pytest.mark.parametrize(
     ("euro", "text"),
     [
-        (0.42, "0.42 € gespart"),
-        (-2.18, "2.18 € mehr ausgegeben"),
-        (0.0, "0.00 € gespart"),
-        (-0.004, "0.00 € gespart"),
-        (-0.006, "0.01 € mehr ausgegeben"),
+        (0.42, "0,42 € gespart"),
+        (-2.18, "2,18 € mehr ausgegeben"),
+        (0.0, "0,00 € gespart"),
+        (-0.004, "0,00 € gespart"),
+        (-0.006, "0,01 € mehr ausgegeben"),
     ],
 )
 def test_saving_text_has_no_sign_and_names_the_meaning(euro, text):
@@ -81,14 +81,14 @@ def test_saving_text_has_no_sign_and_names_the_meaning(euro, text):
 
 
 def test_soc_correction_text_names_the_direction():
-    assert soc_correction_text(0.78) == "0.78 € gutgeschrieben"
-    assert soc_correction_text(-0.1) == "0.10 € abgezogen"
+    assert soc_correction_text(0.78) == "0,78 € gutgeschrieben"
+    assert soc_correction_text(-0.1) == "0,10 € abgezogen"
 
 
 def test_colour_follows_the_shown_cents():
     assert _savings_annotation_color(-0.004) == COLOR_COST_BASELINE
     assert saving_is_loss(-0.004) is False
-    assert euro_amount(-0.004) == "0.00 €"
+    assert euro_amount(-0.004) == "0,00 €"
 
 
 def test_total_counts_closed_days_of_the_current_chain_only():
@@ -187,7 +187,7 @@ def test_today_text_uses_the_words_of_chart2():
     }
 
     assert today_text(ledger, NOW) == (
-        "Heute bisher: 0.97 € mehr ausgegeben · SoC-Korrektur: 0.78 € gutgeschrieben"
+        "Heute bisher: 0,97 € mehr ausgegeben · SoC-Korrektur: 0,78 € gutgeschrieben"
     )
 
 

@@ -2,6 +2,15 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Decimal separator in the UI (2026-11-05)
+
+- [x] **Decimal separator in the UI** `[feat]`: euro and cent amounts follow the viewer's browser language.
+  - Decision: the first language of the request's `Accept-Language` header decides (`ui/number_format.py`); `.` for languages that write a decimal point (en, ja, zh, …), `,` for all others and without a header (the UI is German). The container locale was rejected because Streamlit renders on the server.
+  - `format_euro` / `format_decimal` / `format_cent_kwh` used by `ui/saving_text.py`, Chart 2 annotations (`ui/chart_decorations.py`), the tile, the Scenario Explorer tables and ladder, `ui/pages/page_devices.py` (incl. the Styler table), `ui/consumer_cost_analysis_charts.py`, `ui/price_forecast.py` and the thermal profile price. Chart 2 sets Plotly `layout.separators`, so hovers and axes agree.
+  - No-sign rule (`docs/dev/savings-ledger.md` § 5) extended to the Scenario Explorer savings (headline metric, `Ersparnis vs. Standard-Regeln`, `Ersparnis zur Stufe davor`); differences (`Δ vs Referenz`, end-SoC term, device delta) keep their sign.
+  - Docs: `docs/ui/charts.md`, `docs/ui/betriebsmodi.md`, user manual, `.github/release-notes/UNRELEASED.md`. Follow-up for kWh/kW/% and numeric tables in `Backlog.md`.
+  - Tests: `tests/test_number_format.py`; expectations in the ledger, ladder, Scenario Explorer and device tests switched to the comma.
+
 ### RuleRef P4 — UI ladder and docs (2026-11-05)
 
 - [x] **RuleRef P4 — UI ladder and docs** `[feat]`: spec [`docs/dev/rule-based-reference.md`](../docs/dev/rule-based-reference.md) § 7 O5.

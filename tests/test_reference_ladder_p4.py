@@ -116,13 +116,13 @@ def test_table_steps_add_up_to_the_total_saving():
     meta = _meta()
     meta["ladder_soc_correction"] = {"live": _soc_block(2.0, 1.35)}
     rows = [r for r in ladder_table_rows(build_ladder_summaries(meta)) if r["Szenario"] == "Live"]
-    assert [r["Kosten [€]"] for r in rows] == ["1500.00 €", "1200.00 €", "1000.00 €", "900.00 €"]
-    assert [r["Ladestand am Periodenende [€]"] for r in rows] == ["—", "+2.00 €", "+1.35 €", "—"]
+    assert [r["Kosten [€]"] for r in rows] == ["1500,00 €", "1200,00 €", "1000,00 €", "900,00 €"]
+    assert [r["Ladestand am Periodenende [€]"] for r in rows] == ["—", "+2,00 €", "+1,35 €", "—"]
     assert [r["Ersparnis zur Stufe davor [€]"] for r in rows] == [
         "—",
-        "+298.00 €",
-        "+200.65 €",
-        "+101.35 €",
+        "298,00 € gespart",
+        "200,65 € gespart",
+        "101,35 € gespart",
     ]
     assert 298.00 + 200.65 + 101.35 == pytest.approx(1500.0 - 900.0)
 
