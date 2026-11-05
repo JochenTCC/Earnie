@@ -150,6 +150,7 @@ def test_closed_days_in_the_window_keep_their_result_and_incomplete_flag():
     row = {
         "day_start": yesterday.isoformat(),
         "day_end": _DAY_START.isoformat(),
+        "saving_eur": -0.5,
         "saving_adjusted_eur": -0.4,
         "incomplete": True,
     }
@@ -172,6 +173,7 @@ def test_closed_days_in_the_window_keep_their_result_and_incomplete_flag():
     assert ledger["closed_days"] == [{
         "day_start": yesterday.isoformat(),
         "day_end": _DAY_START.isoformat(),
+        "saving_eur": -0.5,
         "saving_adjusted_eur": -0.4,
         "incomplete": True,
     }]

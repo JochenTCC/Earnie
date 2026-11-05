@@ -1,6 +1,6 @@
 # Chart 2 as an account view
 
-**Status:** agreed with the maintainer in chat on 2026-11-04. **Implemented 2026-11-05 (Account view P2)** for the Monitor and the Scenario Explorer window: `ui/chart_account_view.py` (pure), `ui/chart_account_render.py` (Plotly/Streamlit), slots left of *Jetzt* from `ui/chart_ledger_savings.py`. The former traces and the per-day cost annotations are removed. The analysis page (P3) is still open.
+**Status:** agreed with the maintainer in chat on 2026-11-04. **Implemented 2026-11-05 (Account view P2)** for the Monitor and the Scenario Explorer window: `ui/chart_account_view.py` (pure), `ui/chart_account_render.py` (Plotly/Streamlit), slots left of *Jetzt* from `ui/chart_ledger_savings.py`. The former traces and the per-day cost annotations are removed. **Implemented 2026-11-05 (Account view P3)** on the analysis page: `render_period_account_chart` for the page's 7 / 28-day window.
 **Related:** [`savings-ledger.md`](savings-ledger.md) § 3–5, [`../ui/charts.md`](../ui/charts.md) § Chart 2, `backlog/Backlog.md` epic Ledger (P7, P8).
 
 ---
@@ -59,8 +59,8 @@ The panel only checks that both sides were computed with the same consumption; i
 
 ## 6. Open
 
-1. **Long windows on the analysis page.** The total cost dominates the y scale there, so the gap becomes too small to read. The prototype tries an optional panel with the gap alone.
-2. **Axis label on the analysis page.** With 0 € at the window start, the axis values change with the window while the curve shapes stay the same.
+1. ~~**Long windows on the analysis page.**~~ **Decided 2026-11-05 (P3):** the total cost dominates the y scale there, so the lower panel shows the saving since the window start alone, on its own scale, filled green / red. It replaces the consumption control there, which is flat left of *Jetzt* by construction.
+2. ~~**Axis label on the analysis page.**~~ **Decided 2026-11-05 (P3):** 0 € at the window start, axis "Kontostand seit Fensterstart (€)", as in the Monitor; the values change with the window, the end value is the period's total. The page's own 7 / 28-day selector and navigation apply; no extra period choice.
 3. **Forecast consumption.** The log's `savings_snapshot` has no consumption series, and the debug file stores the costed baseline's rows only implicitly (matched rows minus the profile-fallback consumers). The chart must take the series from the chart context.
 4. **Optional: budget.** The user sets an amount for electricity; the axis then starts at that amount instead of 0 € and the line shows what is left, so reaching 0 € means the budget is used up. This is one more constant offset and needs no extra data. Still to decide: the budget's period (a calendar month does not match the visible window) and whether falling below 0 € is flagged.
 5. ~~**Plan energy difference.**~~ **Decided 2026-11-05 (P2):** costed baseline and optimized plan need not end with the same energy, so "erwartet" also contains the price of that difference. A caption under the chart names it when the difference at *Jetzt* is at least 0.5 kWh **and** at least 2 % of the planned consumption (`ENERGY_DIFF_MIN_KWH`, `ENERGY_DIFF_MIN_SHARE`).
@@ -78,3 +78,10 @@ P7 is on `main` (`a68d2aec`): Chart 2 is visible again in the former presentatio
 - **Gap colouring:** the area between the lines is split where they cross; the sign of the gap (positive = saved, in both modes) picks green or red. 0,00 € is neither (`saving_color`).
 - **Labels:** "Bisher" (window start in "Ist bei Jetzt", *Jetzt* in "Gemeinsamer Start"), "Erwartet" / "Gesamt" at the window end, "Plan" for a window without past; closed days "Ergebnis" with "unvollständig"; the open day's SoC correction at *Jetzt*.
 - **Switch state:** `st.session_state["chart2_anchor_mode"]`, radio inside the Chart 2 fragment, default "Ist bei Jetzt".
+
+## 9. Analysis page (P3)
+
+- `ui/chart_account_render.render_period_account_chart(window.start, window.end)` on `ui/pages/page_consumer_analysis.py`, above the log analysis, following the page's 7 / 28-day window. Quarter-hour slots of the window; the ledger figures come from `load_ledger_chart_savings` with every slot "past", so the anchor is the window end.
+- Lower panel: saving since the window start (`period=True`), no consumption control. Labels: "Zeitraum" for the gap; only incomplete closed days are marked ("unvollständig"); no per-day "Ergebnis" and no open-day SoC label. The caption sums the SoC corrections (`saving_adjusted − saving`) of the closed days that lie fully in the window (`period_soc_correction_eur`).
+- Orange slots are merged into runs (one shape per run), which keeps 28 days light; the Monitor uses the same.
+- Own switch state: `analysis_chart2_anchor_mode`.

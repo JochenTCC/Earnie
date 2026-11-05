@@ -2,6 +2,15 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Account view P3 — Longer periods on the analysis page (2026-11-05)
+
+- [x] **Account view P3 — Longer periods on the analysis page** `[feat]`: spec [`docs/dev/chart2-account-view.md`](../docs/dev/chart2-account-view.md) §§ 6, 9.
+  - "Analyse Verbrauch & Kosten" shows the account view of the page's 7 / 28-day window above the log analysis (`render_period_account_chart`), entirely from the ledger, anchored at the window end, with its own switch state.
+  - Decisions: spec § 6 item 1 — a lower panel with the saving since the window start alone (green / red, own scale) instead of the consumption control; item 2 — 0 € at the window start, as in the Monitor; periods follow the page's selector.
+  - Only incomplete days are marked; a caption sums the SoC corrections of the closed days fully in the window. Orange slots are merged into runs (also in the Monitor).
+  - Tests: `tests/test_chart_account_view.py` (period part), `tests/apptest/test_period_account_apptest.py`.
+  - Docs: user manual § Analyse Verbrauch & Kosten, `docs/ui/charts.md`, page help text, `.github/release-notes/UNRELEASED.md`.
+
 ### Account view P2 — Monitor and SE window show the account view (2026-11-05)
 
 - [x] **Account view P2 — Monitor shows the account view** `[feat]`: spec [`docs/dev/chart2-account-view.md`](../docs/dev/chart2-account-view.md) §§ 3–5, 8.

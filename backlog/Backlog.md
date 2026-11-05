@@ -43,11 +43,8 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 - [ ] **Decimal separator for non-currency numbers** `[feat]` *(follow-up of the decimal separator item, 2026-11-05, no date)*: kWh, kW and % still show a point next to euro amounts with a comma (e.g. `ui/consumer_cost_analysis_charts.py` battery caption, Plotly axes outside Chart 2). Numeric `st.dataframe` columns are formatted by the browser and still show a point. Extend `ui/number_format.py` (`format_decimal`, `plotly_separators`) to these, decide per table whether a text column or a Streamlit `NumberColumn` format fits (sorting must stay numeric).
 
 - **Epic Account view — Chart 2 as an account view** *(design 2026-11-04, follows Ledger P7)*: spec [`docs/dev/chart2-account-view.md`](../docs/dev/chart2-account-view.md). Replaces the former Chart 2 presentation: baseline and optimized as balance lines over the whole window (falling = paying), meeting at *Jetzt* by default, with a switch to a common start; below it a consumption control showing baseline minus optimized, zero at the horizon end. Each phase is sized for **one chat session** and ends with green tests and a commit.
-  - **Order:** P1 and P2 are done (`Backlog-Erledigt.md`); P3 next, P4 is optional.
+  - **Order:** P1–P3 are done (`Backlog-Erledigt.md`); P4 is optional.
   - **Note:** Ledger P11 "Chart 1 baseline from the shadow chain" would start the forecast baseline from the shadow SoC. Spec § 4 ("the baseline changes its definition at *Jetzt*") and the help text must then be revisited.
-
-- [ ] **Account view P3 — Longer periods on the analysis page** `[feat]` *(1 session, after P2)*: same presentation on "Analyse Verbrauch & Kosten" (`ui/pages/page_consumer_analysis.py`) with selectable periods. Decide spec § 6 "Long windows" (gap panel, since the total cost dominates the scale) and "Axis label".
-  - **Docs:** German user manual section of the analysis page.
 
 - [ ] **Account view P4 — Budget** `[feat]` *(optional, after P2)*: the user sets an amount for electricity, the axis shows what is left. First decide the budget's period and whether falling below 0 € is flagged (spec § 6).
 

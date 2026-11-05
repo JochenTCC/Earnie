@@ -8,7 +8,7 @@ there and the switch is not shown.
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -245,13 +245,15 @@ def _gap_label(
     )
 
 
-def _add_gap_labels(fig: go.Figure, view: AccountView, times: list[datetime]) -> None:
+def _add_gap_labels(
+    fig: go.Figure, view: AccountView, times: list[datetime], *, so_far_name: str = "Bisher"
+) -> None:
     n = view.slot_count
     if not view.has_past:
         _gap_label(fig, times, view, n, f"Plan: {saving_text(view.saving_after_eur)}",
                    view.saving_after_eur, xanchor="right")
         return
-    so_far = f"Bisher: {saving_text(view.saving_so_far_eur)}"
+    so_far = f"{so_far_name}: {saving_text(view.saving_so_far_eur)}"
     if view.mode == ANCHOR_NOW:
         _gap_label(fig, times, view, 0, so_far, view.saving_so_far_eur, xanchor="left")
         if view.has_future:
@@ -265,9 +267,18 @@ def _add_gap_labels(fig: go.Figure, view: AccountView, times: list[datetime]) ->
 
 
 def _add_ledger_labels(
-    fig: go.Figure, ledger: dict | None, times: list[datetime], view: AccountView
+    fig: go.Figure,
+    ledger: dict | None,
+    times: list[datetime],
+    view: AccountView,
+    *,
+    period: bool = False,
 ) -> None:
-    """Closed days keep their ledger result; the open day's SoC correction is its own label."""
+    """Closed days keep their ledger result; the open day's SoC correction is its own label.
+
+    A ``period`` of several weeks has no room for a label per day: it marks only the
+    incomplete days and leaves the SoC corrections to the caption under the chart.
+    """
     if not ledger:
         return
     start, end = times[0], times[-1]
@@ -275,6 +286,14 @@ def _add_ledger_labels(
         day_start = max(datetime.fromisoformat(day["day_start"]), start)
         day_end = min(datetime.fromisoformat(day["day_end"]), end)
         if day_end <= day_start:
+            continue
+        if period:
+            if day["incomplete"]:
+                fig.add_annotation(
+                    x=day_start + (day_end - day_start) / 2, y=1.0, xref="x", yref="paper",
+                    yanchor="top", text="unvollständig", showarrow=False, textangle=-90,
+                    font=dict(size=10, color=COLOR_COST_BASELINE),
+                )
             continue
         text = f"Ergebnis: {saving_text(day['saving_adjusted_eur'])}"
         if day["incomplete"]:
@@ -286,7 +305,7 @@ def _add_ledger_labels(
         )
     correction = ledger.get("soc_correction_euro")
     open_start = ledger.get("open_day_start")
-    if correction is None or open_start is None or not view.has_past:
+    if period or correction is None or open_start is None or not view.has_past:
         return
     if not (datetime.fromisoformat(open_start) < end and datetime.fromisoformat(ledger["open_day_end"]) > start):
         return
@@ -298,17 +317,28 @@ def _add_ledger_labels(
     )
 
 
-def _add_marked_slots(
-    fig: go.Figure, axis: ChartSlotAxis, slots: AccountSlots, slot_qualities: tuple[str, ...] | None
-) -> None:
+def _marked_runs(slots: AccountSlots, slot_qualities: tuple[str, ...] | None) -> list[tuple[int, int]]:
+    """Runs ``[first, last]`` of slots shown orange; one shape per run keeps long windows light."""
     qualities = slot_qualities if slot_qualities and len(slot_qualities) == len(slots.states) else None
+    runs: list[tuple[int, int]] = []
     for index, state in enumerate(slots.states):
         missing_log = qualities is not None and qualities[index] == SLOT_MISSING
         if state not in SLOT_STATES_MARKED and not missing_log:
             continue
+        if runs and runs[-1][1] == index - 1:
+            runs[-1] = (runs[-1][0], index)
+        else:
+            runs.append((index, index))
+    return runs
+
+
+def _add_marked_slots(
+    fig: go.Figure, axis: ChartSlotAxis, slots: AccountSlots, slot_qualities: tuple[str, ...] | None
+) -> None:
+    for first, last in _marked_runs(slots, slot_qualities):
         fig.add_vrect(
-            x0=axis.legacy_index_time(index - 0.5),
-            x1=axis.legacy_index_time(index + 0.5),
+            x0=axis.legacy_index_time(first - 0.5),
+            x1=axis.legacy_index_time(last + 0.5),
             fillcolor=CHART_MISSING_SLOT_FILL,
             line_width=0,
             layer="below",
@@ -330,6 +360,47 @@ def _add_consumption_panel(fig: go.Figure, view: AccountView, times: list[dateti
         col=1,
     )
     fig.add_hline(y=0, line=dict(color="rgba(128,128,128,0.6)", width=1), row=2, col=1)
+
+
+def _add_saving_panel(fig: go.Figure, view: AccountView, times: list[datetime]) -> None:
+    """Saving since the window start alone, on its own scale (spec § 6 item 1, decided P3)."""
+    # Balances: the optimized line above the baseline means saved.
+    cumulative = [opt - base for opt, base in zip(view.optimized, _start_baseline(view))]
+    for sign, color in ((1, COLOR_COST_SAVINGS_FILL), (-1, COLOR_COST_SAVINGS_NEGATIVE_FILL)):
+        fig.add_trace(
+            go.Scatter(
+                x=times,
+                y=[max(sign * value, 0.0) * sign for value in cumulative],
+                mode="lines",
+                line=dict(width=0),
+                fill="tozeroy",
+                fillcolor=color,
+                hoverinfo="skip",
+                showlegend=False,
+            ),
+            row=2,
+            col=1,
+        )
+    name = "Ersparnis seit Fensterstart"
+    fig.add_trace(
+        go.Scatter(
+            x=times,
+            y=cumulative,
+            mode="lines",
+            name=name,
+            line=dict(color=COLOR_COST_BASELINE, width=1.5),
+            hovertemplate=f"{name}: %{{y:.2f}} €<extra></extra>",
+        ),
+        row=2,
+        col=1,
+    )
+    fig.add_hline(y=0, line=dict(color="rgba(128,128,128,0.6)", width=1), row=2, col=1)
+
+
+def _start_baseline(view: AccountView) -> list[float]:
+    """The baseline as in "Gemeinsamer Start", whatever the chosen mode."""
+    shift = view.baseline[0] - view.optimized[0]
+    return [value - shift for value in view.baseline]
 
 
 def energy_difference_hint(view: AccountView) -> str | None:
@@ -355,7 +426,9 @@ def build_account_figure(
     chart_zones=None,
     slot_qualities: tuple[str, ...] | None = None,
     sun_markers=None,
+    period: bool = False,
 ) -> go.Figure:
+    """``period``: the analysis page's 7 / 28 days, with the saving panel below (spec § 6, P3)."""
     axis = ChartSlotAxis.from_dataframe(df)
     times = _boundary_times(axis)
     range_start = _chart_range_start(chart_window)
@@ -365,19 +438,30 @@ def build_account_figure(
     # Traces first: Plotly leaves shapes out of subplots that are still empty.
     _add_gap_fills(fig, view, times)
     _add_balance_lines(fig, view, times, ledger_names=view.has_past)
-    _add_consumption_panel(fig, view, times)
+    if period:
+        _add_saving_panel(fig, view, times)
+    else:
+        _add_consumption_panel(fig, view, times)
     if chart_zones is not None:
         _add_zone_backgrounds(fig, chart_zones, axis, range_start=range_start)
     _add_marked_slots(fig, axis, slots, slot_qualities)
     if sun_markers is not None:
         _add_sun_markers(fig, sun_markers)
-    _add_gap_labels(fig, view, times)
-    _add_ledger_labels(fig, ledger, times, view)
+    _add_gap_labels(fig, view, times, so_far_name="Zeitraum" if period else "Bisher")
+    _add_ledger_labels(fig, ledger, times, view, period=period)
     xaxis = _chart_xaxis_config(axis, range_start=range_start)
+    if period:
+        span_days = (times[-1] - times[0]).total_seconds() / 86400
+        xaxis.update(
+            title="Datum",
+            # Plotly writes weekday names in English, so the date alone.
+            tickformat="%d.%m.",
+            dtick=86_400_000 * (1 if span_days <= 8 else 7),
+        )
     fig.update_xaxes(**{key: value for key, value in xaxis.items() if key != "title"})
     fig.update_xaxes(title=xaxis["title"], row=2, col=1)
     fig.update_yaxes(title="Kontostand seit Fensterstart (€)", zeroline=True, row=1, col=1)
-    fig.update_yaxes(title="kWh", row=2, col=1)
+    fig.update_yaxes(title="€" if period else "kWh", row=2, col=1)
     fig.update_layout(
         separators=plotly_separators(),
         height=520,
@@ -443,7 +527,88 @@ def render_account_chart(
         st.caption(ledger["hint"])
 
 
+PERIOD_TITLE = "Kontostand: mit und ohne Earnie"
+PERIOD_HELP = (
+    "Kontostand seit Fensterstart aus dem Ersparnis-Buch: gebuchte Stromkosten und "
+    "Einspeiseerlöse mit Earnie und ohne Earnie (Batterie im Herstellermodus, gleicher "
+    "Verbrauch, gleiche PV, gleiche Preise), ohne Grund- und Netzgebühren. Fällt die Linie, "
+    "wird bezahlt. **Ist bei Jetzt** lässt beide Linien am Fensterende enden, der Abstand am "
+    "Fensterstart ist die Ersparnis des Zeitraums; **Gemeinsamer Start** lässt beide bei 0 € "
+    "beginnen. Das Panel darunter zeigt die Ersparnis seit Fensterstart allein, auf eigener "
+    "Skala: grün gespart, rot mehr ausgegeben. Die SoC-Korrekturen der abgeschlossenen Tage "
+    "stecken in keinem Abstand, die Zeile unter dem Chart nennt ihre Summe. Orange Slots hat "
+    "das Buch nicht gezählt, sie zählen auf beiden Seiten null; unvollständige Tage sind "
+    "markiert."
+)
+SESSION_PERIOD_PREFIX = "analysis_"
+
+
+def period_soc_correction_eur(ledger: dict, window_start: datetime, window_end: datetime) -> tuple[float, int]:
+    """SoC corrections of the closed days that lie fully in the window, and their count."""
+    total = 0.0
+    count = 0
+    for day in ledger.get("closed_days") or []:
+        if (
+            datetime.fromisoformat(day["day_start"]) >= window_start
+            and datetime.fromisoformat(day["day_end"]) <= window_end
+        ):
+            total += float(day["saving_adjusted_eur"]) - float(day["saving_eur"])
+            count += 1
+    return total, count
+
+
+def period_account_slots(ledger: dict) -> AccountSlots:
+    """A past window: every slot from the ledger, anchored at its end; no energy control."""
+    count = len(ledger["slot_states"])
+    return AccountSlots(
+        with_eur=tuple(float(value) for value in ledger["slot_with_eur"]),
+        without_eur=tuple(float(value) for value in ledger["slot_without_eur"]),
+        baseline_kwh=(0.0,) * count,
+        optimized_kwh=(0.0,) * count,
+        states=tuple(ledger["slot_states"]),
+        anchor=count,
+    )
+
+
+def render_period_account_chart(window_start: datetime, window_end: datetime) -> None:
+    """Account view of a 7 / 28-day window on the analysis page (Account view P3)."""
+    from runtime_store.history_timeline import quarter_hour_slots_between
+    from ui.chart_ledger_savings import load_ledger_chart_savings
+
+    render_title_with_help(PERIOD_TITLE, PERIOD_HELP, key=f"{SESSION_PERIOD_PREFIX}chart2_help")
+    # The window's end is the start of its last log slot, which belongs to it.
+    end_exclusive = window_end + timedelta(minutes=15)
+    slot_starts = list(quarter_hour_slots_between(window_start, end_exclusive))
+    if not slot_starts:
+        st.info("Keine Viertelstunden in diesem Zeitraum.")
+        return
+    ledger = load_ledger_chart_savings(
+        slot_starts, len(slot_starts), window_start=window_start, window_end=end_exclusive
+    )
+    slots = period_account_slots(ledger)
+    mode = _anchor_mode(True, SESSION_PERIOD_PREFIX)
+    view = build_account_view(slots, mode)
+    df = pd.DataFrame({"slot_datetime": slot_starts})
+    fig = build_account_figure(df, slots, view, ledger=ledger, chart_window=None, period=True)
+    inject_mobile_legend_css()
+    st.plotly_chart(fig, width="stretch", key=f"{SESSION_PERIOD_PREFIX}account_chart")
+    render_collapsible_legend_from_figure(fig)
+    correction, days = period_soc_correction_eur(ledger, window_start, end_exclusive)
+    if days:
+        st.caption(
+            f"SoC-Korrekturen der {days} abgeschlossenen Tage im Zeitraum, nicht im Abstand "
+            f"enthalten: {soc_correction_text(correction)}."
+        )
+    if ledger.get("hint"):
+        st.caption(ledger["hint"])
+
+
 __all__ = [
+    "PERIOD_HELP",
+    "PERIOD_TITLE",
+    "period_account_slots",
+    "period_soc_correction_eur",
+    "render_period_account_chart",
     "ANCHOR_LABELS",
     "CHART2_HELP",
     "CHART2_TITLE",

@@ -58,6 +58,7 @@ def _row(saving: float, *, incomplete: bool = False, slots_present: int = 90, ch
     return {
         "savings_v": sl.SAVINGS_V,
         "chain_start": chain.isoformat(),
+        "saving_eur": saving,
         "saving_adjusted_eur": saving,
         "incomplete": incomplete,
         "slots_present": slots_present,

@@ -213,7 +213,9 @@ Sind PV, Netz, Batterie und Haus alle exakt 0 kW, zeichnet Earnie keinen Sankey,
 
 ## Analyse Verbrauch & Kosten (Live-Cockpit)
 
-Die Auswertung nutzt dieselbe Slot-Zuordnung wie Chart 1 (`allocate_slot_flows`, siehe [Rauf/Runter-Algorithmus](#raufrunter-algorithmus-wasserfall)).
+**Kontostand mit und ohne Earnie** (oben): dieselbe Kontoansicht wie [Chart 2](#chart-2-kontostand-mit-und-ohne-earnie), für das gewählte 7- oder 28-Tage-Fenster und ganz aus dem Ersparnis-Buch (abgeschlossene Tage aus der Slot-Datei, der laufende Tag aus dem Buch-Zustand). Das Fenster liegt in der Vergangenheit, der Anker steht deshalb am Fensterende: Bei **Ist bei Jetzt** enden beide Linien dort, der Abstand am Fensterstart ist die Ersparnis des Zeitraums (Label **Zeitraum**); **Gemeinsamer Start** lässt beide bei 0 € beginnen. Der Umschalter ist unabhängig von dem im Monitor. Die y-Achse beginnt bei 0 € am Fensterstart, ihre Werte ändern sich also beim Blättern. Statt der Verbrauchskontrolle (links von Jetzt immer flach) zeigt das Panel darunter die **Ersparnis seit Fensterstart** auf eigener Skala, grün oder rot gefüllt; bei mehreren Wochen wäre der Abstand im oberen Panel sonst kaum zu sehen. Statt eines Ergebnis-Labels je Tag sind nur **unvollständige** Tage markiert; die SoC-Korrekturen der Tage, die ganz im Zeitraum liegen, nennt eine Zeile unter dem Chart. Orange Bereiche hat das Buch nicht gezählt (z. B. vor seinem Start).
+
+Die übrige Auswertung nutzt dieselbe Slot-Zuordnung wie Chart 1 (`allocate_slot_flows`, siehe [Rauf/Runter-Algorithmus](#raufrunter-algorithmus-wasserfall)).
 
 - **Verteilung:** Die Zuordnung wird anteilig (pro rata) auf Grundlast und gemessene Flex-Verbraucher verteilt.
 - **Kosten am Verbrauchsort:** Kosten entstehen nur für den **Netzanteil** (Netzanteil × Importpreis); PV und Batterie-Entladung zählen mit 0 €.

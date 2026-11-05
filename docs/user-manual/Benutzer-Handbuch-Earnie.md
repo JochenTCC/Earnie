@@ -482,9 +482,11 @@ Die Seite **Live-Cockpit → Manuelle Geräte** zeigt alle Verbraucher mit der R
 
 ### Analyse Verbrauch & Kosten
 
-Die Seite **Live-Cockpit → Analyse Verbrauch & Kosten** gibt es nur im Live-Betrieb mit bestehender Smarthome-Verbindung (UI-Modus `live_environment`). Sie wertet das Produktiv-Log aus:
+Die Seite **Live-Cockpit → Analyse Verbrauch & Kosten** gibt es nur im Live-Betrieb mit bestehender Smarthome-Verbindung (UI-Modus `live_environment`). Ganz oben steht der **Kontostand mit und ohne Earnie** für den gewählten Zeitraum, aus dem Ersparnis-Buch und in derselben Darstellung wie Chart 2 im Monitor: Zwei Linien zeigen den Kontostand seit Fensterstart, mit dem Umschalter **Ist bei Jetzt** enden beide am Fensterende (der Abstand am Anfang ist die Ersparnis des Zeitraums), mit **Gemeinsamer Start** beginnen beide bei 0 €. Weil bei mehreren Wochen die Gesamtkosten die Skala bestimmen, zeigt ein Panel darunter die **Ersparnis seit Fensterstart** allein: grün gespart, rot mehr ausgegeben. Unvollständige Tage sind markiert; die SoC-Korrekturen der abgeschlossenen Tage stecken in keinem Abstand, eine Zeile unter dem Chart nennt ihre Summe.
 
-- die letzten **7** oder **28 Tage** (verschiebbar),
+Darunter wertet die Seite das Produktiv-Log aus:
+
+- die letzten **7** oder **28 Tage** (verschiebbar; gilt auch für den Kontostand),
 - eine Kennzahl für die letzten **365 Tage** vorhandener Log-Daten,
 - Batterieflüsse,
 - den **Wärmeinhalt** (Simulation und Ist) aus der Live-Historie.

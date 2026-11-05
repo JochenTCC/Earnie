@@ -134,6 +134,7 @@ def build_ledger_chart_savings(
         {
             "day_start": str(item["day_start"]),
             "day_end": str(item["day_end"]),
+            "saving_eur": float(item["saving_eur"]),
             "saving_adjusted_eur": float(item["saving_adjusted_eur"]),
             "incomplete": bool(item.get("incomplete")),
         }

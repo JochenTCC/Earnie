@@ -254,3 +254,82 @@ def test_window_without_past_reads_plan():
     fig = build_account_figure(_frame(), slots, view, ledger=None, chart_window=None)
 
     assert [a.text for a in fig.layout.annotations] == ["Plan: 0,10 € gespart"]
+
+
+# --- Account view P3: the analysis page's 7 / 28-day window -----------------------------
+
+
+def _period_ledger(states, with_eur, without_eur, closed_days=()):
+    return {
+        "slot_with_eur": list(with_eur),
+        "slot_without_eur": list(without_eur),
+        "slot_states": list(states),
+        "closed_days": list(closed_days),
+        "open_day_start": None,
+        "open_day_end": None,
+        "soc_correction_euro": None,
+        "hint": None,
+    }
+
+
+def test_period_is_anchored_at_its_end_without_an_energy_control():
+    from ui.chart_account_render import period_account_slots
+
+    slots = period_account_slots(
+        _period_ledger([SLOT_COUNTED] * 3, [0.1, 0.2, 0.1], [0.3, 0.1, 0.2])
+    )
+    view = build_account_view(slots, ANCHOR_NOW)
+
+    assert slots.anchor == 3 and not view.has_future
+    assert view.saving_so_far_eur == pytest.approx(0.2)
+    assert set(view.consumption_gap_kwh) == {0.0}
+
+
+def test_period_soc_correction_counts_closed_days_fully_inside():
+    from ui.chart_account_render import period_soc_correction_eur
+
+    day = timedelta(days=1)
+    closed = [
+        {"day_start": (_START - day).isoformat(), "day_end": _START.isoformat(),
+         "saving_eur": 1.0, "saving_adjusted_eur": 1.2, "incomplete": False},
+        {"day_start": _START.isoformat(), "day_end": (_START + day).isoformat(),
+         "saving_eur": 0.5, "saving_adjusted_eur": 0.4, "incomplete": True},
+    ]
+    total, count = period_soc_correction_eur(
+        _period_ledger([], [], [], closed), _START - timedelta(hours=1), _START + 2 * day
+    )
+
+    assert count == 1
+    assert total == pytest.approx(-0.1)
+
+
+def test_period_figure_has_the_saving_panel_and_marks_only_incomplete_days():
+    from ui.chart_account_render import period_account_slots
+
+    closed = [
+        {"day_start": _START.isoformat(), "day_end": (_START + 2 * _QUARTER).isoformat(),
+         "saving_eur": 0.1, "saving_adjusted_eur": 0.1, "incomplete": False},
+        {"day_start": (_START + 2 * _QUARTER).isoformat(), "day_end": (_START + 4 * _QUARTER).isoformat(),
+         "saving_eur": 0.1, "saving_adjusted_eur": 0.1, "incomplete": True},
+    ]
+    ledger = _period_ledger(
+        [SLOT_SKIPPED, SLOT_SKIPPED, SLOT_COUNTED, SLOT_COUNTED],
+        [0.0, 0.0, 0.1, 0.4],
+        [0.0, 0.0, 0.3, 0.1],
+        closed,
+    )
+    slots = period_account_slots(ledger)
+    view = build_account_view(slots, ANCHOR_NOW)
+
+    fig = build_account_figure(_frame(), slots, view, ledger=ledger, chart_window=None, period=True)
+
+    texts = [annotation.text for annotation in fig.layout.annotations]
+    assert "Zeitraum: 0,10 € mehr ausgegeben" in texts
+    assert texts.count("unvollständig") == 1
+    assert not any(text.startswith("Ergebnis") or text.startswith("SoC") for text in texts)
+    saving = next(trace for trace in fig.data if trace.name == "Ersparnis seit Fensterstart")
+    assert list(saving.y) == pytest.approx([0.0, 0.0, 0.0, 0.2, -0.1])
+    assert not any(str(trace.name).startswith("Verbrauch ") for trace in fig.data)
+    # Two skipped slots in a row are one orange area per panel.
+    marked = [shape for shape in fig.layout.shapes if shape.fillcolor == CHART_MISSING_SLOT_FILL]
+    assert len(marked) == 2
