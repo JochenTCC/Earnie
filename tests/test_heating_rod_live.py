@@ -406,3 +406,68 @@ def test_live_rod_has_a_pulse_limit(live):
     assert 0 < len(starts) <= 4
 
 
+# --- write and read path ----------------------------------------------------------------
+
+
+def test_rod_enable_follows_the_plan_and_publishes_on_its_own_id():
+    from integrations.loxone_comm_trace import LoxoneWriteRecord
+    from integrations.loxone_writes import _write_flexible_consumer_output
+
+    rod = next(
+        c
+        for c in collect_planning_flex_consumers(
+            _profile(_consumer(_GAS, rod_bindings={_ENABLE: "", _POWER: ""}))
+        )
+        if c["id"] == _ROD_ID
+    )
+    published: list[tuple[str, float]] = []
+
+    def _pub(qid, value, *, io_name=""):
+        published.append((qid, float(value)))
+        return LoxoneWriteRecord(
+            io_name=io_name or qid, value=float(value), success=True, written_at="t"
+        )
+
+    with patch("integrations.loxone_writes._publish_setpoint_traced", side_effect=_pub):
+        for power in (3.0, 0.0):
+            _write_flexible_consumer_output(
+                rod, {_ROD_ID: power}, {}, None, None, send=True,
+                publish_kinds=frozenset({"set_enable"}),
+            )
+    assert published == [(_ENABLE, 1.0), (_ENABLE, 0.0)]
+
+
+def _rod_entry(bindings: dict) -> dict:
+    return next(
+        c
+        for c in collect_planning_flex_consumers(_profile(_consumer(_GAS, rod_bindings=bindings)))
+        if c["id"] == _ROD_ID
+    )
+
+
+def test_live_power_reads_the_rods_meter_as_power():
+    from integrations.loxone_live_power import _read_consumer_meter_kw
+
+    rod = _rod_entry({_ENABLE: "E", _POWER: "Rod_P"})
+    with patch("integrations.loxone_live_power.fetch_loxone_generic_value", return_value=1.5):
+        assert _read_consumer_meter_kw(rod) == pytest.approx(1.5)
+
+
+def test_live_power_without_meter_is_run_state_times_nominal():
+    from integrations.loxone_live_power import _read_consumer_meter_kw
+
+    rod = _rod_entry({_ENABLE: "E", _ACTIVE: "Rod_A"})
+    assert marker_sens_consumer_active(rod) == "Rod_A"
+    with patch("integrations.loxone_live_power.fetch_loxone_generic_value", return_value=1.0):
+        assert _read_consumer_meter_kw(rod) == pytest.approx(3.0)
+    with patch("integrations.loxone_live_power.fetch_loxone_generic_value", return_value=0.0):
+        assert _read_consumer_meter_kw(rod) == pytest.approx(0.0)
+
+
+def test_baseload_subtracts_the_measured_rod():
+    from data.live_consumption import build_consumption_snapshot
+
+    snapshot = build_consumption_snapshot(
+        {"house": 3.5, "pv": 0.0, "grid": 3.5, "battery": 0.0}, {_ROD_ID: 3.0}
+    )
+    assert snapshot["baseload_kw"] == pytest.approx(0.5)
