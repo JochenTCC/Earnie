@@ -294,11 +294,30 @@ Ein Heizstab lädt den Wärmespeicher elektrisch mit Wirkungsgrad 1. Er ist ein 
 - **Kennung:** In Signalen und Ergebnissen heißt der Heizstab `<Kennung des Verbrauchers>_heating_rod`, z. B. `waermepumpe_heating_rod`.
 - **Neben einer Wärmepumpe:** Der Optimierer verteilt die Tageswärme auf Wärmepumpe und Heizstab. Der Heizstab lohnt sich, wenn Strom in einem Zeitfenster weniger kostet als der Strompreis der Wärmepumpe geteilt durch ihre JAZ, z. B. bei negativen Preisen. Die Wärmepumpe braucht dafür die Planung durch den Optimierer (`optimizer_flex` nicht `false`).
 - **Neben einem Brennstoff:** Jede kWh Heizstab-Wärme spart Brennstoff im Wert von Brennstoffpreis / Nutzungsgrad. Der Optimierer setzt den Heizstab ein, wenn Strom günstiger ist, z. B. bei PV-Überschuss mit niedriger Einspeisevergütung. Höchstens so viel Wärme, wie das Haus am Tag braucht.
-- **Grenzen:** Der Optimierer rechnet mit der Tageswärme des Hauses, nicht mit der freien Kapazität des Speichers. Der Heizstab plant derzeit nur im Szenarien-Explorer. Im Live-Betrieb bleibt er aus, eine Steuerung über ein eigenes Binding folgt später.
+- **Im Szenarien-Explorer:** Der Optimierer rechnet mit der Tageswärme des Hauses, nicht mit der freien Kapazität des Speichers.
+
+#### Heizstab im Live-Betrieb
+
+Live plant den Heizstab nur, wenn alle drei Signale vorhanden sind. Fehlt eines, bleibt er aus und das Log nennt das fehlende Signal:
+
+| Signal | Bedeutung |
+|---|---|
+| `heatpump.<Kennung>_heating_rod.set_enable` | Freigabe 0/1, schaltet den Heizstab |
+| `heatpump.<Kennung>_heating_rod.sens_power_act` oder `.sens_consumer_active` | Gemessene Leistung oder Laufstatus. Ohne Messung zählt der laufende Heizstab als Grundlast. Mit dem Laufstatus rechnet Earnie Status × Nennleistung. |
+| `sens_temperature_heat_storage` am Verbraucher | Speichertemperatur, aus ihr rechnet Earnie die freie Kapazität |
+
+Die Signale ordnest du in der EHAL-Zuordnung der eigenen Zeile des Heizstabs zu. Earnie speichert sie am Verbraucher in `heating_rod_ehal_bindings`, nicht im Heizsystem, weil die Verdrahtung zum Haus gehört und das Heizsystem im Szenario austauschbar bleibt.
+
+- **Wie viel:** Höchstens die freie Wärme des Speichers bis zum Sollwert, abzüglich der Wärme, die die Hauptquelle ohnehin liefern muss. Ist der Speicher voll, bleibt der Heizstab aus. Reicht die freie Wärme nicht für eine Viertelstunde Heizstab, bleibt er ebenfalls aus.
+- **Wann:** Nur am laufenden Kalendertag, höchstens vier Einschaltungen je Tag. Billige Nachtstunden nach Mitternacht plant Earnie erst nach dem Tageswechsel ein.
+- **Neben einer Wärmepumpe:** Sie liefert dieselbe Wärme mit weniger Strom, der Heizstab läuft deshalb selten, z. B. bei negativen Preisen. Beide zusammen können den Speicher dann über die freie Wärme hinaus laden, bis die nächste Messung den Heizstab abschaltet.
+- **Neben einem Brennstoff:** Die Kachel „Mit Earnie gespart“ rechnet den Heizstab-Strom als Kosten, die gesparte Brennstoffmenge rechnet sie nicht gegen.
+
+**Sicherheit liegt beim Smarthome:** Earnie gibt den Heizstab nur frei. Den Übertemperaturschutz und das Verhalten beim Ausfall von Earnie muss die Anlage selbst sicherstellen, z. B. über den Sicherheitsthermostat und ein Abschalten, wenn die Freigabe nicht mehr aktualisiert wird. Eine einmal gesetzte Freigabe bleibt sonst stehen, bis Earnie wieder schreibt.
 
 **Kein fester Verbrauch:** Der Heizstab hat keinen eigenen Verbrauch in den Hausdaten, weder als CSV noch als Jahres-kWh. Der Optimierer entscheidet allein, wann er läuft. So bleibt das Heizsystem im Szenario frei austauschbar.
 
-**Mögliche Doppelzählung:** Lief ein Heizstab im Haus während des Messzeitraums (z. B. über eine PV-Überschussregelung), steckt sein Verbrauch im gemessenen Gesamtverbrauch und damit in der Grundlast. Plant der Optimierer den Heizstab im Szenario zusätzlich, zählt dieser Strom doppelt. Earnie nimmt das in Kauf und zeigt dazu keinen Hinweis. Ein Heizstab-Zähler für den Live-Betrieb ist ein eigenes Thema; dort braucht er eigene Smarthome-Bindings.
+**Mögliche Doppelzählung:** Lief ein Heizstab im Haus während des Messzeitraums (z. B. über eine PV-Überschussregelung), steckt sein Verbrauch im gemessenen Gesamtverbrauch und damit in der Grundlast. Plant der Optimierer den Heizstab im Szenario zusätzlich, zählt dieser Strom doppelt. Earnie nimmt das in Kauf und zeigt dazu keinen Hinweis.
 
 Ältere Entwicklungsstände kannten `heating_rod_profile_csv` und `heating_rod_annual_kwh` am Verbraucher. Earnie lehnt diese Felder beim Laden ab; das Feld aus `house_profiles.json` entfernen.
 

@@ -99,7 +99,8 @@ def consumer_namespace(consumer_id: str, consumer_type: str = "", kind: str = ""
     ctype = str(consumer_type or "").strip()
     if ctype == "ev":
         return NS_EVCS if kind in EVCS_KINDS else NS_EV
-    if ctype == "thermal_annual":
+    # The heating rod is a part of the thermal_annual consumer (composite Kennung, D1).
+    if ctype in ("thermal_annual", "heating_rod"):
         return NS_HEATPUMP
     if ctype == "thermal_rc" or str(consumer_id or "").strip() == POOL_FILTER_ID:
         return NS_POOL

@@ -465,9 +465,13 @@ def test_plausibility_counts_rod_as_parent_energy():
     assert out == {"a_heating_rod": 0.0, "b_heating_rod": pytest.approx(2.0), "b": 3.0}
 
 
-def test_rod_is_not_planned_in_live(monkeypatch):
+def test_rod_without_signals_is_not_planned_in_live(monkeypatch):
     from optimizer.targets import resolve_heating_rod_horizon_kwh
 
+    profile = _profile(_thermal_consumer({"type": "gas"}))
+    monkeypatch.setattr(
+        "config.get_resolved_runtime_settings", lambda: {"_house_profile": profile}
+    )
     monkeypatch.setattr(
         "optimizer.live_cycle_scope.is_live_thermal_planning", lambda _matrix: True
     )

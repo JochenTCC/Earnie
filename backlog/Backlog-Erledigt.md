@@ -2,6 +2,18 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### SUSI P1 follow-up — Live control of the heating rod (2026-11-05)
+
+- [x] **SUSI P1 follow-up — Live control of the heating rod** `[feat]` *(branch `feat/heating-rod-live-control`)*: Live plans and switches the rod part once its signals are bound. Design note: [heating-system-variants.md](../docs/dev/heating-system-variants.md) § Heating rod with measured data.
+  - **Bindings:** `consumers[].heating_rod_ehal_bindings`, keys `heatpump.<consumer_id>_heating_rod.{set_enable,sens_power_act,sens_consumer_active}` (`house_config/heating_rod_bindings.py`). A map of its own, not `ehal_bindings`: `canonicalize_consumer_bindings` and `marker_flex_enable` would treat the rod's keys as the heat source's own. Optional field, no migration step. Signal catalog, push sources, mapping page, rename and clear-names know it; the rod is an EHAL entity of its own (`consumer_namespace`: `heating_rod` → `heatpump`).
+  - **Gate (decided 2026-11-05):** Live plans the rod only with `set_enable`, `sens_power_act` or `sens_consumer_active`, and the store temperature; otherwise target 0 and one log line per cycle (`missing_live_signals`).
+  - **Cap (decided 2026-11-05):** Live only. Rod heat ≤ store plan `opp_cap` × efficiency on the first calendar day, also beside a fuel source. The SE keeps the day heat cap, so SE results and goldens do not change.
+  - **Pulse limit:** at most 4 starts per day in Live (`_add_live_rod_pulse_limit`), none in the SE.
+  - **Live power:** `_read_consumer_meter_kw` reads the rod's meter as kW, or run state × nominal power; before, `sens_consumer_active` was not read at all and a kW value was read as 0/1.
+  - **Fail-safe (decided 2026-11-05):** none on the Earnie side. Over-temperature and outage behaviour belong to the smart home (German docs).
+  - **Tests:** `tests/test_heating_rod_live.py`.
+  - **Verify:** not yet on real hardware or HouseSim; with a bound rod check the release in the Live log, the store cap and the Grundlast while the rod runs.
+
 ### Account view P3 — Longer periods on the analysis page (2026-11-05)
 
 - [x] **Account view P3 — Longer periods on the analysis page** `[feat]`: spec [`docs/dev/chart2-account-view.md`](../docs/dev/chart2-account-view.md) §§ 6, 9.

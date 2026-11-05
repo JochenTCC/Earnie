@@ -325,7 +325,42 @@ def iter_catalog_entries(house: dict, components: dict) -> list[CatalogEntry]:
                         required=required,
                     )
                 )
+        _add_rod_entries(profile, components, _add)
 
+    return out
+
+
+def _add_rod_entries(profile: dict, components: dict, add) -> None:
+    """Rod signals: an entity of its own, never required (Live just does not plan it)."""
+    from house_config.heating_rod_bindings import ROD_KINDS, rod_mapping_entities
+
+    for rod in rod_mapping_entities(profile.get("consumers") or [], components):
+        for kind in ROD_KINDS:
+            add(
+                _entry(
+                    component_kind="consumer",
+                    entity_id=rod["id"],
+                    kind=kind,
+                    consumer_type=rod["type"],
+                    bindings=rod["ehal_bindings"],
+                    required=set(),
+                )
+            )
+
+
+def _set_rod_activation(consumer: dict, key: str, activated: bool) -> dict:
+    from house_config.heating_rod_bindings import ROD_BINDINGS_KEY
+
+    out = dict(consumer)
+    bindings = dict(out.get(ROD_BINDINGS_KEY) or {})
+    if activated:
+        bindings.setdefault(key, "")
+    else:
+        bindings.pop(key, None)
+    if bindings:
+        out[ROD_BINDINGS_KEY] = bindings
+    else:
+        out.pop(ROD_BINDINGS_KEY, None)
     return out
 
 
@@ -373,6 +408,14 @@ def set_binding_activation(
                 for consumer in profile.get("consumers") or []:
                     if not isinstance(consumer, dict):
                         consumers.append(consumer)
+                        continue
+                    from house_config.heating_rod_bindings import rod_kennung
+
+                    if (
+                        consumer.get("type") == "thermal_annual"
+                        and rod_kennung(str(consumer.get("id") or "").strip()) == entity_id
+                    ):
+                        consumers.append(_set_rod_activation(consumer, key, activated))
                         continue
                     if str(consumer.get("id") or "").strip() != entity_id:
                         consumers.append(consumer)

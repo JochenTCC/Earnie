@@ -147,6 +147,15 @@ def _resolve_consumer_ids(consumers: list[dict], edited: list[dict]) -> list[dic
                 new_id=consumer_id,
                 consumer_type=str(item.get("type") or "").strip(),
             )
+            from house_config.heating_rod_bindings import (
+                ROD_BINDINGS_KEY,
+                rewrite_rod_bindings_slug,
+            )
+
+            if item.get(ROD_BINDINGS_KEY):
+                item[ROD_BINDINGS_KEY] = rewrite_rod_bindings_slug(
+                    item[ROD_BINDINGS_KEY], new_consumer_id=consumer_id
+                )
         item["id"] = consumer_id
         item["label"] = label or consumer_id
         # Avoid dirty-writing id_locked onto legacy rows (missing flag ⇒ locked)

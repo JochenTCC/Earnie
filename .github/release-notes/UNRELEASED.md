@@ -12,6 +12,8 @@ Wenn seit dem letzten Tag neue Schritte in `runtime_store/migration/` hinzukamen
 
 - **Euro-Beträge mit Komma.** Euro- und Cent-Beträge folgen jetzt der Sprache des Browsers: Deutsch zeigt `2,18 €`, Englisch `2.18 €`. Im Szenario-Explorer steht die Ersparnis wie im Monitor ohne Vorzeichen („gespart“, „mehr ausgegeben“); Differenzen wie `Δ vs Referenz` behalten ihr Vorzeichen.
 
+- **Heizstab im Live-Betrieb.** Earnie plant und schaltet den Heizstab jetzt auch live, sobald Freigabe, Leistung oder Laufstatus und Speichertemperatur zugeordnet sind. Er nutzt die freie Kapazität des Speichers am laufenden Tag, höchstens vier Einschaltungen. Grenzen: Übertemperaturschutz und das Verhalten beim Ausfall von Earnie bleiben Sache des Smarthomes, und die Ersparnis-Kachel rechnet gesparten Brennstoff nicht gegen.
+
 ## Breaking / Bitte prüfen
 
 - **Szenario-Explorer: Die Ersparnis ist jetzt kleiner, weil die Methode strenger ist.** Earnie wird nicht mehr nur mit einer Anlage ohne Batterie und ohne Regeln verglichen, sondern mit Standard-Regeln: Batterie im Eigenverbrauchsmodus, PV-Überschussladen, SG-Ready-Sperre bei hohen Preisen und „günstigste Stunden“. Das sind die freien Mittel, die man auch ohne Earnie hätte. Die Ergebnisse zeigen oben die Ersparnis gegen diese Regeln und ihren Anteil an der Gesamtersparnis, die ganze Leiter von „Ohne Steuerung“ bis Earnie steht im Bereich „Alle Stufen“. Die Optimierung selbst rechnet nicht schlechter. Grenzen: Earnie plant im Szenario-Explorer mit bekannten Verläufen, die Ersparnis ist also eine Obergrenze, und ein Heizstab läuft in den Regeln nicht. Bestehende Läufe bitte neu berechnen.

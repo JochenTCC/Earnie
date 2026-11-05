@@ -26,6 +26,18 @@
       "loxone_blocks_key": "ehal_bindings.sens_temperature_heat_storage_low",
       "suggested_name": "Earnie_Waermespeicher_Temp_low",
       "notes": "Lowest immersion sensor T_low (°C); Live WP-on hint when below band floor."
+    },
+    {
+      "ehal_field": "heatpump.wp_heating_heating_rod.set_enable",
+      "loxone_blocks_key": "heating_rod_ehal_bindings.heatpump.wp_heating_heating_rod.set_enable",
+      "suggested_name": "Earnie_Heizstab_Freigabe",
+      "notes": "Optional heating rod release 0/1 (Kennung {hk_id}_heating_rod). Over-temperature and outage protection stay in the smart home."
+    },
+    {
+      "ehal_field": "heatpump.wp_heating_heating_rod.sens_power_act",
+      "loxone_blocks_key": "heating_rod_ehal_bindings.heatpump.wp_heating_heating_rod.sens_power_act",
+      "suggested_name": "Earnie_Heizstab_Leistung",
+      "notes": "Optional heating rod power kW, or sens_consumer_active as run state; Live plans the rod only with one of them."
     }
   ],
   "reference": "docs/referenz/loxone-signals.md; docs/konfiguration/waermespeicher-schichtung-teq.md"
