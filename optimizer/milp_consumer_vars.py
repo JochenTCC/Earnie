@@ -168,6 +168,9 @@ def _add_setpoint_power_variables(
         p_t = consumer_p[cid][t]
         p_fix = consumer_p_fixed[cid][t]
         prob += pf_t <= on_t
+        # A wallbox cannot follow a surplus below its minimum power.
+        if pv_est < min_kw:
+            prob += pf_t == 0
         prob += p_t <= max_kw * on_t
         prob += p_t <= p_fix + big_m * pf_t
         prob += p_t >= p_fix - big_m * pf_t
