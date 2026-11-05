@@ -226,3 +226,183 @@ def test_missing_live_signals(rod_bindings, store_bound, missing):
     assert missing_live_signals(rod, parent) == missing
 
 
+# --- Live planning ----------------------------------------------------------------------
+
+
+def _matrix(prices: list[float], day: date = date(2024, 1, 15), start: int = 0) -> list[dict]:
+    return [
+        {
+            "hour": (start + index) % 24,
+            "date": day,
+            "slot_datetime": datetime.combine(day, time((start + index) % 24, 0)),
+            "k_act": price,
+            "price_buy": price / 100.0,
+            "expected_p_act": 0.5,
+            "expected_p_pv": 0.0,
+            "consumption_mode": "forecast",  # Live; "profile_spec" would read the SE book
+        }
+        for index, price in enumerate(prices)
+    ]
+
+
+def _store_plan(start_c: float, *, horizon: int = 24, jaz: float = 1.0, wp_kw: float = 1.6):
+    from optimizer.thermal_coupled import capacity_kwh_per_k_from_volume
+    from optimizer.thermal_live_store import ThermalBand, plan_live_store_horizon
+
+    return plan_live_store_horizon(
+        start_temp_c=start_c,
+        ambient_forecast_c=[5.0] * horizon,
+        band=ThermalBand(50.0, 5.0),
+        capacity_kwh_per_k=capacity_kwh_per_k_from_volume(500.0),
+        heat_loss_kw_per_k=0.0,
+        wp_electric_kw=wp_kw,
+        jaz=jaz,
+        persons=0,
+    )
+
+
+@pytest.fixture
+def live(monkeypatch):
+    """Live semantics over a plain matrix; the store plan comes from ``use_plan``."""
+    monkeypatch.setattr("optimizer.live_cycle_scope.is_live_thermal_planning", lambda _m: True)
+    monkeypatch.setattr(
+        "optimizer.absent_mode.resolve_absent_status", lambda _profile: {"effective": False}
+    )
+
+    def use_plan(plan, profile):
+        monkeypatch.setattr(
+            "optimizer.thermal_live_store.live_store_plan_for_matrix",
+            lambda _source, _profile, _matrix: plan,
+        )
+        monkeypatch.setattr(
+            "config.get_resolved_runtime_settings", lambda: {"_house_profile": profile}
+        )
+
+    return use_plan
+
+
+def _solve(matrix: list[dict], profile: dict):
+    from optimizer.cbc_solver import solve_with_strict_fallback
+    from optimizer.milp import _add_milp_objective
+    from optimizer.milp_consumers import (
+        _add_consumer_delivery_constraints,
+        filter_feasible_consumers,
+    )
+    from optimizer.milp_horizon import _build_milp_model
+    from optimizer.targets import resolve_horizon_consumer_targets_kwh
+    from optimizer.thermal_flex_context import (
+        add_thermal_flex_constraints,
+        resolve_thermal_flex_contexts,
+    )
+
+    flex = collect_planning_flex_consumers(profile)
+    horizon = len(matrix)
+    remaining = resolve_horizon_consumer_targets_kwh(matrix, None, flexible_consumers=flex)
+    contexts = resolve_thermal_flex_contexts(matrix, flex, profile)
+    battery = {
+        "min_soc": 10.0,
+        "max_soc": 10.0001,
+        "max_power_kw": 0.001,
+        "battery_capacity_kwh": 0.01,
+        "efficiency": 0.95,
+    }
+    indices = list(range(horizon))
+    planned = filter_feasible_consumers(flex, remaining, matrix, indices, False, {}, {})
+    model = _build_milp_model(matrix, horizon, battery, 10.0, planned, 0.0, remaining, {})
+    _add_milp_objective(model, matrix, 0.0, {}, wear_cent_per_kwh=0.0)
+    _add_consumer_delivery_constraints(model, matrix, remaining, indices, {}, False)
+    add_thermal_flex_constraints(model, matrix, indices, contexts)
+    assert solve_with_strict_fallback(model.prob, msg=False) == "Optimal"
+    return model, remaining, contexts
+
+
+def _on_slots(model, cid: str) -> list[int]:
+    return [
+        slot
+        for slot, var in enumerate(model.consumer_on.get(cid, []))
+        if var.varValue is not None and var.varValue > 0.5
+    ]
+
+
+def _rod_kwh(model) -> float:
+    return len(_on_slots(model, _ROD_ID)) * 3.0 * float(model.dt_h)
+
+
+_CHEAP_NOON = [40.0] * 10 + [2.0] * 4 + [40.0] * 10
+
+
+def test_gas_house_rod_is_capped_by_the_free_store_heat(live):
+    profile = _profile(_consumer(_GAS, rod_bindings=_BOUND))
+    plan = _store_plan(47.0, jaz=0.95)  # 3 K below the setpoint: room for two slots
+    live(plan, profile)
+    model, remaining, contexts = _solve(_matrix(_CHEAP_NOON), profile)
+    cap = plan.opp_cap_electric_kwh * 0.95
+    assert cap > 0.0
+    assert remaining[_ROD_ID] == pytest.approx(cap, abs=1e-3)
+    assert contexts[_ROD_ID]["daily_heat_cap_kwh"] == {date(2024, 1, 15): pytest.approx(cap, abs=1e-3)}
+    assert 0.0 < _rod_kwh(model) <= cap + 1e-6
+    assert all(10 <= slot < 14 for slot in _on_slots(model, _ROD_ID))
+
+
+def test_free_heat_below_one_slot_leaves_the_binary_rod_off(live):
+    profile = _profile(_consumer(_GAS, rod_bindings=_BOUND))
+    live(_store_plan(49.0, jaz=0.95), profile)  # about 0.6 kWh free, one slot delivers 0.75
+    model, remaining, _contexts = _solve(_matrix(_CHEAP_NOON), profile)
+    assert 0.0 < remaining[_ROD_ID] < 0.75
+    assert _on_slots(model, _ROD_ID) == []
+
+
+def test_full_store_leaves_the_rod_off(live):
+    profile = _profile(_consumer(_GAS, rod_bindings=_BOUND))
+    live(_store_plan(50.0, jaz=0.95), profile)
+    model, remaining, _contexts = _solve(_matrix(_CHEAP_NOON), profile)
+    assert remaining[_ROD_ID] == 0.0
+    assert _on_slots(model, _ROD_ID) == []
+
+
+def test_missing_signal_keeps_the_rod_out_of_the_live_plan(live):
+    profile = _profile(_consumer(_GAS, rod_bindings={_ENABLE: "Rod_En"}))
+    live(_store_plan(30.0, jaz=0.95), profile)
+    model, remaining, contexts = _solve(_matrix(_CHEAP_NOON), profile)
+    assert remaining[_ROD_ID] == 0.0
+    assert contexts[_ROD_ID] == {}
+    assert _on_slots(model, _ROD_ID) == []
+
+
+def test_gas_house_rod_stays_off_after_the_first_day(live):
+    profile = _profile(_consumer(_GAS, rod_bindings=_BOUND))
+    live(_store_plan(30.0, jaz=0.95), profile)
+    today = _matrix([40.0] * 24)
+    tomorrow = _matrix([2.0] * 24, day=date(2024, 1, 16))
+    model, _remaining, _contexts = _solve(today + tomorrow, profile)
+    assert _on_slots(model, _ROD_ID) == []
+
+
+def test_heat_pump_house_rod_runs_only_within_the_store_overlay(live):
+    from optimizer.thermal_live_store import live_min_kwh_by_day
+
+    profile = _profile(_consumer(_HP, rod_bindings=_BOUND))
+    jaz = heat_source_efficiency(_HP)
+    plan = _store_plan(45.0, jaz=jaz)
+    live(plan, profile)
+    matrix = _matrix([-5.0] * 4 + [30.0] * 20)
+    model, remaining, contexts = _solve(matrix, profile)
+    assert contexts[_ROD_ID] == {"live_pulse_limit": True}
+    assert remaining[_ROD_ID] == pytest.approx(plan.opp_cap_electric_kwh * jaz, abs=1e-2)
+    assert contexts[_CID]["live_day_min_kwh"] == live_min_kwh_by_day(matrix, plan)
+    assert 0.0 < _rod_kwh(model) <= remaining[_ROD_ID] + 1e-6
+    assert all(slot < 4 for slot in _on_slots(model, _ROD_ID))
+
+
+def test_live_rod_has_a_pulse_limit(live):
+    profile = _profile(_consumer(_GAS, rod_bindings=_BOUND))
+    live(_store_plan(10.0, jaz=0.95), profile)
+    prices = []
+    for _ in range(8):
+        prices += [2.0, 40.0]
+    model, _remaining, _contexts = _solve(_matrix(prices), profile)
+    slots = _on_slots(model, _ROD_ID)
+    starts = [slot for slot in slots if slot - 1 not in slots]
+    assert 0 < len(starts) <= 4
+
+
