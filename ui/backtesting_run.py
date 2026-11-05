@@ -30,6 +30,7 @@ from simulation.backtesting_progress import (
     ordered_backtesting_result_ids,
 )
 from simulation.engine import HISTORICAL_REFERENCE_ID, plan_per_scenario_reference_tasks
+from simulation.reference_ladder import plan_ladder_reference_tasks
 from simulation.horizon_mode import DEFAULT_HORIZON_MODE, FIXED_24H, SUNRISE_WINDOW
 from ui.backtesting_charts import scenario_monthly_cost_chart
 from ui.backtesting_cons_data import render_cons_data_section
@@ -151,6 +152,9 @@ def _prepare_backtesting_run_context() -> dict | None:
         scenario_labels=scenario_labels,
         own_reference_by_scenario=own_ref_flags,
     )
+    _, ladder_specs = plan_ladder_reference_tasks(
+        scenarios or {}, scenario_labels=scenario_labels
+    )
     return {
         "workers": auto_backtesting_workers(parallel_task_count),
         "progress_file": default_progress_file_path(),
@@ -158,11 +162,15 @@ def _prepare_backtesting_run_context() -> dict | None:
             HISTORICAL_REFERENCE_ID: HISTORICAL_REFERENCE_LABEL,
             **scenario_labels,
             **extra_ref_labels,
+            **{spec.ref_id: spec.label for spec in ladder_specs},
         },
         "preferred_progress_ids": ordered_backtesting_result_ids(
             scenarios or {},
             live_scenario_id=live_scenario_id,
-            extra_ref_ids=[ref_id for ref_id, _params, _label in extra_ref_specs],
+            extra_ref_ids=[
+                *(ref_id for ref_id, _params, _label in extra_ref_specs),
+                *(spec.ref_id for spec in ladder_specs),
+            ],
         ),
         "eta_tracker": ProgressEtaTracker(),
     }

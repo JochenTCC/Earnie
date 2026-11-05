@@ -145,7 +145,13 @@ Der Szenario-Explorer hat keine Sonnenaufgang-Navigation wie der Monitor und fü
 
 ### Gesamtkosten und -Verbrauch
 
-Die Tabelle **Gesamtkosten und -Verbrauch** hat die Spalten `Szenario`, `Jahres Verbrauch [kWh]`, `Speicher-Standby [kWh]`, `Gesamtverbrauch [kWh]` (= Jahres Verbrauch + Speicher-Standby), `CO2 [kg]`, `Jahres Kosten [€]`, `Δ vs Referenz [€]` und `Hinweis`. Das Delta bezieht sich immer auf die Zeile der Live-Referenz.
+Die Tabelle **Gesamtkosten und -Verbrauch** hat die Spalten `Szenario`, `Jahres Verbrauch [kWh]`, `Speicher-Standby [kWh]`, `Gesamtverbrauch [kWh]` (= Jahres Verbrauch + Speicher-Standby), `CO2 [kg]`, `Jahres Kosten [€]`, `Ersparnis vs. Standard-Regeln [€]`, `Δ vs Referenz [€]` und `Hinweis`. Das Delta bezieht sich immer auf die Zeile der Live-Referenz.
+
+Je Szenario kommen zwei Referenzzeilen dazu. **Wechselrichter-Eigenverbrauch** rechnet die Batterie im Eigenverbrauchsmodus des Wechselrichters, die flexiblen Verbraucher laufen zu ihren üblichen Zeiten. **Standard-Regeln** ergänzt freie Regeln: PV-Überschussladen, SG-Ready-Sperre bei hohen Preisen und „günstigste Stunden“ für Geräte mit Startfenster. Beide Zeilen liefern je Fenster und Verbraucher dieselbe Energie wie die Optimierung; ein Heizstab läuft in ihnen nicht. Szenarien mit gleichem Haus, Speicher, Tarif und gleichen Verbrauchern teilen sich diese Zeilen.
+
+`Ersparnis vs. Standard-Regeln [€]` ist die Zeile **Standard-Regeln** des Szenarios minus seine optimierten Kosten, also das, was Earnie über freie Regeln hinaus bringt. Positiv heißt gespart. Dieser Wert ist kleiner als die Ersparnis gegen die Referenz ohne Optimierung. Das ist Absicht und kein Rückschritt: Die Batterie und einfache Regeln hätte man auch ohne Earnie. Earnie plant im Szenario-Explorer mit bekannten PV-, Last- und Preisverläufen, der Wert ist deshalb eine Obergrenze. Der Ladestand der Batterie am Periodenende geht noch nicht ein, bei kurzen Zeiträumen kann das die Ersparnis verschieben.
+
+Enden die Börsenpreise vor dem Tag nach dem Zeitraum (zum Beispiel bei einem Lauf bis heute vor der Preisveröffentlichung), rechnet die Preissperre am letzten Nachmittag mit den vorhandenen Preisen. Die Spalte `Hinweis` nennt dann die betroffenen Stunden.
 
 Heizt ein Hausprofil mit einem Brennstoff (Öl, Gas, Pellets, Fernwärme, Stückholz, siehe [Wärmequelle](../konfiguration/flexible-verbraucher.md#haus-wärme-wärmequelle-heat_source)), kommen die Spalten `Brennstoff [kWh]` und `Brennstoffkosten [€]` dazu. `Jahres Kosten [€]` enthält dann Strom **und** Brennstoff. Den Brennstoff rechnet Earnie aus der Jahressimulation über die gebuchten Tage; die Wärme eines Heizstabs zieht er davon ab. `CO2 [kg]` = Netzbezug × 226 g/kWh plus Brennstoff × Faktor des Energieträgers.
 

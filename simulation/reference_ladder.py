@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from typing import NamedTuple
 
 import pandas as pd
 
@@ -31,12 +32,25 @@ from optimizer.thermal_flex_context import (
     is_thermal_flex_consumer,
 )
 from simulation.historical_cache import HistoricalDataCache
-from simulation.horizon_mode import SUNRISE_WINDOW, parse_horizon_mode
+from simulation.horizon_mode import BACKTESTING_STEP_HOURS, SUNRISE_WINDOW, parse_horizon_mode
 from simulation.plausibility import PlausibilityReport, validate_window_consumption
-from simulation.reference_costs import _REFERENCE_COST_COLUMNS, _empty_reference_series
+from simulation.reference_costs import (
+    LADDER_L1,
+    LADDER_L2,
+    LADDER_STEPS,
+    _REFERENCE_COST_COLUMNS,
+    _empty_reference_series,
+    ladder_reference_id,
+)
 
 L1_STEUERBEFEHL = "Referenz L1"
 L2_STEUERBEFEHL = "Referenz L2"
+# ``run_simulation``'s default start SoC: every SE run starts there.
+SE_START_SOC_PERCENT = 50.0
+_LADDER_LABELS = {
+    LADDER_L1: "Wechselrichter-Eigenverbrauch",
+    LADDER_L2: "Standard-Regeln",
+}
 
 
 @dataclass(frozen=True)
@@ -45,12 +59,42 @@ class LadderReferenceResult:
 
     ``frame``: ``_REFERENCE_COST_COLUMNS`` plus ``sim_soc`` (start of slot). ``end_soc``: SoC
     after the last slot. ``no_shape_windows``: per consumer, the windows without a shape.
+    ``no_published_block_windows``, ``truncated_lock_slots``: L2 only, see ``RuleBasedFlex``.
     """
 
     frame: pd.DataFrame
     plausibility: PlausibilityReport
     end_soc: float
     no_shape_windows: dict[str, int]
+    no_published_block_windows: dict[str, int]
+    truncated_lock_slots: int
+
+    def report(self) -> dict:
+        """What the run log keeps of a ladder run."""
+        return {
+            "plausibility_failed_windows": len(self.plausibility.failed),
+            "no_shape_windows": self.no_shape_windows,
+            "no_published_block_windows": self.no_published_block_windows,
+            "truncated_lock_slots": self.truncated_lock_slots,
+        }
+
+
+class _WindowResult(NamedTuple):
+    rows: list[dict]
+    meta: dict
+    end_soc: float
+    no_shape_ids: list[str]
+    no_published_block_ids: list[str]
+    truncated_lock_slots: int
+
+
+class LadderReferenceSpec(NamedTuple):
+    """One L1 or L2 run of a run plan."""
+
+    ref_id: str
+    params: dict
+    label: str
+    step: str
 
 
 @dataclass(frozen=True)
@@ -136,8 +180,7 @@ def _window_rows(
     horizon_mode: str,
     shape_source: _ShapeSource,
     rule_params: dict | None,
-) -> tuple[list[dict], dict, float, list[str]]:
-    """One window: ``(book chart rows, meta, end SoC, consumers without a shape)``."""
+) -> _WindowResult:
     from optimizer.simulation import _prepare_horizon_state
     from simulation.anchor_step import _build_anchor_window_plan
 
@@ -186,6 +229,8 @@ def _window_rows(
                 len(setup.matrix), planned, setup.horizon_limits, shapes, eligible
             )
             steuerbefehl = L1_STEUERBEFEHL
+            no_published_block_ids: list[str] = []
+            truncated_lock_slots = 0
         else:
             flex = build_rule_based_flex_kw_per_hour(
                 setup.matrix,
@@ -205,6 +250,8 @@ def _window_rows(
                 initial_soc=sim_soc,
             )
             steuerbefehl = L2_STEUERBEFEHL
+            no_published_block_ids = flex.no_published_block_ids
+            truncated_lock_slots = flex.truncated_lock_slots
         rows: list[dict] = []
         soc = float(sim_soc)
         for t in book:
@@ -218,7 +265,14 @@ def _window_rows(
                 consumers=consumers,
             )
             rows.append(row)
-    return rows, plan.meta, soc, flex.no_shape_ids
+    return _WindowResult(
+        rows,
+        plan.meta,
+        soc,
+        flex.no_shape_ids,
+        no_published_block_ids,
+        truncated_lock_slots,
+    )
 
 
 def _end_customer_price_series(
@@ -230,7 +284,8 @@ def _end_customer_price_series(
     """End-customer price per slot, from the book's start to the last day published in it.
 
     ``epex_prices_for_slots`` fills gaps with the previous price; here a slot without a
-    market price raises, since the lock must not rank prices that did not exist.
+    market price raises, since the lock must not rank prices that did not exist. Only the
+    end of the market data cuts the series, and never inside the book (spec § 4.2).
     """
     from data.backtesting_prices import (
         last_day_ahead_calendar_date,
@@ -255,11 +310,19 @@ def _end_customer_price_series(
     stamps = pd.DatetimeIndex(slots)
     # Quarter-hour slots of an hourly series take the hour's price.
     has_price = stamps.isin(known) | stamps.floor("h").isin(known)
-    if not has_price.all():
+    last_priced = int(has_price.nonzero()[0].max()) if has_price.any() else -1
+    gaps = stamps[: last_priced + 1][~has_price[: last_priced + 1]]
+    if len(gaps):
         raise ValueError(
-            f"Referenz-Regeln: Kein Börsenpreis für {stamps[~has_price][0]:%Y-%m-%d %H:%M} "
+            f"Referenz-Regeln: Kein Börsenpreis für {gaps[0]:%Y-%m-%d %H:%M} "
             f"(die Preissperre braucht Preise bis {stop:%Y-%m-%d %H:%M})."
         )
+    if last_priced < 0 or slots[last_priced] < last_slot:
+        raise ValueError(
+            f"Referenz-Regeln: Die Börsenpreise enden vor dem letzten gebuchten Slot "
+            f"{last_slot:%Y-%m-%d %H:%M}."
+        )
+    slots = slots[: last_priced + 1]
     _, end_customer, _ = matrix_prices_from_context(
         prices_df, slots, None, **pricing_kwargs_from_resolved(scenario_params)
     )
@@ -275,6 +338,7 @@ def compute_l1_reference_costs(
     *,
     initial_soc: float,
     horizon_mode: str,
+    on_progress=None,
 ) -> LadderReferenceResult:
     """L1 over the period, same anchors and same start SoC as the optimized run."""
     return _compute_ladder_step(
@@ -286,6 +350,7 @@ def compute_l1_reference_costs(
         initial_soc=initial_soc,
         horizon_mode=horizon_mode,
         rule_params=None,
+        on_progress=on_progress,
     )
 
 
@@ -299,6 +364,7 @@ def compute_l2_reference_costs(
     initial_soc: float,
     horizon_mode: str,
     rule_params: dict = DEFAULT_RULE_PARAMS,
+    on_progress=None,
 ) -> LadderReferenceResult:
     """L2 over the period: L1 with the standard rules moving the flex energy (spec § 4)."""
     return _compute_ladder_step(
@@ -310,7 +376,69 @@ def compute_l2_reference_costs(
         initial_soc=initial_soc,
         horizon_mode=horizon_mode,
         rule_params=rule_params,
+        on_progress=on_progress,
     )
+
+
+def compute_ladder_reference(
+    step: str,
+    start: pd.Timestamp,
+    end: pd.Timestamp,
+    scenario_params: dict,
+    prices_df: pd.DataFrame,
+    cache: HistoricalDataCache,
+    *,
+    horizon_mode: str,
+    on_progress=None,
+) -> LadderReferenceResult:
+    """One ladder step of an SE run, from the start SoC of the optimized run."""
+    if step not in LADDER_STEPS:
+        raise ValueError(f"Unbekannte Referenz-Stufe {step!r}.")
+    compute = compute_l1_reference_costs if step == LADDER_L1 else compute_l2_reference_costs
+    return compute(
+        start,
+        end,
+        scenario_params,
+        prices_df,
+        cache,
+        initial_soc=SE_START_SOC_PERCENT,
+        horizon_mode=horizon_mode,
+        on_progress=on_progress,
+    )
+
+
+def plan_ladder_reference_tasks(
+    scenarios: dict[str, dict],
+    *,
+    scenario_labels: dict[str, str] | None = None,
+) -> tuple[dict[str, dict[str, str]], list[LadderReferenceSpec]]:
+    """L1 and L2 runs per scenario; identical setups share them (``ladder_reference_fingerprint``).
+
+    Returns ``ladder_by_scenario`` (scenario id → step → result id) and the runs to compute.
+    """
+    labels = scenario_labels or {}
+    ladder_by_scenario: dict[str, dict[str, str]] = {}
+    specs: list[LadderReferenceSpec] = []
+    owner_by_fingerprint: dict[tuple, str] = {}
+    for scenario_id, params in scenarios.items():
+        fingerprint = ladder_reference_fingerprint(params)
+        owner = owner_by_fingerprint.get(fingerprint)
+        if owner is None:
+            owner = owner_by_fingerprint[fingerprint] = scenario_id
+            display = labels.get(scenario_id, scenario_id)
+            specs.extend(
+                LadderReferenceSpec(
+                    ladder_reference_id(step, scenario_id),
+                    params,
+                    f"{_LADDER_LABELS[step]} ({display})",
+                    step,
+                )
+                for step in LADDER_STEPS
+            )
+        ladder_by_scenario[scenario_id] = {
+            step: ladder_reference_id(step, owner) for step in LADDER_STEPS
+        }
+    return ladder_by_scenario, specs
 
 
 def _compute_ladder_step(
@@ -323,6 +451,7 @@ def _compute_ladder_step(
     initial_soc: float,
     horizon_mode: str,
     rule_params: dict | None,
+    on_progress=None,
 ) -> LadderReferenceResult:
     import config
     from simulation.engine import (
@@ -357,9 +486,12 @@ def _compute_ladder_step(
     timestamps: list[datetime] = []
     plausibility = PlausibilityReport()
     no_shape_windows: dict[str, int] = {}
+    no_published_block_windows: dict[str, int] = {}
+    truncated_lock_slots = 0
+    total_hours = len(anchors) * BACKTESTING_STEP_HOURS
     soc = float(initial_soc)
-    for anchor in anchors:
-        rows, meta, soc, no_shape_ids = _window_rows(
+    for window_index, anchor in enumerate(anchors, start=1):
+        window = _window_rows(
             anchor,
             soc,
             scenario_params=scenario_params,
@@ -371,21 +503,35 @@ def _compute_ladder_step(
             shape_source=shape_source,
             rule_params=rule_params,
         )
+        soc = window.end_soc
+        meta = window.meta
         meta["standby_power_kw"] = standby_kw
-        meta["reference_no_shape_consumers"] = no_shape_ids
-        plausibility.add(validate_window_consumption(rows, meta))
-        for cid in no_shape_ids:
+        meta["reference_no_shape_consumers"] = window.no_shape_ids
+        plausibility.add(validate_window_consumption(window.rows, meta))
+        for cid in window.no_shape_ids:
             no_shape_windows[cid] = no_shape_windows.get(cid, 0) + 1
-        for row in rows:
+        for cid in window.no_published_block_ids:
+            no_published_block_windows[cid] = no_published_block_windows.get(cid, 0) + 1
+        truncated_lock_slots += window.truncated_lock_slots
+        for row in window.rows:
             _append_ladder_slot(series, row)
             timestamps.append(row["slot_datetime"])
+        if on_progress is not None:
+            on_progress(window_index * BACKTESTING_STEP_HOURS, total_hours)
 
     frame = pd.DataFrame(
         {name: series[name] for name in (*_REFERENCE_COST_COLUMNS, "sim_soc")},
         index=pd.DatetimeIndex(timestamps),
     )
     frame.index.name = "ts"
-    return LadderReferenceResult(frame, plausibility, soc, no_shape_windows)
+    return LadderReferenceResult(
+        frame,
+        plausibility,
+        soc,
+        no_shape_windows,
+        no_published_block_windows,
+        truncated_lock_slots,
+    )
 
 
 def _append_ladder_slot(series: dict[str, list[float]], row: dict) -> None:

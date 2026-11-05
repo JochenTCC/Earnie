@@ -15,6 +15,9 @@ from simulation.horizon_mode import BACKTESTING_STEP_HOURS, SUNRISE_WINDOW, pars
 
 HISTORICAL_REFERENCE_ID = "historical_reference"
 SCENARIO_REFERENCE_PREFIX = "ref:"
+LADDER_L1 = "l1"
+LADDER_L2 = "l2"
+LADDER_STEPS = (LADDER_L1, LADDER_L2)
 
 
 def scenario_reference_id(scenario_id: str) -> str:
@@ -27,8 +30,18 @@ def scenario_reference_label(scenario_display: str) -> str:
     return f"Referenz ({scenario_display}) — ohne Optimierung"
 
 
+def ladder_reference_id(step: str, scenario_id: str) -> str:
+    """Result id of a ladder step (``l1`` / ``l2``) of a scenario."""
+    if step not in LADDER_STEPS:
+        raise ValueError(f"Unbekannte Referenz-Stufe {step!r}.")
+    return f"{step}:{scenario_id}"
+
+
 def is_scenario_reference_id(result_id: str) -> bool:
-    return str(result_id).startswith(SCENARIO_REFERENCE_PREFIX)
+    """True for every per-scenario reference: L0 (``ref:``), L1 and L2."""
+    return str(result_id).startswith(
+        (SCENARIO_REFERENCE_PREFIX, *(f"{step}:" for step in LADDER_STEPS))
+    )
 
 
 def resolve_reference_hourly_load(

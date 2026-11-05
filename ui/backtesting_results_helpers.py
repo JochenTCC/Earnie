@@ -15,6 +15,7 @@ from simulation.engine import (
 )
 from optimizer.slot_duration import DEFAULT_DT_H
 from simulation.booked_consumption import BOOKED_CONSUMPTION_KEY
+from simulation.reference_costs import LADDER_L2
 from simulation.jahres_verbrauch import jahres_standby_kwh, jahres_verbrauch_kwh
 from ui.consumption_validation_charts import cons_data_monthly_kwh
 
@@ -382,6 +383,36 @@ def _booked_series_hints(scenario_id: str, booked: dict) -> list[str]:
     return hints
 
 
+def _ladder_report_hints(report: dict | None) -> list[str]:
+    """What an L1 / L2 run reports about its own quality."""
+    if not report:
+        return []
+    hints: list[str] = []
+    failed = int(report.get("plausibility_failed_windows") or 0)
+    if failed:
+        hints.append(f"{failed} Fenster mit abweichender Energie, Vergleich unsicher")
+    for key, text in (
+        ("no_shape_windows", "ohne Lastprofil, läuft ab Fensterbeginn mit Nennleistung"),
+        ("no_published_block_windows", "ohne veröffentlichte Preise, behält seine Startzeit"),
+    ):
+        windows = report.get(key) or {}
+        if windows:
+            parts = ", ".join(f"{cid}: {count} Fenster" for cid, count in sorted(windows.items()))
+            hints.append(f"{parts} {text}")
+    truncated = int(report.get("truncated_lock_slots") or 0)
+    if truncated:
+        hints.append(f"{_slot_hours(truncated)} Preissperre mit kürzerem Horizont (Preisdaten enden)")
+    return hints
+
+
+def _standard_rules_saving_cell(meta: dict, scenario_id: str, totals: dict) -> str:
+    """L2 − L3 of a scenario; logs without a ladder have no value."""
+    steps = (meta.get("ladder_by_scenario") or {}).get(scenario_id)
+    if not steps:
+        return _DASH
+    return f"{float(totals[steps[LADDER_L2]]) - float(totals[scenario_id]):+.2f} €"
+
+
 def _annual_cost_hinweis(
     scenario_id: str,
     *,
@@ -390,8 +421,9 @@ def _annual_cost_hinweis(
     compare_kwh: float | None,
     live_ref_kwh: float | None,
     booked: dict,
+    ladder_report: dict | None = None,
 ) -> str:
-    hints = _booked_series_hints(scenario_id, booked)
+    hints = _booked_series_hints(scenario_id, booked) + _ladder_report_hints(ladder_report)
     # Live-Referenz and Historisch (Ist-Zähler) are baselines, not optimized runs.
     # Historisch vs model Live-ref often differs when meter ≠ Hausprofil — not a sim bug.
     is_baseline = _is_live_reference_row(scenario_id, live_id) or scenario_id == ref_id
@@ -458,6 +490,7 @@ def build_annual_cost_rows(meta: dict) -> list[dict]:
             compare_kwh=_consumption_vs_live_reference(meta, scenario_id, kwh_value),
             live_ref_kwh=live_ref_kwh,
             booked=booked,
+            ladder_report=(meta.get("ladder_report") or {}).get(scenario_id),
         )
         is_reference = scenario_id == ref_id or is_scenario_reference_id(scenario_id)
         if is_reference:
@@ -469,6 +502,7 @@ def build_annual_cost_rows(meta: dict) -> list[dict]:
                     "Gesamtverbrauch [kWh]": total_cell,
                     **_heat_fuel_cells(meta, scenario_id, show_fuel=show_fuel),
                     "Jahres Kosten [€]": f"{total_eur:.2f} €",
+                    "Ersparnis vs. Standard-Regeln [€]": _DASH,
                     "Δ vs Referenz [€]": _DASH,
                     "Hinweis": hinweis,
                 }
@@ -486,6 +520,9 @@ def build_annual_cost_rows(meta: dict) -> list[dict]:
                 "Gesamtverbrauch [kWh]": total_cell,
                 **_heat_fuel_cells(meta, scenario_id, show_fuel=show_fuel),
                 "Jahres Kosten [€]": f"{total_eur:.2f} €",
+                "Ersparnis vs. Standard-Regeln [€]": _standard_rules_saving_cell(
+                    meta, scenario_id, totals
+                ),
                 "Δ vs Referenz [€]": delta_cell,
                 "Hinweis": hinweis,
             }

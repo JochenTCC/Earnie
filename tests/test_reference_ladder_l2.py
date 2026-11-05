@@ -508,13 +508,58 @@ def test_price_series_matches_the_booked_price(ladder_env):
         assert series[ts.to_pydatetime()] == pytest.approx(booked)
 
 
-def test_market_data_ending_inside_the_available_range_fails_loud(ladder_env):
-    day = pd.Timestamp(LOW_EAUTO_DAY)
+def _prices_until(env: dict, stop: pd.Timestamp) -> pd.DataFrame:
+    prices = env["prices"]
+    index = prices.index.tz_localize(None) if prices.index.tz is not None else prices.index
+    return prices[index < stop]
+
+
+def test_market_data_ending_after_the_book_shortens_the_lock_horizon_and_reports_it(ladder_env):
+    last_booked = _run_step(ladder_env, "l2", LOW_EAUTO_DAY, LOW_EAUTO_DAY).frame.index[-1]
+    full = _run_step(ladder_env, "l2", LOW_EAUTO_DAY, LOW_EAUTO_DAY)
+    assert full.truncated_lock_slots == 0
+    short = _run_step(
+        ladder_env,
+        "l2",
+        LOW_EAUTO_DAY,
+        LOW_EAUTO_DAY,
+        prices=_prices_until(ladder_env, last_booked + pd.Timedelta(hours=1)),
+    )
+    assert short.truncated_lock_slots > 0
+    assert short.report()["truncated_lock_slots"] == short.truncated_lock_slots
+    assert list(short.frame.index) == list(full.frame.index)
+
+
+def test_market_data_ending_inside_the_book_fails_loud(ladder_env):
+    last_booked = _run_step(ladder_env, "l2", LOW_EAUTO_DAY, LOW_EAUTO_DAY).frame.index[-1]
+    with pytest.raises(ValueError, match="enden vor dem letzten gebuchten Slot"):
+        _run_step(
+            ladder_env,
+            "l2",
+            LOW_EAUTO_DAY,
+            LOW_EAUTO_DAY,
+            prices=_prices_until(ladder_env, last_booked - pd.Timedelta(hours=2)),
+        )
+
+
+def test_gap_inside_the_market_data_fails_loud(ladder_env):
+    first_booked = _run_step(ladder_env, "l2", LOW_EAUTO_DAY, LOW_EAUTO_DAY).frame.index[0]
     prices = ladder_env["prices"]
     index = prices.index.tz_localize(None) if prices.index.tz is not None else prices.index
-    truncated = prices[index < day + pd.Timedelta(days=1)]
+    gap_hour = first_booked.floor("h") + pd.Timedelta(hours=3)
     with pytest.raises(ValueError, match="Kein Börsenpreis"):
-        _run_step(ladder_env, "l2", LOW_EAUTO_DAY, LOW_EAUTO_DAY, prices=truncated)
+        _run_step(
+            ladder_env, "l2", LOW_EAUTO_DAY, LOW_EAUTO_DAY, prices=prices[index != gap_hour]
+        )
+
+
+def test_series_end_shortens_the_available_prices_but_a_gap_raises():
+    prices = {slot: price for slot, price in _prices().items() if slot < _slot(60)}
+    assert len(available_slot_prices(_slot(52), prices)) == 8
+    with pytest.raises(ValueError, match="Preisdaten enden"):
+        available_slot_prices(_slot(60), prices)
+    result = _build(HEAT_PUMP, 0.25, {50: 1.0}, list(range(40, 60)), prices=prices, matrix=_matrix(60))
+    assert result.truncated_lock_slots > 0
 
 
 def test_l1_does_not_need_prices_past_the_window(ladder_env):

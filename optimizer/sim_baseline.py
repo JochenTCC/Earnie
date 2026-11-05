@@ -211,11 +211,13 @@ class RuleBasedFlex(NamedTuple):
 
     ``no_shape_ids``: as in ``ShapedFlex``. ``no_published_block_ids``: cheapest-block
     consumers that kept their real timing because no start had all prices published.
+    ``truncated_lock_slots``: slots whose price lock ran on a horizon cut by the data's end.
     """
 
     per_slot: list[dict[str, float]]
     no_shape_ids: list[str]
     no_published_block_ids: list[str]
+    truncated_lock_slots: int
 
 
 def _is_nonexistent_local_slot(slot_dt: datetime) -> bool:
@@ -225,20 +227,39 @@ def _is_nonexistent_local_slot(slot_dt: datetime) -> bool:
     return round_trip.replace(tzinfo=None) != slot_dt
 
 
+def _last_published_stop(slot_dt: datetime) -> datetime:
+    """End (exclusive) of the last day-ahead day published at ``slot_dt``."""
+    from data.backtesting_prices import last_day_ahead_calendar_date
+
+    return datetime.combine(
+        last_day_ahead_calendar_date(slot_dt) + timedelta(days=1), datetime.min.time()
+    )
+
+
+def _lock_horizon_truncated(slot_dt: datetime, price_series: dict[datetime, float]) -> bool:
+    step = timedelta(hours=float(DEFAULT_DT_H))
+    return max(price_series) + step < _last_published_stop(slot_dt)
+
+
 def available_slot_prices(
     slot_dt: datetime,
     price_series: dict[datetime, float],
 ) -> list[float]:
-    """End-customer prices known at ``slot_dt``: the slot up to its last published day-ahead day."""
-    from data.backtesting_prices import last_day_ahead_calendar_date
+    """End-customer prices known at ``slot_dt``: the slot up to its last published day-ahead day.
 
-    stop = datetime.combine(
-        last_day_ahead_calendar_date(slot_dt) + timedelta(days=1), datetime.min.time()
-    )
+    The range ends early only at the end of the series (spec § 4.2); a gap inside it raises.
+    """
+    stop = _last_published_stop(slot_dt)
+    last_known = max(price_series)
     step = timedelta(hours=float(DEFAULT_DT_H))
     prices: list[float] = []
     current = slot_dt
-    while current < stop:
+    if current > last_known:
+        raise ValueError(
+            f"Referenz-Regeln: Kein Endkundenpreis für {current:%Y-%m-%d %H:%M}, "
+            f"die Preisdaten enden {last_known:%Y-%m-%d %H:%M}."
+        )
+    while current < stop and current <= last_known:
         price = price_series.get(current)
         if price is not None:
             prices.append(float(price))
@@ -461,9 +482,9 @@ def build_rule_based_flex_kw_per_hour(
     """L2: standard rules move the energy of the L1 profile, the total per consumer stays exact.
 
     Spec ``docs/dev/rule-based-reference.md`` § 4. ``price_series``: end-customer price per
-    slot, up to the last published day-ahead day of the book's last slot. With no rule
-    firing the result equals ``build_shaped_flex_kw_per_slot``. A missing price or an
-    undeliverable target raises.
+    slot, up to the last published day-ahead day of the book's last slot or the end of the
+    data. With no rule firing the result equals ``build_shaped_flex_kw_per_slot``. A missing
+    price inside the series or an undeliverable target raises.
     """
     quantile, priority = _validated_rule_params(rule_params)
     shaped = build_shaped_flex_kw_per_slot(
@@ -488,6 +509,7 @@ def build_rule_based_flex_kw_per_hour(
         {state.cid: 0.0 for state in states} for _ in range(len(matrix))
     ]
     soc = float(initial_soc)
+    truncated_lock_slots = 0
     for t in book_indices:
         row = matrix[t]
         slot_kw = per_slot[t]
@@ -500,6 +522,7 @@ def build_rule_based_flex_kw_per_hour(
             running.append(state)
             if state.price_lock and locked is None:
                 locked = _price_locked(row["slot_datetime"], price_series, quantile)
+                truncated_lock_slots += _lock_horizon_truncated(row["slot_datetime"], price_series)
             slot_kw[state.cid] = state.base_power_kw(t, bool(state.price_lock and locked))
         net_before_flex_kw = float(row["expected_p_pv"]) - bat.effective_p_act(row, battery_params)
         for state in running:
@@ -520,7 +543,9 @@ def build_rule_based_flex_kw_per_hour(
                 f"Referenz-Regeln: Verbraucher '{state.cid}' erreicht sein Ziel von "
                 f"{target:.3f} kWh nicht, es fehlen {target - delivered:.3f} kWh."
             )
-    return RuleBasedFlex(per_slot, shaped.no_shape_ids, no_published_block_ids)
+    return RuleBasedFlex(
+        per_slot, shaped.no_shape_ids, no_published_block_ids, truncated_lock_slots
+    )
 
 
 def _simulate_single_hour_baseline(

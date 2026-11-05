@@ -214,13 +214,17 @@ def test_count_backtesting_parallel_tasks_includes_reference(monkeypatch):
             [("ref:pv", {}, "Referenz (PV)")],
         ),
     )
+    monkeypatch.setattr(
+        "simulation.reference_ladder.plan_ladder_reference_tasks",
+        lambda scenarios: ({}, ["l1:a", "l2:a"]),
+    )
     assert (
         count_backtesting_parallel_tasks(
             {"a": {}, "b": {}},
             live_scenario_id="a",
             own_reference_by_scenario={},
         )
-        == 4
+        == 6
     )
 
 

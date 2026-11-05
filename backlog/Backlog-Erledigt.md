@@ -2,6 +2,15 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### RuleRef P3 — Ladder in the SE (2026-11-05)
+
+- [x] **RuleRef P3 — Ladder in the SE, L2 as reference of the saving** `[feat]`: spec [`docs/dev/rule-based-reference.md`](../docs/dev/rule-based-reference.md) §§ 2, 4.2, 5. Window charts and the end-SoC valuation moved to **RuleRef P3b** by maintainer decision.
+  - Every SE run computes L1 and L2 per setup: `plan_ladder_reference_tasks` shares them by `ladder_reference_fingerprint`, `_run_ladder_worker` runs them in the pool (also sequential, with progress). Ids `l1:<scenario>`, `l2:<scenario>`; `is_scenario_reference_id` covers them, so table, invoices, fees and fuel treat them as references.
+  - New column `Ersparnis vs. Standard-Regeln [€]` = L2 − L3 incl. fuel and fees. `Δ vs Referenz [€]` stays. `run_backtesting` prints L2 − L3 and the rule share. Log keys `ladder_by_scenario`, `ladder_report`; the report shows in `Hinweis`.
+  - The price load reaches the day after the period, which also gives the last window's MILP real prices past the period instead of the forward-filled ones. At the end of the data the lock's horizon ends at the last price and the slots are reported (decided by the maintainer, narrows O3); gaps still raise.
+  - No golden-master case asserts SE savings, so none changed (the item expected some).
+  - Docs: `docs/ui/betriebsmodi.md`, user manual. Tests: `tests/test_reference_ladder_se.py`, additions in `tests/test_reference_ladder_l2.py`.
+
 ### RuleRef P2 — L2 rule builder (2026-11-05)
 
 - [x] **RuleRef P2 — L2 rule builder** `[dev]`: spec [`docs/dev/rule-based-reference.md`](../docs/dev/rule-based-reference.md) § 4, § 5. Not shown in the SE yet (P3).
