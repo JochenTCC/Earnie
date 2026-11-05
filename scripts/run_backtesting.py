@@ -57,6 +57,7 @@ from simulation.reference_ladder import (
     compute_ladder_reference,
     ladder_soc_correction,
     plan_ladder_reference_tasks,
+    rule_share,
 )
 from simulation.backtesting_progress import (
     clear_progress_dir,
@@ -184,6 +185,54 @@ def _price_load_window(
     return load_start, load_end
 
 
+def scenarios_for_period(
+    scenarios: dict[str, dict],
+    start: pd.Timestamp,
+    end: pd.Timestamp,
+    horizon_mode: str,
+) -> dict[str, dict]:
+    """First / last sunrise book reach over the period edges: book only the in-period part.
+
+    See ``BOOK_PERIOD_KEY``; this way no clip shifts energy.
+    """
+    if horizon_mode != SUNRISE_WINDOW:
+        return scenarios
+    book_period = (
+        start.normalize().to_pydatetime(),
+        (end.normalize() + pd.Timedelta(days=1)).to_pydatetime(),
+    )
+    return {
+        scenario_id: {**params, BOOK_PERIOD_KEY: book_period}
+        for scenario_id, params in scenarios.items()
+    }
+
+
+def _selected_scenarios(scenarios: dict[str, dict], selected: list[str] | None) -> dict[str, dict]:
+    if not selected:
+        return scenarios
+    unknown = [sid for sid in selected if sid not in scenarios]
+    if unknown:
+        raise SystemExit(
+            f"Unbekanntes Szenario: {', '.join(unknown)}. Vorhanden: {', '.join(scenarios)}."
+        )
+    return {sid: scenarios[sid] for sid in dict.fromkeys(selected)}
+
+
+def load_run_prices(
+    load_start: pd.Timestamp,
+    load_end: pd.Timestamp,
+    sim_cfg: dict,
+    live_params: dict | None,
+) -> pd.DataFrame:
+    return load_market_prices(
+        load_start,
+        load_end,
+        sim_cfg,
+        timeout=config.get_global_timeout(default=30),
+        market_zone=live_params.get("market_zone") if live_params is not None else None,
+    )
+
+
 def _build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Backtesting der Energie-Optimierung auf historischen Loxone-Daten.",
@@ -258,6 +307,12 @@ def _build_arg_parser() -> argparse.ArgumentParser:
             "Fortschrittsverzeichnis für UI (pro Worker eine JSON-Datei); "
             "Legacy: einzelne *.json-Datei → Sibling .backtesting_workers/."
         ),
+    )
+    parser.add_argument(
+        "--scenario",
+        action="append",
+        metavar="ID",
+        help="Nur dieses Szenario rechnen (mehrfach möglich; Standard: alle).",
     )
     parser.add_argument(
         "--allow-stale-cons-data",
@@ -764,8 +819,8 @@ def print_ladder_summary(
         l3 = float(results[scenario_id]["sim_cost"].sum())
         l2 = float(results[steps[LADDER_L2]]["sim_cost"].sum()) + correction
         l0 = float(results[reference_by_scenario[scenario_id]]["sim_cost"].sum())
-        total_saving = l0 - l3
-        share = f"{(l0 - l2) / total_saving:.0%}" if total_saving > 0 else "—"
+        share_value = rule_share(l0, l2, l3)
+        share = f"{share_value:.0%}" if share_value is not None else "—"
         print(
             f"  {labels.get(scenario_id, scenario_id):30s}: {l2 - l3:>+10,.2f} € "
             f"(davon SoC am Periodenende {correction:+,.2f} €; "
@@ -964,18 +1019,11 @@ def main(argv: list[str] | None = None):
 
     scenario_labels = config.get_scenario_labels()
     labels = _all_labels(scenario_labels)
-    scenarios = config.get_backtesting_scenarios()
-    if horizon_mode == SUNRISE_WINDOW:
-        # First / last sunrise book reach over the period edges: book only the
-        # in-period part (see ``BOOK_PERIOD_KEY``), so no clip shifts energy.
-        book_period = (
-            start.normalize().to_pydatetime(),
-            (end.normalize() + pd.Timedelta(days=1)).to_pydatetime(),
-        )
-        scenarios = {
-            scenario_id: {**params, BOOK_PERIOD_KEY: book_period}
-            for scenario_id, params in scenarios.items()
-        }
+    # The Live scenario and the reference plan always see all scenarios; the run only the chosen.
+    all_scenarios = scenarios_for_period(
+        config.get_backtesting_scenarios(), start, end, horizon_mode
+    )
+    scenarios = _selected_scenarios(all_scenarios, args.scenario)
     from house_config.baseload import (
         BaseloadOverAllocatedError,
         ensure_baseload_not_over_allocated,
@@ -995,19 +1043,10 @@ def main(argv: list[str] | None = None):
         scenarios, anchors, horizon_mode, start=start, end=end, cache=cache
     )
     live_scenario_id = config.get_live_scenario_id()
-    live_params = scenarios.get(live_scenario_id) or (
-        next(iter(scenarios.values())) if scenarios else None
+    live_params = all_scenarios.get(live_scenario_id) or (
+        next(iter(all_scenarios.values())) if all_scenarios else None
     )
-    market_zone = None
-    if live_params is not None:
-        market_zone = live_params.get("market_zone")
-    prices = load_market_prices(
-        price_load_start,
-        price_load_end,
-        sim_cfg,
-        timeout=config.get_global_timeout(default=30),
-        market_zone=market_zone,
-    )
+    prices = load_run_prices(price_load_start, price_load_end, sim_cfg, live_params)
 
     first_window = window_slot_datetimes(anchors[0])[0]
     last_window = window_slot_datetimes(anchors[-1])[-1]
@@ -1042,12 +1081,15 @@ def main(argv: list[str] | None = None):
     total_hours = len(anchors) * 24
     reference_by_scenario, extra_ref_labels, extra_ref_specs = (
         plan_per_scenario_reference_tasks(
-            scenarios,
+            all_scenarios,
             live_scenario_id=live_scenario_id,
             scenario_labels=scenario_labels,
             own_reference_by_scenario=config.get_own_reference_flags(),
         )
     )
+    reference_by_scenario = {sid: reference_by_scenario[sid] for sid in scenarios}
+    used_references = set(reference_by_scenario.values())
+    extra_ref_specs = [spec for spec in extra_ref_specs if spec[0] in used_references]
     labels.update(extra_ref_labels)
     ladder_by_scenario, ladder_specs = plan_ladder_reference_tasks(
         scenarios, scenario_labels=scenario_labels

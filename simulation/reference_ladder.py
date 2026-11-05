@@ -569,7 +569,32 @@ def _append_ladder_slot(series: dict[str, list[float]], row: dict) -> None:
     series["batt_action_kw"].append(float(row["Geplante Batterie-Aktion (kW)"]))
 
 
-def _soc_at_period_end(frame: pd.DataFrame, end_exclusive: pd.Timestamp) -> float:
+def soc_kwh_per_percent(scenario_params: dict) -> float:
+    """Usable energy of one SoC percent, as the ledger's correction counts it."""
+    from simulation.engine_scenario import _scenario_to_battery_params
+
+    battery = _baseline_battery_params(_scenario_to_battery_params(scenario_params))
+    return float(battery["battery_capacity_kwh"]) * float(battery["efficiency"]) / 100.0
+
+
+def soc_correction_eur(
+    l3_soc: float, step_soc: float, kwh_per_percent: float, p_ref_cent: float
+) -> float:
+    """Positive when L3 ends fuller than the step: the step's cost is that much too low."""
+    return (l3_soc - step_soc) * kwh_per_percent * p_ref_cent / 100.0
+
+
+def rule_share(l0_eur: float, l2_eur: float, l3_eur: float) -> float | None:
+    """Share of the rules in the total saving; ``None`` when Earnie saves nothing against L0."""
+    total_saving = l0_eur - l3_eur
+    return (l0_eur - l2_eur) / total_saving if total_saving > 0 else None
+
+
+def period_end_exclusive(period_end: pd.Timestamp | str) -> pd.Timestamp:
+    return pd.Timestamp(period_end).normalize() + pd.Timedelta(days=1)
+
+
+def soc_at_period_end(frame: pd.DataFrame, end_exclusive: pd.Timestamp) -> float:
     """SoC where the booked period ends: the next slot's start SoC, else the run's end SoC."""
     index = pd.DatetimeIndex(frame.index)
     later = frame.loc[index >= end_exclusive]
@@ -608,15 +633,10 @@ def ladder_soc_correction(
     that much too low for the comparison. ``results`` are not clipped to the period, since
     the SoC at the period's end is the start SoC of the slot behind it.
     """
-    from simulation.engine_scenario import _scenario_to_battery_params
-
-    end_exclusive = pd.Timestamp(period_end).normalize() + pd.Timedelta(days=1)
-    battery = _baseline_battery_params(_scenario_to_battery_params(scenario_params))
-    kwh_per_percent = (
-        float(battery["battery_capacity_kwh"]) * float(battery["efficiency"]) / 100.0
-    )
+    end_exclusive = period_end_exclusive(period_end)
+    kwh_per_percent = soc_kwh_per_percent(scenario_params)
     l3_frame = results[scenario_id]
-    l3_soc = _soc_at_period_end(l3_frame, end_exclusive)
+    l3_soc = soc_at_period_end(l3_frame, end_exclusive)
     p_ref_cent, basis = _reference_buy_price_cent(l3_frame, end_exclusive)
     block: dict = {
         "soc_end_percent": l3_soc,
@@ -625,10 +645,10 @@ def ladder_soc_correction(
         "steps": {},
     }
     for step, ref_id in steps.items():
-        step_soc = _soc_at_period_end(results[ref_id], end_exclusive)
+        step_soc = soc_at_period_end(results[ref_id], end_exclusive)
         block["steps"][step] = {
             "soc_end_percent": step_soc,
-            "correction_eur": (l3_soc - step_soc) * kwh_per_percent * p_ref_cent / 100.0,
+            "correction_eur": soc_correction_eur(l3_soc, step_soc, kwh_per_percent, p_ref_cent),
         }
     return block
 

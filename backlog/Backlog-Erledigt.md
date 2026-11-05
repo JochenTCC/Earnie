@@ -2,6 +2,14 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### RuleRef P5 — Study export and rule sensitivity (2026-11-05)
+
+- [x] **RuleRef P5 — Study export and rule sensitivity** `[dev]`: spec [`docs/dev/rule-based-reference.md`](../docs/dev/rule-based-reference.md) §§ 4.7, 5.
+  - `python -m scripts.run_reference_ladder --scenario … --workers N --output-dir …` runs a normal SE, then writes `reference_ladder_daily.csv`, `_summary.csv` and `_sensitivity.csv` (`simulation/reference_ladder_export.py`). Amounts are booked electricity without fees and fuel; fuel stays with the follow-up. Heating rod flag and `l3_foresight=perfect` on the rows.
+  - Sensitivity: 8 parameter sets per scenario, 7 extra L2 runs per setup since the default is the SE run's own L2. Best in hindsight is the lowest L2 cost including the end-SoC term. `--skip-sensitivity` for large samples.
+  - `run_backtesting --scenario ID` added; it narrows what runs, while the reference plan and the Live scenario still see all scenarios.
+  - Tests: `tests/test_reference_ladder_export.py`.
+
 ### RuleRef P3b — Window charts on L2, end-SoC valuation (2026-11-05)
 
 - [x] **RuleRef P3b — Window charts on L2, end-SoC valuation** `[feat]`: spec [`docs/dev/rule-based-reference.md`](../docs/dev/rule-based-reference.md) §§ 3.3, 5.
