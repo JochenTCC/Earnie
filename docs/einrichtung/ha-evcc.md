@@ -60,6 +60,7 @@ Damit evcc und Earnie sich nicht in die Quere kommen, gilt die folgende Checklis
 Lokale Strategien des Hubs für Überschuss, Preise oder Laden dürfen Earnies 48-h-Fahrplan nicht überschreiben:
 
 - [ ] In **evcc** ist keine eigenständige Surplus- oder Spotpreis-Ladeplanung aktiv (kein Smart Cost, kein konkurrierender Planner).
+- [ ] Der **Automatikmodus des evcc-Optimizers** (ab evcc 0.318, in den Optimizer-Einstellungen) ist ausgeschaltet. Eingeschaltet entscheidet evcc selbst, wann das E-Auto lädt und wie sich die Hausbatterie verhält.
 - [ ] Der Loadpoint ist so eingestellt, dass Earnie den Maxstrom (HA-`number`-Entity) setzen kann.
 - [ ] Keine HA-Automation schreibt auf dieselben Setpoint-Entities wie die Automationen aus dem Earnie-YAML-Paket.
 - [ ] Spotpreise und Fahrpläne kommen aus **Earnie**, nicht aus dem Hub.
