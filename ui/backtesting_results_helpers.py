@@ -18,6 +18,7 @@ from simulation.booked_consumption import BOOKED_CONSUMPTION_KEY
 from simulation.reference_costs import LADDER_L2
 from simulation.jahres_verbrauch import jahres_standby_kwh, jahres_verbrauch_kwh
 from ui.consumption_validation_charts import cons_data_monthly_kwh
+from ui.saving_text import soc_correction_text
 
 _DASH = "—"
 _TIMING_SHIFT_NOTE = "Zeitliche Lastverschiebung (Energie ≈ Spec)"
@@ -405,12 +406,36 @@ def _ladder_report_hints(report: dict | None) -> list[str]:
     return hints
 
 
+def _soc_correction_block(meta: dict, scenario_id: str) -> dict | None:
+    return (meta.get("ladder_soc_correction") or {}).get(scenario_id)
+
+
 def _standard_rules_saving_cell(meta: dict, scenario_id: str, totals: dict) -> str:
-    """L2 − L3 of a scenario; logs without a ladder have no value."""
+    """L2 − L3 of a scenario with the end-SoC term; logs without a ladder have no value."""
     steps = (meta.get("ladder_by_scenario") or {}).get(scenario_id)
     if not steps:
         return _DASH
-    return f"{float(totals[steps[LADDER_L2]]) - float(totals[scenario_id]):+.2f} €"
+    saving = float(totals[steps[LADDER_L2]]) - float(totals[scenario_id])
+    block = _soc_correction_block(meta, scenario_id)
+    if block:
+        saving += float(block["steps"][LADDER_L2]["correction_eur"])
+    return f"{saving:+.2f} €"
+
+
+def _soc_correction_hint(meta: dict, scenario_id: str) -> list[str]:
+    """How the saving column values the SoC at the end of the period."""
+    if scenario_id not in (meta.get("ladder_by_scenario") or {}):
+        return []
+    block = _soc_correction_block(meta, scenario_id)
+    if not block:
+        return ["SoC am Periodenende nicht bewertet (Log vor dieser Auswertung)"]
+    step = block["steps"][LADDER_L2]
+    if round(float(step["correction_eur"]), 2) == 0.0:
+        return []
+    return [
+        f"Ersparnis mit SoC am Periodenende: {soc_correction_text(step['correction_eur'])} "
+        f"({block['soc_end_percent']:.0f} % gegen {step['soc_end_percent']:.0f} %)"
+    ]
 
 
 def _annual_cost_hinweis(
@@ -422,8 +447,13 @@ def _annual_cost_hinweis(
     live_ref_kwh: float | None,
     booked: dict,
     ladder_report: dict | None = None,
+    soc_hint: list[str] | None = None,
 ) -> str:
-    hints = _booked_series_hints(scenario_id, booked) + _ladder_report_hints(ladder_report)
+    hints = (
+        _booked_series_hints(scenario_id, booked)
+        + _ladder_report_hints(ladder_report)
+        + (soc_hint or [])
+    )
     # Live-Referenz and Historisch (Ist-Zähler) are baselines, not optimized runs.
     # Historisch vs model Live-ref often differs when meter ≠ Hausprofil — not a sim bug.
     is_baseline = _is_live_reference_row(scenario_id, live_id) or scenario_id == ref_id
@@ -491,6 +521,7 @@ def build_annual_cost_rows(meta: dict) -> list[dict]:
             live_ref_kwh=live_ref_kwh,
             booked=booked,
             ladder_report=(meta.get("ladder_report") or {}).get(scenario_id),
+            soc_hint=_soc_correction_hint(meta, scenario_id),
         )
         is_reference = scenario_id == ref_id or is_scenario_reference_id(scenario_id)
         if is_reference:

@@ -32,7 +32,12 @@ from data.planning_window import (
     normalize_hour_slot,
     ui_chart_zones,
 )
-from simulation.backtesting_horizon import window_start_before_anchor
+from optimizer.slot_duration import normalize_quarter_hour_slot
+from simulation.backtesting_horizon import (
+    hourly_slots_half_open,
+    resolve_ready_by_sunrise_step,
+    window_start_before_anchor,
+)
 from simulation.backtesting_snapshots import (
     load_window_snapshot,
     snapshot_supports_sunrise_view,
@@ -68,13 +73,8 @@ def sa_segment_date_overlap_hours(
     try:
         lat, lon, tz_name = _geo_from_snapshot(snapshot)
         anchor_dt = _parse_window_anchor(str(window_anchor), tz_name)
-        planning_moment = window_start_before_anchor(anchor_dt, tz_name)
-        foresight = _backtesting_sunrise_segment_window(
-            planning_moment, 0, lat, lon, tz_name
-        )
-        book = _backtesting_sunrise_segment_window(
-            planning_moment, 1, lat, lon, tz_name
-        )
+        foresight = _backtesting_sunrise_segment_window(anchor_dt, 0, lat, lon, tz_name)
+        book = _backtesting_sunrise_segment_window(anchor_dt, 1, lat, lon, tz_name)
     except (ValueError, TypeError, KeyError):
         return 0, 0
     foresight_hours = sum(
@@ -244,49 +244,31 @@ def _backtesting_24h_header_label(window_anchor: str, tz_name: str) -> str:
     )
 
 def _backtesting_sunrise_segment_window(
-    planning_moment: datetime,
+    window_anchor: datetime,
     segment_index: int,
     lat: float,
     lon: float,
     tz_name: str,
 ) -> UiChartWindow:
     """
-    SA-Segment für Backtesting: ab Planungsstart (Anker−24h), nicht ab astronomischem SA₀.
+    SA segment of an SE window: the sunrises the run used for this anchor.
 
-    Live S-2 zeigt SA₀→SA₁ ab letztem Sonnenaufgang; Backtesting-Daten beginnen erst
-    am Planungsstart — Slots davor wären leer und verschieben die X-Achse fälschlich.
+    ``resolve_ready_by_sunrise_step`` sets SA₀→SA₂ by the anchor's calendar date, and the
+    slots are half open, so SA₁→SA₂ holds exactly the slots this window booked.
     """
     if segment_index not in (0, 1):
         raise ValueError(
             f"segment_index muss 0 oder 1 sein, erhalten: {segment_index}."
         )
-    planning_window = compute_planning_window(
-        planning_moment,
-        lat,
-        lon,
-        tz_name,
-    )
-    anchors = compute_sunrise_anchors(planning_moment, lat, lon, tz_name)
-    if segment_index == 0:
-        seg_start = planning_moment
-        seg_end = anchors.sa1
-    else:
-        seg_start = anchors.sa1
-        seg_end = anchors.sa2
-    seg_start = normalize_hour_slot(max(seg_start, planning_window.start))
-    seg_end = normalize_hour_slot(min(seg_end, planning_window.end))
-    if seg_start > seg_end:
-        raise ValueError(
-            f"Backtesting-SA-Segment {segment_index} leer: "
-            f"{seg_start} liegt nach {seg_end}."
-        )
-    slots = tuple(hourly_slots_inclusive(seg_start, seg_end))
+    step = resolve_ready_by_sunrise_step(window_anchor, lat, lon, tz_name)
+    seg_start, seg_end = (step.sa0, step.sa1) if segment_index == 0 else (step.sa1, step.sa2)
+    slots = hourly_slots_half_open(seg_start, seg_end)
     return UiChartWindow(
-        start=seg_start,
-        end=seg_end,
-        sa0=anchors.sa0,
-        sa1=anchors.sa1,
-        sa2=anchors.sa2,
+        start=normalize_quarter_hour_slot(seg_start),
+        end=normalize_quarter_hour_slot(seg_end),
+        sa0=step.sa0,
+        sa1=step.sa1,
+        sa2=step.sa2,
         segment_index=segment_index,
         slot_datetimes=slots,
     )
@@ -300,14 +282,14 @@ def _build_backtesting_sunrise_chart_context(
 ) -> LiveChartContext:
     lat, lon, tz_name = geo
     anchor_dt = _parse_window_anchor(window_anchor, tz_name)
-    planning_moment = window_start_before_anchor(anchor_dt, tz_name)
     chart = _backtesting_sunrise_segment_window(
-        planning_moment,
+        anchor_dt,
         segment_index,
         lat,
         lon,
         tz_name,
     )
+    planning_moment = chart.start
     zone_reference = chart.end
     zones = ui_chart_zones(
         zone_reference,

@@ -69,6 +69,7 @@ class OptimizationDisplayBundle:
     flex_consumers: tuple[dict, ...] | None = None
     show_soc_plausibility: bool = False
     cost_summary_days: tuple = ()
+    baseline_label: str | None = None
 
 
 def _apply_backtesting_chart_merge(
@@ -307,6 +308,7 @@ def build_optimization_display_bundle(
     backtesting_chart: bool = False,
     flex_consumers: tuple[dict, ...] | None = None,
     show_soc_plausibility: bool = False,
+    baseline_label: str | None = None,
 ) -> OptimizationDisplayBundle:
     if matched_baseline_df is None and savings_info.get("matched_baseline_rows"):
         matched_baseline_df = pd.DataFrame(savings_info["matched_baseline_rows"])
@@ -352,6 +354,7 @@ def build_optimization_display_bundle(
             "battery_params": battery_params,
             "flex_consumers": flex_consumers,
             "show_soc_plausibility": show_soc_plausibility,
+            "baseline_label": baseline_label,
         }
     )
 
@@ -383,6 +386,7 @@ def _make_optimization_display_bundle(parts: dict) -> OptimizationDisplayBundle:
         battery_params=parts["battery_params"],
         flex_consumers=parts["flex_consumers"],
         show_soc_plausibility=parts["show_soc_plausibility"],
+        baseline_label=parts["baseline_label"],
     )
 
 def build_optimization_display_bundle_from_snapshot(

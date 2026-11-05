@@ -55,6 +55,7 @@ from simulation.matrix_builder import (
 )
 from simulation.reference_costs import (
     HISTORICAL_REFERENCE_ID,
+    RUN_END_SOC_ATTR,
     SCENARIO_REFERENCE_PREFIX,
     build_per_scenario_reference_costs,
     compute_historical_reference_costs,
@@ -521,6 +522,7 @@ def run_simulation(
     df_res = _finalize_simulation_result(
         all_chart_rows, all_timestamps, init.flexible_consumers
     )
+    df_res.attrs[RUN_END_SOC_ATTR] = float(sim_soc)
     cbc_events = take_cbc_events() if collect_cbc else []
     return df_res, plausibility, cbc_events
 

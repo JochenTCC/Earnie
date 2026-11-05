@@ -2,6 +2,16 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### RuleRef P3b — Window charts on L2, end-SoC valuation (2026-11-05)
+
+- [x] **RuleRef P3b — Window charts on L2, end-SoC valuation** `[feat]`: spec [`docs/dev/rule-based-reference.md`](../docs/dev/rule-based-reference.md) §§ 3.3, 5.
+  - End SoC: `simulation/reference_ladder.py::ladder_soc_correction` values the SoC difference to L3 at the period's end with the ledger formula, for L1 and L2; `p_ref` from L3's last 24 h. Log key `ladder_soc_correction`. `Ersparnis vs. Standard-Regeln` and the CLI's rule share include it and `Hinweis` names it; `Jahres Kosten` and invoices stay booked cost. `run_simulation` and the ladder frame keep the run's end SoC in `frame.attrs`.
+  - The CLI's ladder summary now sums the period-clipped series, so it matches the cost table instead of counting the book spill past the period.
+  - Window view: `ui/backtesting_standard_rules.py` reads booked L2 and L3 per slot from the series file (no extra sidecar: the ladder frame carries flex, base load and battery columns like an optimized run). The saving of a window is the L2 − L3 of its slots, also in SA₀→SA₁, where a window's own rows are not what was booked; so Chart 2's "Optimiert" is the booked L3 there. Slots outside the period cost 0 € on both sides and are named. Label "Standard-Regeln" through `ui/chart_baseline_label.py`; the Monitor keeps "BL Ziel". Logs without a ladder keep the recomputed baseline.
+  - Fixed on the way: the sunrise chart context still worked from anchor − 24 h, one day behind the chain introduced by `e5a08493`, so "SA₁→SA₂" of a window was nearly empty and "SA₀→SA₁" showed its book. It now uses `resolve_ready_by_sunrise_step` and half-open slots, so the book segment holds exactly the booked slots; the segment preselection follows.
+  - Checked on a real October run (stale cons data, not study-grade): window saving equals the series' L2 − L3 in both segments of the first and last critical window; end SoC 5 % on all steps at this period's end, so a 0.00 € term there. Streamlit page not opened.
+  - Docs: `docs/ui/betriebsmodi.md`. Tests: `tests/test_reference_ladder_p3b.py`.
+
 ### RuleRef P3 — Ladder in the SE (2026-11-05)
 
 - [x] **RuleRef P3 — Ladder in the SE, L2 as reference of the saving** `[feat]`: spec [`docs/dev/rule-based-reference.md`](../docs/dev/rule-based-reference.md) §§ 2, 4.2, 5. Window charts and the end-SoC valuation moved to **RuleRef P3b** by maintainer decision.

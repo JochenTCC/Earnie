@@ -34,6 +34,7 @@ from ui.backtesting_display_bundle import (
 )
 from simulation.backtesting_snapshots import load_window_snapshot
 from ui.backtesting_results_helpers import nav_bounds_from_period
+from ui.backtesting_standard_rules import standard_rules_caption
 from ui.simulation_results import (
     render_optimization_chart1,
     render_optimization_chart2,
@@ -258,6 +259,9 @@ def _render_deviation_charts(
         bundle,
         chart_key=f"backtesting_price_savings_{chart_suffix}",
     )
+    caption = standard_rules_caption(bundle.savings_info)
+    if caption:
+        st.caption(caption)
 
 
 def _optimized_scenario_ids(meta: dict) -> list[str]:

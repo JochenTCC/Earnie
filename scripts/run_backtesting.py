@@ -55,6 +55,7 @@ from simulation.reference_costs import LADDER_L2
 from simulation.reference_ladder import (
     LadderReferenceSpec,
     compute_ladder_reference,
+    ladder_soc_correction,
     plan_ladder_reference_tasks,
 )
 from simulation.backtesting_progress import (
@@ -750,18 +751,25 @@ def print_ladder_summary(
     ladder_by_scenario: dict[str, dict[str, str]],
     reference_by_scenario: dict[str, str],
     ladder_report: dict[str, dict],
+    soc_correction: dict[str, dict],
 ) -> None:
-    """Earnie gegen Standard-Regeln (L2 − L3) und Anteil der Regeln an der Gesamtersparnis."""
+    """Earnie gegen Standard-Regeln (L2 − L3 mit SoC-Bewertung) über den gebuchten Zeitraum.
+
+    Dazu der Anteil der Regeln an der Gesamtersparnis; L0 hat keinen Speicher und bleibt
+    ohne SoC-Term.
+    """
     print("\n=== ERSPARNIS GEGEN STANDARD-REGELN ===")
     for scenario_id, steps in ladder_by_scenario.items():
+        correction = soc_correction[scenario_id]["steps"][LADDER_L2]["correction_eur"]
         l3 = float(results[scenario_id]["sim_cost"].sum())
-        l2 = float(results[steps[LADDER_L2]]["sim_cost"].sum())
+        l2 = float(results[steps[LADDER_L2]]["sim_cost"].sum()) + correction
         l0 = float(results[reference_by_scenario[scenario_id]]["sim_cost"].sum())
         total_saving = l0 - l3
         share = f"{(l0 - l2) / total_saving:.0%}" if total_saving > 0 else "—"
         print(
             f"  {labels.get(scenario_id, scenario_id):30s}: {l2 - l3:>+10,.2f} € "
-            f"(Anteil der Regeln an der Gesamtersparnis: {share})"
+            f"(davon SoC am Periodenende {correction:+,.2f} €; "
+            f"Anteil der Regeln an der Gesamtersparnis: {share})"
         )
     for ref_id, report in ladder_report.items():
         if report["plausibility_failed_windows"]:
@@ -1231,13 +1239,6 @@ def main(argv: list[str] | None = None):
 
     print_monthly_report(sim_results, labels)
     print_total_summary(sim_results, labels)
-    print_ladder_summary(
-        sim_results,
-        labels,
-        ladder_by_scenario=ladder_by_scenario,
-        reference_by_scenario=reference_by_scenario,
-        ladder_report=ladder_report,
-    )
 
     period_meta = {
         "start": start.date().isoformat(),
@@ -1290,6 +1291,20 @@ def main(argv: list[str] | None = None):
     )
     clipped_results = clip_results_map_to_period(
         sim_results, period_meta["start"], period_meta["end"]
+    )
+    period_meta["ladder_soc_correction"] = {
+        scenario_id: ladder_soc_correction(
+            sim_results, scenario_id, steps, scenarios[scenario_id], period_meta["end"]
+        )
+        for scenario_id, steps in ladder_by_scenario.items()
+    }
+    print_ladder_summary(
+        clipped_results,
+        labels,
+        ladder_by_scenario=ladder_by_scenario,
+        reference_by_scenario=reference_by_scenario,
+        ladder_report=ladder_report,
+        soc_correction=period_meta["ladder_soc_correction"],
     )
     booked_consumption = booked_consumption_by_result(
         clipped_results,

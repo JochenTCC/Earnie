@@ -9,6 +9,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from data.planning_window import UiChartWindow
+from ui.chart_baseline_label import DEFAULT_BASELINE_LABEL, baseline_label
 from ui.chart_cumulative import (
     add_achieved_savings_trace,
     add_cumulative_consumption_traces,
@@ -164,9 +165,14 @@ def _render_cumulative_figure(
     if (series.show_costs or series.show_consumption) and not series.split_mode:
         extrap_start, _ = _extrapolation_bounds(df)
         if extrap_start is None:
+            baseline_note = (
+                " BL Ziel: historisches Profil skaliert."
+                if baseline_label() == DEFAULT_BASELINE_LABEL
+                else ""
+            )
             st.caption(
                 "Durchgezogene Linien: Kosten. Gestrichelte Linien (rechte Achse): "
-                "Gesamtverbrauch Grundlast + Flex. BL Ziel: historisches Profil skaliert."
+                f"Gesamtverbrauch Grundlast + Flex.{baseline_note}"
             )
     inject_mobile_legend_css()
     plotly_kwargs: dict = {"width": "stretch"}

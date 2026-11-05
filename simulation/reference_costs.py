@@ -18,6 +18,8 @@ SCENARIO_REFERENCE_PREFIX = "ref:"
 LADDER_L1 = "l1"
 LADDER_L2 = "l2"
 LADDER_STEPS = (LADDER_L1, LADDER_L2)
+# ``frame.attrs`` key of a run's SoC after its last slot; ``sim_soc`` is start of slot.
+RUN_END_SOC_ATTR = "end_soc"
 
 
 def scenario_reference_id(scenario_id: str) -> str:

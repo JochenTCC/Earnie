@@ -39,6 +39,12 @@ from simulation.backtesting_snapshots import (
 )
 from simulation.engine import _scenario_to_battery_params, flex_consumers_from_snapshot
 from simulation.horizon_mode import BACKTESTING_STEP_HOURS, FIXED_24H, SUNRISE_WINDOW
+from ui.backtesting_standard_rules import (
+    STANDARD_RULES_LABEL,
+    StandardRulesSeries,
+    apply_standard_rules,
+    standard_rules_series,
+)
 from ui.chart_context import LiveChartContext
 from ui.history_navigation import s2_zone_help_text
 from ui.simulation_results import (
@@ -273,6 +279,7 @@ def build_backtesting_display_bundle(
     *,
     view_mode: str = VIEW_MODE_24H,
     segment_index: int = 0,
+    standard_rules: StandardRulesSeries | None = None,
 ) -> OptimizationDisplayBundle:
     geo = _geo_from_snapshot(snapshot)
     _, _, tz_name = geo
@@ -296,6 +303,9 @@ def build_backtesting_display_bundle(
         sunrise_soc_min_index=sunrise_soc_min_index,
         battery_params=battery_params,
     )
+    flex = flex_consumers_from_snapshot(snapshot)
+    if standard_rules is not None:
+        savings_info = apply_standard_rules(savings_info, chart_rows, standard_rules, list(flex))
     optimized_df = pd.DataFrame(chart_rows)
     baseline_df = pd.DataFrame(savings_info.get("baseline_rows") or [])
     matched_rows = savings_info.get("matched_baseline_rows")
@@ -315,7 +325,6 @@ def build_backtesting_display_bundle(
         view_mode=view_mode,
         segment_index=segment_index,
     )
-    flex = flex_consumers_from_snapshot(snapshot)
     return build_optimization_display_bundle(
         savings_info,
         optimized_df,
@@ -329,6 +338,7 @@ def build_backtesting_display_bundle(
         chart_header_help=header_help,
         backtesting_chart=True,
         flex_consumers=tuple(flex),
+        baseline_label=STANDARD_RULES_LABEL if standard_rules is not None else None,
     )
 
 
@@ -344,6 +354,7 @@ def load_backtesting_display_bundle(
     view_mode: str = VIEW_MODE_24H,
     segment_index: int = 0,
     log_horizon_mode: str | None = None,
+    standard_rules: StandardRulesSeries | None = None,
 ) -> OptimizationDisplayBundle | None:
     snapshot = load_window_snapshot(log_dir, window_anchor, scenario_id)
     if snapshot is None:
@@ -361,6 +372,7 @@ def load_backtesting_display_bundle(
         snapshot,
         view_mode=view_mode,
         segment_index=segment_index,
+        standard_rules=standard_rules,
     )
 
 
@@ -474,12 +486,14 @@ def resolve_backtesting_display_bundle(
         int(segment_index),
         str(log_horizon),
         "multi_ess_soc_v1",
+        "standard_rules_v1",
     )
     bundle_cache = _display_bundle_cache()
     cached = bundle_cache.get(bundle_key)
     if cached is not None:
         return cached
 
+    standard_rules = standard_rules_series(meta, hourly_df, scenario_id)
     existing = load_window_snapshot(log_dir, window_anchor, scenario_id)
     replace_stale = bool(
         existing is not None
@@ -495,6 +509,7 @@ def resolve_backtesting_display_bundle(
             view_mode=view_mode,
             segment_index=segment_index,
             log_horizon_mode=log_horizon,
+            standard_rules=standard_rules,
         )
     if bundle is None or replace_stale:
         snapshot = _on_demand_window_snapshot(
@@ -510,6 +525,7 @@ def resolve_backtesting_display_bundle(
             snapshot,
             view_mode=view_mode,
             segment_index=segment_index,
+            standard_rules=standard_rules,
         )
     if bundle is not None:
         bundle_cache[bundle_key] = bundle

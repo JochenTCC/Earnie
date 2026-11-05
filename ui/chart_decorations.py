@@ -9,6 +9,7 @@ from typing import Sequence
 import pandas as pd
 import plotly.graph_objects as go
 
+from ui.chart_baseline_label import baseline_label
 from ui.chart_consumer_stack import _chart_flex_consumers
 from ui.saving_text import saving_text, soc_correction_text
 from optimizer.deviation_eval import DeviationEvent
@@ -384,7 +385,7 @@ def _cost_summary_head_lines(
         lines,
         base,
         summary_font,
-        text=f"BL Ziel: {matched_baseline_cost_euro:.2f} €",
+        text=f"{baseline_label()}: {matched_baseline_cost_euro:.2f} €",
         line_index=line_index,
         color=COLOR_COST_BASELINE,
     )

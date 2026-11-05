@@ -7,6 +7,7 @@ from dataclasses import dataclass
 import pandas as pd
 import plotly.graph_objects as go
 
+from ui.chart_baseline_label import baseline_label
 from ui.chart_colors import (
     COLOR_COST_ACTUAL,
     COLOR_COST_BASELINE,
@@ -353,10 +354,10 @@ def add_cumulative_cost_traces(
         matched_cum,
         uhrzeit,
         segments,
-        name="Kosten BL Ziel",
+        name=f"Kosten {baseline_label()}",
         line_kwargs=dict(color=COLOR_COST_BASELINE, width=2.5, shape="hv"),
         segment_hover_template=(
-            "Uhrzeit: %{customdata}<br>Kosten BL Ziel (kumuliert): %{y:.3f} €"
+            f"Uhrzeit: %{{customdata}}<br>Kosten {baseline_label()} (kumuliert): %{{y:.3f}} €"
             "<extra></extra>"
         ),
     )
@@ -398,13 +399,13 @@ def add_cumulative_consumption_traces(
         matched_cum,
         uhrzeit,
         segments,
-        name="Verbrauch BL Ziel",
+        name=f"Verbrauch {baseline_label()}",
         line_kwargs=dict(color=COLOR_COST_BASELINE, width=2.5, dash="dash", shape="hv"),
         yaxis=yaxis,
         y_format=".2f",
         base_opacity=1.0,
         segment_hover_template=(
-            "Uhrzeit: %{customdata}<br>Verbrauch BL Ziel (kumuliert): %{y:.2f} kWh"
+            f"Uhrzeit: %{{customdata}}<br>Verbrauch {baseline_label()} (kumuliert): %{{y:.2f}} kWh"
             "<extra></extra>"
         ),
     )

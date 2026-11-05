@@ -141,14 +141,11 @@ class TestBacktestingDisplayBundle:
         assert len(bundle_sunrise.display_df) == len(
             bundle_sunrise.chart_context.chart_window.slot_datetimes
         )
-        planning_start = pd.Timestamp(anchor) - pd.Timedelta(hours=24)
-        if planning_start.tzinfo is None:
-            planning_start = planning_start.tz_localize("Europe/Vienna")
-        assert bundle_sunrise.chart_context.chart_window.start >= planning_start.to_pydatetime()
+        # SA₀→SA₁ starts where the window's rows start, on the run's own sunrises.
         snapshot_first = pd.Timestamp(snapshot["chart_rows_full"][0]["slot_datetime"])
         if snapshot_first.tzinfo is None:
             snapshot_first = snapshot_first.tz_localize("Europe/Vienna")
-        assert bundle_sunrise.chart_context.chart_window.start >= snapshot_first.to_pydatetime()
+        assert bundle_sunrise.chart_context.chart_window.start == snapshot_first.to_pydatetime()
 
 
 def test_soc_tail_y_uses_explicit_battery_params_when_live_capacity_zero(monkeypatch):

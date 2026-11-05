@@ -8,6 +8,7 @@ import pandas as pd
 import plotly.graph_objects as go
 
 from optimizer.targets import consumer_column_name
+from ui.chart_baseline_label import DEFAULT_BASELINE_LABEL, baseline_label
 from ui.chart_colors import flex_bar_chart_color
 from ui.chart_consumer_stack import _chart_flex_consumers
 from ui.chart_flow_segments import FLOW_BALANCE_BAR_WIDTH_FRACTION, _safe_float
@@ -121,6 +122,8 @@ def _add_ghost_bucket_traces(
     buckets: dict[str, dict[str, list[Any]]],
 ) -> None:
     legend_shown = False
+    label = baseline_label()
+    name = "Original-Schedule" if label == DEFAULT_BASELINE_LABEL else f"Flex {label}"
     for bucket in buckets.values():
         if not bucket["x"]:
             continue
@@ -132,7 +135,7 @@ def _add_ghost_bucket_traces(
                 y=bucket["y"],
                 base=bucket["base"],
                 width=bucket["widths"],
-                name="Original-Schedule",
+                name=name,
                 legendgroup="ghost_bl_ziel",
                 showlegend=showlegend,
                 marker=dict(
@@ -142,7 +145,7 @@ def _add_ghost_bucket_traces(
                 opacity=1.0,
                 customdata=bucket["customdata"],
                 hovertemplate=(
-                    "Uhrzeit: %{customdata[0]}<br>Original-Schedule %{customdata[2]}: "
+                    f"Uhrzeit: %{{customdata[0]}}<br>{name} %{{customdata[2]}}: "
                     "%{customdata[1]:.2f} kW<extra></extra>"
                 ),
             )

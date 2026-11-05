@@ -565,6 +565,7 @@ def _attach_period_bounds(
     if period.get("ladder_by_scenario"):
         payload["ladder_by_scenario"] = period["ladder_by_scenario"]
         payload["ladder_report"] = period["ladder_report"]
+        payload["ladder_soc_correction"] = period["ladder_soc_correction"]
     if period.get("live_scenario_id"):
         payload["live_scenario_id"] = period["live_scenario_id"]
     if period.get("imported_pv_scenario_ids"):

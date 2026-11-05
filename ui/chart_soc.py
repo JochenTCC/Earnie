@@ -17,6 +17,7 @@ from optimizer.slot_duration import (
     slot_step,
 )
 from runtime_store.history_timeline import CHART_IST_BATTERY_KW_COLUMN
+from ui.chart_baseline_label import baseline_label
 from ui.chart_colors import (
     COLOR_ESS_UNDERLAY_CHARGE,
     COLOR_ESS_UNDERLAY_DISCHARGE,
@@ -451,7 +452,7 @@ def add_baseline_soc_traces(
     add_anchored_counterfactual_soc_traces(
         fig,
         matched_baseline_df,
-        name="SoC BL Ziel",
+        name=f"SoC {baseline_label()}",
         dash="dot",
         yaxis=yaxis,
         extrap_start=extrap_start,

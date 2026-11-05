@@ -100,7 +100,7 @@ def test_ladder_gets_cheaper_step_by_step_with_pv_battery_and_ev(ladder_env):
     """Spot tariff, PV, battery, EV; a chain of days on which L1 and L2 end on the same SoC.
 
     One day alone can end the other way round: L2 then ends with a fuller battery, which
-    the cost sum does not value (spec § 3.3, item RuleRef P3b).
+    the cost sum does not value; ``test_reference_ladder_p3b`` covers that with the SoC term.
     """
     import config
     from simulation.engine import compute_historical_reference_costs
@@ -257,7 +257,9 @@ def test_log_payload_keeps_the_ladder():
     period = {
         "ladder_by_scenario": {"live": {"l1": "l1:live", "l2": "l2:live"}},
         "ladder_report": {"l1:live": {}},
+        "ladder_soc_correction": {"live": {}},
     }
     _attach_period_bounds(payload, period, [], 1)
     assert payload["ladder_by_scenario"] == period["ladder_by_scenario"]
     assert payload["ladder_report"] == period["ladder_report"]
+    assert payload["ladder_soc_correction"] == period["ladder_soc_correction"]

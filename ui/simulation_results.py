@@ -17,6 +17,7 @@ from runtime_store.history_timeline import (
     SLOT_MISSING,
     SLOT_PRESENT,
 )
+from ui.chart_baseline_label import chart_baseline_label_context
 from ui.chart_consumer_stack import _chart_flex_consumers, chart_flex_consumers_context
 from ui.chart_context import (
     LiveChartContext,
@@ -58,7 +59,7 @@ def render_optimization_chart1(
 ) -> None:
     with chart_flex_consumers_context(
         list(bundle.flex_consumers) if bundle.flex_consumers else None
-    ):
+    ), chart_baseline_label_context(bundle.baseline_label):
         render_power_soc_chart(
             bundle.display_df,
             bundle.baseline_df,
@@ -84,25 +85,26 @@ def render_optimization_chart2(
     *,
     chart_key: str = "live_price_savings_chart",
 ) -> None:
-    render_price_savings_chart(
-        bundle.display_df,
-        bundle.savings_view.get("hourly_matched_baseline_cost_euro"),
-        bundle.savings_view.get("hourly_optimized_cost_euro"),
-        bundle.savings_view.get("hourly_matched_baseline_consumption_kwh"),
-        bundle.savings_view.get("hourly_optimized_consumption_kwh"),
-        matched_baseline_cost_euro=bundle.matched_cost,
-        optimized_cost_euro=bundle.optimized_cost,
-        cost_summary_days=bundle.cost_summary_days or None,
-        ledger_savings=bundle.savings_view.get("ledger_savings"),
-        chart_window=bundle.chart_context.chart_window if bundle.chart_context else None,
-        chart_now=bundle.chart_context.zone_reference if bundle.chart_context else None,
-        chart_zones=bundle.chart_zones,
-        slot_qualities=bundle.chart_qualities,
-        history_slot_count=bundle.history_slot_count,
-        slot_actual_cost_euro=bundle.savings_view.get("slot_actual_cost_euro"),
-        slot_actual_consumption_kwh=bundle.savings_view.get("slot_actual_consumption_kwh"),
-        chart_key=chart_key,
-    )
+    with chart_baseline_label_context(bundle.baseline_label):
+        render_price_savings_chart(
+            bundle.display_df,
+            bundle.savings_view.get("hourly_matched_baseline_cost_euro"),
+            bundle.savings_view.get("hourly_optimized_cost_euro"),
+            bundle.savings_view.get("hourly_matched_baseline_consumption_kwh"),
+            bundle.savings_view.get("hourly_optimized_consumption_kwh"),
+            matched_baseline_cost_euro=bundle.matched_cost,
+            optimized_cost_euro=bundle.optimized_cost,
+            cost_summary_days=bundle.cost_summary_days or None,
+            ledger_savings=bundle.savings_view.get("ledger_savings"),
+            chart_window=bundle.chart_context.chart_window if bundle.chart_context else None,
+            chart_now=bundle.chart_context.zone_reference if bundle.chart_context else None,
+            chart_zones=bundle.chart_zones,
+            slot_qualities=bundle.chart_qualities,
+            history_slot_count=bundle.history_slot_count,
+            slot_actual_cost_euro=bundle.savings_view.get("slot_actual_cost_euro"),
+            slot_actual_consumption_kwh=bundle.savings_view.get("slot_actual_consumption_kwh"),
+            chart_key=chart_key,
+        )
 
 
 def render_optimization_results_tail(bundle: OptimizationDisplayBundle) -> None:
