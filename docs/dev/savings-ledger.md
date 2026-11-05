@@ -4,6 +4,8 @@
 **Fixed 2026-11-02:** D2 (Ledger P1) and D3 (Ledger P2); D1 is replaced by the ledger.
 **Implemented 2026-11-02:** slot engine and day close `runtime_store/savings_ledger.py` (Ledger P3, P4), files `runtime_store/savings_ledger_store.py` (P4), daemon hook `runtime_store/savings_ledger_daemon.py` (P5), backfill CLI `scripts/build_savings_ledger.py` (P6).
 **Decision 2026-11-02 (Ledger P0):** `p_ref`, partial days and powerstations are decided (§ 3, § 4, § 9).
+**Superseded 2026-11-05 (Account view P2):** Chart 2 is an account view now ([`chart2-account-view.md`](chart2-account-view.md)); the "Ersparnis bisher" line and the per-day annotations described below are gone. The ledger supplies the slot series left of *Jetzt*.
+
 **Implemented 2026-11-04 (Ledger P7):** Chart 2 reads "Ersparnis bisher" from the ledger (`ui/chart_ledger_savings.py`) and is shown again; `chart2_enabled()` and `EARNIE_UI_CHART2` are gone. On a running day BL Ziel, Optimiert and "Ersparnis erwartet" cover the rest of the day; an elapsed day shows only its ledger row. The SoC correction is a label, as the change against the previous day (`saving_adjusted − saving`).
 
 **Implemented 2026-11-04 (Account view P1):** slot series of closed SA-days in `savings_ledger_slots.jsonl` (§ 4).

@@ -120,7 +120,7 @@ Details: [Charts & Panels](charts.md).
 
 ### Kennzahlen-Horizont
 
-**Chart 2** zeigt die Kosten-Annotationen **BL Ziel**, **Optimiert** und **Plan** **pro SA-Tag**. Mobil gilt das nur für den sichtbaren Tag, am Desktop für SA₀→SA₂ in zwei Spalten. Am laufenden Tag erscheinen statt **Plan** die Werte **Bisher** (SA bis jetzt) und **Erwartet** (Rest des Tages). Abgelaufene Tage zeigen nur das **Ergebnis** aus dem Ersparnis-Buch. Im grauen Bereich zeigt das Chart zusätzlich die Kurve **Ersparnis bisher**.
+**Chart 2** ist eine Kontoansicht: Kontostand mit und ohne Earnie seit Fensterstart, links von Jetzt gebucht aus dem Ersparnis-Buch, rechts der Plan. Ein Umschalter wählt **Ist bei Jetzt** oder **Gemeinsamer Start**; der Abstand zwischen den Linien ist die Ersparnis (**Bisher**, **Erwartet**, **Gesamt**). Abgeschlossene Tage zeigen ihr **Ergebnis** aus dem Buch. Details: [Charts](charts.md#chart-2-kontostand-mit-und-ohne-earnie).
 
 Der **Energievergleich** und das MILP-Matching beziehen sich weiterhin auf **Jetzt → SA₂**, also den vollen Planungshorizont. Die Chart-Fenster dienen nur der Darstellung: Kumulierte Kurven darin sind Ausschnitte und bilden keine eigene Matching-Periode.
 
@@ -172,7 +172,7 @@ Je Szenario kommen zwei Referenzzeilen dazu. **Wechselrichter-Eigenverbrauch** r
 
 Die Spalte bewertet auch den Ladestand der Batterie am Periodenende. Endet Earnie voller als die Standard-Regeln, wird die zusätzlich gespeicherte Energie gutgeschrieben, endet es leerer, wird sie abgezogen. Bewertet wird sie wie im Ersparnis-Buch: Energie × Wirkungsgrad × mittlerer Bezugspreis des letzten Tages. Die Spalte `Hinweis` nennt den Betrag und beide Ladestände. Bei kurzen Zeiträumen kann das viel ausmachen, bei einem Jahr kaum. `Jahres Kosten [€]` bleibt der gebuchte Betrag ohne diese Bewertung.
 
-In der **Abweichungsliste** vergleichen die Charts eines Fensters ebenfalls mit den Standard-Regeln. Chart 2 zeigt je Slot die gebuchten Kosten beider Läufe, die Ersparnis im Fenster passt also zur Tabelle (ohne die Bewertung des Ladestands). Chart 1 zeigt weiter den Plan dieses Fensters, dazu Ladestand und flexible Verbraucher der Standard-Regeln. Den Abschnitt SA₀→SA₁ hat das Vorfenster gebucht, dort können Chart 1 und Chart 2 voneinander abweichen. Slots außerhalb des Zeitraums zählen nicht mit, der Text unter den Charts nennt sie. Ältere Läufe ohne Standard-Regeln zeigen wie bisher **BL Ziel**.
+In der **Abweichungsliste** vergleichen die Charts eines Fensters ebenfalls mit den Standard-Regeln. Chart 2 zeigt als Kontoansicht den Kontostand beider Läufe seit Fensterstart (gebuchte Kosten je Slot, beide beginnen bei 0 €); der Abstand am Fensterende ist die Ersparnis des Fensters (**Plan**) und passt zur Tabelle (ohne die Bewertung des Ladestands). Chart 1 zeigt weiter den Plan dieses Fensters, dazu Ladestand und flexible Verbraucher der Standard-Regeln. Den Abschnitt SA₀→SA₁ hat das Vorfenster gebucht, dort können Chart 1 und Chart 2 voneinander abweichen. Slots außerhalb des Zeitraums zählen nicht mit, der Text unter den Charts nennt sie. Ältere Läufe ohne Standard-Regeln zeigen wie bisher **BL Ziel**.
 
 Enden die Börsenpreise vor dem Tag nach dem Zeitraum (zum Beispiel bei einem Lauf bis heute vor der Preisveröffentlichung), rechnet die Preissperre am letzten Nachmittag mit den vorhandenen Preisen. Die Spalte `Hinweis` nennt dann die betroffenen Stunden.
 

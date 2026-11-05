@@ -7,14 +7,13 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 import pytest
 
-from ui.chart_colors import COLOR_COST_SAVINGS, CONSUMER_PALETTE, consumer_palette_color
+from ui.chart_colors import CONSUMER_PALETTE, consumer_palette_color
 from ui.charts import (
     ChartSlotAxis,
     _battery_bar_times,
     _chart_has_pv_follow_bars,
     _consumer_bar_marker,
     _consumer_bar_pattern_shapes,
-    _cost_summary_annotations,
     _extended_line_xy,
     _hv_line_endpoint_time,
     _segment_connected_line_xy,
@@ -478,23 +477,6 @@ def test_horizon_soc_tail_kept_when_current_hour_ramp_active():
     assert ys[t_start] == pytest.approx(30.8)
     assert ys[t_end] == pytest.approx(tail_y)
     assert ys[t_end] < ys[t_start]
-
-
-def test_cost_summary_annotations_include_totals_and_the_plan_in_words():
-    annotations = _cost_summary_annotations(12.34, 11.50)
-    assert len(annotations) == 3
-    assert annotations[0]["text"] == "BL Ziel: 12,34 €"
-    assert annotations[1]["text"] == "Optimiert: 11,50 €"
-    assert annotations[2]["text"] == "Plan: 0,84 € gespart"
-    assert annotations[2]["font"]["color"] == COLOR_COST_SAVINGS
-    assert annotations[0]["xref"] == "paper"
-    assert annotations[0]["xanchor"] == "left"
-    assert annotations[0]["yanchor"] == "top"
-    assert annotations[0]["yref"] == "y domain"
-    assert annotations[0]["y"] == 1.0
-    assert annotations[1]["yshift"] == -20
-    assert annotations[2]["yshift"] == -40
-    assert annotations[0]["font"]["size"] == 14
 
 
 def test_current_hour_ramp_preserves_later_milp_quarters_with_underlay():

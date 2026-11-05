@@ -2,6 +2,16 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Account view P2 — Monitor and SE window show the account view (2026-11-05)
+
+- [x] **Account view P2 — Monitor shows the account view** `[feat]`: spec [`docs/dev/chart2-account-view.md`](../docs/dev/chart2-account-view.md) §§ 3–5, 8.
+  - `ui/chart_account_view.py` (pure: balances, anchoring "Ist bei Jetzt" / "Gemeinsamer Start", signed gap, gap runs split at crossings, consumption control zero at the horizon end, energy-difference flag) and `ui/chart_account_render.py` (money panel with green/red gap and labels without a sign, SoC correction label, closed days' "Ergebnis" with "unvollständig", orange skipped / no-data slots, consumption panel, anchor switch in session state).
+  - `ui/chart_ledger_savings.py` gives every slot left of *Jetzt* `cost_with` / `cost_without` and a state, open day from the ledger state, closed days from `savings_ledger_slots.jsonl`; an unreadable slot file is a hint and marks those slots orange. `ui/chart_context.py` adds the plan energy after the window.
+  - Decisions: spec § 6 item 5 — flag the plan energy difference at *Jetzt* from 0.5 kWh and 2 % of the planned consumption; item 6 — the SE window moves to the account view too (no *Jetzt*, both lines from 0 €, baseline L2, label "Plan").
+  - Removed: `ui/chart_cumulative.py`, `ui/chart_cumulative_render.py`, `ui/chart_day_costs.py`, the per-day cost annotations in `ui/chart_decorations.py`, `cost_summary_days` in the display bundle, `ledger_figures_for_day`.
+  - Tests: `tests/test_chart_account_view.py`, `tests/test_chart_ledger_savings.py`, `tests/apptest/test_chart2_ledger_apptest.py` (switch state), `tests/test_reference_ladder_p3b.py`, `tests/test_ledger_kpi.py`.
+  - Docs: `docs/ui/charts.md` § Chart 2, `docs/ui/betriebsmodi.md`, user manual, **?** help text, `.github/release-notes/UNRELEASED.md`.
+
 ### Decimal separator in the UI (2026-11-05)
 
 - [x] **Decimal separator in the UI** `[feat]`: euro and cent amounts follow the viewer's browser language.

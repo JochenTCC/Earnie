@@ -8,6 +8,8 @@ Wenn seit dem letzten Tag neue Schritte in `runtime_store/migration/` hinzukamen
 
 - **Chart 2 ist zurück, jetzt mit tatsächlicher Ersparnis.** Der Monitor vergleicht die gemessenen Kosten mit einer Anlage ohne Earnie (gleicher Verbrauch, gleiche PV, Batterie im Herstellermodus, gleiche Preise). Die neue Kachel „Mit Earnie gespart“ über Chart 2 zeigt das Ergebnis seit Beginn der Zählung. Beträge stehen ohne Vorzeichen, die Bedeutung als Wort dabei („gespart“, „mehr ausgegeben“). Grenzen: Das Verschieben von Verbrauch ist noch nicht bewertet, und das Ergebnis hängt vom eingestellten Batterie-Wirkungsgrad ab.
 
+- **Chart 2 als Kontostand.** Chart 2 zeigt jetzt den Kontostand seit Fensterstart mit und ohne Earnie: links von Jetzt gebucht aus dem Ersparnis-Buch, rechts der Plan; fällt eine Linie, wird bezahlt. Der grüne oder rote Abstand zwischen den Linien ist die Ersparnis. Ein Umschalter wählt, ob sich die Linien bei Jetzt treffen (Abstand am Anfang = bisher gespart, am Ende = erwartet) oder gemeinsam bei 0 € beginnen. Ein kleines Panel darunter prüft, ob beide Seiten mit demselben Verbrauch gerechnet wurden. Das Fenster im Szenario-Explorer zeigt dieselbe Ansicht für seine beiden Läufe. Die bisherigen Kostenkurven und die Kosten-Annotationen je Tag entfallen.
+
 - **Euro-Beträge mit Komma.** Euro- und Cent-Beträge folgen jetzt der Sprache des Browsers: Deutsch zeigt `2,18 €`, Englisch `2.18 €`. Im Szenario-Explorer steht die Ersparnis wie im Monitor ohne Vorzeichen („gespart“, „mehr ausgegeben“); Differenzen wie `Δ vs Referenz` behalten ihr Vorzeichen.
 
 ## Breaking / Bitte prüfen

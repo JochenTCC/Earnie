@@ -147,20 +147,29 @@ Die Wärmepumpe („Freigabe, aber nicht angesprungen“) bewertet Earnie genaus
 
 Die kompakten Buttons stehen in einer Zeile **ohne** Fließtext dazwischen (mobil-tauglich) und liegen **zwischen Chart 1 und Sankey**; Chart 2 folgt darunter. Der Desktop zeigt standardmäßig SA₀→SA₂, mobil bleibt es bei 24-h-Segmenten.
 
-## Chart 2: Kumulierte Kosten & Verbrauch
+## Chart 2: Kontostand mit und ohne Earnie
 
-**Überschrift** mit **?** (Ist vs. Prognose, orange Lücken). Im Sunset-2-Sunset-Fenster sind Ist und Prognose getrennte Kurven:
+**Überschrift** „Kontostand: mit und ohne Earnie“ mit **?**. Chart 2 ist eine Kontoansicht: Die Linien zeigen den **Kontostand seit Fensterstart**, also Stromkosten und Einspeiseerlöse zu den Preisen des Ersparnis-Buchs, ohne Grund- und Netzgebühren. Beide Linien beginnen bei 0 €; fällt eine Linie, wird bezahlt, steigt sie, kommt Geld durch Einspeisung herein. Es ist weder ein Bankkonto noch die Stromrechnung.
 
-| Bereich | Kurven |
-|---------|--------|
-| Grau (Log) | **Ist bisher:** kumuliert aus dem Produktiv-Log. **Ersparnis bisher:** aus dem Ersparnis-Buch: Kosten ohne Earnie minus Ist-Kosten der gebuchten Slots des laufenden SA-Tags. Positiv heißt gespart. Ohne Buch fehlt die Linie, und unter dem Chart steht ein kurzer Hinweis. |
-| Neutral/Grün | **Prognose:** BL Ziel / optimiert ab der Log-Grenze (an die Ist-Kurve angeschlossen) |
+| Bereich | Mit Earnie | Vergleich |
+|---------|------------|-----------|
+| Links von **Jetzt** | gebuchte Kosten aus dem Ersparnis-Buch („Mit Earnie (gebucht)“) | Vergleichsanlage des Buchs: gleicher Verbrauch, gleiche PV, Batterie im Herstellermodus, gleiche Preise („Ohne Earnie (gebucht)“) |
+| Rechts von **Jetzt** | Plan („Optimiert (Plan)“, gestrichelt) | **BL Ziel** ab dem aktuellen Speicherstand („BL Ziel (Plan)“, gestrichelt) |
 
-Fehlende Log-Slots sind orange markiert; die Ist-Kurven haben dort Lücken.
+Die Vergleichslinie ändert bei **Jetzt** also ihre Bedeutung: links die Vergleichsanlage des Buchs, rechts BL Ziel. Der **?**-Hilfetext sagt das ebenfalls.
 
-Die Kennzahlen stehen **pro SA-Tag** im Chart: mobil nur für den sichtbaren Tag, am Desktop (SA₀→SA₂) in zwei Spalten (SA₀→SA₁ | SA₁→SA₂). Am **laufenden Tag** gelten **BL Ziel**, **Optimiert** und **Erwartet** für den Rest des Tages; **Bisher** kommt aus dem Ersparnis-Buch, darunter steht als **SoC** die SoC-Korrektur (Unterschied im Speicherstand gegenüber der Vergleichsbatterie, bewertet zum mittleren Bezugspreis). **Abgelaufene Tage** zeigen nur das **Ergebnis** aus dem Buch, ohne Linie und ohne Planwerte; Tage mit weniger als 80 % gebuchten Slots sind als „unvollständig“ markiert. Ein **Tag, der noch nicht begonnen hat**, zeigt als **Plan** die geplante Ersparnis. Der Szenario-Explorer nennt seine Ersparnis ebenfalls **Plan**.
+**Verankerung.** Ein Umschalter über dem Chart wählt, wie die Vergleichslinie liegt; die Wahl bleibt für die Sitzung erhalten.
 
-Beträge stehen ohne Vorzeichen, die Bedeutung als Wort dabei: „gespart“ oder „mehr ausgegeben“, bei der SoC-Korrektur „gutgeschrieben“ oder „abgezogen“. Nur die Kurve **Ersparnis bisher** braucht die Achse und liegt unter 0, wenn mehr ausgegeben wurde. Das Dezimalzeichen folgt der Sprache des Browsers: Steht in den Spracheinstellungen Englisch vor Deutsch, zeigt Earnie einen Punkt (`2.18 €`), sonst ein Komma (`2,18 €`). Das gilt für Euro- und Cent-Beträge; kWh, kW und Prozent stehen noch mit Punkt.
+- **Ist bei Jetzt** (Standard): Die Vergleichslinie ist so verschoben, dass sich beide Linien bei Jetzt treffen. Der Abstand am Fensterstart ist das **bisher** Gesparte, der Abstand am Fensterende das **erwartete**.
+- **Gemeinsamer Start**: Beide Linien beginnen bei 0 €. Der Abstand bei Jetzt ist das **bisher** Gesparte, am Fensterende das **Gesamte**.
+
+Die Fläche zwischen den Linien ist **grün**, wo gespart wurde, und **rot**, wo mehr ausgegeben wurde. Bei „Ist bei Jetzt“ liegt links und rechts von Jetzt jeweils eine andere Linie oben; Farbe und Labels sagen, was gemeint ist. Liegt das Fenster ganz in der Vergangenheit (Blättern), steht der Anker an seinem Ende; liegt es ganz in der Zukunft (Smartphone, zweiter Tag), gibt es keinen Umschalter und das Label heißt **Plan**.
+
+**Labels.** **Bisher**, **Erwartet** bzw. **Gesamt** stehen am jeweiligen Abstand. Die **SoC-Korrektur** des laufenden Tags (Speicherstand gegenüber der Vergleichsbatterie, bewertet zum mittleren Bezugspreis) steckt in keinem Abstand und steht als eigenes Label bei Jetzt. Abgeschlossene Tage im Fenster zeigen oben ihr **Ergebnis** aus dem Buch; Tage mit weniger als 80 % gebuchten Slots sind als „unvollständig“ markiert. Beträge stehen ohne Vorzeichen, die Bedeutung als Wort dabei: „gespart“ oder „mehr ausgegeben“, bei der SoC-Korrektur „gutgeschrieben“ oder „abgezogen“. Das Dezimalzeichen folgt der Sprache des Browsers: Steht in den Spracheinstellungen Englisch vor Deutsch, zeigt Earnie einen Punkt (`2.18 €`), sonst ein Komma (`2,18 €`). Das gilt für Euro- und Cent-Beträge; kWh, kW und Prozent stehen noch mit Punkt.
+
+**Orange Slots** hat das Buch nicht gezählt (fehlende Messwerte, Buch nicht gelaufen, fehlende Log-Daten). Sie zählen auf beiden Seiten null. Die gerade laufende Viertelstunde erscheint erst, wenn sie gebucht ist. Läuft das Buch nicht oder ist es nicht lesbar, steht unter dem Chart ein kurzer Hinweis.
+
+**Verbrauchskontrolle.** Das kleine Panel darunter prüft nur, ob beide Seiten mit demselben Verbrauch gerechnet wurden; es ist kein zweites Ergebnis. Es zeigt Vergleich minus optimiert in kWh, **null am Horizontende** (auch wenn das sichtbare Fenster früher endet). Der Wert bei Jetzt ist der Energieunterschied des Plans über den restlichen Horizont. Rechts von Jetzt zeigt die Linie auch zeitlich verschobene Verbraucher: Sie verlässt null, solange eine Seite früher verbraucht, und kehrt zurück, wenn die andere aufholt. Links von Jetzt ist sie flach, weil beide Seiten denselben gemessenen Verbrauch nutzen. Unterscheidet sich die Energie bei Jetzt um mindestens 0,5 kWh und mindestens 2 % des geplanten Verbrauchs, nennt ein Hinweis unter dem Chart den Unterschied: „Erwartet“ enthält dann auch den Preis dieser Energie.
 
 ### Kachel „Mit Earnie gespart“
 
