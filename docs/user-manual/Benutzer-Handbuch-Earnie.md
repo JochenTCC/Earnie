@@ -323,6 +323,7 @@ Die erzeugten Verbrauchsverläufe lassen sich im Explorer prüfen (Plausibilitä
 
 Die Auswertung umfasst unter anderem:
 
+- **Ersparnis gegen Standard-Regeln:** Was Earnie über Batterie und freie Regeln hinaus bringt, dazu der Anteil der Regeln an der Gesamtersparnis. Der Bereich **Alle Stufen** zeigt die Leiter von „Ohne Steuerung“ bis Earnie. Der Wert ist kleiner als die frühere Ersparnis gegen die Referenz ohne Optimierung, weil die Methode strenger ist. Details: [Betriebsmodi](../ui/betriebsmodi.md#ersparnis-gegen-standard-regeln)
 - **Gesamtkosten und -Verbrauch:** Tabelle mit Jahres Verbrauch, Speicher-Standby, Gesamtverbrauch, Jahres Kosten, Ersparnis gegen Standard-Regeln, Δ zur Live-Referenz und Hinweis
 - **Kostenvergleich** je Monat (Referenz und optimierte Szenarien)
 - **Monatsverläufe** und Plausibilitätsansichten

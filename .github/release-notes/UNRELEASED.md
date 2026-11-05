@@ -10,6 +10,8 @@ Wenn seit dem letzten Tag neue Schritte in `runtime_store/migration/` hinzukamen
 
 ## Breaking / Bitte prüfen
 
+- **Szenario-Explorer: Die Ersparnis ist jetzt kleiner, weil die Methode strenger ist.** Earnie wird nicht mehr nur mit einer Anlage ohne Batterie und ohne Regeln verglichen, sondern mit Standard-Regeln: Batterie im Eigenverbrauchsmodus, PV-Überschussladen, SG-Ready-Sperre bei hohen Preisen und „günstigste Stunden“. Das sind die freien Mittel, die man auch ohne Earnie hätte. Die Ergebnisse zeigen oben die Ersparnis gegen diese Regeln und ihren Anteil an der Gesamtersparnis, die ganze Leiter von „Ohne Steuerung“ bis Earnie steht im Bereich „Alle Stufen“. Die Optimierung selbst rechnet nicht schlechter. Grenzen: Earnie plant im Szenario-Explorer mit bekannten Verläufen, die Ersparnis ist also eine Obergrenze, und ein Heizstab läuft in den Regeln nicht. Bestehende Läufe bitte neu berechnen.
+
 - **Tariftypen `ex_post_spot` und `monthly_market` entfernt.** Beide wurden genau wie `spot_hourly` gerechnet und kamen im Tarifkatalog nicht vor. Ein Benutzertarif mit einem dieser Typen wird beim Laden abgelehnt; in `user_tariffs.json` den Typ auf `spot_hourly` ändern (gleiche Preise) oder den Tarif im Tarif-Editor neu anlegen. Die Typ-Filter im Szenarienkonfigurator heißen jetzt wie im Tarif-Editor („Festpreis“, „Börsenpreis + Aufschlag“, „Monatspreise“, jeweils mit „– Bezug“ / „– Einspeisung“).
 
 - **`flexible_consumers` aus `config.json` entfernt.** Verbraucher kommen nur noch aus dem Hausprofil. Ein verbliebener Block (auch `[]`) stoppt den Start: einmal `python -m scripts.migrate_config` ausführen. Enthält der Block noch Einträge, bricht die Migration ab; dann die Verbraucher zuerst im Hausprofil anlegen.

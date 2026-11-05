@@ -1,6 +1,6 @@
 # Rule-based reference — Earnie vs. standard rules (Scenario Explorer)
 
-**Status:** design 2026-11-03, method decisions O1–O5 taken 2026-11-05 (§ 7). L1 and L2 implemented 2026-11-05 (`simulation/reference_ladder.py`) and computed in every SE run; the cost table, invoices, log and CLI summary read them (P3). The end-SoC valuation of § 3.3 and the window charts on L2 are in (P3b), the study export and sensitivity too (P5). The headline and expander are open (P4). Backlog: epic **RuleRef** and item **SE forecast mode** in `backlog/Backlog.md`.
+**Status:** design 2026-11-03, method decisions O1–O5 taken 2026-11-05 (§ 7). L1 and L2 implemented 2026-11-05 (`simulation/reference_ladder.py`) and computed in every SE run; the cost table, invoices, log and CLI summary read them (P3). The end-SoC valuation of § 3.3 and the window charts on L2 are in (P3b), the study export and sensitivity too (P5), the headline and expander as well (P4, `ui/backtesting_ladder.py`). Backlog: item **SE forecast mode** and the **RuleRef follow-up** items in `backlog/Backlog.md`.
 
 **Related:** [`savings-ledger.md`](savings-ledger.md) (live counterfactual, `savings_v`), [`../workflow/earnie-points.md`](../workflow/earnie-points.md), `optimizer/sim_baseline.py`, `simulation/reference_costs.py`.
 
@@ -170,3 +170,5 @@ See § 4.2. Calendar day was the alternative. The strict comparison is not a mat
 ### O5 UI: L2 vs. L3 as the headline, ladder in an expander.
 
 The headline shows the saving L2 − L3 and the rule share; the expander shows L0–L3.
+
+Implemented in `ui/backtesting_ladder.py` (P4): one metric per scenario above the cost table, Live first. It reads the cost table's totals, so fees and fuel are in and the headline equals the column `Ersparnis vs. Standard-Regeln`. The export's figures are booked electricity only (§ 5), so with fuel or different fees on L0 its rule share can differ from the headline's.

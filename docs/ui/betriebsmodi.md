@@ -143,6 +143,25 @@ Der Szenario-Explorer hat keine Sonnenaufgang-Navigation wie der Monitor und fü
 >
 > Standard-Horizont ist `sunrise_window`: Das MILP rechnet SA₀→SA₂, gebucht wird jeweils **[SA₁, SA₂)**. SA₂ ist der Sonnenaufgang am `ready_by`-Tag, SA₁ der des Vortags. Die Buchungsfenster schließen damit lückenlos und ohne Doppelbuchung aneinander, auch wenn die Sonne erst nach `ready_by` aufgeht. `ready_by` ist nur die Lade-Deadline des E-Autos; die Ladenacht davor liegt im selben Buchungsfenster. Alle flexiblen Verbraucher laufen nur innerhalb des Buchungsfensters. Der SoC wird an den Sonnenaufgang-Übergängen verkettet. `fixed_24h` bleibt als Vergleichsmodus erhalten (an `ready_by` ausgerichtete 24-h-Fenster).
 
+### Ersparnis gegen Standard-Regeln
+
+Ganz oben in den Ergebnissen steht je Szenario, was Earnie über Batterie und freie Regeln hinaus bringt: die Kosten mit **Standard-Regeln** minus die Kosten mit Earnie. Darunter steht der **Anteil der Regeln**: (Ohne Steuerung − Standard-Regeln) / (Ohne Steuerung − Earnie). Er sagt, wie viel der gesamten Ersparnis man auch ohne Earnie erreicht. Spart Earnie gegen „Ohne Steuerung“ nichts, steht dort „keine Gesamtersparnis“.
+
+Der Bereich **Alle Stufen** zeigt die ganze Leiter. Jede Stufe ergänzt genau eine Sache:
+
+| Stufe | Batterie | Flexible Verbraucher | Vorbild |
+|---|---|---|---|
+| **Ohne Steuerung** | keine | zu ihren üblichen Zeiten | die frühere Referenz ohne Optimierung |
+| **Wechselrichter-Eigenverbrauch** | Eigenverbrauchsmodus des Wechselrichters | zu ihren üblichen Zeiten | was der Wechselrichter von sich aus tut |
+| **Standard-Regeln** | Eigenverbrauchsmodus des Wechselrichters | lokale Regeln | E-Auto: PV-Überschussladen wie evcc, mit Zielladung. Heizung und Pool: SG-Ready-Sperre bei hohen Preisen und Anhebung bei Überschuss. Geräte mit Startfenster: „günstigste Stunden“ wie in Home Assistant |
+| **Earnie** | MILP-Plan | MILP-Plan | der optimierte Lauf des Szenarios |
+
+Die Regeln sind großzügig angesetzt: Sie sehen den Überschuss am Zähler und die veröffentlichten Day-Ahead-Preise, wissen aber nichts von anderen Verbrauchern und vom Ladestand der Batterie. Alle Stufen liefern dieselbe Energie, buchen dieselben Preise und halten dieselben Ladefenster ein.
+
+**Warum die Ersparnis kleiner ist als früher:** Bisher verglich der Szenario-Explorer nur mit einer Anlage ohne Batterie und ohne jede Regel. Die Ersparnis schrieb Earnie damit auch das zu, was der Wechselrichter und kostenlose Regeln ohnehin leisten. Die neue Zahl ist kleiner, weil die Methode strenger ist. Die Optimierung rechnet nicht schlechter, und die frühere Vergleichszeile bleibt als „Ohne Steuerung“ erhalten.
+
+**Grenzen:** Earnie plant im Szenario-Explorer mit bekannten PV-, Last- und Preisverläufen, die Ersparnis ist also eine Obergrenze. Ein Heizstab läuft in den Standard-Regeln nicht, bei Häusern mit Heizstab fällt sie dadurch etwas zu hoch aus. Läufe von vor dieser Auswertung zeigen einen Hinweis, bis sie neu berechnet sind.
+
 ### Gesamtkosten und -Verbrauch
 
 Die Tabelle **Gesamtkosten und -Verbrauch** hat die Spalten `Szenario`, `Jahres Verbrauch [kWh]`, `Speicher-Standby [kWh]`, `Gesamtverbrauch [kWh]` (= Jahres Verbrauch + Speicher-Standby), `CO2 [kg]`, `Jahres Kosten [€]`, `Ersparnis vs. Standard-Regeln [€]`, `Δ vs Referenz [€]` und `Hinweis`. Das Delta bezieht sich immer auf die Zeile der Live-Referenz.

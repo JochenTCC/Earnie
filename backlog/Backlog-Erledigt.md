@@ -2,6 +2,13 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### RuleRef P4 — UI ladder and docs (2026-11-05)
+
+- [x] **RuleRef P4 — UI ladder and docs** `[feat]`: spec [`docs/dev/rule-based-reference.md`](../docs/dev/rule-based-reference.md) § 7 O5.
+  - `ui/backtesting_ladder.py`: above the cost table, one metric per scenario with the saving L2 − L3 and the rule share, Live first; the expander "Alle Stufen" shows L0–L3 with the end-SoC term and the saving per step. It reads the cost table's totals, so the headline equals the column `Ersparnis vs. Standard-Regeln`. A log without a ladder shows a hint to recalculate.
+  - Docs: `docs/ui/betriebsmodi.md` § Ersparnis gegen Standard-Regeln, user manual, `.github/release-notes/UNRELEASED.md`.
+  - Tests: `tests/test_reference_ladder_p4.py`, `tests/apptest/test_backtesting_ladder_apptest.py`.
+
 ### RuleRef P5 — Study export and rule sensitivity (2026-11-05)
 
 - [x] **RuleRef P5 — Study export and rule sensitivity** `[dev]`: spec [`docs/dev/rule-based-reference.md`](../docs/dev/rule-based-reference.md) §§ 4.7, 5.

@@ -28,6 +28,7 @@ from simulation.horizon_mode import DEFAULT_HORIZON_MODE, FIXED_24H, SUNRISE_WIN
 from ui.backtesting_charts import scenario_monthly_cost_chart
 from ui.backtesting_cons_data import render_cons_data_section
 from ui.backtesting_deviation_list import render_deviation_list
+from ui.backtesting_ladder import render_ladder_headline
 from ui.backtesting_results_helpers import (
     build_annual_cost_rows,
     build_scenario_consumption_rows,
@@ -283,6 +284,7 @@ def _render_backtesting_results(meta: dict, hourly_df: pd.DataFrame) -> None:
     render_backtesting_log_caption(meta)
     _render_imported_pv_results_notice(meta)
     _render_heating_results_notice(meta)
+    render_ladder_headline(meta)
     render_annual_cost_table(meta)
     render_backtesting_monthly_chart(meta)
     render_scenario_consumption_table(meta, hourly_df)
