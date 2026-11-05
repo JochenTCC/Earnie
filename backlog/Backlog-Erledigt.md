@@ -2,6 +2,16 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### RuleRef P1 — L1 reference on one SoC chain (2026-11-05)
+
+- [x] **RuleRef P1 — L1 reference: vendor-mode battery on one SoC chain** `[dev]`: spec [`docs/dev/rule-based-reference.md`](../docs/dev/rule-based-reference.md) § 4.1, § 5. Not shown in the SE yet (P3).
+  - `simulation/reference_ladder.py::compute_l1_reference_costs`: same anchors, windows, targets and flex windows as the optimized run (the MILP's own preparation), actual prices, battery via `vendor_mode_step`, SoC carried across anchors. Result: `_REFERENCE_COST_COLUMNS` plus `sim_soc`, plausibility report, end SoC, windows without a shape.
+  - `optimizer/sim_baseline.py::build_shaped_flex_kw_per_slot`: real timing per consumer (house profile model, else `cons_data` column), scaled to the target, capped at nominal; no shape → nominal from window start, reported; infeasible target fails loud with the missing kWh. Heating rod 0 kWh. Scenario consumers instead of the live ones.
+  - `ladder_reference_fingerprint` adds house, battery and flex consumers for L1 / L2. `reference_fingerprint` stays unchanged, so L0 columns in the SE do not change before P3 (deviates from the item's wording).
+  - `consumer_delivery_eligible_indices` extracted from the MILP delivery path, behaviour unchanged. `HistoricalDataCache.get_consumer_kw_for_slots` added.
+  - Limit: minimum power and minimum run time are not enforced on the scaled replay (spec § 4.1).
+  - Tests: `tests/test_reference_ladder_l1.py`.
+
 ### RuleRef P0 — Method decisions (2026-11-05)
 
 - [x] **RuleRef P0 — Method decisions** `[dev]`: spec [`docs/dev/rule-based-reference.md`](../docs/dev/rule-based-reference.md) § 7, O1–O5 decided by the maintainer. No production code.

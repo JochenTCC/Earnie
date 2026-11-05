@@ -1,6 +1,6 @@
 # Rule-based reference — Earnie vs. standard rules (Scenario Explorer)
 
-**Status:** design 2026-11-03, method decisions O1–O5 taken 2026-11-05 (§ 7), not implemented. Backlog: epic **RuleRef** and item **SE forecast mode** in `backlog/Backlog.md`.
+**Status:** design 2026-11-03, method decisions O1–O5 taken 2026-11-05 (§ 7). L1 runner implemented 2026-11-05 (`simulation/reference_ladder.py`), not yet shown in the SE (P3); L2 not implemented. Backlog: epic **RuleRef** and item **SE forecast mode** in `backlog/Backlog.md`.
 
 **Related:** [`savings-ledger.md`](savings-ledger.md) (live counterfactual, `savings_v`), [`../workflow/earnie-points.md`](../workflow/earnie-points.md), `optimizer/sim_baseline.py`, `simulation/reference_costs.py`.
 
@@ -46,11 +46,12 @@ Each rule is local: it knows its own consumer, the meter, and the price. It know
 
 ### 4.1 Mechanism: deferral queue on top of the matched profile
 
-Starting point per consumer is the matched-baseline profile (`build_matched_flex_kw_per_hour`: historical shape scaled to the target, zero outside the eligible window). SE matrices carry no `expected_flex_kw` today, so that function spreads every target flat over the eligible slots; the SE reference must supply the shape itself (O4):
+Starting point per consumer is the L1 profile (`optimizer/sim_baseline.py::build_shaped_flex_kw_per_slot`: real shape scaled to the target, zero outside the eligible window). It replaces `build_matched_flex_kw_per_hour` in the SE: SE matrices carry no `expected_flex_kw`, so that function spreads every target flat over the eligible slots, and it reads the live scenario's consumers (O4):
 
-- **Shape source:** `logged_day`: the consumer's `cons_data` column. `profile_spec`: `data/consumption_profiles.py::modeled_consumer_kw_at_datetime`, the source of the L0 load. Scaled to the target and capped at `nominal_power_kw`; energy cut by the cap moves to the next eligible slots with headroom.
-- **Target > 0 but no shape in the eligible window:** nominal power from the start of the eligible window until the target is reached ("switch on and run"), counted per consumer in the step's meta. Not spread flat.
-- **Consumer list:** the scenario's flex consumers. `build_matched_flex_kw_per_hour` and `_simulate_single_hour_baseline` read `config.get_flexible_consumers` (the live scenario) today.
+- **Shape source:** consumers of the scenario's house profile: `data/consumption_profiles.py::modeled_consumer_kw_for_slots`, the source of the L0 load. Others, and `logged_day` runs: the consumer's `cons_data` column. Scaled to the target and capped at `nominal_power_kw`; energy cut by the cap moves to the next eligible slots with headroom, then to earlier ones at the end of the window.
+- **Target > 0 but no shape in the eligible window:** nominal power from the start of the eligible window until the target is reached ("switch on and run"), counted per consumer in the step's meta and in the run's result. Not spread flat.
+- **Targets and windows:** the MILP's own preparation (`_prepare_horizon_state`: fixed load credited, charging limits) and its eligibility (`consumer_delivery_eligible_indices`, plus the thermal window).
+- **Limit:** `min_power_kw` and `min_on_quarterhours` are not enforced on the scaled replay; a scaled shape can run below minimum power. § 3.2 holds for windows and nominal power.
 
 Rules only **move** energy; a per-consumer budget keeps the total exact. Slots are processed in time order:
 
@@ -102,7 +103,7 @@ Defaults: quantile 0.75, consumer before battery, hysteresis from `min_on_quarte
 
 - **Rule builder** `optimizer/sim_baseline.py::build_rule_based_flex_kw_per_hour(matrix, targets, charging_contexts, consumers, shapes, price_series, rule_params)` — pure, same output shape as `build_matched_flex_kw_per_hour`. `shapes` and `price_series` per § 4.1 and § 4.2. Per-slot simulation reuses `_simulate_single_hour_baseline(flex_kw_override=…)`.
 - **SE reference runner**: L1 and L2 are not closed-form any more. They use the same per-window matrices as the optimized run (`build_historical_window_matrix` / `build_sunrise_window_matrix`) and carry the SoC across anchors. Those matrices split baseload from flex but hold only per-consumer targets, no per-consumer series, so the runner adds the shapes (§ 4.1). L1 and L2 always book actual prices. L0 stays closed-form.
-- **Reference sharing**: today references are shared across scenarios by `reference_fingerprint` (Historisch = assets stripped). L1/L2 depend on battery and flex consumers, so the fingerprint must include them; sharing between scenarios with different storage ends.
+- **Reference sharing**: today references are shared across scenarios by `reference_fingerprint` (Historisch = assets stripped). L1/L2 depend on the house, the battery and the flex consumers, so they share by `simulation/reference_ladder.py::ladder_reference_fingerprint`, which adds those to the L0 key. `reference_fingerprint` stays as it is: L0 ignores them, and SE reference columns must not change before P3.
 - **Output**: per-slot frame with the same columns as today (`_REFERENCE_COST_COLUMNS`) per ladder step, plus SoC for L1/L2, so existing charts and the SE invoice keep working.
 - **Study export**: one CLI (`python -m scripts.run_reference_ladder --scenario … --workers N`) writing L0–L3 per day and per scenario as CSV for the Points / pricing studies (`backtesting-max-workers.mdc`). Each scenario row carries a flag when the scenario has a heating rod (§ 3.1) and states that L3 is perfect foresight.
 

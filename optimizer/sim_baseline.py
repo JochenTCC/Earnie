@@ -1,9 +1,12 @@
 """Baseline and matched-baseline horizon simulation."""
 from __future__ import annotations
 
+from typing import NamedTuple
+
 import config
 from settings.flexible_consumers import flex_kw_lookup
 from optimizer import battery as bat
+from optimizer.consumer_power import power_limits_kw
 from optimizer.milp_horizon import (
     aggregate_battery_params_for_load,
     coerce_battery_params_list,
@@ -110,6 +113,84 @@ def build_matched_flex_kw_per_hour(
     return per_hour
 
 
+_ENERGY_EPSILON_KWH = 1e-3
+
+
+class ShapedFlex(NamedTuple):
+    """Reference flex of one window: kW per slot, and the consumers without a shape."""
+
+    per_slot: list[dict[str, float]]
+    no_shape_ids: list[str]
+
+
+def _spread_with_power_cap(
+    desired_kw: dict[int, float],
+    eligible: list[int],
+    max_kw: float,
+) -> tuple[dict[int, float], float]:
+    """Cap at ``max_kw``: excess moves to the next eligible slots, then to earlier ones.
+
+    Returns ``(kw_by_slot, undelivered_kw)``; both passes keep the slot's own energy first.
+    """
+    out: dict[int, float] = {}
+    carry = 0.0
+    for t in eligible:
+        wanted = desired_kw.get(t, 0.0) + carry
+        out[t] = min(max_kw, wanted)
+        carry = wanted - out[t]
+    for t in reversed(eligible):
+        if carry <= 0.0:
+            break
+        added = min(max_kw - out[t], carry)
+        out[t] += added
+        carry -= added
+    return out, carry
+
+
+def build_shaped_flex_kw_per_slot(
+    slot_count: int,
+    consumers: list[dict],
+    targets_kwh: dict[str, float],
+    shapes_kw: dict[str, list[float]],
+    eligible_by_consumer: dict[str, list[int]],
+) -> ShapedFlex:
+    """Reference timing per consumer: its real shape, scaled to the target, capped at nominal.
+
+    Target > 0 without shape energy in the eligible slots: nominal power from the start of
+    the eligible slots ("switch on and run"), reported in ``no_shape_ids``. A target the
+    eligible slots cannot deliver raises with the missing kWh. Pure.
+    """
+    dt_h = float(DEFAULT_DT_H)
+    per_slot: list[dict[str, float]] = [{} for _ in range(slot_count)]
+    no_shape_ids: list[str] = []
+    for consumer in consumers:
+        cid = consumer["id"]
+        target = float(targets_kwh.get(cid, 0.0) or 0.0)
+        eligible = eligible_by_consumer.get(cid, [])
+        _, max_kw = power_limits_kw(consumer)
+        shape_kw = shapes_kw.get(cid)
+        shape_sum = sum(max(0.0, float(shape_kw[t])) for t in eligible) if shape_kw else 0.0
+        if target <= 0.0:
+            desired: dict[int, float] = {}
+        elif shape_sum > 1e-6:
+            scale = target / (shape_sum * dt_h)
+            desired = {t: max(0.0, float(shape_kw[t])) * scale for t in eligible}
+        else:
+            no_shape_ids.append(str(cid))
+            desired = {eligible[0]: target / dt_h} if eligible else {}
+        delivered, undelivered_kw = _spread_with_power_cap(desired, eligible, max_kw)
+        missing_kwh = undelivered_kw * dt_h if desired else target
+        if missing_kwh > _ENERGY_EPSILON_KWH:
+            raise ValueError(
+                f"Referenz-Fenster: Verbraucher '{cid}' erreicht sein Ziel von {target:.3f} kWh "
+                f"nicht, es fehlen {missing_kwh:.3f} kWh ({len(eligible)} zulässige Slots, "
+                f"max. {max_kw:g} kW)."
+            )
+        for t in range(slot_count):
+            per_slot[t][cid] = delivered.get(t, 0.0)
+    return ShapedFlex(per_slot, no_shape_ids)
+
+
 def _simulate_single_hour_baseline(
     row: dict,
     sim_soc: float,
@@ -117,8 +198,13 @@ def _simulate_single_hour_baseline(
     flex_kw_override: dict[str, float] | None = None,
     steuerbefehl: str = "Baseline",
     baseload_kw_override: float | None = None,
+    *,
+    consumers: list[dict] | None = None,
 ) -> tuple[float, dict]:
-    """Simuliert eine einzelne Stunde im Baseline-Pfad."""
+    """Simuliert eine einzelne Stunde im Baseline-Pfad.
+
+    ``consumers`` names the flex columns of the chart row (default: the live scenario's).
+    """
     pv = row["expected_p_pv"]
     flex_kw = flex_kw_override if flex_kw_override is not None else (row.get("expected_flex_kw") or {})
     has_flex_profile = any(float(v or 0.0) > 0.0 for v in flex_kw.values())
@@ -151,7 +237,10 @@ def _simulate_single_hour_baseline(
         "Simulierter SoC (%)": round(old_soc, 1),
         "Steuerbefehl": steuerbefehl,
     }
-    for consumer in config.get_flexible_consumers(optimizer_only=True):
+    column_consumers = (
+        consumers if consumers is not None else config.get_flexible_consumers(optimizer_only=True)
+    )
+    for consumer in column_consumers:
         if flex_kw:
             chart_row[consumer_column_name(consumer)] = round(
                 float(flex_kw.get(consumer["id"], 0.0) or 0.0), 2

@@ -146,6 +146,24 @@ class HistoricalDataCache:
         total_load = df_window["Total"].round(3).tolist()
         return baseload, historical_totals, total_load, hourly_flex
 
+    def get_consumer_kw_for_slots(
+        self,
+        slot_datetimes: list[datetime],
+        consumer_ids: list[str],
+    ) -> dict[str, list[float]]:
+        """kW per slot of each consumer that has a cons_data column; others are left out."""
+        from data.cons_data_house_profile import consumer_labels_for_ids
+
+        self.load()
+        labels = consumer_labels_for_ids(consumer_ids)
+        df_window = _hold_from_hourly(self._consumption_df_hourly, slot_datetimes)
+        series: dict[str, list[float]] = {}
+        for consumer_id in consumer_ids:
+            label = labels.get(consumer_id, consumer_id)
+            if label in df_window.columns:
+                series[consumer_id] = df_window[label].astype(float).tolist()
+        return series
+
     def get_pv_for_slots(
         self,
         slot_datetimes: list[datetime],

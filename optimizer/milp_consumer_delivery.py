@@ -298,6 +298,41 @@ def _add_urgent_min_asap_constraint(
     model.prob += _delivery_energy_expr(model, consumer, asap) >= effective_urgent
 
 
+def consumer_delivery_eligible_indices(
+    matrix: list[dict[str, Any]],
+    horizon: int,
+    consumer: dict,
+    schedule_indices: list[int],
+    ctx: dict | None,
+    filter_ctx: dict | None,
+) -> tuple[list[int], list[int]]:
+    """``(candidate, eligible)`` slots of one consumer's delivery in the horizon.
+
+    Charging window minus native filter slots, intersected with the generic flex window.
+    Also the window source of the SE reference ladder (same windows as the MILP).
+    """
+    consumer_indices = schedule_indices_for_consumer(
+        matrix, horizon, schedule_indices, consumer, ctx
+    )
+    eligible = consumer_flex_eligible_indices(
+        matrix[:horizon],
+        consumer,
+        consumer_indices,
+        ctx,
+        filter_ctx,
+    )
+    if generic_flex_window(consumer):
+        generic_eligible = set(
+            consumer_generic_eligible_indices(
+                matrix[:horizon],
+                consumer,
+                consumer_indices,
+            )
+        )
+        eligible = [index for index in eligible if index in generic_eligible]
+    return consumer_indices, eligible
+
+
 def _resolve_delivery_eligible_indices(
     model: MilpHorizonModel,
     matrix: list[dict[str, Any]],
@@ -306,26 +341,9 @@ def _resolve_delivery_eligible_indices(
     ctx: dict | None,
     filters: dict[str, dict],
 ) -> list[int]:
-    cid = consumer["id"]
-    consumer_indices = schedule_indices_for_consumer(
-        matrix, model.horizon, schedule_indices, consumer, ctx
+    consumer_indices, eligible = consumer_delivery_eligible_indices(
+        matrix, model.horizon, consumer, schedule_indices, ctx, filters.get(consumer["id"])
     )
-    eligible = consumer_flex_eligible_indices(
-        matrix[: model.horizon],
-        consumer,
-        consumer_indices,
-        ctx,
-        filters.get(cid),
-    )
-    if generic_flex_window(consumer):
-        generic_eligible = set(
-            consumer_generic_eligible_indices(
-                matrix[: model.horizon],
-                consumer,
-                consumer_indices,
-            )
-        )
-        eligible = [index for index in eligible if index in generic_eligible]
     return apply_slot_availability_constraints(
         model.prob,
         model.consumer_on,
