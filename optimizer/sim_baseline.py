@@ -1,7 +1,12 @@
 """Baseline and matched-baseline horizon simulation."""
 from __future__ import annotations
 
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from typing import NamedTuple
+from zoneinfo import ZoneInfo
+
+import numpy as np
 
 import config
 from settings.flexible_consumers import flex_kw_lookup
@@ -189,6 +194,333 @@ def build_shaped_flex_kw_per_slot(
         for t in range(slot_count):
             per_slot[t][cid] = delivered.get(t, 0.0)
     return ShapedFlex(per_slot, no_shape_ids)
+
+
+SURPLUS_CONSUMER_FIRST = "consumer_first"
+SURPLUS_BATTERY_FIRST = "battery_first"
+DEFAULT_RULE_PARAMS = {
+    "lock_quantile": 0.75,
+    "surplus_priority": SURPLUS_CONSUMER_FIRST,
+}
+_PRICE_EPSILON_CENT = 1e-9
+_POWER_EPSILON_KW = 1e-9
+
+
+class RuleBasedFlex(NamedTuple):
+    """L2 flex of one window.
+
+    ``no_shape_ids``: as in ``ShapedFlex``. ``no_published_block_ids``: cheapest-block
+    consumers that kept their real timing because no start had all prices published.
+    """
+
+    per_slot: list[dict[str, float]]
+    no_shape_ids: list[str]
+    no_published_block_ids: list[str]
+
+
+def _is_nonexistent_local_slot(slot_dt: datetime) -> bool:
+    """True inside the spring DST gap of the planning timezone."""
+    tz = ZoneInfo(config.get_planning_timezone())
+    round_trip = slot_dt.replace(tzinfo=tz).astimezone(timezone.utc).astimezone(tz)
+    return round_trip.replace(tzinfo=None) != slot_dt
+
+
+def available_slot_prices(
+    slot_dt: datetime,
+    price_series: dict[datetime, float],
+) -> list[float]:
+    """End-customer prices known at ``slot_dt``: the slot up to its last published day-ahead day."""
+    from data.backtesting_prices import last_day_ahead_calendar_date
+
+    stop = datetime.combine(
+        last_day_ahead_calendar_date(slot_dt) + timedelta(days=1), datetime.min.time()
+    )
+    step = timedelta(hours=float(DEFAULT_DT_H))
+    prices: list[float] = []
+    current = slot_dt
+    while current < stop:
+        price = price_series.get(current)
+        if price is not None:
+            prices.append(float(price))
+        elif not _is_nonexistent_local_slot(current):
+            raise ValueError(
+                f"Referenz-Regeln: Kein Endkundenpreis für {current:%Y-%m-%d %H:%M} "
+                f"(nötig für die Preissperre um {slot_dt:%Y-%m-%d %H:%M})."
+            )
+        current += step
+    return prices
+
+
+def _price_locked(
+    slot_dt: datetime,
+    price_series: dict[datetime, float],
+    quantile: float,
+) -> bool:
+    """Strictly above the quantile of the available prices: a flat tariff never locks."""
+    prices = available_slot_prices(slot_dt, price_series)
+    return prices[0] > float(np.quantile(prices, quantile)) + _PRICE_EPSILON_CENT
+
+
+def _validated_rule_params(rule_params: dict) -> tuple[float, str]:
+    quantile = float(rule_params["lock_quantile"])
+    priority = rule_params["surplus_priority"]
+    if not 0.0 <= quantile <= 1.0:
+        raise ValueError(f"lock_quantile muss in [0, 1] liegen, nicht {quantile}.")
+    if priority not in (SURPLUS_CONSUMER_FIRST, SURPLUS_BATTERY_FIRST):
+        raise ValueError(f"Unbekannte surplus_priority {priority!r}.")
+    return quantile, priority
+
+
+def _is_ev_consumer(consumer: dict) -> bool:
+    """House-profile EVs carry the type, config consumers only the charging schedule."""
+    schedule = consumer.get("charging_schedule") or {}
+    return consumer.get("type") == "ev" or bool(schedule.get("enabled"))
+
+
+def _surplus_threshold_kw(consumer: dict, max_kw: float) -> float:
+    """Start threshold: the configured minimum, else an EV modulates and others run on/off."""
+    min_kw = float(consumer.get("min_power_kw") or 0.0)
+    if min_kw > 0.0:
+        return min_kw
+    return 0.0 if _is_ev_consumer(consumer) else max_kw
+
+
+@dataclass
+class _RuleConsumer:
+    """Deferral queue of one consumer: delivered + backlog + later planned = target."""
+
+    cid: str
+    planned_kw: list[float]
+    eligible: list[int]
+    max_kw: float
+    price_lock: bool
+    surplus: bool
+    threshold_kw: float
+    min_on_slots: int
+    backlog_kwh: float = 0.0
+    hold_slots: int = 0
+
+    def later_kwh(self, t: int) -> float:
+        return sum(self.planned_kw[s] for s in self.eligible if s > t) * float(DEFAULT_DT_H)
+
+    def draw(self, kwh: float, t: int) -> None:
+        """Take delivered energy from the backlog, then from the back of the later profile."""
+        from_backlog = min(kwh, self.backlog_kwh)
+        self.backlog_kwh -= from_backlog
+        missing = kwh - from_backlog
+        dt_h = float(DEFAULT_DT_H)
+        for s in reversed(self.eligible):
+            if missing <= 0.0 or s <= t:
+                break
+            taken = min(missing, self.planned_kw[s] * dt_h)
+            self.planned_kw[s] -= taken / dt_h
+            missing -= taken
+
+    def base_power_kw(self, t: int, locked: bool) -> float:
+        """Planned energy and backlog unless locked, and never below the deadline's need."""
+        dt_h = float(DEFAULT_DT_H)
+        self.backlog_kwh += self.planned_kw[t] * dt_h
+        self.planned_kw[t] = 0.0
+        slots_after = sum(1 for s in self.eligible if s > t)
+        later_kwh = self.later_kwh(t)
+        needed_kw = max(
+            0.0, (self.backlog_kwh + later_kwh - slots_after * self.max_kw * dt_h) / dt_h
+        )
+        wanted_kw = 0.0 if locked else self.backlog_kwh / dt_h
+        power_kw = min(self.max_kw, max(wanted_kw, needed_kw))
+        self.draw(power_kw * dt_h, t)
+        return power_kw
+
+    def surplus_extra_kw(self, t: int, power_kw: float, available_kw: float) -> float:
+        """Extra power from the surplus; ``min_on_slots`` holds a started run."""
+        if available_kw > _POWER_EPSILON_KW and available_kw >= self.threshold_kw:
+            wanted_kw = min(self.max_kw, available_kw)
+            self.hold_slots = self.min_on_slots - 1
+        elif self.hold_slots > 0:
+            wanted_kw = min(self.max_kw, max(self.threshold_kw, available_kw))
+            self.hold_slots -= 1
+        else:
+            return 0.0
+        dt_h = float(DEFAULT_DT_H)
+        open_kwh = self.backlog_kwh + self.later_kwh(t)
+        extra_kw = min(max(0.0, wanted_kw - power_kw), open_kwh / dt_h)
+        self.draw(extra_kw * dt_h, t)
+        return extra_kw
+
+
+def _contiguous_runs(indices: list[int]) -> list[list[int]]:
+    runs: list[list[int]] = []
+    for index in indices:
+        if runs and runs[-1][-1] == index - 1:
+            runs[-1].append(index)
+        else:
+            runs.append([index])
+    return runs
+
+
+def _move_to_cheapest_block(
+    planned_kw: list[float],
+    eligible: list[int],
+    matrix: list[dict],
+    price_series: dict[datetime, float],
+) -> bool:
+    """Move the cycle to its cheapest start, judged on the prices published at window opening.
+
+    Keeps the real start on a tie. Returns False when no start had all prices published.
+    """
+    from data.backtesting_prices import last_day_ahead_calendar_date
+
+    active = [t for t in eligible if planned_kw[t] > 0.0]
+    if not active:
+        return True
+    start, end = active[0], active[-1]
+    cycle = planned_kw[start : end + 1]
+
+    def block_cost(first: int) -> float:
+        total = 0.0
+        for offset, power_kw in enumerate(cycle):
+            slot_dt = matrix[first + offset]["slot_datetime"]
+            if slot_dt not in price_series:
+                raise ValueError(
+                    f"Referenz-Regeln: Kein Endkundenpreis für {slot_dt:%Y-%m-%d %H:%M} "
+                    "(nötig für den günstigsten Block)."
+                )
+            total += power_kw * float(price_series[slot_dt])
+        return total
+
+    costs: dict[int, float] = {}
+    for run in _contiguous_runs(eligible):
+        published_until = last_day_ahead_calendar_date(matrix[run[0]]["slot_datetime"])
+        for first in run[: max(0, len(run) - len(cycle) + 1)]:
+            if matrix[first + len(cycle) - 1]["slot_datetime"].date() <= published_until:
+                costs[first] = block_cost(first)
+    if not costs:
+        return False
+    best = min(costs, key=lambda first: (costs[first], first))
+    if start in costs and costs[start] <= costs[best] + _PRICE_EPSILON_CENT:
+        return True
+    for t in range(start, end + 1):
+        planned_kw[t] = 0.0
+    for offset, power_kw in enumerate(cycle):
+        planned_kw[best + offset] = power_kw
+    return True
+
+
+def _rule_consumer(
+    consumer: dict,
+    planned_kw: list[float],
+    eligible: list[int],
+) -> _RuleConsumer:
+    """Rules per consumer type (spec § 4.1). Cheapest block and fixed load run as planned."""
+    _, max_kw = power_limits_kw(consumer)
+    fixed_timing = bool(consumer.get("continuous_load") or consumer.get("generic_flex_window"))
+    thermal = consumer.get("type") in ("thermal_annual", "thermal_rc")
+    is_ev = _is_ev_consumer(consumer)
+    return _RuleConsumer(
+        cid=consumer["id"],
+        planned_kw=planned_kw,
+        eligible=eligible,
+        max_kw=max_kw,
+        price_lock=not fixed_timing and not is_ev,
+        surplus=not fixed_timing and (is_ev or thermal),
+        threshold_kw=_surplus_threshold_kw(consumer, max_kw),
+        min_on_slots=max(1, int(consumer.get("min_on_quarterhours", 1) or 1)),
+    )
+
+
+def _available_surplus_kw(
+    consumer_id: str,
+    net_before_flex_kw: float,
+    slot_kw: dict[str, float],
+    priority: str,
+    soc: float,
+    battery_params: dict,
+) -> float:
+    """Surplus the consumer sees, its own power included: before or after the battery."""
+    if priority == SURPLUS_CONSUMER_FIRST:
+        others_kw = sum(kw for cid, kw in slot_kw.items() if cid != consumer_id)
+        return net_before_flex_kw - others_kw
+    net_kw = net_before_flex_kw - sum(slot_kw.values())
+    _, batt_kw = bat.vendor_mode_step(soc, net_kw, battery_params, dt_h=DEFAULT_DT_H)
+    return slot_kw[consumer_id] + max(0.0, net_kw - max(0.0, batt_kw))
+
+
+def build_rule_based_flex_kw_per_hour(
+    matrix: list[dict],
+    targets_kwh: dict[str, float],
+    eligible_by_consumer: dict[str, list[int]],
+    consumers: list[dict],
+    shapes_kw: dict[str, list[float]],
+    price_series: dict[datetime, float],
+    rule_params: dict,
+    *,
+    book_indices: list[int],
+    battery_params: dict,
+    initial_soc: float,
+) -> RuleBasedFlex:
+    """L2: standard rules move the energy of the L1 profile, the total per consumer stays exact.
+
+    Spec ``docs/dev/rule-based-reference.md`` § 4. ``price_series``: end-customer price per
+    slot, up to the last published day-ahead day of the book's last slot. With no rule
+    firing the result equals ``build_shaped_flex_kw_per_slot``. A missing price or an
+    undeliverable target raises.
+    """
+    quantile, priority = _validated_rule_params(rule_params)
+    shaped = build_shaped_flex_kw_per_slot(
+        len(matrix), consumers, targets_kwh, shapes_kw, eligible_by_consumer
+    )
+    no_published_block_ids: list[str] = []
+    states: list[_RuleConsumer] = []
+    for consumer in consumers:
+        cid = consumer["id"]
+        eligible = eligible_by_consumer.get(cid, [])
+        planned_kw = [slot[cid] for slot in shaped.per_slot]
+        if (
+            consumer.get("generic_flex_window")
+            and not consumer.get("continuous_load")
+            and not _move_to_cheapest_block(planned_kw, eligible, matrix, price_series)
+        ):
+            no_published_block_ids.append(str(cid))
+        states.append(_rule_consumer(consumer, planned_kw, eligible))
+
+    dt_h = float(DEFAULT_DT_H)
+    per_slot: list[dict[str, float]] = [
+        {state.cid: 0.0 for state in states} for _ in range(len(matrix))
+    ]
+    soc = float(initial_soc)
+    for t in book_indices:
+        row = matrix[t]
+        slot_kw = per_slot[t]
+        locked: bool | None = None
+        running: list[_RuleConsumer] = []
+        for state in states:
+            if t not in state.eligible:
+                state.hold_slots = 0
+                continue
+            running.append(state)
+            if state.price_lock and locked is None:
+                locked = _price_locked(row["slot_datetime"], price_series, quantile)
+            slot_kw[state.cid] = state.base_power_kw(t, bool(state.price_lock and locked))
+        net_before_flex_kw = float(row["expected_p_pv"]) - bat.effective_p_act(row, battery_params)
+        for state in running:
+            if state.surplus:
+                available_kw = _available_surplus_kw(
+                    state.cid, net_before_flex_kw, slot_kw, priority, soc, battery_params
+                )
+                slot_kw[state.cid] += state.surplus_extra_kw(t, slot_kw[state.cid], available_kw)
+        soc, _ = bat.vendor_mode_step(
+            soc, net_before_flex_kw - sum(slot_kw.values()), battery_params, dt_h=DEFAULT_DT_H
+        )
+
+    for state in states:
+        target = float(targets_kwh.get(state.cid, 0.0) or 0.0)
+        delivered = sum(slot[state.cid] for slot in per_slot) * dt_h
+        if abs(target - delivered) > _ENERGY_EPSILON_KWH:
+            raise ValueError(
+                f"Referenz-Regeln: Verbraucher '{state.cid}' erreicht sein Ziel von "
+                f"{target:.3f} kWh nicht, es fehlen {target - delivered:.3f} kWh."
+            )
+    return RuleBasedFlex(per_slot, shaped.no_shape_ids, no_published_block_ids)
 
 
 def _simulate_single_hour_baseline(

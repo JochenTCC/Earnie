@@ -1,13 +1,14 @@
-"""SE reference ladder: L1 = battery in vendor mode, flex at real timing, one SoC chain.
+"""SE reference ladder on one SoC chain: L1 = vendor-mode battery, flex at real timing;
+L2 = L1 plus the standard rules moving the flex energy.
 
-Spec: ``docs/dev/rule-based-reference.md`` §§ 2, 3, 4.1. L1 runs on the windows, targets
-and flex windows of the optimized run and always books actual prices.
+Spec: ``docs/dev/rule-based-reference.md`` §§ 2, 3, 4. Both run on the windows, targets
+and flex windows of the optimized run and always book actual prices.
 """
 from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pandas as pd
 
@@ -17,6 +18,8 @@ from optimizer.scenario_planning_scope import planning_scenario_scope
 from optimizer.sim_baseline import (
     _baseline_battery_params,
     _simulate_single_hour_baseline,
+    DEFAULT_RULE_PARAMS,
+    build_rule_based_flex_kw_per_hour,
     build_shaped_flex_kw_per_slot,
 )
 from optimizer.sim_chart_rows import COL_EINSPEISEVERGUETUNG
@@ -33,6 +36,7 @@ from simulation.plausibility import PlausibilityReport, validate_window_consumpt
 from simulation.reference_costs import _REFERENCE_COST_COLUMNS, _empty_reference_series
 
 L1_STEUERBEFEHL = "Referenz L1"
+L2_STEUERBEFEHL = "Referenz L2"
 
 
 @dataclass(frozen=True)
@@ -131,6 +135,7 @@ def _window_rows(
     prices_df: pd.DataFrame,
     horizon_mode: str,
     shape_source: _ShapeSource,
+    rule_params: dict | None,
 ) -> tuple[list[dict], dict, float, list[str]]:
     """One window: ``(book chart rows, meta, end SoC, consumers without a shape)``."""
     from optimizer.simulation import _prepare_horizon_state
@@ -171,30 +176,94 @@ def _window_rows(
         )
         book = _book_indices(plan)
         planned = [c for c in consumers if not is_heating_rod_consumer(c)]
-        shaped = build_shaped_flex_kw_per_slot(
-            len(setup.matrix),
-            planned,
-            setup.horizon_limits,
-            reference_flex_shapes_kw(
-                [row["slot_datetime"] for row in setup.matrix], planned, shape_source
-            ),
-            {c["id"]: _eligible_slots(setup, c, book) for c in planned},
+        shapes = reference_flex_shapes_kw(
+            [row["slot_datetime"] for row in setup.matrix], planned, shape_source
         )
+        eligible = {c["id"]: _eligible_slots(setup, c, book) for c in planned}
         battery = _baseline_battery_params(battery_params)
+        if rule_params is None:
+            flex = build_shaped_flex_kw_per_slot(
+                len(setup.matrix), planned, setup.horizon_limits, shapes, eligible
+            )
+            steuerbefehl = L1_STEUERBEFEHL
+        else:
+            flex = build_rule_based_flex_kw_per_hour(
+                setup.matrix,
+                setup.horizon_limits,
+                eligible,
+                planned,
+                shapes,
+                _end_customer_price_series(
+                    setup.matrix[book[0]]["slot_datetime"],
+                    setup.matrix[book[-1]]["slot_datetime"],
+                    prices_df,
+                    scenario_params,
+                ),
+                rule_params,
+                book_indices=book,
+                battery_params=battery,
+                initial_soc=sim_soc,
+            )
+            steuerbefehl = L2_STEUERBEFEHL
         rows: list[dict] = []
         soc = float(sim_soc)
         for t in book:
-            flex_kw = {str(c["id"]): 0.0 for c in consumers} | shaped.per_slot[t]
+            flex_kw = {str(c["id"]): 0.0 for c in consumers} | flex.per_slot[t]
             soc, row = _simulate_single_hour_baseline(
                 setup.matrix[t],
                 soc,
                 battery,
                 flex_kw_override=flex_kw,
-                steuerbefehl=L1_STEUERBEFEHL,
+                steuerbefehl=steuerbefehl,
                 consumers=consumers,
             )
             rows.append(row)
-    return rows, plan.meta, soc, shaped.no_shape_ids
+    return rows, plan.meta, soc, flex.no_shape_ids
+
+
+def _end_customer_price_series(
+    first_slot: datetime,
+    last_slot: datetime,
+    prices_df: pd.DataFrame,
+    scenario_params: dict,
+) -> dict[datetime, float]:
+    """End-customer price per slot, from the book's start to the last day published in it.
+
+    ``epex_prices_for_slots`` fills gaps with the previous price; here a slot without a
+    market price raises, since the lock must not rank prices that did not exist.
+    """
+    from data.backtesting_prices import (
+        last_day_ahead_calendar_date,
+        matrix_prices_from_context,
+        pricing_kwargs_from_resolved,
+    )
+    from optimizer.sim_baseline import _is_nonexistent_local_slot
+    from optimizer.slot_duration import DEFAULT_DT_H
+
+    stop = datetime.combine(
+        last_day_ahead_calendar_date(last_slot) + timedelta(days=1), datetime.min.time()
+    )
+    step = timedelta(hours=float(DEFAULT_DT_H))
+    slots: list[datetime] = []
+    current = first_slot
+    while current < stop:
+        if not _is_nonexistent_local_slot(current):
+            slots.append(current)
+        current += step
+    index = prices_df.index
+    known = index.tz_localize(None) if index.tz is not None else index
+    stamps = pd.DatetimeIndex(slots)
+    # Quarter-hour slots of an hourly series take the hour's price.
+    has_price = stamps.isin(known) | stamps.floor("h").isin(known)
+    if not has_price.all():
+        raise ValueError(
+            f"Referenz-Regeln: Kein Börsenpreis für {stamps[~has_price][0]:%Y-%m-%d %H:%M} "
+            f"(die Preissperre braucht Preise bis {stop:%Y-%m-%d %H:%M})."
+        )
+    _, end_customer, _ = matrix_prices_from_context(
+        prices_df, slots, None, **pricing_kwargs_from_resolved(scenario_params)
+    )
+    return dict(zip(slots, end_customer))
 
 
 def compute_l1_reference_costs(
@@ -208,6 +277,53 @@ def compute_l1_reference_costs(
     horizon_mode: str,
 ) -> LadderReferenceResult:
     """L1 over the period, same anchors and same start SoC as the optimized run."""
+    return _compute_ladder_step(
+        start,
+        end,
+        scenario_params,
+        prices_df,
+        cache,
+        initial_soc=initial_soc,
+        horizon_mode=horizon_mode,
+        rule_params=None,
+    )
+
+
+def compute_l2_reference_costs(
+    start: pd.Timestamp,
+    end: pd.Timestamp,
+    scenario_params: dict,
+    prices_df: pd.DataFrame,
+    cache: HistoricalDataCache,
+    *,
+    initial_soc: float,
+    horizon_mode: str,
+    rule_params: dict = DEFAULT_RULE_PARAMS,
+) -> LadderReferenceResult:
+    """L2 over the period: L1 with the standard rules moving the flex energy (spec § 4)."""
+    return _compute_ladder_step(
+        start,
+        end,
+        scenario_params,
+        prices_df,
+        cache,
+        initial_soc=initial_soc,
+        horizon_mode=horizon_mode,
+        rule_params=rule_params,
+    )
+
+
+def _compute_ladder_step(
+    start: pd.Timestamp,
+    end: pd.Timestamp,
+    scenario_params: dict,
+    prices_df: pd.DataFrame,
+    cache: HistoricalDataCache,
+    *,
+    initial_soc: float,
+    horizon_mode: str,
+    rule_params: dict | None,
+) -> LadderReferenceResult:
     import config
     from simulation.engine import (
         list_simulation_anchors,
@@ -253,6 +369,7 @@ def compute_l1_reference_costs(
             prices_df=prices_df,
             horizon_mode=horizon_mode,
             shape_source=shape_source,
+            rule_params=rule_params,
         )
         meta["standby_power_kw"] = standby_kw
         meta["reference_no_shape_consumers"] = no_shape_ids
@@ -260,7 +377,7 @@ def compute_l1_reference_costs(
         for cid in no_shape_ids:
             no_shape_windows[cid] = no_shape_windows.get(cid, 0) + 1
         for row in rows:
-            _append_l1_slot(series, row)
+            _append_ladder_slot(series, row)
             timestamps.append(row["slot_datetime"])
 
     frame = pd.DataFrame(
@@ -271,7 +388,7 @@ def compute_l1_reference_costs(
     return LadderReferenceResult(frame, plausibility, soc, no_shape_windows)
 
 
-def _append_l1_slot(series: dict[str, list[float]], row: dict) -> None:
+def _append_ladder_slot(series: dict[str, list[float]], row: dict) -> None:
     from optimizer.sim_chart_rows import flexible_consumer_power_kw
 
     import_eur, export_eur, net_eur, import_kwh, export_kwh = (

@@ -2,6 +2,14 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### RuleRef P2 — L2 rule builder (2026-11-05)
+
+- [x] **RuleRef P2 — L2 rule builder** `[dev]`: spec [`docs/dev/rule-based-reference.md`](../docs/dev/rule-based-reference.md) § 4, § 5. Not shown in the SE yet (P3).
+  - `optimizer/sim_baseline.py::build_rule_based_flex_kw_per_hour`: deferral queue on the P1 profile, energy exact per consumer, equal to L1 when no rule fires. Rule per consumer type: price lock strictly above the quantile of the prices available at the slot, PV surplus with hysteresis and thermal boost, deadline forcing, cheapest block on published prices. Quantile and surplus priority in `rule_params`.
+  - `simulation/reference_ladder.py::compute_l2_reference_costs` shares the L1 runner, beyond the item's builder-only wording, so the rules could be checked on real windows. Its price series raises on missing market prices, because `epex_prices_for_slots` fills gaps with the previous price.
+  - Details decided while building, in the spec: consumer order within a slot, on / off threshold without a configured minimum, the deadline runs only the power later slots cannot deliver, consumers without a type count as other flexible `generic` unless they have a charging schedule.
+  - Tests: `tests/test_reference_ladder_l2.py`.
+
 ### RuleRef P1 — L1 reference on one SoC chain (2026-11-05)
 
 - [x] **RuleRef P1 — L1 reference: vendor-mode battery on one SoC chain** `[dev]`: spec [`docs/dev/rule-based-reference.md`](../docs/dev/rule-based-reference.md) § 4.1, § 5. Not shown in the SE yet (P3).

@@ -1,6 +1,6 @@
 # Rule-based reference — Earnie vs. standard rules (Scenario Explorer)
 
-**Status:** design 2026-11-03, method decisions O1–O5 taken 2026-11-05 (§ 7). L1 runner implemented 2026-11-05 (`simulation/reference_ladder.py`), not yet shown in the SE (P3); L2 not implemented. Backlog: epic **RuleRef** and item **SE forecast mode** in `backlog/Backlog.md`.
+**Status:** design 2026-11-03, method decisions O1–O5 taken 2026-11-05 (§ 7). L1 and L2 runners implemented 2026-11-05 (`simulation/reference_ladder.py`), not yet shown in the SE (P3). Backlog: epic **RuleRef** and item **SE forecast mode** in `backlog/Backlog.md`.
 
 **Related:** [`savings-ledger.md`](savings-ledger.md) (live counterfactual, `savings_v`), [`../workflow/earnie-points.md`](../workflow/earnie-points.md), `optimizer/sim_baseline.py`, `simulation/reference_costs.py`.
 
@@ -57,10 +57,12 @@ Rules only **move** energy; a per-consumer budget keeps the total exact. Slots a
 
 - `planned[t]` = matched profile value; `backlog` = energy deferred so far; `remaining` = target − delivered.
 - Block → the slot's planned energy goes to `backlog`.
-- Allowed → deliver `min(nominal, planned[t] + backlog_share)`; surplus pull may add more from `remaining` (§ 4.3).
+- Allowed → deliver `min(nominal, planned[t] + backlog)`; surplus pull may add more from `remaining` (§ 4.3).
 - Deadline forcing (§ 4.4) overrides the block.
 
 If no rule fires, L2 equals L1 slot for slot. Every L1 → L2 difference can therefore be traced to a rule.
+
+Within a slot, all consumers first take their planned energy and the deadline's need; the surplus rule then runs in consumer order and each consumer sees what the ones before it took. Two consumers never claim the same surplus.
 
 **Rule per consumer type (O4):**
 
@@ -69,27 +71,32 @@ If no rule fires, L2 equals L1 slot for slot. Every L1 → L2 difference can the
 | `ev` | PV surplus (§ 4.3), deadline (§ 4.4). No price lock, no V2G discharge. |
 | `thermal_annual`, `thermal_rc` | Price lock (§ 4.2), surplus boost (§ 4.3), deadline (§ 4.4). |
 | `generic` with `generic_flex_window` | Cheapest block (§ 4.5). |
-| Other flexible `generic` | Price lock (§ 4.2), deadline (§ 4.4). |
-| Fixed load (`continuous_load`, native filter run) | No rule: already booked as fixed load. |
+| Other flexible `generic` (also a consumer without a type) | Price lock (§ 4.2), deadline (§ 4.4). |
+| Fixed load (`continuous_load`, native filter run) | No rule: already booked as fixed load. A filter's remaining target outside its native run counts as other flexible `generic`. |
 | Heating rod (`daily_target_source: heating_rod`) | Runs 0 kWh in L1 and L2 (§ 3.1). |
 
 ### 4.2 Price lock — "SG-Ready lock / EVU-Sperre"
 
 Blocked when the slot's end-customer price (incl. grid fee and VAT, `k_act` on actual prices) is **strictly above** the P75 quantile of the prices available at that slot. "Available" means from the slot to the end of the last published day-ahead day (`data/backtesting_prices.py::last_day_ahead_calendar_date`), recomputed per slot. So the rule never uses an unpublished price, and a flat tariff never locks. Deferred energy is caught up in the next allowed slots. Thermal comfort is not modelled (same limitation as the matched baseline today).
 
-The available horizon reaches past the book's end (SA₂), so the rule builder needs the price series up to that day, not just the window matrix. A missing price in that range fails loud.
+The available horizon reaches past the book's end (SA₂), so the rule builder needs the price series up to that day, not just the window matrix. A missing price in that range fails loud; `epex_prices_for_slots` would fill it with the previous price, so the runner checks the market data first. A run therefore needs market prices up to the end of the day after its last booked afternoon.
 
 ### 4.3 PV surplus charging (EV, heat pump and pool boost) — "evcc mode PV / SG-Ready state 3"
 
-The consumer sees the local surplus `pv − baseload − Σ other flex in this slot` (before the battery: the consumer has priority, a common evcc setup). Battery first runs in the sensitivity (§ 4.7): there the consumer sees only what would be exported at the meter after `vendor_mode_step`. It charges when surplus ≥ `min_power_kw` with hysteresis via `min_on_quarterhours`, at most `nominal_power_kw`, from `remaining`. Energy pulled forward this way reduces later planned slots (from the back of the profile) so the total stays exact.
+The consumer sees the local surplus `pv − baseload − Σ other flex in this slot` (before the battery: the consumer has priority, a common evcc setup). Battery first runs in the sensitivity (§ 4.7): there the consumer sees only what would be exported at the meter after `vendor_mode_step`. It charges when surplus ≥ `min_power_kw` with hysteresis via `min_on_quarterhours`, at most `nominal_power_kw`, from `remaining`. Without a configured minimum, an EV starts on any surplus and other consumers need their nominal power (they run on / off). The surplus rule works in locked slots too. While a started run is held, it draws at least its minimum power, from the grid if needed. Energy pulled forward this way comes from the backlog first, then from later planned slots (from the back of the profile), so the total stays exact.
 
 ### 4.4 Deadline forcing — "evcc Min+PV / target charge"
 
-If `remaining > (allowed slots left in the window) × nominal × dt`, the consumer runs regardless of price lock or surplus. This guarantees the target where the window allows it; if even that fails, the window is infeasible and the run fails loud (§ 3.1).
+If `remaining > (eligible slots after this one) × nominal × dt`, the consumer runs regardless of price lock or surplus, with exactly the power the later slots cannot deliver (at most nominal). A slot that planned more keeps its plan, which is why forcing alone never changes the L1 profile. This guarantees the target where the window allows it; if even that fails, the window is infeasible and the run fails loud (§ 3.1). The first forced slot can run below `min_power_kw` (limit in § 4.1).
 
 ### 4.5 Generic flex with a start window — "HA cheapest hours"
 
-Consumers with `generic_flex_window` start their historical cycle (same duration and energy) in the cheapest contiguous block inside the window, by end-customer day-ahead price. Only prices published when the window opens count; slots without a published price are not candidates. No PV term.
+Consumers with `generic_flex_window` start their historical cycle (same duration and energy) in the cheapest contiguous block inside the window, by end-customer day-ahead price weighted with the cycle's power. Only prices published when the window opens count; slots without a published price are not candidates. No PV term.
+
+- **Cycle:** the L1 profile from its first to its last running slot.
+- **Window:** each contiguous run of eligible slots opens on its own.
+- **Tie:** the real start stays, so a flat tariff changes nothing.
+- **No start with all prices published:** the real timing stays and the consumer is reported in `no_published_block_ids`.
 
 ### 4.6 Battery
 
@@ -101,7 +108,7 @@ Defaults: quantile 0.75, consumer before battery, hysteresis from `min_on_quarte
 
 ## 5. Implementation sketch
 
-- **Rule builder** `optimizer/sim_baseline.py::build_rule_based_flex_kw_per_hour(matrix, targets, charging_contexts, consumers, shapes, price_series, rule_params)` — pure, same output shape as `build_matched_flex_kw_per_hour`. `shapes` and `price_series` per § 4.1 and § 4.2. Per-slot simulation reuses `_simulate_single_hour_baseline(flex_kw_override=…)`.
+- **Rule builder** `optimizer/sim_baseline.py::build_rule_based_flex_kw_per_hour(matrix, targets_kwh, eligible_by_consumer, consumers, shapes_kw, price_series, rule_params, *, book_indices, battery_params, initial_soc)`: per-slot output like `build_shaped_flex_kw_per_slot`. It takes the eligible slots instead of charging contexts because the runner resolves them with the MILP's own eligibility. `shapes_kw` and `price_series` per § 4.1 and § 4.2; battery and start SoC serve the battery-first sensitivity. `rule_params` holds `lock_quantile` and `surplus_priority` (`DEFAULT_RULE_PARAMS`). Per-slot simulation reuses `_simulate_single_hour_baseline(flex_kw_override=…)`. The runner entry is `compute_l2_reference_costs`.
 - **SE reference runner**: L1 and L2 are not closed-form any more. They use the same per-window matrices as the optimized run (`build_historical_window_matrix` / `build_sunrise_window_matrix`) and carry the SoC across anchors. Those matrices split baseload from flex but hold only per-consumer targets, no per-consumer series, so the runner adds the shapes (§ 4.1). L1 and L2 always book actual prices. L0 stays closed-form.
 - **Reference sharing**: today references are shared across scenarios by `reference_fingerprint` (Historisch = assets stripped). L1/L2 depend on the house, the battery and the flex consumers, so they share by `simulation/reference_ladder.py::ladder_reference_fingerprint`, which adds those to the L0 key. `reference_fingerprint` stays as it is: L0 ignores them, and SE reference columns must not change before P3.
 - **Output**: per-slot frame with the same columns as today (`_REFERENCE_COST_COLUMNS`) per ladder step, plus SoC for L1/L2, so existing charts and the SE invoice keep working.
