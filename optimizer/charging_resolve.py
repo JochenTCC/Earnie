@@ -237,7 +237,6 @@ def historical_charging_context(
         "deadline": deadline,
         "target_kwh": round(target_kwh, 3) if target_kwh > 0 else 0.0,
         "use_time_window": True,
-        "config_day_schedule": day_sched,
         "source_label": source_label,
     }
 
