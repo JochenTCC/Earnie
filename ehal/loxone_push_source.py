@@ -80,6 +80,9 @@ def binding_sources_from_docs(house: dict, components: dict) -> list[BindingSour
             ctype = str(consumer.get("type") or "")
             for field, name in (consumer.get("ehal_bindings") or {}).items():
                 entries.append(("consumer", cid, ctype, str(field), str(name)))
+        from ehal.push_signals import _rod_entries
+
+        entries.extend(_rod_entries(profile))
     for battery in components.get("batteries", []):
         bid = str(battery.get("id") or "")
         for field, name in (battery.get("ehal_bindings") or {}).items():

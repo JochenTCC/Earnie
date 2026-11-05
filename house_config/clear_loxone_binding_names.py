@@ -27,6 +27,10 @@ def _clear_consumers_in_profile(profile: dict) -> dict:
             consumer["ehal_bindings"] = clear_binding_values(
                 consumer.get("ehal_bindings")
             )
+        from house_config.heating_rod_bindings import ROD_BINDINGS_KEY
+
+        if isinstance(consumer.get(ROD_BINDINGS_KEY), dict):
+            consumer[ROD_BINDINGS_KEY] = clear_binding_values(consumer[ROD_BINDINGS_KEY])
         consumers.append(consumer)
     profile["consumers"] = consumers
     return profile
