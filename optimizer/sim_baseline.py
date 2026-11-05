@@ -320,6 +320,7 @@ class _RuleConsumer:
     min_on_slots: int
     backlog_kwh: float = 0.0
     hold_slots: int = 0
+    waits_for_surplus: bool = False
 
     def later_kwh(self, t: int) -> float:
         return sum(self.planned_kw[s] for s in self.eligible if s > t) * float(DEFAULT_DT_H)
@@ -446,6 +447,7 @@ def _rule_consumer(
         surplus=not fixed_timing and (is_ev or thermal),
         threshold_kw=_surplus_threshold_kw(consumer, max_kw),
         min_on_slots=max(1, int(consumer.get("min_on_quarterhours", 1) or 1)),
+        waits_for_surplus=is_ev and not fixed_timing,
     )
 
 
@@ -483,7 +485,8 @@ def build_rule_based_flex_kw_per_hour(
 
     Spec ``docs/dev/rule-based-reference.md`` § 4. ``price_series``: end-customer price per
     slot, up to the last published day-ahead day of the book's last slot or the end of the
-    data. With no rule firing the result equals ``build_shaped_flex_kw_per_slot``. A missing
+    data. An EV waits for the surplus or its deadline; other consumers equal
+    ``build_shaped_flex_kw_per_slot`` when no rule fires. A missing
     price inside the series or an undeliverable target raises.
     """
     quantile, priority = _validated_rule_params(rule_params)
@@ -523,7 +526,8 @@ def build_rule_based_flex_kw_per_hour(
             if state.price_lock and locked is None:
                 locked = _price_locked(row["slot_datetime"], price_series, quantile)
                 truncated_lock_slots += _lock_horizon_truncated(row["slot_datetime"], price_series)
-            slot_kw[state.cid] = state.base_power_kw(t, bool(state.price_lock and locked))
+            holds = state.waits_for_surplus or bool(state.price_lock and locked)
+            slot_kw[state.cid] = state.base_power_kw(t, holds)
         net_before_flex_kw = float(row["expected_p_pv"]) - bat.effective_p_act(row, battery_params)
         for state in running:
             if state.surplus:

@@ -60,7 +60,7 @@ Rules only **move** energy; a per-consumer budget keeps the total exact. Slots a
 - Allowed → deliver `min(nominal, planned[t] + backlog)`; surplus pull may add more from `remaining` (§ 4.3).
 - Deadline forcing (§ 4.4) overrides the block.
 
-If no rule fires, L2 equals L1 slot for slot. Every L1 → L2 difference can therefore be traced to a rule.
+If no rule fires, L2 equals L1 slot for slot. Every L1 → L2 difference can therefore be traced to a rule. An EV is the exception: its wait rule (§ 4.3) always applies, so it departs from L1 by design.
 
 Within a slot, all consumers first take their planned energy and the deadline's need; the surplus rule then runs in consumer order and each consumer sees what the ones before it took. Two consumers never claim the same surplus.
 
@@ -68,7 +68,7 @@ Within a slot, all consumers first take their planned energy and the deadline's 
 
 | Consumer | Rules |
 |---|---|
-| `ev` | PV surplus (§ 4.3), deadline (§ 4.4). No price lock, no V2G discharge. |
+| `ev` | Waits for PV surplus (§ 4.3), deadline (§ 4.4). No price lock, no V2G discharge. |
 | `thermal_annual`, `thermal_rc` | Price lock (§ 4.2), surplus boost (§ 4.3), deadline (§ 4.4). |
 | `generic` with `generic_flex_window` | Cheapest block (§ 4.5). |
 | Other flexible `generic` (also a consumer without a type) | Price lock (§ 4.2), deadline (§ 4.4). |
@@ -87,6 +87,8 @@ The available horizon reaches past the book's end (SA₂), so the rule builder n
 
 The consumer sees the local surplus `pv − baseload − Σ other flex in this slot` (before the battery: the consumer has priority, a common evcc setup). Battery first runs in the sensitivity (§ 4.7): there the consumer sees only what would be exported at the meter after `vendor_mode_step`. It charges when surplus ≥ `min_power_kw` with hysteresis via `min_on_quarterhours`, at most `nominal_power_kw`, from `remaining`. Without a configured minimum, an EV starts on any surplus and other consumers need their nominal power (they run on / off). The surplus rule works in locked slots too. While a started run is held, it draws at least its minimum power, from the grid if needed. Energy pulled forward this way comes from the backlog first, then from later planned slots (from the back of the profile), so the total stays exact.
 
+An EV does not charge its L1 profile when it is plugged in: all its planned energy waits for the surplus, and only the deadline (§ 4.4) charges from the grid. This is what a surplus wallbox with a target time does. Charging at plug-in would leave the midday surplus unused and credit Earnie with a shift any such wallbox achieves. For a commuter car that plugs in during the evening, the wait moves charging into the night before departure, which can cost more than charging at plug-in on a flat tariff.
+
 ### 4.4 Deadline forcing — "evcc Min+PV / target charge"
 
 If `remaining > (eligible slots after this one) × nominal × dt`, the consumer runs regardless of price lock or surplus, with exactly the power the later slots cannot deliver (at most nominal). A slot that planned more keeps its plan, which is why forcing alone never changes the L1 profile. This guarantees the target where the window allows it; if even that fails, the window is infeasible and the run fails loud (§ 3.1). The first forced slot can run below `min_power_kw` (limit in § 4.1).
@@ -103,6 +105,8 @@ Consumers with `generic_flex_window` start their historical cycle (same duration
 ### 4.6 Battery
 
 Unchanged `vendor_mode_step` on what remains after the flex consumers in that slot. No grid charging, no price logic: this is the inverter's own behaviour.
+
+**Curtailment (O6):** while the slot's feed-in price is negative, L2 limits export at the meter to zero and the rest of the PV is curtailed, like the MILP's export cap and like a zero-export setting a home automation can switch on the published price. The battery still charges first. L1 does not curtail: it is the inverter alone, without any price logic.
 
 ### 4.7 Parameters and sensitivity
 
@@ -166,6 +170,10 @@ See § 4.2. Calendar day was the alternative. The strict comparison is not a mat
 - **Mapping:** table in § 4.1, generous to the rules (surplus boost for thermal consumers).
 - **Starting profile:** real timing per consumer, "switch on and run" where there is no shape (§ 4.1). Flat spreading is out: it runs consumers below their minimum power and breaks comparability with L0.
 - **Heating rod:** 0 kWh in L1 and L2, flagged in the study export (§ 3.1). A surplus rule with heat replacement can follow later.
+
+### O6 Curtailment at a negative feed-in price: L2 yes, L1 no (maintainer, 2026-11-05).
+
+Found in the study's sample runs: on a dynamic export tariff L3 curtailed 353 kWh in one June while L1 and L2 paid to export, which credited the whole effect to Earnie. See § 4.6.
 
 ### O5 UI: L2 vs. L3 as the headline, ladder in an expander.
 

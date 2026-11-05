@@ -153,7 +153,7 @@ Der Bereich **Alle Stufen** zeigt die ganze Leiter. Jede Stufe ergänzt genau ei
 |---|---|---|---|
 | **Ohne Steuerung** | keine | zu ihren üblichen Zeiten | die frühere Referenz ohne Optimierung |
 | **Wechselrichter-Eigenverbrauch** | Eigenverbrauchsmodus des Wechselrichters | zu ihren üblichen Zeiten | was der Wechselrichter von sich aus tut |
-| **Standard-Regeln** | Eigenverbrauchsmodus des Wechselrichters | lokale Regeln | E-Auto: PV-Überschussladen wie evcc, mit Zielladung. Heizung und Pool: SG-Ready-Sperre bei hohen Preisen und Anhebung bei Überschuss. Geräte mit Startfenster: „günstigste Stunden“ wie in Home Assistant |
+| **Standard-Regeln** | Eigenverbrauchsmodus des Wechselrichters | lokale Regeln | E-Auto: PV-Überschussladen wie evcc, mit Zielladung. Heizung und Pool: SG-Ready-Sperre bei hohen Preisen und Anhebung bei Überschuss. Geräte mit Startfenster: „günstigste Stunden“ wie in Home Assistant. Bei negativem Einspeisepreis wird nicht eingespeist, überschüssige PV-Leistung wird abgeregelt |
 | **Earnie** | MILP-Plan | MILP-Plan | der optimierte Lauf des Szenarios |
 
 Die Regeln sind großzügig angesetzt: Sie sehen den Überschuss am Zähler und die veröffentlichten Day-Ahead-Preise, wissen aber nichts von anderen Verbrauchern und vom Ladestand der Batterie. Alle Stufen liefern dieselbe Energie, buchen dieselben Preise und halten dieselben Ladefenster ein.

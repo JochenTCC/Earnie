@@ -14,6 +14,7 @@ from typing import NamedTuple
 import pandas as pd
 
 from optimizer.charging_schedule import contexts_within_book
+from optimizer.export_power_limit import clip_grid_kw_to_export_cap
 from optimizer.milp_consumer_delivery import consumer_delivery_eligible_indices
 from optimizer.scenario_planning_scope import planning_scenario_scope
 from optimizer.sim_baseline import (
@@ -267,6 +268,8 @@ def _window_rows(
                 steuerbefehl=steuerbefehl,
                 consumers=consumers,
             )
+            if rule_params is not None:
+                curtail_negative_export(row, setup.matrix[t])
             rows.append(row)
     return _WindowResult(
         rows,
@@ -275,6 +278,13 @@ def _window_rows(
         flex.no_shape_ids,
         no_published_block_ids,
         truncated_lock_slots,
+    )
+
+
+def curtail_negative_export(chart_row: dict, matrix_row: dict) -> None:
+    """L2 limits export to zero while feeding in costs money; L1 does not (spec § 4.6)."""
+    chart_row["Netzbezug (kW)"] = round(
+        clip_grid_kw_to_export_cap(chart_row["Netzbezug (kW)"], k_push_act=matrix_row["k_push_act"]), 2
     )
 
 

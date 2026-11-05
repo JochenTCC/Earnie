@@ -122,9 +122,9 @@ def _running(result, cid: str) -> dict[int, float]:
     return {t: round(kw, 6) for t, kw in enumerate(_kw(result, cid)) if kw > 1e-6}
 
 
-@pytest.mark.parametrize("consumer", [EV, HEAT_PUMP, FLEX_GENERIC, WINDOW_GENERIC])
+@pytest.mark.parametrize("consumer", [HEAT_PUMP, FLEX_GENERIC, WINDOW_GENERIC])
 def test_no_rule_firing_equals_the_l1_profile(consumer):
-    """Flat prices, no PV: every consumer type keeps its L1 slots."""
+    """Flat prices, no PV: every consumer type but the EV keeps its L1 slots."""
     shape = {20: 1.0, 21: 2.0, 60: 1.0}
     eligible = list(range(SLOTS_PER_DAY))
     cid = consumer["id"]
@@ -133,6 +133,11 @@ def test_no_rule_firing_equals_the_l1_profile(consumer):
     )
     result = _build(consumer, 1.0, shape, eligible)
     assert _kw(result, cid) == pytest.approx(_kw(l1, cid))
+
+
+def test_ev_without_surplus_waits_for_its_deadline():
+    result = _build(EV, 1.0, {20: 1.0, 21: 2.0, 60: 1.0})
+    assert _running(result, "ev") == {95: 4.0}
 
 
 def test_energy_is_exact_when_several_rules_fire_per_consumer():
@@ -236,18 +241,18 @@ def test_spring_dst_gap_is_not_a_missing_price():
     assert len(available_slot_prices(gap_day, prices)) == SLOTS_PER_DAY - 4
 
 
-def test_surplus_pull_reduces_later_slots_from_the_back():
+def test_surplus_energy_reduces_what_the_deadline_charges():
     matrix = _matrix(pv={40: 3.0})
     shape = {t: 1.0 for t in range(80, 88)}
     result = _build(EV, 2.0, shape, matrix=matrix)
-    assert _running(result, "ev") == {40: 2.0, **{t: 1.0 for t in range(80, 86)}}
+    assert _running(result, "ev") == {40: 2.0, 95: 6.0}
     assert energy_kwh_from_kw(_kw(result, "ev")) == pytest.approx(2.0)
 
 
 def test_surplus_below_the_minimum_power_does_not_start():
     matrix = _matrix(pv={40: 2.0})
     result = _build(EV, 1.0, {80: 4.0}, matrix=matrix)
-    assert _running(result, "ev") == {80: 4.0}
+    assert _running(result, "ev") == {95: 4.0}
 
 
 def test_thermal_boost_needs_its_on_off_power_and_overrides_the_lock():
@@ -298,7 +303,7 @@ def test_battery_first_leaves_the_surplus_to_a_battery_with_room():
     result = _build(
         EV, 1.0, {80: 4.0}, matrix=_matrix(pv={40: 3.0}), battery=BATTERY, soc=20.0, params=params
     )
-    assert _running(result, "ev") == {80: 4.0}
+    assert _running(result, "ev") == {95: 4.0}
 
 
 def test_battery_first_takes_what_a_full_battery_would_export():
@@ -377,9 +382,9 @@ def test_cycle_longer_than_the_window_has_no_start():
 
 
 def test_ev_has_no_price_lock():
-    prices = _prices({40: 90.0})
+    prices = _prices({95: 90.0})
     result = _build(EV, 1.0, {40: 4.0}, prices=prices)
-    assert _running(result, "ev") == {40: 4.0}
+    assert _running(result, "ev") == {95: 4.0}
 
 
 def test_generic_without_window_locks_but_has_no_surplus_rule():
@@ -487,8 +492,8 @@ def test_config_ev_without_a_type_has_no_lock_but_the_surplus_rule():
         "min_power_kw": 1.4,
         "charging_schedule": {"enabled": True},
     }
-    expensive = _build(consumer, 1.0, {40: 3.5, 41: 0.5}, prices=_prices({40: 90.0, 41: 90.0}))
-    assert _running(expensive, "eauto") == {40: 3.5, 41: 0.5}
+    expensive = _build(consumer, 1.0, {40: 3.5, 41: 0.5}, prices=_prices({94: 90.0, 95: 90.0}))
+    assert _running(expensive, "eauto") == {94: 0.5, 95: 3.5}
     pulled = _build(consumer, 1.0, {80: 4.0}, matrix=_matrix(pv={40: 3.0}))
     assert _running(pulled, "eauto")[40] == pytest.approx(2.0)
 
@@ -565,3 +570,15 @@ def test_series_end_shortens_the_available_prices_but_a_gap_raises():
 def test_l1_does_not_need_prices_past_the_window(ladder_env):
     """The lock's range is an L2 requirement; L1 keeps running on what the matrix needs."""
     assert _run_step(ladder_env, "l1", LOW_EAUTO_DAY, LOW_EAUTO_DAY).frame["sim_cost"].notna().all()
+
+
+@pytest.mark.parametrize(
+    ("grid_kw", "feed_in_cent", "expected"),
+    [(-3.0, -1.0, 0.0), (-3.0, 0.0, -3.0), (-3.0, 5.0, -3.0), (2.0, -1.0, 2.0)],
+)
+def test_l2_exports_nothing_at_a_negative_feed_in_price(grid_kw, feed_in_cent, expected):
+    from simulation.reference_ladder import curtail_negative_export
+
+    row = {"Netzbezug (kW)": grid_kw}
+    curtail_negative_export(row, {"k_push_act": feed_in_cent})
+    assert row["Netzbezug (kW)"] == expected
