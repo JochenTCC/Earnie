@@ -15,6 +15,7 @@ from data.backtesting_prices import (
 from optimizer.slot_duration import DEFAULT_DT_H
 from simulation.baseload_validation import resolve_hourly_baseload_kw
 from simulation.backtesting_horizon import (
+    lookahead_hours,
     naive_backtesting_slot,
     overlay_step_consumption_on_matrix,
     resolve_sunrise_book_step_for_scenario,
@@ -553,6 +554,27 @@ def build_historical_window_matrix(
     )
 
 
+def _add_flex_shape_past_book(
+    matrix: list[dict],
+    book_end: datetime,
+    cache: HistoricalDataCache,
+    scenario_params: dict,
+) -> None:
+    """Prototype look-ahead: flex runs only in the book, so past it its real timing is plain load."""
+    from simulation.reference_ladder import _shape_source, reference_flex_shapes_kw
+
+    consumers, _ = _flex_consumers_for_matrix(scenario_params)
+    rows = [row for row in matrix if naive_backtesting_slot(row["slot_datetime"]) >= book_end]
+    if not rows or not consumers:
+        return
+    slots = [naive_backtesting_slot(row["slot_datetime"]) for row in rows]
+    shapes = reference_flex_shapes_kw(slots, consumers, _shape_source(cache, scenario_params))
+    for index, row in enumerate(rows):
+        row["expected_p_act"] = round(
+            row["expected_p_act"] + sum(shape[index] for shape in shapes.values()), 3
+        )
+
+
 def build_sunrise_window_matrix(
     anchor: datetime,
     cache: HistoricalDataCache,
@@ -597,6 +619,8 @@ def build_sunrise_window_matrix(
     )
     matrix_full = list(matrix_full)
     overlay_step_consumption_on_matrix(matrix_full, book_matrix)
+    if lookahead_hours() > 0.0:
+        _add_flex_shape_past_book(matrix_full, book_slots[-1] + slot_step, cache, scenario_params)
     meta["planning_horizon_hours"] = len(milp_slots)
     meta["sunrise_anchor"] = step.sa1
     meta["step_slot_datetimes"] = book_slots
