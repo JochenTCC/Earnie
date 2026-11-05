@@ -391,12 +391,33 @@ def _normalize_consumer(
         )
     normalize_points_fields(raw, spec, profile_id=profile_id, index=index)
     _copy_ehal_entity_fields(raw, spec)
+    _copy_rod_bindings(raw, spec, profile_id=profile_id)
     return spec
 
 
+def _copy_rod_bindings(raw: dict, spec: dict, *, profile_id: str) -> None:
+    from house_config.heating_rod_bindings import ROD_BINDINGS_KEY, normalize_rod_bindings
+
+    if ROD_BINDINGS_KEY not in raw:
+        return
+    label = f"profiles '{profile_id}' consumers '{spec['id']}'"
+    if spec["type"] != "thermal_annual":
+        raise ValueError(
+            f"{label}: {ROD_BINDINGS_KEY} gehört an den Haus-Wärme-Verbraucher "
+            "(type thermal_annual)."
+        )
+    spec[ROD_BINDINGS_KEY] = normalize_rod_bindings(
+        raw[ROD_BINDINGS_KEY], consumer_id=spec["id"], label=label
+    )
+
+
 def _attach_ehal_entity_fields(out: dict, consumer: dict) -> None:
+    from house_config.heating_rod_bindings import ROD_BINDINGS_KEY
+
     if consumer.get("ehal_bindings"):
         out["ehal_bindings"] = dict(consumer["ehal_bindings"])
+    if consumer.get(ROD_BINDINGS_KEY):
+        out[ROD_BINDINGS_KEY] = dict(consumer[ROD_BINDINGS_KEY])
 
 
 def _copy_loxone_io_fields(consumer: dict, out: dict, *, outputs: bool = True) -> None:

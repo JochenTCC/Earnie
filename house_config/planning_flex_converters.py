@@ -486,8 +486,8 @@ def planning_heating_rod_to_milp(consumer: dict, part: dict) -> dict:
     The rod has no target of its own: with an electric parent it shares the parent's day
     heat target (rod kWh count as heat, the heat pump's as kWh × JAZ); with a fuel parent
     it earns the avoided fuel cost per kWh, capped at the day's heat demand
-    (``optimizer.thermal_flex_context``). Live plans it only once an EHAL binding exists
-    (follow-up item), so its Live target is 0.
+    (``optimizer.thermal_flex_context``). Live plans it only with its EHAL signals
+    (``house_config.heating_rod_bindings.missing_live_signals``).
     """
     from house_config.heat_source import (
         consumer_heat_source,
@@ -496,6 +496,7 @@ def planning_heating_rod_to_milp(consumer: dict, part: dict) -> dict:
         heating_rod_fuel_credit_cent_per_kwh,
         part_kennung,
     )
+    from house_config.heating_rod_bindings import rod_binding_entity
 
     parent_id = str(consumer["id"])
     heat_source = consumer_heat_source(consumer)
@@ -530,6 +531,9 @@ def planning_heating_rod_to_milp(consumer: dict, part: dict) -> dict:
     window = consumer.get("thermal_flex_window")
     if isinstance(window, dict) and window:
         entry["thermal_flex_window"] = dict(window)
+    entity = rod_binding_entity(consumer)
+    if entity is not None:
+        entry["ehal_bindings"] = entity["ehal_bindings"]
     return entry
 
 

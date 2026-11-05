@@ -58,8 +58,20 @@ def apply_entity_bindings(
         return house
     profile = dict(profiles.get(profile_id) or {})
     consumers = [dict(c) for c in (profile.get("consumers") or []) if isinstance(c, dict)]
+    from house_config.heating_rod_bindings import (
+        ROD_BINDINGS_KEY,
+        normalize_rod_bindings,
+        rod_kennung,
+    )
+
     for consumer in consumers:
-        if _nonempty(consumer.get("id")) == entity_id:
+        consumer_id = _nonempty(consumer.get("id"))
+        if consumer.get("type") == "thermal_annual" and rod_kennung(consumer_id) == entity_id:
+            consumer[ROD_BINDINGS_KEY] = normalize_rod_bindings(
+                cleaned, consumer_id=consumer_id, label=f"Verbraucher '{consumer_id}'"
+            )
+            break
+        if consumer_id == entity_id:
             from ehal.flex_fields import canonicalize_consumer_bindings
 
             ctype = str(consumer.get("type") or "").strip()

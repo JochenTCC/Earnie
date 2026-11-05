@@ -145,6 +145,16 @@ def _group_for(entity_kind: str, entity_id: str) -> str:
     return "Verbraucher"
 
 
+def _rod_entries(profile: dict) -> list[tuple[str, str, str, str, str]]:
+    from house_config.heating_rod_bindings import rod_binding_entities
+
+    return [
+        ("consumer", rod["id"], rod["type"], str(field), str(name))
+        for rod in rod_binding_entities(profile.get("consumers", []))
+        for field, name in rod["ehal_bindings"].items()
+    ]
+
+
 def _binding_entries(house: dict, components: dict) -> list[tuple[str, str, str, str, str]]:
     """kind, id, type, field, name for plant, consumers, batteries, inverters."""
     entries: list[tuple[str, str, str, str, str]] = []
@@ -157,6 +167,7 @@ def _binding_entries(house: dict, components: dict) -> list[tuple[str, str, str,
                 entries.append(
                     ("consumer", str(consumer.get("id")), str(consumer.get("type") or ""), field, name)
                 )
+        entries.extend(_rod_entries(profile))
     for battery in components.get("batteries", []):
         for field, name in (battery.get("ehal_bindings") or {}).items():
             entries.append(("battery", str(battery.get("id")), "", field, name))

@@ -586,6 +586,10 @@
         "ehal_bindings": {
           "$ref": "#/definitions/ehal_bindings"
         },
+        "heating_rod_ehal_bindings": {
+          "$ref": "#/definitions/ehal_bindings",
+          "description": "Nur thermal_annual: EHAL-Felder des Heizstabs (heatpump.<consumer_id>_heating_rod.set_enable, .sens_power_act, .sens_consumer_active). Eigene Map, damit sie nicht als Felder des Wärmeerzeugers gelten."
+        },
         "loxone_inputs": {
           "$ref": "#/definitions/loxone_inputs"
         },

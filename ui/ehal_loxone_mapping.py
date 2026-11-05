@@ -414,6 +414,16 @@ def build_entity_rows(
             fields_for=lambda _cid, consumer: fields_for_consumer(consumer),
         )
     )
+    from house_config.heating_rod_bindings import rod_mapping_entities
+
+    rows.extend(
+        _entity_rows(
+            rod_mapping_entities(consumers_for_profile(house_doc, profile_id), components),
+            kind="consumer",
+            entity_key="consumer",
+            fields_for=lambda _cid, rod: fields_for_consumer(rod),
+        )
+    )
     return rows
 
 

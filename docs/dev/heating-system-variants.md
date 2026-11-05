@@ -159,9 +159,14 @@ its own and stays out of `cons_data` (as since `73461c4d`); the MILP alone decid
 runs. The remaining double count for a house whose real rod ran during the measured period is
 accepted and documented in the German user docs, without a runtime hint.
 
-A rod meter for Live (control, visualisation, later balancing) is a separate topic via EHAL
-fields of the `heating_rod` part (*SUSI P1 follow-up — Live control of the heating rod*);
-those bindings stay on the house consumer, not in the catalog entry.
+Live control and the rod meter use EHAL fields of the `heating_rod` part (*SUSI P1 follow-up —
+Live control of the heating rod*). Those bindings stay on the house consumer, not in the catalog
+entry, in `heating_rod_ehal_bindings` (`house_config/heating_rod_bindings.py`). It is a map of its
+own: in `ehal_bindings`, `canonicalize_consumer_bindings` would rewrite the rod's `set_enable` to
+the heat source's own and `marker_flex_enable` would pick it for the parent. Live caps the rod with
+the store plan (`opp_cap` × efficiency, first calendar day only); the SE keeps the day heat cap, so
+SE results and goldens do not change. No Earnie-side fail-safe for the rod (decided 2026-11-05):
+over-temperature and outage behaviour belong to the smart home.
 
 **Implemented (2026-11-03, backlog item *Heating-system variants — align code with the
 decisions of 2026-11-03*):** the rod measurement fields, their baseload subtraction and the
