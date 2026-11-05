@@ -1,64 +1,106 @@
 {
-  "_hinweis": "Parameter des Haeuser-Generators der Wirtschaftlichkeitsstudie (oeffentlich). Schluessel mit Unterstrich sind Kommentare. Anleitung: studies/viability/anleitung-parameter.md. Abo-Stufen und Preise gehoeren nicht in diese Datei.",
+  "_hinweis": "Parameter des Haeuser-Generators der Wirtschaftlichkeitsstudie (oeffentlich). Schluessel mit Unterstrich sind Kommentare. Anleitung: studies/viability/anleitung-parameter.md. Abo-Stufen und Abo-Preise gehoeren nicht in diese Datei.",
+  "preisjahr": 2025,
   "annahmen": {
-    "_ev": "Verbrauch aus VCOe/UBA (undatiert); Akku, Wallbox sind Annahmen. Wallbox 11 kW dreiphasig = 2 Punkte.",
+    "standort": [47.24, 9.6],
+    "netzbereich": "AT-VBG",
+    "pv_neigung_grad": 30,
+    "pv_performance_ratio": 0.8,
+    "akku_leistung_c": 0.5,
+    "_akku_zell_wirkungsgrad": "Annahme: einfacher Weg der Zelle. Mit dem Wechselrichter (0,97) ergibt das rund 90 % fuer Laden und Entladen zusammen.",
+    "akku_zell_wirkungsgrad": 0.98,
+    "akku_verschleiss_eur_pro_kwh": 300,
+    "ev_km_pro_jahr": 12000,
     "ev_kwh_pro_100km": 21.0,
     "ev_akku_kwh": 60.0,
+    "ev_ziel_soc_prozent": 80.0,
     "wallbox_kw": 11.0,
-    "_heizstab": "Annahme: elektrische Warmwasserbereitung, kein oesterreichischer Wert gefunden.",
+    "wallbox_min_kw": 4.1,
+    "wallbox_phasen": 3,
+    "solltemperatur_c": 21.5,
+    "heizgrenze_c": 15.0,
+    "absenkung_c": 6.5,
     "heizstab_kw": 3.0,
-    "heizstab_kwh_jahr": 2000.0,
-    "pv_neigung_grad": 30,
-    "pv_azimut_sued_grad": 0,
-    "_standort": "Breite, Laenge; Feldkirch, oeffentlich gerundet. Neuer Standort verlangt neue Waermepumpen-Kalibrierung und Wetter-Cache.",
-    "standort": [47.24, 9.6],
-    "_haushalte": "Haushaltsstrom ohne Waermepumpe, E-Auto, Heizstab in kWh/Jahr. Haeuser ohne E-Auto laufen mit allen Haushalten, Haeuser mit E-Auto nur mit dem Standard-Haushalt.",
-    "haushalte": {"k": 2500, "m": 3500, "g": 4500},
-    "standard_haushalt": "m"
+    "kollektor_neigung_grad": 30,
+    "_speicher_verlust": "Annahme: ErP-Klasse C fuer 500 l, rund 117 W bei 45 K, also 2,6 W/K. Earnies Standard von 20 W/K waeren ueber 4.000 kWh Waerme im Jahr.",
+    "speicher_verlust_kw_pro_k": 0.0026
   },
-  "umsetzung": {
-    "netzbereich": "AT-VBG",
-    "akku_leistung_kw_pro_kwh": 0.5,
-    "akku_verschleiss_eur_pro_kwh": 300,
-    "heizstab_startstunde": 11,
-    "heizstab_spielraum_h": 6.0,
-    "ev_ziel_soc_prozent": 80.0
+  "solver": {
+    "_hinweis": "Lueckengroesse und Zeitlimit je MILP-Fenster.",
+    "cbc_gap_rel": 0.1,
+    "cbc_strict_time_limit_sec": 3
   },
-  "waermepumpe": {
-    "_stufen": "Ziel-Jahresverbrauch in kWh -> Gebaeudeklasse (3 Bestand, 4 Altbau). Die Wohnflaeche wird mit calibrate_wp berechnet.",
-    "stufen": {"4000": 3, "6000": 4, "7000": 4},
-    "basis": {"heat_pump_type": "luft", "persons": 3, "target_temp_c": 21.5, "absent_temp_reduction_c": 6.5, "heating_limit_c": 15.0},
-    "flaeche_bereich_m2": [60.0, 400.0]
+  "regeln": {
+    "_wohnflaeche": "Wohnflaeche = basis + je_person * (Personen - 2); Annahme.",
+    "wohnflaeche_basis_m2": 120,
+    "wohnflaeche_je_person_m2": 16,
+    "bgf_faktor": 1.25,
+    "_haushaltsstrom": "SUSI-Richtwerte in Earnie, Plan F1.",
+    "haushaltsstrom_kwh": {"2": 3400, "3": 4200, "4": 4700, "5": 4700},
+    "warmwasser_kwh_je_person_tag": 2.0,
+    "_huellen": "Klasse und Heizwaermebedarf wie in Earnie; JAZ Luft-WP aus Hexit VL-1 und VL-2.",
+    "huellen": {
+      "neubau": {"gebaeudeklasse": 2, "hwb_kwh_m2": 45, "jaz": 3.5},
+      "bestand": {"gebaeudeklasse": 3, "hwb_kwh_m2": 80, "jaz": 3.0}
+    },
+    "_heizlast": "Heizrechner-Formel: Q_Heiz * delta_t / (Heizgradtage * 24 h) + kW je Person. Heizgradtage aus dem Feldkirch-Wetter 2025.",
+    "heizlast_delta_t_k": 32,
+    "heizgradtage_kd": 3044,
+    "heizlast_kw_je_person": 0.6,
+    "kollektor_m2_je_person": 1.5,
+    "speicher_basis_l": 500,
+    "speicher_l_je_m2_kollektor": 70,
+    "_dach": "Grundflaeche = BGF / Geschosse; Dachseite = Grundflaeche / 2 / cos(Neigung); Annahme.",
+    "dach_geschosse": 1.5,
+    "dach_neigung_grad": 30,
+    "dach_nutzbar": 0.75,
+    "dach_m2_je_kwp": 5.5,
+    "pv_min_kwp": 5.0
+  },
+  "brennstoffpreise": {
+    "_2025": "Plan F7: Oktober 2025, aus Oktober 2026 und der Vorjahresaenderung zurueckgerechnet (Biomasseverband). Gas in ct/kWh, Pellets in EUR/t.",
+    "2025": {"gas": 14.1, "pellets": 343.0}
+  },
+  "heizsysteme": {
+    "H1": {"quelle": "heat_pump", "kollektor": false, "heizstab": false, "speicher": true, "huellen": ["neubau", "bestand"]},
+    "H2": {"quelle": "heat_pump", "kollektor": true, "heizstab": false, "speicher": true, "huellen": ["neubau", "bestand"]},
+    "H3": {"quelle": "heat_pump", "kollektor": false, "heizstab": true, "speicher": true, "huellen": ["neubau", "bestand"]},
+    "_kombination": "Kollektor und Heizstab zusammen werden nicht gerechnet (Entscheidung 05.11.2026).",
+    "H5": {"quelle": "gas", "kollektor": false, "heizstab": false, "speicher": false, "huellen": ["bestand"]},
+    "H6": {"quelle": "gas", "kollektor": false, "heizstab": true, "speicher": true, "huellen": ["bestand"]},
+    "H7": {"quelle": "pellets", "kollektor": false, "heizstab": true, "speicher": true, "huellen": ["bestand"]}
+  },
+  "achsen": {
+    "personen": [2, 3, 4, 5],
+    "heizsystem": ["H1", "H2", "H3", "H5", "H6", "H7"],
+    "huelle": ["neubau", "bestand"],
+    "pv_kwp_je_mwh": [0.75, 1.25, 1.75, 2.2],
+    "pv_belegung": ["sued", "ost_west"],
+    "speicher_kwh_je_kwp": [0, 1, 1.5],
+    "eauto": ["keins", "pendler", "zuhause", "zwei"]
+  },
+  "eauto_muster": {
+    "_muster": "Stunde ab Verfuegbarkeit und Fertig-bis, je Werktag und Wochenende. Pendler: abends zu Hause, am Wochenende auch tagsueber. Zuhause: tagsueber verfuegbar.",
+    "pendler": {"werktag": [18, 7], "wochenende": [9, 8]},
+    "zuhause": {"werktag": [9, 8], "wochenende": [9, 8]},
+    "_fahrzeuge": "Muster je Fahrzeug der Achse eauto.",
+    "fahrzeuge": {"keins": [], "pendler": ["pendler"], "zuhause": ["zuhause"], "zwei": ["pendler", "zuhause"]}
   },
   "szenarien": {
-    "_hinweis": "Tarif-IDs aus share/config/tariffs.json. Schluessel muessen duo und dynamisch heissen (evaluate.py).",
+    "_hinweis": "Tarif-IDs aus share/config/tariffs.json. Das erste Szenario eines Hauses ist das Live-Szenario.",
     "duo": {"import_tariff_id": "at_vkw_strom_duo_normalpreis", "export_tariff_id": "at_verbund_v_strom_sonneneinspeisung_fix"},
-    "dynamisch": {"import_tariff_id": "at_vkw_strom_dynamisch", "export_tariff_id": "at_vkw_pv_dynamisch"}
+    "dynamisch": {"import_tariff_id": "at_vkw_strom_dynamisch", "export_tariff_id": "at_vkw_pv_dynamisch"},
+    "duo_pvdyn": {"import_tariff_id": "at_vkw_strom_duo_normalpreis", "export_tariff_id": "at_vkw_pv_dynamisch"}
   },
-  "haeuser": [
-    {"id": "A01", "name": "Nur Haushalt", "pv_kwp": 0.0, "pv_layout": "south", "battery_kwh": 0.0, "evs": [], "heat_pump_kwh": 0, "heating_rod": false},
-    {"id": "A02", "name": "E-Auto ohne PV", "pv_kwp": 0.0, "pv_layout": "south", "battery_kwh": 0.0, "evs": [12000], "heat_pump_kwh": 0, "heating_rod": false},
-    {"id": "A03", "name": "Waermepumpe ohne PV", "pv_kwp": 0.0, "pv_layout": "south", "battery_kwh": 0.0, "evs": [], "heat_pump_kwh": 4000, "heating_rod": false},
-    {"id": "A04", "name": "PV 5 kWp", "pv_kwp": 5, "pv_layout": "south", "battery_kwh": 0.0, "evs": [], "heat_pump_kwh": 0, "heating_rod": false},
-    {"id": "A05", "name": "PV 8 kWp", "pv_kwp": 8, "pv_layout": "south", "battery_kwh": 0.0, "evs": [], "heat_pump_kwh": 0, "heating_rod": false},
-    {"id": "A06", "name": "PV 12 kWp", "pv_kwp": 12, "pv_layout": "south", "battery_kwh": 0.0, "evs": [], "heat_pump_kwh": 0, "heating_rod": false},
-    {"id": "A07", "name": "PV 20 kWp", "pv_kwp": 20, "pv_layout": "south", "battery_kwh": 0.0, "evs": [], "heat_pump_kwh": 0, "heating_rod": false},
-    {"id": "A08", "name": "PV 5 kWp + 5 kWh", "pv_kwp": 5, "pv_layout": "south", "battery_kwh": 5, "evs": [], "heat_pump_kwh": 0, "heating_rod": false},
-    {"id": "A09", "name": "PV 8 kWp + 10 kWh", "pv_kwp": 8, "pv_layout": "south", "battery_kwh": 10, "evs": [], "heat_pump_kwh": 0, "heating_rod": false},
-    {"id": "A10", "name": "PV 12 kWp + 14 kWh", "pv_kwp": 12, "pv_layout": "south", "battery_kwh": 14, "evs": [], "heat_pump_kwh": 0, "heating_rod": false},
-    {"id": "A11", "name": "PV 20 kWp + 20 kWh", "pv_kwp": 20, "pv_layout": "south", "battery_kwh": 20, "evs": [], "heat_pump_kwh": 0, "heating_rod": false},
-    {"id": "A12", "name": "PV 8 kWp ohne Speicher + E-Auto", "pv_kwp": 8, "pv_layout": "south", "battery_kwh": 0.0, "evs": [12000], "heat_pump_kwh": 0, "heating_rod": false},
-    {"id": "A13", "name": "PV 8 kWp + 10 kWh + E-Auto", "pv_kwp": 8, "pv_layout": "south", "battery_kwh": 10, "evs": [12000], "heat_pump_kwh": 0, "heating_rod": false},
-    {"id": "A14", "name": "PV 12 kWp + 14 kWh + E-Auto", "pv_kwp": 12, "pv_layout": "south", "battery_kwh": 14, "evs": [12000], "heat_pump_kwh": 0, "heating_rod": false},
-    {"id": "A15", "name": "wie A14, Vielfahrer 18.000 km", "pv_kwp": 12, "pv_layout": "south", "battery_kwh": 14, "evs": [18000], "heat_pump_kwh": 0, "heating_rod": false},
-    {"id": "A16", "name": "wie A14, Ost/West", "pv_kwp": 12, "pv_layout": "east_west", "battery_kwh": 14, "evs": [12000], "heat_pump_kwh": 0, "heating_rod": false},
-    {"id": "A17", "name": "PV 8 kWp ohne Speicher + WP 4.000 kWh", "pv_kwp": 8, "pv_layout": "south", "battery_kwh": 0.0, "evs": [], "heat_pump_kwh": 4000, "heating_rod": false},
-    {"id": "A18", "name": "PV 8 kWp + 10 kWh + WP 4.000 kWh", "pv_kwp": 8, "pv_layout": "south", "battery_kwh": 10, "evs": [], "heat_pump_kwh": 4000, "heating_rod": false},
-    {"id": "A19", "name": "PV 12 kWp + 14 kWh + WP 6.000 kWh", "pv_kwp": 12, "pv_layout": "south", "battery_kwh": 14, "evs": [], "heat_pump_kwh": 6000, "heating_rod": false},
-    {"id": "A20", "name": "A19 mit E-Auto", "pv_kwp": 12, "pv_layout": "south", "battery_kwh": 14, "evs": [12000], "heat_pump_kwh": 6000, "heating_rod": false},
-    {"id": "A21", "name": "PV 12 kWp + 14 kWh + Heizstab", "pv_kwp": 12, "pv_layout": "south", "battery_kwh": 14, "evs": [], "heat_pump_kwh": 0, "heating_rod": true},
-    {"id": "A22", "name": "A20 mit Heizstab", "pv_kwp": 12, "pv_layout": "south", "battery_kwh": 14, "evs": [12000], "heat_pump_kwh": 6000, "heating_rod": true},
-    {"id": "A23", "name": "Grosshaus: 20 kWp, 20 kWh, WP 7.000, 2 E-Autos", "pv_kwp": 20, "pv_layout": "south", "battery_kwh": 20, "evs": [12000, 12000], "heat_pump_kwh": 7000, "heating_rod": false},
-    {"id": "A24", "name": "Grosshaus: 20 kWp, 20 kWh, WP 7.000, 1 E-Auto, Heizstab", "pv_kwp": 20, "pv_layout": "south", "battery_kwh": 20, "evs": [12000], "heat_pump_kwh": 7000, "heating_rod": true}
+  "standard_szenarien": ["duo", "dynamisch"],
+  "stichproben": [
+    {"id": "S1", "_zweck": "kleinstes Haus, ohne Speicher, Mindest-kWp greift", "personen": 2, "huelle": "neubau", "heizsystem": "H1", "pv_kwp_je_mwh": 0.75, "pv_belegung": "sued", "speicher_kwh_je_kwp": 0, "eauto": "keins"},
+    {"id": "S2", "_zweck": "groesstes Haus, Dachdeckel Ost/West greift, zwei E-Autos", "personen": 5, "huelle": "bestand", "heizsystem": "H2", "pv_kwp_je_mwh": 2.2, "pv_belegung": "ost_west", "speicher_kwh_je_kwp": 1.5, "eauto": "zwei"},
+    {"id": "S3", "_zweck": "Bestand, Dachdeckel Sued greift, Pendler, drittes Szenario", "personen": 4, "huelle": "bestand", "heizsystem": "H1", "pv_kwp_je_mwh": 1.25, "pv_belegung": "sued", "speicher_kwh_je_kwp": 1, "eauto": "pendler", "szenarien": ["duo", "dynamisch", "duo_pvdyn"]},
+    {"id": "S4", "_zweck": "Neubau mit Kollektor, Ost/West, tagsueber zu Hause, drittes Szenario", "personen": 3, "huelle": "neubau", "heizsystem": "H2", "pv_kwp_je_mwh": 1.25, "pv_belegung": "ost_west", "speicher_kwh_je_kwp": 1, "eauto": "zuhause", "szenarien": ["duo", "dynamisch", "duo_pvdyn"]},
+    {"id": "S5", "_zweck": "Waermepumpe mit Heizstab", "personen": 3, "huelle": "bestand", "heizsystem": "H3", "pv_kwp_je_mwh": 1.75, "pv_belegung": "sued", "speicher_kwh_je_kwp": 1.5, "eauto": "keins"},
+    {"id": "S6", "_zweck": "Gas ohne Heizstab, tagsueber zu Hause", "personen": 2, "huelle": "bestand", "heizsystem": "H5", "pv_kwp_je_mwh": 1.25, "pv_belegung": "sued", "speicher_kwh_je_kwp": 1, "eauto": "zuhause"},
+    {"id": "S7", "_zweck": "Gas mit Heizstab, Ost/West, Pendler", "personen": 4, "huelle": "bestand", "heizsystem": "H6", "pv_kwp_je_mwh": 1.25, "pv_belegung": "ost_west", "speicher_kwh_je_kwp": 1, "eauto": "pendler"},
+    {"id": "S8", "_zweck": "Pellets mit Heizstab", "personen": 3, "huelle": "bestand", "heizsystem": "H7", "pv_kwp_je_mwh": 1.75, "pv_belegung": "sued", "speicher_kwh_je_kwp": 1, "eauto": "keins"}
   ]
 }

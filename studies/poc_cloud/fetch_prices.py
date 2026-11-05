@@ -67,9 +67,11 @@ def main() -> None:
     parser.add_argument("--zone", default="AT")
     parser.add_argument("--start", type=date.fromisoformat, required=True)
     parser.add_argument("--end", type=date.fromisoformat, required=True)
-    parser.add_argument("--out", type=Path, default=CACHE_DIR / "prices_AT_2025.csv")
+    parser.add_argument("--out", type=Path, default=None, help="Default: cache/prices_AT_<start year>.csv")
     args = parser.parse_args()
 
+    if args.out is None:
+        args.out = CACHE_DIR / f"prices_{args.zone}_{args.start.year}.csv"
     frame = fetch(args.zone, args.start, args.end)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     with open(args.out, "w", encoding="utf-8", newline="") as handle:

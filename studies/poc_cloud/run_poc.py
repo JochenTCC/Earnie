@@ -69,6 +69,12 @@ def _run(args: list[str], env: dict[str, str]) -> None:
         raise SystemExit(f"Step failed ({result.returncode}): {' '.join(args)}")
 
 
+def generate_cons_data(pack_dir: Path, year: int, env: dict[str, str]) -> None:
+    if not (pack_dir / "runtime" / "cons_data.csv").is_file():
+        _run(["-m", "scripts.generate_cons_data", "--source", "synthetic",
+              "--synthetic-start", f"{year}-01-01", "--synthetic-end", f"{year}-12-31"], env)
+
+
 def _summarize(out_dir: Path) -> dict:
     log = json.loads((out_dir / "backtesting_log.json").read_text(encoding="utf-8"))
     summary = {
@@ -97,6 +103,7 @@ def _job_count(pack_dir: Path) -> int:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--study-dir", type=Path, default=STUDY_DIR)
+    parser.add_argument("--year", type=int, default=2025, help="Year of the synthetic consumption data.")
     parser.add_argument("--start-month", type=int, default=1)
     parser.add_argument("--end-month", type=int, default=12)
     parser.add_argument("--workers", type=int, default=None,
@@ -123,9 +130,7 @@ def main() -> None:
     print(f"Weather cache: {copied} file(s) installed into {WEATHER_DST}")
     started_at = time.time()
 
-    if not (pack_dir / "runtime" / "cons_data.csv").is_file():
-        _run(["-m", "scripts.generate_cons_data", "--source", "synthetic",
-              "--synthetic-start", "2025-01-01", "--synthetic-end", "2025-12-31"], env)
+    generate_cons_data(pack_dir, args.year, env)
 
     out_dir.mkdir(parents=True, exist_ok=True)
     started = time.time()
