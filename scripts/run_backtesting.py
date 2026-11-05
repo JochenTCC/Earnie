@@ -1289,7 +1289,7 @@ def main(argv: list[str] | None = None):
         "horizon_mode": horizon_mode,
         "start_month": args.start_month.month if args.start_month is not None else None,
         "end_month": args.end_month.month if args.end_month is not None else None,
-        "backtesting_year": BACKTESTING_YEAR,
+        "backtesting_year": start.year,
         "price_source": price_source,
         "price_strategy": price_strategy,
         "season_mirror_to_last_month": is_season_mirror_enabled(),

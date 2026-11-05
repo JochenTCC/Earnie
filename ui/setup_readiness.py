@@ -157,7 +157,8 @@ def _missing_live_battery_items(live_settings: dict, components_path: str) -> li
         for item in components_doc.get("batteries", [])
         if isinstance(item, dict) and item.get("id")
     }
-    if not battery_ids or any(bat_id not in batteries for bat_id in battery_ids):
+    # No battery is a valid plant; only a reference to a missing one is an error.
+    if any(bat_id not in batteries for bat_id in battery_ids):
         return ["Batterie für Live-Szenario wählen (Echtzeit-Umgebung)"]
     return []
 
