@@ -11,6 +11,8 @@ import math
 import random
 from dataclasses import dataclass
 
+from studies.viability.params import validate_heating_system
+
 
 @dataclass(frozen=True)
 class DerivedHouse:
@@ -56,6 +58,7 @@ def derive_house(house: dict, params: dict) -> DerivedHouse:
     persons = int(house["personen"])
     envelope = rules["huellen"][house["huelle"]]
     system = params["heizsysteme"][house["heizsystem"]]
+    validate_heating_system(system, f"{house['id']}.{house['heizsystem']}")
 
     area = rules["wohnflaeche_basis_m2"] + rules["wohnflaeche_je_person_m2"] * (persons - 2)
     gross = area * rules["bgf_faktor"]
@@ -114,6 +117,8 @@ def derive_house(house: dict, params: dict) -> DerivedHouse:
 def all_houses(params: dict) -> list[dict]:
     """Every valid combination of the axes, with a stable id."""
     axes = params["achsen"]
+    for system in axes["heizsystem"]:
+        validate_heating_system(params["heizsysteme"][system], system)
     houses: list[dict] = []
     for persons, envelope, system, pv, layout, battery, ev in itertools.product(
         axes["personen"], axes["huelle"], axes["heizsystem"], axes["pv_kwp_je_mwh"],

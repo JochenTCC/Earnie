@@ -68,6 +68,12 @@ def _exact_keys(obj: Any, allowed: set[str], where: str) -> dict:
     return data
 
 
+def validate_heating_system(system: dict, where: str) -> None:
+    """A heat pump with a heating rod is not an allowed configuration (decided 2026-11-06)."""
+    if system["quelle"] == HEAT_PUMP and system["heizstab"]:
+        _fail(where, "Waermepumpe mit Heizstab ist keine erlaubte Konfiguration")
+
+
 def validate_house(raw: Any, doc: dict, where: str) -> dict:
     """Axis values of one house; an invalid combination fails here."""
     data = _public(raw, where)
@@ -107,6 +113,7 @@ def validate(doc: Any) -> dict:
             _fail(f"heizsysteme.{sid}.quelle", f"{system['quelle']!r} unbekannt")
         if (system["heizstab"] or system["kollektor"]) and not system["speicher"]:
             _fail(f"heizsysteme.{sid}", "Heizstab und Kollektor brauchen einen Waermespeicher")
+        validate_heating_system(system, f"heizsysteme.{sid}")
     data["brennstoffpreise"] = {
         year: _exact_keys(prices, FUELS, f"brennstoffpreise.{year}")
         for year, prices in _public(data["brennstoffpreise"], "brennstoffpreise").items()

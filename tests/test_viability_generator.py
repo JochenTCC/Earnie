@@ -109,6 +109,45 @@ def _raw_doc() -> dict:
     return json.loads(params_mod.DEFAULT_PATH.read_text(encoding="utf-8"))
 
 
+_HEAT_PUMP_WITH_ROD = {
+    "quelle": "heat_pump", "kollektor": False, "heizstab": True, "speicher": True, "huellen": ["neubau", "bestand"],
+}
+
+
+def test_parameter_file_with_heat_pump_and_rod_fails_loud():
+    doc = _raw_doc()
+    doc["heizsysteme"]["HX"] = dict(_HEAT_PUMP_WITH_ROD)
+    with pytest.raises(params_mod.ParameterError, match="HX.*Waermepumpe mit Heizstab"):
+        params_mod.validate(doc)
+
+
+def test_generator_rejects_heat_pump_with_rod_without_the_loader(params):
+    """``derive_house`` and ``all_houses`` also refuse parameters that skipped ``validate``."""
+    other = copy.deepcopy(params)
+    other["heizsysteme"]["HX"] = dict(_HEAT_PUMP_WITH_ROD)
+    other["achsen"]["heizsystem"].append("HX")
+    with pytest.raises(params_mod.ParameterError, match="Waermepumpe mit Heizstab"):
+        derive_house(_house(heizsystem="HX"), other)
+    with pytest.raises(params_mod.ParameterError, match="Waermepumpe mit Heizstab"):
+        all_houses(other)
+
+
+def test_fuel_source_keeps_its_rod(params):
+    assert params["heizsysteme"]["H6"]["heizstab"] and params["heizsysteme"]["H7"]["heizstab"]
+    assert not any(
+        system["heizstab"] and system["quelle"] == params_mod.HEAT_PUMP
+        for system in params["heizsysteme"].values()
+    )
+
+
+def test_sample_houses_cover_every_level_without_s5(params):
+    houses = params["stichproben"]
+    assert [h["id"] for h in houses] == ["S1", "S2", "S3", "S4", "S6", "S7", "S8"]
+    for axis, levels in params["achsen"].items():
+        for level in levels:
+            assert any(h[axis] == level for h in houses), (axis, level)
+
+
 def test_unknown_key_and_missing_fuel_year_fail_loud():
     doc = _raw_doc()
     doc["annahmen"]["tippfehler"] = 1
@@ -133,7 +172,7 @@ def test_price_year_other_than_the_thermal_year_fails_loud():
 
 
 def test_grid_size_and_sample_is_reproducible_and_covers_every_level(params):
-    assert len(all_houses(params)) == 3456
+    assert len(all_houses(params)) == 2688
     first = stratified_sample(params, 60, seed=7)
     assert first == stratified_sample(params, 60, seed=7)
     assert first != stratified_sample(params, 60, seed=8)

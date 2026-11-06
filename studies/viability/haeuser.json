@@ -64,15 +64,14 @@
   "heizsysteme": {
     "H1": {"quelle": "heat_pump", "kollektor": false, "heizstab": false, "speicher": true, "huellen": ["neubau", "bestand"]},
     "H2": {"quelle": "heat_pump", "kollektor": true, "heizstab": false, "speicher": true, "huellen": ["neubau", "bestand"]},
-    "H3": {"quelle": "heat_pump", "kollektor": false, "heizstab": true, "speicher": true, "huellen": ["neubau", "bestand"]},
-    "_kombination": "Kollektor und Heizstab zusammen werden nicht gerechnet (Entscheidung 05.11.2026).",
+    "_kombination": "Kollektor und Heizstab zusammen werden nicht gerechnet (Entscheidung 05.11.2026). Waermepumpe mit Heizstab (frueher H3) ist keine erlaubte Konfiguration (Entscheidung 06.11.2026), params.py lehnt sie ab.",
     "H5": {"quelle": "gas", "kollektor": false, "heizstab": false, "speicher": false, "huellen": ["bestand"]},
     "H6": {"quelle": "gas", "kollektor": false, "heizstab": true, "speicher": true, "huellen": ["bestand"]},
     "H7": {"quelle": "pellets", "kollektor": false, "heizstab": true, "speicher": true, "huellen": ["bestand"]}
   },
   "achsen": {
     "personen": [2, 3, 4, 5],
-    "heizsystem": ["H1", "H2", "H3", "H5", "H6", "H7"],
+    "heizsystem": ["H1", "H2", "H5", "H6", "H7"],
     "huelle": ["neubau", "bestand"],
     "pv_kwp_je_mwh": [0.75, 1.25, 1.75, 2.2],
     "pv_belegung": ["sued", "ost_west"],
@@ -98,7 +97,6 @@
     {"id": "S2", "_zweck": "groesstes Haus, Dachdeckel Ost/West greift, zwei E-Autos", "personen": 5, "huelle": "bestand", "heizsystem": "H2", "pv_kwp_je_mwh": 2.2, "pv_belegung": "ost_west", "speicher_kwh_je_kwp": 1.5, "eauto": "zwei"},
     {"id": "S3", "_zweck": "Bestand, Dachdeckel Sued greift, Pendler, drittes Szenario", "personen": 4, "huelle": "bestand", "heizsystem": "H1", "pv_kwp_je_mwh": 1.25, "pv_belegung": "sued", "speicher_kwh_je_kwp": 1, "eauto": "pendler", "szenarien": ["duo", "dynamisch", "duo_pvdyn"]},
     {"id": "S4", "_zweck": "Neubau mit Kollektor, Ost/West, tagsueber zu Hause, drittes Szenario", "personen": 3, "huelle": "neubau", "heizsystem": "H2", "pv_kwp_je_mwh": 1.25, "pv_belegung": "ost_west", "speicher_kwh_je_kwp": 1, "eauto": "zuhause", "szenarien": ["duo", "dynamisch", "duo_pvdyn"]},
-    {"id": "S5", "_zweck": "Waermepumpe mit Heizstab", "personen": 3, "huelle": "bestand", "heizsystem": "H3", "pv_kwp_je_mwh": 1.75, "pv_belegung": "sued", "speicher_kwh_je_kwp": 1.5, "eauto": "keins"},
     {"id": "S6", "_zweck": "Gas ohne Heizstab, tagsueber zu Hause", "personen": 2, "huelle": "bestand", "heizsystem": "H5", "pv_kwp_je_mwh": 1.25, "pv_belegung": "sued", "speicher_kwh_je_kwp": 1, "eauto": "zuhause"},
     {"id": "S7", "_zweck": "Gas mit Heizstab, Ost/West, Pendler", "personen": 4, "huelle": "bestand", "heizsystem": "H6", "pv_kwp_je_mwh": 1.25, "pv_belegung": "ost_west", "speicher_kwh_je_kwp": 1, "eauto": "pendler"},
     {"id": "S8", "_zweck": "Pellets mit Heizstab", "personen": 3, "huelle": "bestand", "heizsystem": "H7", "pv_kwp_je_mwh": 1.75, "pv_belegung": "sued", "speicher_kwh_je_kwp": 1, "eauto": "keins"}
