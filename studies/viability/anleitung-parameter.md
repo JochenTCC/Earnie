@@ -23,6 +23,7 @@ Befehle laufen im Repo-Root in PowerShell; vorher einmal `$env:PYTHONUTF8='1'` s
   setzt `annual_kwh` im Hausprofil so, dass genau der Haushaltsstrom der Regel als Grundlast bleibt.
 - `run_houses` legt je Haus `results/<Lauf>/` an, mit SE-Log, `run.log` und den CSVs der Referenzleiter. `--start-month`/`--end-month`
   wählen den Zeitraum, `--sensitivity` rechnet die 8 Regel-Sätze zusätzlich.
+- `--forecast-price-strategy mirror` rechnet einen zweiten Lauf im Forecast-Modus (Untergrenze von L2 − L3, Spalten `*_forecast`, doppelte Laufzeit). Beim ersten Mal braucht er `--allow-network` für die archivierten PV-Prognosen. Für Januar muss die Preisdatei etwa 8 Tage vor dem Jahresanfang beginnen: `python -m studies.poc_cloud.fetch_prices --start 2024-12-20 --end 2026-01-04`.
 - Mehr Häuser gleichzeitig nutzen die Kerne besser als mehr Worker je Haus: Die Referenzen sind schnell fertig, danach rechnet
   ein Haus nur noch einen MILP-Prozess je Szenario.
 - Ohne `--allow-network` ist das Netz blockiert und ein fehlender Wetter-Cache bricht ab. Mit dem Schalter landen neue

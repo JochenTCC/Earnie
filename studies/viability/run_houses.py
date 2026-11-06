@@ -45,6 +45,10 @@ def run_house(root: Path, args: argparse.Namespace) -> float:
     ]
     if not args.sensitivity:
         command.append("--skip-sensitivity")
+    if args.forecast_price_strategy:
+        command += ["--forecast-price-strategy", args.forecast_price_strategy]
+    else:
+        command.append("--skip-forecast")
     started = time.time()
     with open(out_dir / "run.log", "w", encoding="utf-8") as log:
         if not (pack_dir / "runtime" / "cons_data.csv").is_file():
@@ -67,6 +71,11 @@ def main() -> None:
     parser.add_argument("--start-month", type=int, default=1)
     parser.add_argument("--end-month", type=int, default=12)
     parser.add_argument("--sensitivity", action="store_true")
+    parser.add_argument(
+        "--forecast-price-strategy",
+        choices=("mirror", "forecast"),
+        help="Zweiter Lauf im Forecast-Modus fuer die Untergrenze von L2 - L3; ohne Angabe keiner.",
+    )
     parser.add_argument("--allow-network", action="store_true")
     args = parser.parse_args()
 

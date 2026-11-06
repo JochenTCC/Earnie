@@ -2,6 +2,15 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### SE forecast mode — plan on forecasts, book on actuals (2026-11-05)
+
+- [x] **SE forecast mode** `[dev]`: spec [`docs/dev/se-forecast-mode.md`](../docs/dev/se-forecast-mode.md), RuleRef decision O1. A run plans each window from what was known then and books on actuals, giving the lower end of the L3 range; perfect foresight stays the upper end.
+  - Plan inputs, each switchable (`--plan-forecast price,pv,load`): prices as of SA₁ with `mirror` or `forecast`; PV from Open-Meteo Previous Runs (forecast 24 h earlier), scaled per calendar month to the booked PV (maintainer decision); baseload from the profile. Flex targets stay actual.
+  - Booking: `simulate_horizon(booking_matrix=...)` applies the schedule to actual rows through the live battery control mapping; flex runs at the planned power.
+  - Export: `run_reference_ladder` runs both and adds `*_forecast` columns; `run_houses --forecast-price-strategy`.
+  - Tests: `tests/test_se_forecast_mode.py`. Checked on one study house for February and June 2025.
+  - Open for the study: the January run needs a price file that starts before the year (spec § 3.5).
+
 ### SUSI P1 follow-up — Live control of the heating rod (2026-11-05)
 
 - [x] **SUSI P1 follow-up — Live control of the heating rod** `[feat]` *(branch `feat/heating-rod-live-control`)*: Live plans and switches the rod part once its signals are bound. Design note: [heating-system-variants.md](../docs/dev/heating-system-variants.md) § Heating rod with measured data.

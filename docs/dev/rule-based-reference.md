@@ -1,6 +1,6 @@
 # Rule-based reference — Earnie vs. standard rules (Scenario Explorer)
 
-**Status:** design 2026-11-03, method decisions O1–O5 taken 2026-11-05 (§ 7). L1 and L2 implemented 2026-11-05 (`simulation/reference_ladder.py`) and computed in every SE run; the cost table, invoices, log and CLI summary read them (P3). The end-SoC valuation of § 3.3 and the window charts on L2 are in (P3b), the study export and sensitivity too (P5), the headline and expander as well (P4, `ui/backtesting_ladder.py`). Backlog: item **SE forecast mode** and the **RuleRef follow-up** items in `backlog/Backlog.md`.
+**Status:** design 2026-11-03, method decisions O1–O5 taken 2026-11-05 (§ 7). L1 and L2 implemented 2026-11-05 (`simulation/reference_ladder.py`) and computed in every SE run; the cost table, invoices, log and CLI summary read them (P3). The end-SoC valuation of § 3.3 and the window charts on L2 are in (P3b), the study export and sensitivity too (P5), the headline and expander as well (P4, `ui/backtesting_ladder.py`). The SE forecast mode is in ([`se-forecast-mode.md`](se-forecast-mode.md)). Backlog: the **RuleRef follow-up** items in `backlog/Backlog.md`.
 
 **Related:** [`savings-ledger.md`](savings-ledger.md) (live counterfactual, `savings_v`), [`../workflow/earnie-points.md`](../workflow/earnie-points.md), `optimizer/sim_baseline.py`, `simulation/reference_costs.py`.
 
@@ -37,7 +37,7 @@ A reference ladder in the SE. Each step adds one thing; the delta between two st
 2. **Same windows and constraints.** Same charging windows (`charging_contexts`, `consumer_charging_eligible_indices`), same nominal / min power, `min_on_quarterhours`.
 3. **One continuous SoC chain** over the whole SE period, never reset per anchor (lesson D1 in `savings-ledger.md`). End-of-period SoC difference to L3 is valued like the ledger's SoC correction: `(soc_L3 − soc_step) / 100 · capacity · efficiency · p_ref`, with `p_ref` L3's import-weighted buy price of the period's last 24 h (time mean on a day without import, recorded as `p_ref_basis`). All steps start at the same SoC, so there is no start term, and the ledger's telescoping sum reduces to this one term. The SoC is the one at the period's end, not at the run's end: books spill past it. The log keeps it per scenario for L1 and L2 (`ladder_soc_correction`). The cost column `Ersparnis vs. Standard-Regeln` and the CLI's rule share include it, `Jahres Kosten` and invoices stay the booked cost. L0 has no storage and no term.
 4. **Same prices and fees.** End-customer price per slot incl. time-variable grid fee, same feed-in settings (`_reference_feed_in_settings`).
-5. **Information parity.** Rules see measured values in real time (surplus at the meter) and the day-ahead prices once published — that is what real products see. Earnie in the SE plans with perfect foresight of PV, load and prices (O1, § 7), so L2 − L3 from a plain SE run is an **upper bound**. Studies report it as a range together with the **SE forecast mode** (separate backlog item, required before final study prices); the ladder itself does not depend on that mode.
+5. **Information parity.** Rules see measured values in real time (surplus at the meter) and the day-ahead prices once published — that is what real products see. Earnie in the SE plans with perfect foresight of PV, load and prices (O1, § 7), so L2 − L3 from a plain SE run is an **upper bound**. Studies report it as a range together with the **SE forecast mode** ([`se-forecast-mode.md`](se-forecast-mode.md), required before final study prices); the ladder itself does not depend on that mode.
 6. **Rule parameters fixed up front**, plus a sensitivity run (§ 4.5) that reports the best parameter set in hindsight. Being generous to the rules is the point.
 
 ## 4. L2 rule set
@@ -123,6 +123,7 @@ Defaults: quantile 0.75, consumer before battery, hysteresis from `min_on_quarte
   - `reference_ladder_daily.csv`: L0–L3 per calendar day and scenario. A day missing on one step fails loud.
   - `reference_ladder_summary.csv`: totals per scenario, end-SoC terms and SoCs, L2 − L3 and rule share with the term, plausibility of L1 and L2.
   - `reference_ladder_sensitivity.csv`: the 8 parameter sets of § 4.7 per scenario, with `is_default` and `is_best_in_hindsight`. Best is the lowest L2 cost including the end-SoC term; the default wins a tie. The default is the SE run's own L2, so a setup needs 7 extra runs; scenarios sharing a setup share them. `--skip-sensitivity` leaves them out.
+  - The forecast run adds the range's lower end as `*_forecast` columns (`se-forecast-mode.md` § 4).
   - Every row of the daily, summary and sensitivity files states `l3_foresight=perfect`; daily and summary carry `heating_rod` (§ 3.1). `--scenario` only narrows what runs: the reference plan and the Live scenario still see all scenarios, so a chosen scenario's L0 does not change.
 
 ## 6. Effect on other features
@@ -155,7 +156,7 @@ Limits on that foresight: one plan per day with no re-plan as in live, and no vi
 
 The earlier result "forecast vs. mirror ±0.1–0.6 %" therefore says nothing about the foresight effect.
 
-**Decision:** separate backlog item **SE forecast mode**: plan on forecasts, book on actuals. Perfect foresight is the upper bound for L3's value; one plan per day without re-plan is the lower bound. It does not block P1–P5, but final study prices wait for it.
+**Decision:** **SE forecast mode** ([`se-forecast-mode.md`](se-forecast-mode.md), implemented 2026-11-05): plan on forecasts, book on actuals. Perfect foresight is the upper bound for L3's value; one plan per day without re-plan is the lower bound. It does not block P1–P5, but final study prices wait for it.
 
 ### O2 Surplus priority: consumer before battery, battery first in the sensitivity.
 

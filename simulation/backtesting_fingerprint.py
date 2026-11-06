@@ -112,6 +112,7 @@ def compute_backtesting_fingerprint(
                 "end",
                 "horizon_mode",
                 "price_strategy",
+                "plan_forecast",
                 "windows",
                 "season_mirror_to_last_month",
             )

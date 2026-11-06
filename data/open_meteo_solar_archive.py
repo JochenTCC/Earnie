@@ -19,6 +19,7 @@ OPEN_METEO_ARCHIVE = open_meteo.ARCHIVE_URL
 # of the fetch day (Open-Meteo applies one fixed offset per response), so they are not reused.
 OPEN_METEO_CACHE_DIR = Path("data/cache/open_meteo_utc")
 HOURLY_VAR = "global_tilted_irradiance"
+HOURLY_VAR_DAY1_FORECAST = f"{HOURLY_VAR}_previous_day1"
 HOURLY_TEMP_VAR = "temperature_2m"
 REFERENCE_WM2 = 1000.0
 DEFAULT_THERMAL_EFFICIENCY = 0.40
@@ -183,9 +184,10 @@ def _fetch_hourly_archive_chunk(
     end: date,
     hourly_vars: str,
     extra_params: dict[str, Any] | None = None,
+    fetch=open_meteo.archive,
 ) -> dict[str, pd.Series]:
     # One UTC day earlier: the first local hours of ``start`` belong to the previous UTC day.
-    payload = open_meteo.archive(
+    payload = fetch(
         opendata_session.session(),
         latitude=lat,
         longitude=lon,
@@ -261,6 +263,38 @@ def fetch_hourly_tilted_irradiance_wm2_series(
             },
         )
         chunks.append(payload[HOURLY_VAR])
+    return _concat_hourly_chunks(chunks)
+
+
+def fetch_hourly_tilted_irradiance_day1_forecast_wm2_series(
+    start: date,
+    end: date,
+    *,
+    lat: float,
+    lon: float,
+    tilt: float,
+    azimuth: float,
+    timezone: str,
+) -> pd.Series:
+    """Tilted irradiance as forecast 24 h earlier, local wall clock; NaN where no run is archived."""
+    if end < start:
+        raise ValueError("Open-Meteo Prognosearchiv: end muss nicht vor start liegen.")
+    chunks: list[pd.Series] = []
+    for chunk_start, chunk_end in month_ranges(start, end + timedelta(days=1)):
+        payload = _fetch_hourly_archive_chunk(
+            lat=lat,
+            lon=lon,
+            timezone=timezone,
+            start=chunk_start,
+            end=chunk_end,
+            hourly_vars=HOURLY_VAR_DAY1_FORECAST,
+            extra_params={
+                "tilt": int(round(tilt)),
+                "azimuth": int(round(azimuth)),
+            },
+            fetch=open_meteo.previous_runs,
+        )
+        chunks.append(payload[HOURLY_VAR_DAY1_FORECAST])
     return _concat_hourly_chunks(chunks)
 
 

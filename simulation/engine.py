@@ -243,6 +243,7 @@ class _AnchorRunConfig:
     scenario_id: str | None
     collect_cbc: bool
     snapshot_collector: list[dict] | None
+    forecast_planner: object | None = None
 
 
 class _AnchorStepResult(NamedTuple):
@@ -372,6 +373,7 @@ def _process_anchor_window(
             collect_cbc=cfg.collect_cbc,
             price_resources=cfg.price_resources,
             collect_full_horizon=collect_snapshots,
+            forecast_planner=cfg.forecast_planner,
         )
     )
     if cfg.collect_cbc:
@@ -453,6 +455,7 @@ def run_simulation(
     horizon_mode: str = DEFAULT_HORIZON_MODE,
     price_resources: BacktestingPriceResources | None = None,
     snapshot_collector: list[dict] | None = None,
+    plan_forecast: tuple[str, ...] | None = None,
 ) -> tuple[pd.DataFrame, PlausibilityReport, list[dict]]:
     """
     Simuliert historische Verbrauchsdaten mit Flex-Optimierung.
@@ -461,6 +464,10 @@ def run_simulation(
       - fixed_24h: [Anker−24h, Anker), SOC frei am Fensterende (E-Auto-Anker)
       - sunrise_window: lückenlose Sonnenaufgang-Kette, je Tag start…end+1 Book
         [SA₁, SA₂) aus MILP SA₀→SA₂; SoC-Kette an den Sonnenaufgängen
+
+    plan_forecast: Forecast-Modus (``docs/dev/se-forecast-mode.md``), die genannten Eingaben
+    plant der MILP auf Prognosen, gebucht wird immer auf Ist-Werten. ``price_resources`` wirken
+    dann nur auf den Plan. ``None`` = Plan und Buchung auf derselben Matrix.
     """
     horizon_mode = parse_horizon_mode(horizon_mode)
     if horizon_mode == SUNRISE_WINDOW:
@@ -479,6 +486,21 @@ def run_simulation(
         )
 
     init = _init_simulation_run(anchors, scenario_params, horizon_mode)
+    forecast_planner = None
+    if plan_forecast is not None:
+        if horizon_mode != SUNRISE_WINDOW:
+            raise ValueError(f"Forecast-Modus erfordert horizon_mode={SUNRISE_WINDOW}.")
+        from simulation.forecast_mode import ForecastPlanner
+
+        forecast_planner = ForecastPlanner(
+            plan_forecast,
+            scenario_params=scenario_params,
+            cache=cache,
+            prices_df=prices_df,
+            feed_in_settings=init.feed_in_settings,
+            price_resources=price_resources,
+        )
+        price_resources = None
     hours_done = 0
     sim_soc = initial_soc
 
@@ -501,6 +523,7 @@ def run_simulation(
         scenario_id=scenario_id,
         collect_cbc=collect_cbc,
         snapshot_collector=snapshot_collector,
+        forecast_planner=forecast_planner,
     )
     try:
         for anchor in anchors:

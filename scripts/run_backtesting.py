@@ -52,6 +52,7 @@ from simulation.engine import (
     window_slot_datetimes,
 )
 from simulation.reference_costs import LADDER_L2
+from simulation.forecast_mode import PLAN_PRICE, parse_plan_forecast
 from simulation.reference_ladder import (
     LadderReferenceSpec,
     compute_ladder_reference,
@@ -285,6 +286,16 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--plan-forecast",
+        metavar="EINGABEN",
+        help=(
+            "Forecast-Modus (nur sunrise_window): der MILP plant diese Eingaben auf Prognosen, "
+            "gebucht wird auf Ist-Werten. Kommagetrennt aus price, pv, load; 'price' braucht "
+            "--price-strategy mirror|forecast. Leer = Plan auf Ist-Werten, gleiches Ergebnis wie "
+            "ohne Schalter. Siehe docs/dev/se-forecast-mode.md."
+        ),
+    )
+    parser.add_argument(
         "--feature-dataset",
         metavar="CSV",
         help="Training-CSV für price_strategy=forecast (Standard: neuestes data/cache/price_training_*.csv).",
@@ -452,6 +463,7 @@ def _run_scenario_worker(
     forecast_model_path: str | None,
     progress_file: str | None = None,
     progress_label: str | None = None,
+    plan_forecast: tuple[str, ...] | None = None,
 ) -> tuple[str, pd.DataFrame, object, list[dict], list[dict]]:
     """Top-Level-Worker für ProcessPoolExecutor (Windows spawn)."""
     from pathlib import Path
@@ -489,6 +501,7 @@ def _run_scenario_worker(
         price_resources=price_resources,
         snapshot_collector=snapshots,
         on_progress=on_progress,
+        plan_forecast=plan_forecast,
     )
     return name, df_result, plausibility, cbc_events, snapshots
 
@@ -508,6 +521,7 @@ def _run_parallel_backtesting(
     progress_file: str | None = None,
     *,
     ladder_specs: list[LadderReferenceSpec],
+    plan_forecast: tuple[str, ...] | None = None,
 ) -> tuple[
     dict[str, pd.DataFrame],
     dict[str, object],
@@ -577,6 +591,7 @@ def _run_parallel_backtesting(
                     forecast_model_path,
                     progress_file,
                     labels.get(name, name),
+                    plan_forecast,
                 )
             ] = ("sim", name, labels.get(name, name))
         for future in as_completed(futures):
@@ -937,6 +952,14 @@ def main(argv: list[str] | None = None):
         raise SystemExit(
             f"--price-strategy {price_strategy} erfordert --horizon-mode {SUNRISE_WINDOW}."
         )
+    plan_forecast = parse_plan_forecast(args.plan_forecast)
+    if plan_forecast is not None:
+        if horizon_mode != SUNRISE_WINDOW:
+            raise SystemExit(f"--plan-forecast erfordert --horizon-mode {SUNRISE_WINDOW}.")
+        if (PLAN_PRICE in plan_forecast) != (price_strategy != PRICE_STRATEGY_PERFECT):
+            raise SystemExit(
+                f"--plan-forecast {PLAN_PRICE} und --price-strategy mirror|forecast gehören zusammen."
+            )
     feature_dataset_path, forecast_model_path = _resolve_price_paths(args)
     feature_dataset_str = str(feature_dataset_path) if feature_dataset_path else None
     forecast_model_str = str(forecast_model_path) if forecast_model_path else None
@@ -971,6 +994,8 @@ def main(argv: list[str] | None = None):
             f"{start.date()} – {end.date()}"
         )
 
+    if plan_forecast is not None:
+        print(f"Forecast-Modus: Plan auf {', '.join(plan_forecast) or 'Ist-Werten'}, Buchung auf Ist-Werten.")
     if price_strategy != PRICE_STRATEGY_PERFECT:
         print(f"Preisstrategie grüne Zone: {price_strategy}")
         if feature_dataset_path is not None:
@@ -1226,6 +1251,7 @@ def main(argv: list[str] | None = None):
                 horizon_mode=horizon_mode,
                 price_resources=price_resources,
                 snapshot_collector=scenario_snapshots,
+                plan_forecast=plan_forecast,
             )
             sim_results[name] = df_result
             plausibility_by_scenario[name] = plausibility
@@ -1254,6 +1280,7 @@ def main(argv: list[str] | None = None):
                 forecast_model_str,
                 progress_file=progress_file,
                 ladder_specs=ladder_specs,
+                plan_forecast=plan_forecast,
             )
         )
         for name in scenarios:
@@ -1298,6 +1325,8 @@ def main(argv: list[str] | None = None):
         "ladder_report": ladder_report,
         "live_scenario_id": live_scenario_id,
     }
+    if plan_forecast is not None:
+        period_meta["plan_forecast"] = list(plan_forecast)
     from simulation.engine import collect_imported_pv_scenario_meta
 
     used_pv, missing_pv = collect_imported_pv_scenario_meta(scenarios)

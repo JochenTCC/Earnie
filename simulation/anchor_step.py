@@ -229,9 +229,16 @@ def _simulate_plan_horizon(
     hours_done: int,
     collect_cbc: bool,
     scenario_params: dict,
+    forecast_planner=None,
 ) -> list[dict]:
+    matrix = plan.matrix
+    forecast_kwargs: dict = {}
+    if forecast_planner is not None:
+        # Forecast mode: the MILP sees the plan matrix, the window's own matrix books.
+        matrix = forecast_planner.plan_matrix(plan.matrix, plan.meta["sa1"])
+        forecast_kwargs["booking_matrix"] = plan.matrix
     return _simulate_horizon(
-        plan.matrix,
+        matrix,
         sim_soc,
         battery_params=battery_params,
         verbose=False,
@@ -245,6 +252,7 @@ def _simulate_plan_horizon(
         flex_book_start=plan.flex_book_start,
         soc_hold_index=plan.soc_hold_index,
         soc_hold_percent=plan.soc_hold_percent,
+        **forecast_kwargs,
     )
 
 
@@ -273,6 +281,7 @@ def _simulate_anchor_step(
     collect_cbc: bool,
     price_resources: BacktestingPriceResources | None = None,
     collect_full_horizon: bool = False,
+    forecast_planner=None,
 ) -> tuple[
     list[dict],
     list[dict],
@@ -303,6 +312,7 @@ def _simulate_anchor_step(
             hours_done=hours_done,
             collect_cbc=collect_cbc,
             scenario_params=scenario_params,
+            forecast_planner=forecast_planner,
         )
     flexible_consumers = _flexible_consumers_from_scenario(scenario_params)
     if horizon_mode == SUNRISE_WINDOW:

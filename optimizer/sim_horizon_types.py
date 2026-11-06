@@ -36,6 +36,8 @@ class _HorizonSetup:
     chart_soc_entities: tuple[dict, ...] = ()
     standby_plans: dict | None = None
     standby_packs_by_id: dict | None = None
+    # SE forecast mode: the rows the schedule is applied to; the MILP solves on ``matrix``.
+    booking_matrix: list | None = None
 
 
 class _SlotInputs(NamedTuple):

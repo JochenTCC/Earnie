@@ -236,7 +236,7 @@ def test_argv_reaches_the_se_run():
     args = _build_arg_parser().parse_args(
         ["--workers", "4", "--output-dir", "x", "--scenario", "a", "--scenario", "b", "--start-month", "10", "--end-month", "10"]
     )
-    assert _backtesting_argv(args) == [
+    assert _backtesting_argv(args, args.output_dir) == [
         "--workers", "4", "--output-dir", "x",
         "--scenario", "a", "--scenario", "b",
         "--start-month", "10", "--end-month", "10",

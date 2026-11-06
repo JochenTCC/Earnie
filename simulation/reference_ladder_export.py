@@ -2,7 +2,8 @@
 
 Spec: ``docs/dev/rule-based-reference.md`` §§ 4.7, 5. Reads a finished SE run (series file and
 log). All amounts are booked electricity: no fixed fees, no fuel, and L3 plans with perfect
-foresight (spec O1), so L2 − L3 is an upper bound.
+foresight (spec O1), so L2 − L3 is an upper bound. A second run in forecast mode gives the other
+end of the range (``docs/dev/se-forecast-mode.md`` § 4): the ``*_forecast`` columns.
 """
 from __future__ import annotations
 
@@ -25,6 +26,17 @@ SENSITIVITY_CSV = "reference_ladder_sensitivity.csv"
 L3_FORESIGHT = "perfect"
 SENSITIVITY_QUANTILES = (0.50, 0.66, 0.75, 0.90)
 SENSITIVITY_PRIORITIES = (SURPLUS_CONSUMER_FIRST, SURPLUS_BATTERY_FIRST)
+
+
+# Booked cents differ by the CSV's rounding only: L0–L2 do not depend on L3's plan.
+REFERENCE_MATCH_TOLERANCE_EUR = 0.05
+
+
+class ForecastRun(NamedTuple):
+    """The log of the same period's SE run in forecast mode."""
+
+    meta: dict
+    hourly: pd.DataFrame
 
 
 class SensitivityRun(NamedTuple):
@@ -81,7 +93,27 @@ def _step_ids(meta: dict, scenario_id: str) -> dict[str, str]:
     }
 
 
-def daily_ladder_frame(meta: dict, hourly: pd.DataFrame, scenarios: dict[str, dict]) -> pd.DataFrame:
+def assert_references_match(meta: dict, hourly: pd.DataFrame, forecast: ForecastRun) -> None:
+    """L0–L2 must be the same in both runs, or their L3 values are not one range."""
+    for scenario_id in meta["ladder_by_scenario"]:
+        ids = _step_ids(meta, scenario_id)
+        forecast_ids = _step_ids(forecast.meta, scenario_id)
+        for step in ("l0", "l1", "l2"):
+            perfect_eur = _total(hourly, ids[step])
+            forecast_eur = _total(forecast.hourly, forecast_ids[step])
+            if abs(perfect_eur - forecast_eur) > REFERENCE_MATCH_TOLERANCE_EUR:
+                raise ValueError(
+                    f"Szenario {scenario_id!r}: {step.upper()} unterscheidet sich zwischen den Läufen "
+                    f"({perfect_eur:.2f} € und {forecast_eur:.2f} € im Forecast-Modus)."
+                )
+
+
+def daily_ladder_frame(
+    meta: dict,
+    hourly: pd.DataFrame,
+    scenarios: dict[str, dict],
+    forecast: ForecastRun | None = None,
+) -> pd.DataFrame:
     """One row per day and scenario; a day missing on one step fails loud."""
     frames: list[pd.DataFrame] = []
     labels = meta.get("labels", {})
@@ -90,6 +122,8 @@ def daily_ladder_frame(meta: dict, hourly: pd.DataFrame, scenarios: dict[str, di
         day = pd.DataFrame(
             {f"{step}_eur": _cost_per_day(hourly, result_id) for step, result_id in ids.items()}
         )
+        if forecast is not None:
+            day["l3_forecast_eur"] = _cost_per_day(forecast.hourly, scenario_id)
         missing = day[day.isna().any(axis=1)]
         if not missing.empty:
             raise ValueError(
@@ -114,7 +148,34 @@ def _plausibility_failed(meta: dict, result_id: str) -> int:
     return int((meta.get("ladder_report") or {}).get(result_id, {})["plausibility_failed_windows"])
 
 
-def summary_frame(meta: dict, hourly: pd.DataFrame, scenarios: dict[str, dict]) -> pd.DataFrame:
+def _forecast_columns(scenario_id: str, l0_eur: float, forecast: ForecastRun) -> dict:
+    """The range's other end; the end-SoC term is the forecast run's own (spec § 4)."""
+    meta, hourly = forecast
+    l2_eur = _total(hourly, _step_ids(meta, scenario_id)["l2"])
+    l3_eur = _total(hourly, scenario_id)
+    block = meta["ladder_soc_correction"][scenario_id]
+    correction = float(block["steps"][LADDER_L2]["correction_eur"])
+    adjusted = l2_eur + correction
+    plausibility = meta["plausibility"][scenario_id]
+    period = meta["period"]
+    return {
+        "l3_forecast_eur": l3_eur,
+        "l2_soc_correction_forecast_eur": correction,
+        "saving_l2_l3_forecast_eur": adjusted - l3_eur,
+        "rule_share_forecast": rule_share(l0_eur, adjusted, l3_eur),
+        "soc_end_percent_l3_forecast": block["soc_end_percent"],
+        "plausibility_failed_windows_l3_forecast": int(plausibility["failed_count"]),
+        "plan_forecast": ",".join(period["plan_forecast"]),
+        "price_strategy": period["price_strategy"],
+    }
+
+
+def summary_frame(
+    meta: dict,
+    hourly: pd.DataFrame,
+    scenarios: dict[str, dict],
+    forecast: ForecastRun | None = None,
+) -> pd.DataFrame:
     """One row per scenario. ``l2_adjusted`` carries the end-SoC term (spec § 3.3)."""
     rows: list[dict] = []
     for scenario_id in meta["ladder_by_scenario"]:
@@ -149,6 +210,8 @@ def summary_frame(meta: dict, hourly: pd.DataFrame, scenarios: dict[str, dict]) 
                 "l3_foresight": L3_FORESIGHT,
             }
         )
+        if forecast is not None:
+            rows[-1].update(_forecast_columns(scenario_id, totals["l0"], forecast))
     return pd.DataFrame(rows)
 
 
