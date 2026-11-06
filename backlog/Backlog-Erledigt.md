@@ -2,6 +2,14 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Viability study — house generator on data model 5 (2026-11-06)
+
+- [x] **Viability study — house generator on data model 5 with derived houses** `[dev]`: `studies/viability/make_houses.py`, `derive.py`, `params.py`, `haeuser.json`, `run_houses.py`.
+  - Packs on data model 5 with free axes and derived values, each rule and value in the parameter file; invalid combinations fail loud. Commuter and at-home EV pattern, price year read by generator and runner, stratified sample with a fixed seed.
+  - `backtesting_year` in the log now follows the run's start.
+  - Limit: a price year other than the last full archive year fails loud, because the thermal model and baseload still use that archive year (`check_thermal_year`).
+  - Tests: `tests/test_viability_generator.py`. Sample packs S1–S8 ran a full year. Follow-up: **Viability study — drop H3**.
+
 ### RuleRef follow-up — L2 PV surplus rule for the heating rod (2026-11-06)
 
 - [x] **RuleRef follow-up — L2 PV surplus rule for the heating rod** `[feat]`: spec [`docs/dev/rule-based-reference.md`](../docs/dev/rule-based-reference.md) §§ 3.1, 4.1, 4.3, O2, O4.
