@@ -1,6 +1,6 @@
 {
   "engine": {
-    "earnie_version": "2.7.0-alpha.9",
+    "earnie_version": "2.8.0-dev.8",
     "solver": "highs",
     "solver_mode": "strict",
     "highspy": "1.15.1",
@@ -14,10 +14,10 @@
   "metrics": {
     "status_optimal": 1,
     "n_slots": 192,
-    "cost_euro": -0.15166249999999992,
-    "import_kwh": 5.3675,
-    "export_kwh": 31.9375,
-    "battery_throughput_kwh": 22.105,
+    "cost_euro": -0.2129125,
+    "import_kwh": 5.0,
+    "export_kwh": 31.7975,
+    "battery_throughput_kwh": 20.43,
     "plausibility_failures": 0.0
   },
   "plan": {
@@ -25,24 +25,24 @@
     "diff_slots": null
   },
   "baseline": {
-    "git_sha": "de3583c945b9a3394f8e8242c54a5ff3dad2ebd4",
-    "recorded_at": "2026-10-26T07:50:01Z",
+    "git_sha": "4866576230d2c6f0063cf8c6f63bbfd7ffff194a",
+    "recorded_at": "2026-11-06T06:46:02Z",
     "source": "update-golden"
   },
   "inputs": {
     "files": {
-      "fixtures/backtesting_scenarios.json": "fa30790f3ccba557",
-      "fixtures/components.json": "8b0b8a2e17422255",
-      "fixtures/config.json": "77e7a6b56f40038f",
+      "fixtures/backtesting_scenarios.json": "0a959777f5a0cfe7",
+      "fixtures/components.json": "55ec9e6db654d771",
+      "fixtures/config.json": "590426fa4620c716",
       "fixtures/cons_data.csv": "9dcccd6817385b2e",
       "fixtures/flex_consumers.json": "21be86172fc50e43",
-      "fixtures/house_profiles.json": "b7a432b1bcc12805",
+      "fixtures/grid_fees.json": "f2f800a84ee7dc3e",
+      "fixtures/house_profiles.json": "9846fa4690b8618c",
       "fixtures/open_meteo/47.4000_9.7000_2025-01-01_2025-12-31_Europe-Vienna_none.json": "cced3026b26261c3",
       "fixtures/open_meteo/47.4040_9.7430_2026-01-01_2026-10-17_Europe-Vienna_18.0_28.0.json": "ba5564dba8d71740",
       "fixtures/prices.csv": "57885d9ae16e27b0",
-      "fixtures/shadow_feed/feed-2026-10-20.jsonl": "f2c66efda10c1e14",
-      "fixtures/shadow_feed/feed-2026-10-21.jsonl": "4ee4e41d51a2ed6c",
-      "fixtures/tariffs.json": "7885e56a4c22592a",
+      "fixtures/tariffs.json": "3fcafb70b778b8cd",
+      "fixtures/user_grid_fees.json": "81b1eec23572ebf3",
       "case.inputs": "bbb1d79301023441"
     },
     "series": {
