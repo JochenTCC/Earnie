@@ -44,6 +44,7 @@ from .milp_horizon import (
     _build_milp_model,
     _terminal_soc_energy_kwh,
 )
+from .milp_vendor_mode import add_vendor_mode_export_constraints, plan_vendor_mode_enabled
 from .milp_result import (
     _extract_milp_plan,
     _log_milp_decision,
@@ -344,6 +345,13 @@ def _solve_milp_to_model(
         sunrise_soc_min_index=sunrise_soc_min_index,
         terminal_soc_percent=terminal_soc_percent,
     )
+    if plan_vendor_mode_enabled():
+        add_vendor_mode_export_constraints(
+            model,
+            matrix,
+            inverter_params if inverter_params is not None else _default_inverter_params(),
+            first_slot=0 if soc_hold_index is None else soc_hold_index + 1,
+        )
 
     update_cbc_milp_context_from_row(matrix[0])
     status = solve_with_strict_fallback(model.prob, msg=False, verbose=verbose)
