@@ -39,7 +39,7 @@ Schlüssel mit Unterstrich sind Kommentare. Unbekannte und fehlende Schlüssel b
 | `annahmen` | Feste Werte: Standort, PR, Akku, E-Auto, Wallbox, Solltemperatur, Heizstab, Speicherverlust |
 | `regeln` | Werte der Ableitungsregeln: Wohnfläche, Haushaltsstrom, Hüllen, Heizlast, Kollektor, Speicher, Dach, Mindest-kWp |
 | `brennstoffpreise` | Je Jahr `gas` (ct/kWh) und `pellets` (€/t) |
-| `heizsysteme` | H1 bis H3 und H5 bis H7: Quelle, Kollektor, Heizstab, Speicher, erlaubte Hüllen |
+| `heizsysteme` | H1, H2 und H5 bis H7: Quelle, Kollektor, Heizstab, Speicher, erlaubte Hüllen. Wärmepumpe mit Heizstab (früher H3) ist keine erlaubte Konfiguration und bricht ab |
 | `achsen` | Freie Achsen und ihre Stufen |
 | `eauto_muster` | Ladefenster je Muster, Muster je Stufe der Achse `eauto` |
 | `szenarien`, `standard_szenarien` | Tarife je Szenario; welche ein Haus ohne eigene Angabe rechnet |
@@ -61,6 +61,8 @@ geschichtete Stichprobe mit festem Seed.
 - **`make_houses` löscht das Paket des Hauses** samt `results/`. Ergebnisse vorher sichern.
 - **Jahresränder:** Ein Jahreslauf braucht auch die Wetterdateien der Nachbarjahre.
 - **PV-Punkte:** `kwp` im Paket ist nominal × Performance Ratio, die Punkte in `house.json` rechnen mit dem nominalen Wert.
-- **Heizstab und Brennstoff in der Leiter:** Bis die beiden RuleRef-Folgepunkte umgesetzt sind, läuft der Heizstab in L1 und L2
-  nicht, und die CSVs enthalten keinen Brennstoff. Bei Häusern mit Brennstoff oder Heizstab sind die Stufen deshalb nicht
-  vergleichbar.
+- **Brennstoff in der Leiter:** `saving_l2_l3_eur` und `rule_share` in den CSVs sind reiner Strom. Bei Häusern mit Brennstoff
+  zählen `saving_l2_l3_with_fuel_eur` und `rule_share_with_fuel`, die Stufen stehen in `l0_total_eur` bis `l3_total_eur`.
+  Läufe von vor dieser Spalte brauchen für die CSVs einen neuen Lauf.
+- **Pakete ausgeschiedener Häuser:** `packs_s1/S5` (Wärmepumpe mit Heizstab) bleibt auf der Platte, steht aber nicht mehr in
+  `haeuser.json`. `make_houses` kann es nicht mehr bauen.

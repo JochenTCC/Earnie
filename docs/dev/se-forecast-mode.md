@@ -88,8 +88,8 @@ Preparation of the matrix (immediate charging, appliance plans, standby relief) 
 
 `python -m scripts.run_reference_ladder` runs the perfect run, then the forecast run into `<output-dir>/forecast_mode/`, and adds to the study export:
 
-- `reference_ladder_summary.csv`: `l3_forecast_eur`, `saving_l2_l3_forecast_eur`, `rule_share_forecast`, `l2_soc_correction_forecast_eur`, `soc_end_percent_l3_forecast`, `plausibility_failed_windows_l3_forecast`, `plan_forecast`, `price_strategy`.
-- `reference_ladder_daily.csv`: `l3_forecast_eur`.
+- `reference_ladder_summary.csv`: `l3_forecast_eur`, `saving_l2_l3_forecast_eur`, `rule_share_forecast`, `l3_fuel_forecast_eur`, `l3_total_forecast_eur`, `saving_l2_l3_with_fuel_forecast_eur`, `rule_share_with_fuel_forecast`, `l2_soc_correction_forecast_eur`, `soc_end_percent_l3_forecast`, `plausibility_failed_windows_l3_forecast`, `plan_forecast`, `price_strategy`.
+- `reference_ladder_daily.csv`: `l3_forecast_eur`, `l3_fuel_forecast_eur`, `l3_total_forecast_eur`.
 
 `l3_eur` stays the perfect run and `l3_foresight` keeps saying so. The end-SoC term of the forecast columns comes from the forecast run. A run whose L0, L1 or L2 totals differ between the two logs fails loud, because they must not depend on the plan. `--skip-forecast` leaves the second run out. The new price argument is `--forecast-price-strategy`, mandatory unless skipped. It has no default because the training data for `forecast` does not cover every year (`data/cache/price_training_*.csv`).
 

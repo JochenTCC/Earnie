@@ -7,6 +7,7 @@
 Spec: ``docs/dev/rule-based-reference.md`` §§ 4.7, 5; ``docs/dev/se-forecast-mode.md`` § 4. A
 second SE run in forecast mode goes to ``<output-dir>/forecast_mode``. Perfect foresight is the
 upper bound of L2 − L3, the forecast run the lower one; ``--skip-forecast`` leaves it out.
+Electricity, fuel and both are separate columns; ``*_with_fuel_*`` is the saving including fuel.
 """
 import os
 
@@ -31,6 +32,7 @@ from scripts.run_backtesting import (
 from simulation.backtesting_log import load_backtesting_log
 from simulation.engine import HistoricalDataCache
 from simulation.forecast_mode import PLAN_ALL, PLAN_PRICE, parse_plan_forecast
+from simulation.heat_fuel import heat_fuel_for_result
 from simulation.period_clip import clip_results_to_period
 from simulation.reference_costs import LADDER_L2
 from simulation.reference_ladder import (
@@ -84,13 +86,15 @@ def _run_sensitivity_worker(
         horizon_mode=horizon_mode,
         rule_params=rule_params,
     )
+    clipped = clip_results_to_period(result.frame, start, end)
     return (
         ref_id,
         rule_params,
         SensitivityRun(
-            float(clip_results_to_period(result.frame, start, end)["sim_cost"].sum()),
+            float(clipped["sim_cost"].sum()),
             soc_at_period_end(result.frame, period_end_exclusive(end)),
             len(result.plausibility.failed),
+            float(heat_fuel_for_result(clipped, scenario_params)["fuel_eur"]),
         ),
     )
 
@@ -141,20 +145,29 @@ def _run_sensitivity(
 
 def _print_summary(summary: pd.DataFrame, sensitivity: pd.DataFrame | None) -> None:
     print("\n=== REFERENZLEITER ===")
-    print("L3 plant mit perfekter Voraussicht, L2 − L3 ist eine Obergrenze. Strom ohne Fixkosten und Brennstoff.")
+    print("L3 plant mit perfekter Voraussicht, L2 − L3 ist eine Obergrenze. L0 bis L3 sind Strom ohne Fixkosten.")
     has_forecast = "l3_forecast_eur" in summary.columns
     for row in summary.itertuples():
         share = f"{row.rule_share:.0%}" if pd.notna(row.rule_share) else "—"
-        rod = " · Heizstab: L2 − L3 zu hoch" if row.heating_rod else ""
+        # A rod beside an electric source stays at 0 kWh in L2 (spec § 3.1).
+        rod = " · Heizstab: L2 − L3 zu hoch" if row.heating_rod and not row.fuel_carriers else ""
         print(
             f"  {row.scenario_label}: L0 {row.l0_eur:,.2f} € · L1 {row.l1_eur:,.2f} € · "
             f"L2 {row.l2_eur:,.2f} € · L3 {row.l3_eur:,.2f} € · "
             f"L2 − L3 {row.saving_l2_l3_eur:+,.2f} € · Regel-Anteil {share}{rod}"
         )
+        if row.fuel_carriers:
+            share_all_in = f"{row.rule_share_with_fuel:.0%}" if pd.notna(row.rule_share_with_fuel) else "—"
+            print(
+                f"    Mit Brennstoff ({row.fuel_carriers}): L0 {row.l0_total_eur:,.2f} € · "
+                f"L1 {row.l1_total_eur:,.2f} € · L2 {row.l2_total_eur:,.2f} € · L3 {row.l3_total_eur:,.2f} € · "
+                f"L2 − L3 {row.saving_l2_l3_with_fuel_eur:+,.2f} € · Regel-Anteil {share_all_in}"
+            )
         if has_forecast:
             print(
                 f"    Forecast-Modus ({row.plan_forecast}, Preise {row.price_strategy}): "
-                f"L3 {row.l3_forecast_eur:,.2f} € · L2 − L3 {row.saving_l2_l3_forecast_eur:+,.2f} €"
+                f"L3 {row.l3_forecast_eur:,.2f} € · L2 − L3 {row.saving_l2_l3_forecast_eur:+,.2f} € · "
+                f"mit Brennstoff {row.saving_l2_l3_with_fuel_forecast_eur:+,.2f} €"
             )
         if sensitivity is None:
             continue
@@ -162,7 +175,8 @@ def _print_summary(summary: pd.DataFrame, sensitivity: pd.DataFrame | None) -> N
         best = part.loc[part["is_best_in_hindsight"]].iloc[0]
         print(
             f"    Bestes Regel-Set im Nachhinein: Quantil {best.lock_quantile:.2f}, "
-            f"{best.surplus_priority}, L2 − L3 {best.saving_l2_l3_eur:+,.2f} €"
+            f"{best.surplus_priority}, L2 − L3 {best.saving_l2_l3_eur:+,.2f} €, "
+            f"mit Brennstoff {best.saving_l2_l3_with_fuel_eur:+,.2f} €"
         )
 
 

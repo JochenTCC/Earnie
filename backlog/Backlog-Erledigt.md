@@ -2,6 +2,22 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### RuleRef follow-up — Fuel cost in the ladder and study export (2026-11-06)
+
+- [x] **RuleRef follow-up — Fuel cost in the ladder and study export** `[feat]`: spec [`docs/dev/rule-based-reference.md`](../docs/dev/rule-based-reference.md) § 5, O4, O5.
+  - `reference_ladder_summary.csv` and `reference_ladder_daily.csv` carry per step `l*_fuel_eur`, `l*_total_eur` and the quantities import, export, fuel, rod and battery throughput. `saving_l2_l3_with_fuel_eur` and `rule_share_with_fuel` compare electricity plus fuel; `saving_l2_l3_eur` and `rule_share` stay electricity only. The forecast columns and the sensitivity file carry fuel too, and "best in hindsight" now counts it. L0–L2 must match between perfect and forecast run in fuel as well.
+  - `simulation/heat_fuel.py` writes the fuel per day into the log (`heat_fuel.<result>.daily`), so a log from before this change fails loud in the daily export and needs a new run. Daily fuel is not floored: in L3 a rod can deliver more heat than its day needs, and only the period's total is floored. L1 and L2 already had the block.
+  - Measured on `results/rod` (S7, S8), L2 − L3 with fuel without the end-SoC term, Duo / Dynamisch: S7 +149 / +313 €, S8 +22 / +98 €; the new code reproduces the logged fuel on every step. The L3 rod delivers more heat than its calendar day needs on 17 / 36 days in S7 and 0 / 3 in S8, cause not examined. A floor per day would raise L3's fuel by up to 23 € (S7 Dynamisch), so **Heating rod in the SE: cap by the store's free capacity** should check this if stage 1 depends on the rod.
+  - A real S7 run over July with the sensitivity: daily fuel and rod sum to the summary on every step, and the sensitivity worker's L2 fuel equals the log's.
+  - `studies/poc_cloud/run_poc.py::_summarize` is unchanged: the study reads the ladder CSVs.
+  - Tests: `tests/test_reference_ladder_export.py`, `tests/test_se_forecast_mode.py`. Docs: `docs/ui/betriebsmodi.md`, `docs/dev/se-forecast-mode.md`, `studies/viability/anleitung-parameter.md`, `.github/release-notes/UNRELEASED.md`.
+
+### Viability study — drop H3 (heat pump with rod) (2026-11-06)
+
+- [x] **Viability study — drop H3 (heat pump with rod)** `[dev]`: a heat pump with a rod will not be an allowed configuration.
+  - Removed from `studies/viability/haeuser.json`, and S5 from the sample. `params.py::validate_heating_system` rejects the combination when the file loads, and `derive_house` and `all_houses` reject it too. The house space drops from 3,456 to 2,688 combinations. IDs H5–H7 and S6–S8 keep their numbers. The built pack `studies/viability/packs_s1/S5` stays on disk.
+  - Tests: `tests/test_viability_generator.py` (generator rejects the combination; the sample and the 60-house draw cover every level).
+
 ### Viability study — house generator on data model 5 (2026-11-06)
 
 - [x] **Viability study — house generator on data model 5 with derived houses** `[dev]`: `studies/viability/make_houses.py`, `derive.py`, `params.py`, `haeuser.json`, `run_houses.py`.

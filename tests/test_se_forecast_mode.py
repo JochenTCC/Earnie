@@ -43,7 +43,7 @@ from tests.fixtures.backtesting_fixtures import (
     fixture_tariff_params,
     load_fixture_cache,
 )
-from tests.test_reference_ladder_export import _BATTERY, _all_hourly, _hourly, _meta
+from tests.test_reference_ladder_export import _BATTERY, _all_hourly, _block, _hourly, _meta
 
 os.environ.setdefault("EARNIE_OFFLINE", "1")
 
@@ -523,6 +523,31 @@ def test_summary_carries_the_range(plain_setup):
     assert row["plan_forecast"] == "price,pv"
     assert row["price_strategy"] == "mirror"
     assert row["l3_foresight"] == "perfect"
+
+
+def test_summary_range_carries_the_forecast_runs_own_fuel(plain_setup):
+    meta = _meta()
+    meta["heat_fuel"] = {rid: _block(30.0) for rid in ("ref:a", "l1:a", "l2:a")} | {"a": _block(20.0)}
+    forecast = _forecast_run()
+    forecast.meta["heat_fuel"] = {rid: _block(30.0) for rid in ("ref:a", "l1:a", "l2:a")} | {"a": _block(25.0)}
+    row = summary_frame(meta, _all_hourly(), {"a": {}}, forecast).iloc[0]
+    slots = 2 * 96
+    assert row["l3_fuel_eur"] == pytest.approx(4.0)
+    assert row["l3_fuel_forecast_eur"] == pytest.approx(5.0)
+    assert row["l3_total_forecast_eur"] == pytest.approx(slots * 0.015 + 5.0)
+    assert row["saving_l2_l3_with_fuel_forecast_eur"] == pytest.approx(
+        slots * 0.02 + 6.0 + 0.27 - (slots * 0.015 + 5.0)
+    )
+    daily = daily_ladder_frame(meta, _all_hourly(), {"a": {}}, forecast)
+    assert daily["l3_fuel_forecast_eur"].sum() == pytest.approx(5.0)
+    assert daily["l3_total_forecast_eur"].sum() == pytest.approx(slots * 0.015 + 5.0)
+
+
+def test_references_must_match_in_fuel_between_the_runs():
+    forecast = _forecast_run()
+    forecast.meta["heat_fuel"]["l2:a"] = _block(30.0)
+    with pytest.raises(ValueError, match="L2.*Brennstoff"):
+        assert_references_match(_meta(), _all_hourly(), forecast)
 
 
 def test_summary_without_a_forecast_run_stays_as_it_was(plain_setup):

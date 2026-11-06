@@ -12,6 +12,8 @@ Wenn seit dem letzten Tag neue Schritte in `runtime_store/migration/` hinzukamen
 
 - **Euro-Beträge mit Komma.** Euro- und Cent-Beträge folgen jetzt der Sprache des Browsers: Deutsch zeigt `2,18 €`, Englisch `2.18 €`. Im Szenario-Explorer steht die Ersparnis wie im Monitor ohne Vorzeichen („gespart“, „mehr ausgegeben“); Differenzen wie `Δ vs Referenz` behalten ihr Vorzeichen.
 
+- **Studienexport der Referenzleiter mit Brennstoff.** `scripts.run_reference_ladder` schreibt in `reference_ladder_summary.csv` und `reference_ladder_daily.csv` je Stufe jetzt auch Brennstoff (€ und kWh), Strom plus Brennstoff, Heizstab, Bezug, Einspeisung und Batterie-Durchsatz. Die neuen Spalten `saving_l2_l3_with_fuel_eur` und `rule_share_with_fuel` zeigen die Ersparnis inklusive Brennstoff. Die bisherigen Spalten bleiben reiner Strom. Der Tagesexport braucht einen neu gerechneten Lauf: Ältere Logs enthalten den Brennstoff nicht je Tag, das Skript bricht dann ab.
+
 - **Heizstab im Live-Betrieb.** Earnie plant und schaltet den Heizstab jetzt auch live, sobald Freigabe, Leistung oder Laufstatus und Speichertemperatur zugeordnet sind. Er nutzt die freie Kapazität des Speichers am laufenden Tag, höchstens vier Einschaltungen. Grenzen: Übertemperaturschutz und das Verhalten beim Ausfall von Earnie bleiben Sache des Smarthomes, und die Ersparnis-Kachel rechnet gesparten Brennstoff nicht gegen.
 
 ## Breaking / Bitte prüfen

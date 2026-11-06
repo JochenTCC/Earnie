@@ -10,7 +10,9 @@ profile (no model) get only the electricity part.
 
 The block also names the result's heating systems (``heating_systems``: thermal_annual id →
 ``heating_system_id``) and the electricity of its heating rods (``rod_kwh``), so the cost
-table can tell a heating variant or rod electricity from a simulation problem.
+table can tell a heating variant or rod electricity from a simulation problem. ``daily`` holds
+fuel and rod per booked day for the study export. Its fuel is not floored per day: a rod can
+store more heat than its day needs, so such a day is negative and the days sum to the total.
 """
 from __future__ import annotations
 
@@ -22,6 +24,7 @@ import pandas as pd
 from optimizer.slot_duration import DEFAULT_DT_H, validate_dt_h
 
 HEAT_FUEL_KEY = "heat_fuel"
+HEAT_FUEL_DAILY_KEY = "daily"
 
 
 def _unique_slots(df: pd.DataFrame) -> pd.DataFrame:
@@ -44,35 +47,34 @@ def _fuel_consumers(profile: dict) -> list[tuple[dict, dict]]:
     return out
 
 
-def _booked_fuel_kwh(
+def _booked_fuel_by_day(
     consumer: dict,
     profile: dict,
     slots_per_day: Counter,
     *,
     climate,
     dt_h: float,
-) -> float:
+) -> dict[date, float]:
     from optimizer.thermal_flex_context import thermal_daily_fuel_kwh_for_date
 
-    total = 0.0
-    for day, slots in slots_per_day.items():
-        share = min(1.0, slots * dt_h / 24.0)
-        total += share * thermal_daily_fuel_kwh_for_date(
-            consumer, profile, day, climate=climate
-        )
-    return total
+    return {
+        day: min(1.0, slots * dt_h / 24.0)
+        * thermal_daily_fuel_kwh_for_date(consumer, profile, day, climate=climate)
+        for day, slots in slots_per_day.items()
+    }
 
 
-def _rod_kwh(unique: pd.DataFrame, consumer: dict, dt_h: float) -> float:
+def _rod_kwh_by_day(unique: pd.DataFrame, consumer: dict, dt_h: float) -> dict[date, float]:
     from house_config.heat_source import heating_rod_part, part_kennung
 
     part = heating_rod_part(consumer)
     if part is None:
-        return 0.0
+        return {}
     column = f"{part_kennung(str(consumer['id']), str(part['id']))}_kw"
     if column not in unique.columns:
-        return 0.0
-    return float(unique[column].fillna(0.0).sum()) * dt_h
+        return {}
+    per_day = unique[column].fillna(0.0).groupby(unique.index.date).sum() * dt_h
+    return {day: float(kwh) for day, kwh in per_day.items()}
 
 
 def _thermal_consumers(profile: dict) -> list[dict]:
@@ -102,30 +104,42 @@ def heat_fuel_for_result(df: pd.DataFrame, scenario_params: dict | None) -> dict
     unique = _unique_slots(df)
     import_kwh = float(unique["import_kwh"].fillna(0.0).sum()) if "import_kwh" in unique else 0.0
     co2_g = import_kwh * electricity_co2_g_per_kwh()
-    fuel_kwh = 0.0
-    fuel_eur = 0.0
     carriers: list[str] = []
     heating_systems: dict[str, str] = {}
-    rod_kwh = 0.0
+    slots_per_day: Counter = Counter(
+        ts.date() for ts in unique.index if isinstance(ts.date(), date)
+    )
+    fuel_kwh = 0.0
+    fuel_eur = 0.0
+    fuel_kwh_by_day: Counter = Counter()
+    fuel_eur_by_day: Counter = Counter()
+    rod_kwh_by_day: Counter = Counter()
     profile = (scenario_params or {}).get("_house_profile")
     if isinstance(profile, dict):
         heating_systems = _heating_systems(profile)
-        rod_kwh = sum(_rod_kwh(unique, consumer, dt_h) for consumer in _thermal_consumers(profile))
+        for consumer in _thermal_consumers(profile):
+            rod_kwh_by_day.update(_rod_kwh_by_day(unique, consumer, dt_h))
         consumers = _fuel_consumers(profile)
         if consumers:
             climate = ModeledClimateContext.from_scenario(scenario_params or {})
-            slots_per_day: Counter = Counter(
-                ts.date() for ts in unique.index if isinstance(ts.date(), date)
-            )
             for consumer, heat_source in consumers:
-                modeled = _booked_fuel_kwh(
+                modeled = _booked_fuel_by_day(
                     consumer, profile, slots_per_day, climate=climate, dt_h=dt_h
                 )
-                rod_heat = _rod_kwh(unique, consumer, dt_h)
-                kwh = max(0.0, modeled - rod_heat / heat_source_efficiency(heat_source))
+                rod_heat = _rod_kwh_by_day(unique, consumer, dt_h)
+                efficiency = heat_source_efficiency(heat_source)
+                price = float(fuel_price_eur_per_kwh(heat_source))
+                per_day = {
+                    day: modeled_kwh - rod_heat.get(day, 0.0) / efficiency
+                    for day, modeled_kwh in modeled.items()
+                }
+                kwh = max(0.0, sum(per_day.values()))
                 fuel_kwh += kwh
-                fuel_eur += kwh * float(fuel_price_eur_per_kwh(heat_source))
+                fuel_eur += kwh * price
                 co2_g += kwh * float(fuel_co2_g_per_kwh(heat_source))
+                for day, day_kwh in per_day.items():
+                    fuel_kwh_by_day[day] += day_kwh
+                    fuel_eur_by_day[day] += day_kwh * price
                 carriers.append(str(heat_source["type"]))
     return {
         "fuel_kwh": round(fuel_kwh, 1),
@@ -134,7 +148,15 @@ def heat_fuel_for_result(df: pd.DataFrame, scenario_params: dict | None) -> dict
         "import_kwh": round(import_kwh, 1),
         "carriers": carriers,
         "heating_systems": heating_systems,
-        "rod_kwh": round(rod_kwh, 1),
+        "rod_kwh": round(sum(rod_kwh_by_day.values()), 1),
+        HEAT_FUEL_DAILY_KEY: {
+            day.isoformat(): {
+                "fuel_kwh": round(fuel_kwh_by_day[day], 3),
+                "fuel_eur": round(fuel_eur_by_day[day], 4),
+                "rod_kwh": round(rod_kwh_by_day[day], 3),
+            }
+            for day in sorted(slots_per_day)
+        },
     }
 
 
