@@ -2,6 +2,14 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### RuleRef follow-up — L2 PV surplus rule for the heating rod (2026-11-06)
+
+- [x] **RuleRef follow-up — L2 PV surplus rule for the heating rod** `[feat]`: spec [`docs/dev/rule-based-reference.md`](../docs/dev/rule-based-reference.md) §§ 3.1, 4.1, 4.3, O2, O4.
+  - L2 runs a rod beside a fuel source on the export left at the meter, after all consumers and the battery in both surplus priorities, on / off at nominal power, within the MILP's window and day heat cap (`optimizer/sim_baseline.py::SurplusRod`, `simulation/reference_ladder.py::_surplus_rods`). No price check, lock or deadline. L1 stays at 0 kWh.
+  - Decision (maintainer, 2026-11-06): a heat pump with a rod will not be an allowed configuration, checked elsewhere, so L2 has no rule for it and such a rod stays at 0 kWh. Study house S5 still has this combination.
+  - Measured on sample houses S7 (gas) and S8 (pellets), year run: the rod runs 1,664 and 2,362 kWh in L2, no plausibility failures. Electricity only, L2 − L3 on Duo / Dynamisch: S7 +1 / −83 €, S8 −71 / +86 € (before −108 / −119 and −225 / −17 €). With fuel from the log: S7 +149 / +313 €, S8 +22 / +98 €.
+  - Tests: `tests/test_reference_ladder_rod.py`. Docs: `docs/ui/betriebsmodi.md`, `.github/release-notes/UNRELEASED.md`.
+
 ### SE forecast mode — plan on forecasts, book on actuals (2026-11-05)
 
 - [x] **SE forecast mode** `[dev]`: spec [`docs/dev/se-forecast-mode.md`](../docs/dev/se-forecast-mode.md), RuleRef decision O1. A run plans each window from what was known then and books on actuals, giving the lower end of the L3 range; perfect foresight stays the upper end.

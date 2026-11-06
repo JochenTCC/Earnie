@@ -33,7 +33,7 @@ A reference ladder in the SE. Each step adds one thing; the delta between two st
 
 ## 3. Fairness requirements (all steps)
 
-1. **Same energy.** Per window and per flex consumer, L1 and L2 deliver exactly the energy that L3 delivers (the same `consumer_daily_targets_kwh` / horizon targets the optimized run uses). Checked by the same `simulation/plausibility.py::validate_window_consumption` as the optimized run; a step that cannot reach its target in the eligible window fails loud with the missing kWh (`no-implicit-fallbacks.mdc`), no silent clipping. **Exception, heating rod:** it has no target, only an upper bound, and the MILP decides how much heat it replaces (`optimizer/targets.py::resolve_heating_rod_horizon_kwh`). In L1 and L2 it runs 0 kWh and the parent heat source delivers the heat (O4). L2 − L3 is therefore somewhat overstated for houses with a rod; the study export flags those scenarios.
+1. **Same energy.** Per window and per flex consumer, L1 and L2 deliver exactly the energy that L3 delivers (the same `consumer_daily_targets_kwh` / horizon targets the optimized run uses). Checked by the same `simulation/plausibility.py::validate_window_consumption` as the optimized run; a step that cannot reach its target in the eligible window fails loud with the missing kWh (`no-implicit-fallbacks.mdc`), no silent clipping. **Exception, heating rod:** it has no target, only an upper bound, and the MILP decides how much heat it replaces (`optimizer/targets.py::resolve_heating_rod_horizon_kwh`). In L1 it runs 0 kWh and the parent heat source delivers the heat. In L2 a rod beside a fuel source runs on surplus (§ 4.3); a rod beside an electric heat source stays at 0 kWh, since that configuration is not going to be allowed (O4). So L2 − L3 is overstated only for such a rod. The study export flags scenarios with a rod.
 2. **Same windows and constraints.** Same charging windows (`charging_contexts`, `consumer_charging_eligible_indices`), same nominal / min power, `min_on_quarterhours`.
 3. **One continuous SoC chain** over the whole SE period, never reset per anchor (lesson D1 in `savings-ledger.md`). End-of-period SoC difference to L3 is valued like the ledger's SoC correction: `(soc_L3 − soc_step) / 100 · capacity · efficiency · p_ref`, with `p_ref` L3's import-weighted buy price of the period's last 24 h (time mean on a day without import, recorded as `p_ref_basis`). All steps start at the same SoC, so there is no start term, and the ledger's telescoping sum reduces to this one term. The SoC is the one at the period's end, not at the run's end: books spill past it. The log keeps it per scenario for L1 and L2 (`ladder_soc_correction`). The cost column `Ersparnis vs. Standard-Regeln` and the CLI's rule share include it, `Jahres Kosten` and invoices stay the booked cost. L0 has no storage and no term.
 4. **Same prices and fees.** End-customer price per slot incl. time-variable grid fee, same feed-in settings (`_reference_feed_in_settings`).
@@ -73,7 +73,7 @@ Within a slot, all consumers first take their planned energy and the deadline's 
 | `generic` with `generic_flex_window` | Cheapest block (§ 4.5). |
 | Other flexible `generic` (also a consumer without a type) | Price lock (§ 4.2), deadline (§ 4.4). |
 | Fixed load (`continuous_load`, native filter run) | No rule: already booked as fixed load. A filter's remaining target outside its native run counts as other flexible `generic`. |
-| Heating rod (`daily_target_source: heating_rod`) | Runs 0 kWh in L1 and L2 (§ 3.1). |
+| Heating rod (`daily_target_source: heating_rod`) | L1: 0 kWh. L2 beside a fuel source: surplus at the meter (§ 4.3), no price lock, no deadline. L2 beside an electric heat source: 0 kWh (§ 3.1). |
 
 ### 4.2 Price lock — "SG-Ready lock / EVU-Sperre"
 
@@ -88,6 +88,8 @@ The available horizon reaches past the book's end (SA₂), so the rule builder n
 The consumer sees the local surplus `pv − baseload − Σ other flex in this slot` (before the battery: the consumer has priority, a common evcc setup). Battery first runs in the sensitivity (§ 4.7): there the consumer sees only what would be exported at the meter after `vendor_mode_step`. It charges when surplus ≥ `min_power_kw` with hysteresis via `min_on_quarterhours`, at most `nominal_power_kw`, from `remaining`. Without a configured minimum, an EV starts on any surplus and other consumers need their nominal power (they run on / off). The surplus rule works in locked slots too. While a started run is held, it draws at least its minimum power, from the grid if needed. Energy pulled forward this way comes from the backlog first, then from later planned slots (from the back of the profile), so the total stays exact.
 
 An EV does not charge its L1 profile when it is plugged in: all its planned energy waits for the surplus, and only the deadline (§ 4.4) charges from the grid. This is what a surplus wallbox with a target time does. Charging at plug-in would leave the midday surplus unused and credit Earnie with a shift any such wallbox achieves. For a commuter car that plugs in during the evening, the wait moves charging into the night before departure, which can cost more than charging at plug-in on a flat tariff.
+
+**Heating rod beside a fuel source — "surplus rod controller":** it sees what would go to the grid after all other consumers and the battery, also in the battery-first sensitivity, since such a controller measures export at the meter. So it changes neither the others nor the battery. It runs on / off at nominal power like in the MILP, when the export covers that power and the day's heat allows the whole slot. The cap is the MILP's own (`optimizer/thermal_flex_context.py::_rod_daily_heat_caps`, η = 1); the window too. It runs before L2's curtailment (§ 4.6), so it uses export that would cost money. No price lock and no deadline: it has no target. Its kWh appear in the rod's column, and `simulation/heat_fuel.py` takes the heat off the fuel (rod kWh / efficiency). The rule has no price check, like a simple controller, even when the export pays more than the fuel saved.
 
 ### 4.4 Deadline forcing — "evcc Min+PV / target charge"
 
@@ -160,7 +162,7 @@ The earlier result "forecast vs. mirror ±0.1–0.6 %" therefore says nothing ab
 
 ### O2 Surplus priority: consumer before battery, battery first in the sensitivity.
 
-See § 4.3 and § 4.7. The sensitivity grid doubles to 8 runs per scenario.
+See § 4.3 and § 4.7. The sensitivity grid doubles to 8 runs per scenario. A heating rod is always last, after the battery, in both priorities (maintainer, 2026-11-06).
 
 ### O3 Lock basis: available horizon, end-customer price, strictly above P75.
 
@@ -170,7 +172,7 @@ See § 4.2. Calendar day was the alternative. The strict comparison is not a mat
 
 - **Mapping:** table in § 4.1, generous to the rules (surplus boost for thermal consumers).
 - **Starting profile:** real timing per consumer, "switch on and run" where there is no shape (§ 4.1). Flat spreading is out: it runs consumers below their minimum power and breaks comparability with L0.
-- **Heating rod:** 0 kWh in L1 and L2, flagged in the study export (§ 3.1). A surplus rule with heat replacement can follow later.
+- **Heating rod (2026-11-06):** 0 kWh in L1. In L2 beside a fuel source it runs on the export at the meter (§ 4.3), without price check, lock or deadline. A heat pump with a rod will not be an allowed configuration (checked elsewhere), so L2 has no rule for it and such a rod stays at 0 kWh. The study export keeps its flag (§ 5). The export's figures hold no fuel yet, so the rod shows only as extra electricity there until the backlog item **Fuel cost in the ladder and study export**.
 
 ### O6 Curtailment at a negative feed-in price: L2 yes, L1 no (maintainer, 2026-11-05).
 

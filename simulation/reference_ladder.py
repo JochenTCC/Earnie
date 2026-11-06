@@ -14,13 +14,16 @@ from typing import NamedTuple
 import pandas as pd
 
 from optimizer.charging_schedule import contexts_within_book
+from optimizer.consumer_power import power_limits_kw
 from optimizer.export_power_limit import clip_grid_kw_to_export_cap
 from optimizer.milp_consumer_delivery import consumer_delivery_eligible_indices
+from optimizer.milp_inputs import _resolve_thermal_flex_contexts
 from optimizer.scenario_planning_scope import planning_scenario_scope
 from optimizer.sim_baseline import (
     _baseline_battery_params,
     _simulate_single_hour_baseline,
     DEFAULT_RULE_PARAMS,
+    SurplusRod,
     build_rule_based_flex_kw_per_hour,
     build_shaped_flex_kw_per_slot,
 )
@@ -161,9 +164,29 @@ def _eligible_slots(setup, consumer: dict, book_indices: list[int]) -> list[int]
         contexts.get(cid),
         (setup.filters or {}).get(cid),
     )
-    if is_thermal_flex_consumer(consumer):
+    if is_thermal_flex_consumer(consumer) or is_heating_rod_consumer(consumer):
         return consumer_thermal_eligible_indices(matrix, consumer, eligible)
     return eligible
+
+
+def _surplus_rods(setup, consumers: list[dict], book_indices: list[int]) -> list[SurplusRod]:
+    """L2's heating rods with the MILP's window and day heat caps: only beside a fuel source.
+
+    A rod beside an electric heat source stays at 0 kWh (spec § 3.1).
+    """
+    rods = [c for c in consumers if is_heating_rod_consumer(c) and not c["parent_heat_electric"]]
+    if not rods:
+        return []
+    contexts = _resolve_thermal_flex_contexts(setup.matrix, rods, None)
+    return [
+        SurplusRod(
+            cid=str(rod["id"]),
+            nominal_kw=power_limits_kw(rod)[1],
+            eligible=_eligible_slots(setup, rod, book_indices),
+            heat_left_kwh=dict(contexts[str(rod["id"])]["daily_heat_cap_kwh"]),
+        )
+        for rod in rods
+    ]
 
 
 def _book_indices(plan) -> list[int]:
@@ -252,6 +275,7 @@ def _window_rows(
                 book_indices=book,
                 battery_params=battery,
                 initial_soc=sim_soc,
+                surplus_rods=_surplus_rods(setup, consumers, book),
             )
             steuerbefehl = L2_STEUERBEFEHL
             no_published_block_ids = flex.no_published_block_ids
