@@ -2,6 +2,11 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Live price prognosis — Energy-Charts trial, moved from Backlog.md (2026-11-06)
+
+- [x] **Live price prognosis — Energy-Charts `public_power_forecast` trial** `[dev]`: unsuccessful, dropped on 2026-10-02 in `f82da60e`. Product power features remain archive hour-of-day.
+  - The branch `archive/energy-charts-forecast-research` named in the old entry no longer exists, locally or on `origin`. The full implementation, including async `runtime/cache` warmup, is in the history at `f82da60e^`.
+
 ### RuleRef follow-up — Fuel cost in the ladder and study export (2026-11-06)
 
 - [x] **RuleRef follow-up — Fuel cost in the ladder and study export** `[feat]`: spec [`docs/dev/rule-based-reference.md`](../docs/dev/rule-based-reference.md) § 5, O4, O5.
