@@ -8,8 +8,8 @@ import pytest
 
 from runtime_store import savings_ledger as sl
 from ui import ledger_kpi as kpi_mod
-from ui.chart_ledger_savings import _no_ledger, build_ledger_chart_savings, ledger_figures_for_day
-from ui.chart_decorations import _savings_annotation_color
+from ui.chart_ledger_savings import _no_ledger, build_ledger_chart_savings
+from ui.chart_account_render import saving_color
 from ui.chart_colors import COLOR_COST_BASELINE
 from ui.ledger_kpi import LedgerKpi, LedgerKpiNotice, build_ledger_kpi, load_ledger_kpi, tile_help, today_text
 from ui.saving_text import euro_amount, saving_is_loss, saving_text, soc_correction_text
@@ -58,6 +58,7 @@ def _row(saving: float, *, incomplete: bool = False, slots_present: int = 90, ch
     return {
         "savings_v": sl.SAVINGS_V,
         "chain_start": chain.isoformat(),
+        "saving_eur": saving,
         "saving_adjusted_eur": saving,
         "incomplete": incomplete,
         "slots_present": slots_present,
@@ -69,11 +70,11 @@ def _row(saving: float, *, incomplete: bool = False, slots_present: int = 90, ch
 @pytest.mark.parametrize(
     ("euro", "text"),
     [
-        (0.42, "0.42 € gespart"),
-        (-2.18, "2.18 € mehr ausgegeben"),
-        (0.0, "0.00 € gespart"),
-        (-0.004, "0.00 € gespart"),
-        (-0.006, "0.01 € mehr ausgegeben"),
+        (0.42, "0,42 € gespart"),
+        (-2.18, "2,18 € mehr ausgegeben"),
+        (0.0, "0,00 € gespart"),
+        (-0.004, "0,00 € gespart"),
+        (-0.006, "0,01 € mehr ausgegeben"),
     ],
 )
 def test_saving_text_has_no_sign_and_names_the_meaning(euro, text):
@@ -81,14 +82,14 @@ def test_saving_text_has_no_sign_and_names_the_meaning(euro, text):
 
 
 def test_soc_correction_text_names_the_direction():
-    assert soc_correction_text(0.78) == "0.78 € gutgeschrieben"
-    assert soc_correction_text(-0.1) == "0.10 € abgezogen"
+    assert soc_correction_text(0.78) == "0,78 € gutgeschrieben"
+    assert soc_correction_text(-0.1) == "0,10 € abgezogen"
 
 
 def test_colour_follows_the_shown_cents():
-    assert _savings_annotation_color(-0.004) == COLOR_COST_BASELINE
+    assert saving_color(-0.004) == COLOR_COST_BASELINE
     assert saving_is_loss(-0.004) is False
-    assert euro_amount(-0.004) == "0.00 €"
+    assert euro_amount(-0.004) == "0,00 €"
 
 
 def test_total_counts_closed_days_of_the_current_chain_only():
@@ -126,15 +127,22 @@ def test_running_day_stays_out_of_the_total():
 
 
 def test_tile_and_chart2_read_the_same_figures_of_the_current_sa_day():
-    """Same dict, same words: the today line and Chart 2 cannot show different amounts."""
-    ledger = _chart_ledger(_two_slot_state())
-    figures = ledger_figures_for_day(ledger, DAY_START)
+    """Same dict, same words: the today line and Chart 2 cannot show different amounts.
 
-    assert figures["saving_euro"] == ledger["saving_euro"]
-    assert figures["soc_correction_euro"] == ledger["soc_correction_euro"]
+    Chart 2's "Bisher" over a window that starts at the open day is the sum of the
+    ledger's slots; its SoC label reads the same ``soc_correction_euro``.
+    """
+    state = _two_slot_state()
+    window_slots = [datetime.fromisoformat(slot["slot_start"]) for slot in state.slots]
+    ledger = _chart_ledger(state, slots=window_slots)
+    chart_saving = sum(
+        without - with_ for with_, without in zip(ledger["slot_with_eur"], ledger["slot_without_eur"])
+    )
+
+    assert chart_saving == pytest.approx(ledger["saving_euro"])
     assert today_text(ledger, NOW) == (
-        f"Heute bisher: {saving_text(figures['saving_euro'])} · "
-        f"SoC-Korrektur: {soc_correction_text(figures['soc_correction_euro'])}"
+        f"Heute bisher: {saving_text(chart_saving)} · "
+        f"SoC-Korrektur: {soc_correction_text(ledger['soc_correction_euro'])}"
     )
 
 
@@ -165,7 +173,7 @@ def test_no_today_line_without_a_bundle_without_figures_or_outside_the_day():
     ledger = _chart_ledger(_state(_slot(DAY_START + timedelta(minutes=6), with_eur=0.1, without_eur=0.3)))
 
     assert today_text(None, NOW) is None
-    assert today_text(_no_ledger(0, "Hinweis"), NOW) is None
+    assert today_text(_no_ledger(0, 0, "Hinweis"), NOW) is None
     assert today_text(_chart_ledger(_state()), NOW) is None
     assert today_text(ledger, DAY_END) is None
     assert today_text(ledger, DAY_START - timedelta(minutes=1)) is None
@@ -187,7 +195,7 @@ def test_today_text_uses_the_words_of_chart2():
     }
 
     assert today_text(ledger, NOW) == (
-        "Heute bisher: 0.97 € mehr ausgegeben · SoC-Korrektur: 0.78 € gutgeschrieben"
+        "Heute bisher: 0,97 € mehr ausgegeben · SoC-Korrektur: 0,78 € gutgeschrieben"
     )
 
 

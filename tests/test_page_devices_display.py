@@ -94,7 +94,7 @@ def test_style_recommendation_dataframe_formats_signed_delta() -> None:
     slots = _make_slots([30.0, 10.0, 20.0, 40.0, 25.0, 35.0])
     rec = recommend_start_times(slots, power_kw=1.0, runtime_h=1.0)
     html = _style_recommendation_dataframe(rec).to_html()
-    assert "+0.20" in html
-    assert "+0.00" in html
+    assert "+0,20" in html
+    assert "+0,00" in html
     assert COLOR_COST_SAVINGS_NEGATIVE in html
-    assert COLOR_COST_SAVINGS not in html or "+0.00" in html
+    assert COLOR_COST_SAVINGS not in html or "+0,00" in html

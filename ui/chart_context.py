@@ -560,6 +560,31 @@ def _actual_slot_increments(
     return cost, kwh
 
 
+def _plan_kwh_after_window(
+    source: dict,
+    matrix: list[dict],
+    chart: UiChartWindow,
+) -> tuple[float, float]:
+    """Plan energy of baseline and optimized after the window, up to the horizon end.
+
+    Chart 2's consumption control is zero at the horizon end, also when the window
+    (a phone's 24 h segment) ends before it.
+    """
+    baseline = source.get("hourly_matched_baseline_consumption_kwh") or []
+    optimized = source.get("hourly_optimized_consumption_kwh") or []
+    baseline_total = 0.0
+    optimized_total = 0.0
+    for index, row in enumerate(matrix):
+        slot = _row_slot(row)
+        if slot is None or slot <= chart.end:
+            continue
+        if index < len(baseline):
+            baseline_total += float(baseline[index])
+        if index < len(optimized):
+            optimized_total += float(optimized[index])
+    return baseline_total, optimized_total
+
+
 def build_display_savings_series(
     display_ctx: ChartDisplayContext,
     savings_view: dict,
@@ -586,6 +611,9 @@ def build_display_savings_series(
         view[key] = align_hourly_increments_to_display_slots(
             values, matrix, chart, slots
         )
+    baseline_after, optimized_after = _plan_kwh_after_window(matrix_source, matrix, chart)
+    view["hourly_matched_baseline_consumption_after_window_kwh"] = baseline_after
+    view["hourly_optimized_consumption_after_window_kwh"] = optimized_after
     actual_cost, actual_kwh = _actual_slot_increments(display_ctx)
     view["slot_actual_cost_euro"] = actual_cost
     view["slot_actual_consumption_kwh"] = actual_kwh

@@ -29,6 +29,7 @@ from runtime_store.live_display_loader import (
 )
 from ui.chart_colors import COLOR_COST_SAVINGS, COLOR_COST_SAVINGS_NEGATIVE
 from ui.help_hint import render_page_title_with_help
+from ui.number_format import decimal_separator, format_decimal, format_euro
 from ui.runtime_config import invalidate_live_optimization_cache
 
 _DEVICES_HELP = (
@@ -39,6 +40,7 @@ _DEVICES_HELP = (
     "manueller Trigger, wenn kein Leistungsmerker vorhanden."
 )
 _DEFAULT_RUNTIME_H = 2.0
+_COST_COLUMN = "Kosten (€)"
 _DELTA_COLUMN = "Delta"
 _DELTA_EPS = 0.005
 
@@ -545,7 +547,7 @@ def _render_recommendation_table(
             row[1].markdown(f"**{option.start_datetime:%H:%M}**")
             row[2].markdown(_stars_text(option.stars))
             row[3].markdown(
-                f'<span style="{_delta_cell_color(delta)}">{delta:+.2f}</span>',
+                f'<span style="{_delta_cell_color(delta)}">{format_decimal(delta, signed=True)}</span>',
                 unsafe_allow_html=True,
             )
 
@@ -556,8 +558,8 @@ def _render_cheapest_caption(rec: ApplianceRecommendation) -> None:
     color = _delta_cell_color(delta)
     st.markdown(
         f"Günstigste Startzeit: **{best.start_datetime:%H:%M} Uhr** · "
-        f"{best.cost_eur:.2f} € · Delta (sofort): "
-        f'<span style="{color}">{delta:+.2f} €</span>',
+        f"{format_euro(best.cost_eur)} · Delta (sofort): "
+        f'<span style="{color}">{format_euro(delta, signed=True)}</span>',
         unsafe_allow_html=True,
     )
 
@@ -573,7 +575,7 @@ def _recommendation_dataframe(rec: ApplianceRecommendation) -> pd.DataFrame:
             {
                 "Start": f"{option.start_datetime:%H:%M}",
                 "Güte": _stars_text(option.stars),
-                "Kosten (€)": round(option.cost_eur, 2),
+                _COST_COLUMN: round(option.cost_eur, 2),
                 _DELTA_COLUMN: round(
                     _delta_to_best_eur(option.cost_eur, best_cost), 2
                 ),
@@ -591,6 +593,9 @@ def _style_recommendation_dataframe(
     def _color_delta(val: float) -> str:
         return _delta_cell_color(float(val))
 
-    return df.style.format({_DELTA_COLUMN: "{:+.2f}"}).map(
+    decimal = decimal_separator()
+    return df.style.format(
+        {_COST_COLUMN: "{:.2f}", _DELTA_COLUMN: "{:+.2f}"}, decimal=decimal
+    ).map(
         _color_delta, subset=[_DELTA_COLUMN]
     )

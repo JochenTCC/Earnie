@@ -19,6 +19,7 @@ from data.price_forecast_viz import (
 )
 from ui.help_hint import render_page_title_with_help
 from ui.doc_links import get_page_docs, markdown_doc_link
+from ui.number_format import format_cent_kwh, format_decimal
 
 
 @st.cache_data(ttl=120, show_spinner="Lade Preis-Dataset …")
@@ -72,22 +73,23 @@ def _metric_columns(model_metrics: dict, mirror_metrics: dict, test: pd.DataFram
     actual = test["actual_cent_kwh"].to_numpy(dtype=float)
     model_peak = peak_regression_metrics(actual, test["model_cent_kwh"].to_numpy(dtype=float))
     mirror_peak = peak_regression_metrics(actual, test["mirror_cent_kwh"].to_numpy(dtype=float))
+    mae_gain = mirror_metrics["mae_cent_kwh"] - model_metrics["mae_cent_kwh"]
     cols = st.columns(4)
     cols[0].metric(
         "Modell MAE",
-        f"{model_metrics['mae_cent_kwh']:.2f} Cent/kWh",
-        delta=f"{mirror_metrics['mae_cent_kwh'] - model_metrics['mae_cent_kwh']:+.2f} vs Spiegel",
+        format_cent_kwh(model_metrics['mae_cent_kwh']),
+        delta=f"{format_decimal(mae_gain, signed=True)} vs Spiegel",
         delta_color="normal",
     )
-    cols[1].metric("Spiegel MAE", f"{mirror_metrics['mae_cent_kwh']:.2f} Cent/kWh")
+    cols[1].metric("Spiegel MAE", format_cent_kwh(mirror_metrics['mae_cent_kwh']))
     cols[2].metric(
         "Peak-MAE Modell",
-        f"{model_peak['mae_cent_kwh']:.2f} Cent/kWh",
-        help=f"Obere {model_peak['peak_percentile']:.0f} % der Ist-Preise (≥ {model_peak['peak_threshold_cent_kwh']:.1f} Cent/kWh)",
+        format_cent_kwh(model_peak['mae_cent_kwh']),
+        help=f"Obere {model_peak['peak_percentile']:.0f} % der Ist-Preise (≥ {format_cent_kwh(model_peak['peak_threshold_cent_kwh'], 1)})",
     )
     cols[3].metric(
         "Peak-MAE Spiegel",
-        f"{mirror_peak['mae_cent_kwh']:.2f} Cent/kWh",
+        format_cent_kwh(mirror_peak['mae_cent_kwh']),
     )
 
 
@@ -240,7 +242,7 @@ def render_price_forecast_block() -> None:
         f"Dataset: `{dataset_path.name}` · {len(frame)} h gesamt · "
         f"Holdout: {len(evaluation.test)} h · Modell: {evaluation.model.feature_variant} "
         f"({evaluation.model.training_rows} Trainingszeilen) · "
-        f"Bias-Korrektur: {evaluation.model.bias_correction_cent_kwh:+.3f} Cent/kWh "
+        f"Bias-Korrektur: {format_cent_kwh(evaluation.model.bias_correction_cent_kwh, 3, signed=True)} "
         f"(Nicht-Peak < P{evaluation.model.bias_correction_peak_percentile:.0f})"
     )
     _metric_columns(evaluation.model_metrics, evaluation.mirror_metrics, evaluation.test)

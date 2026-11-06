@@ -18,7 +18,8 @@ from simulation.booked_consumption import BOOKED_CONSUMPTION_KEY
 from simulation.reference_costs import LADDER_L2
 from simulation.jahres_verbrauch import jahres_standby_kwh, jahres_verbrauch_kwh
 from ui.consumption_validation_charts import cons_data_monthly_kwh
-from ui.saving_text import soc_correction_text
+from ui.number_format import format_euro
+from ui.saving_text import saving_text, soc_correction_text
 
 _DASH = "—"
 _TIMING_SHIFT_NOTE = "Zeitliche Lastverschiebung (Energie ≈ Spec)"
@@ -419,7 +420,7 @@ def _standard_rules_saving_cell(meta: dict, scenario_id: str, totals: dict) -> s
     block = _soc_correction_block(meta, scenario_id)
     if block:
         saving += float(block["steps"][LADDER_L2]["correction_eur"])
-    return f"{saving:+.2f} €"
+    return saving_text(saving)
 
 
 def _soc_correction_hint(meta: dict, scenario_id: str) -> list[str]:
@@ -472,7 +473,7 @@ def _heat_fuel_cells(meta: dict, scenario_id: str, *, show_fuel: bool) -> dict:
         fuel_kwh = float((block or {}).get("fuel_kwh") or 0.0)
         cells["Brennstoff [kWh]"] = _format_kwh(fuel_kwh) if fuel_kwh else _DASH
         cells["Brennstoffkosten [€]"] = (
-            f"{float(block['fuel_eur']):.2f} €" if fuel_kwh else _DASH
+            format_euro(float(block["fuel_eur"])) if fuel_kwh else _DASH
         )
     cells["CO2 [kg]"] = f"{float(block['co2_kg']):.0f}" if block else _DASH
     return cells
@@ -532,7 +533,7 @@ def build_annual_cost_rows(meta: dict) -> list[dict]:
                     "Speicher-Standby [kWh]": standby_cell,
                     "Gesamtverbrauch [kWh]": total_cell,
                     **_heat_fuel_cells(meta, scenario_id, show_fuel=show_fuel),
-                    "Jahres Kosten [€]": f"{total_eur:.2f} €",
+                    "Jahres Kosten [€]": format_euro(total_eur),
                     "Ersparnis vs. Standard-Regeln [€]": _DASH,
                     "Δ vs Referenz [€]": _DASH,
                     "Hinweis": hinweis,
@@ -542,7 +543,7 @@ def build_annual_cost_rows(meta: dict) -> list[dict]:
 
         delta_cell = _DASH
         if live_ref_total is not None:
-            delta_cell = f"{total_eur - live_ref_total:+.2f} €"
+            delta_cell = format_euro(total_eur - live_ref_total, signed=True)
         rows.append(
             {
                 "Szenario": label,
@@ -550,7 +551,7 @@ def build_annual_cost_rows(meta: dict) -> list[dict]:
                 "Speicher-Standby [kWh]": standby_cell,
                 "Gesamtverbrauch [kWh]": total_cell,
                 **_heat_fuel_cells(meta, scenario_id, show_fuel=show_fuel),
-                "Jahres Kosten [€]": f"{total_eur:.2f} €",
+                "Jahres Kosten [€]": format_euro(total_eur),
                 "Ersparnis vs. Standard-Regeln [€]": _standard_rules_saving_cell(
                     meta, scenario_id, totals
                 ),

@@ -9,6 +9,7 @@ from ui.backtesting_ladder import (
     rule_share_text,
 )
 from ui.backtesting_results_helpers import build_annual_cost_rows
+from ui.saving_text import saving_text
 
 
 def _meta() -> dict:
@@ -73,7 +74,7 @@ def test_end_soc_term_counts_in_saving_and_share_like_the_table():
     assert summary.saving_eur == pytest.approx(101.35)
     assert summary.rule_share == pytest.approx((1500.0 - 1001.35) / 600.0)
     row = next(row for row in build_annual_cost_rows(meta) if row["Szenario"] == "Live")
-    assert row["Ersparnis vs. Standard-Regeln [€]"] == f"{summary.saving_eur:+.2f} €"
+    assert row["Ersparnis vs. Standard-Regeln [€]"] == saving_text(summary.saving_eur)
 
 
 def test_fuel_counts_on_every_step():
@@ -116,13 +117,13 @@ def test_table_steps_add_up_to_the_total_saving():
     meta = _meta()
     meta["ladder_soc_correction"] = {"live": _soc_block(2.0, 1.35)}
     rows = [r for r in ladder_table_rows(build_ladder_summaries(meta)) if r["Szenario"] == "Live"]
-    assert [r["Kosten [€]"] for r in rows] == ["1500.00 €", "1200.00 €", "1000.00 €", "900.00 €"]
-    assert [r["Ladestand am Periodenende [€]"] for r in rows] == ["—", "+2.00 €", "+1.35 €", "—"]
+    assert [r["Kosten [€]"] for r in rows] == ["1500,00 €", "1200,00 €", "1000,00 €", "900,00 €"]
+    assert [r["Ladestand am Periodenende [€]"] for r in rows] == ["—", "+2,00 €", "+1,35 €", "—"]
     assert [r["Ersparnis zur Stufe davor [€]"] for r in rows] == [
         "—",
-        "+298.00 €",
-        "+200.65 €",
-        "+101.35 €",
+        "298,00 € gespart",
+        "200,65 € gespart",
+        "101,35 € gespart",
     ]
     assert 298.00 + 200.65 + 101.35 == pytest.approx(1500.0 - 900.0)
 

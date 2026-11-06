@@ -10,10 +10,6 @@ import plotly.graph_objects as go
 
 from data.planning_window import UiChartWindow
 from optimizer.deviation_eval import DeviationEvent
-from ui.chart_cumulative_render import (
-    render_cumulative_cost_chart,
-    render_price_savings_chart,
-)
 from ui.chart_decorations import (
     ChartSunMarkers,
     _add_deviation_markers,
@@ -345,10 +341,7 @@ from ui.chart_trace_segments import (
     _segment_connected_line_xy,
     _segment_linear_connected_line_xy,
 )
-from ui.chart_decorations import (
-    _cost_summary_annotations,
-    build_deviation_marker_traces,
-)
+from ui.chart_decorations import build_deviation_marker_traces
 from ui.chart_consumer_stack import (
     _chart_has_immediate_charge_bars,
     _chart_has_pv_follow_bars,
@@ -356,12 +349,6 @@ from ui.chart_consumer_stack import (
     _consumer_bar_pattern_shapes,
     _consumer_horizon_energy_kwh,
     clear_consumer_stack_order_cache,
-)
-from ui.chart_cumulative import (
-    _bridged_forecast_cumulative_series,
-    _region_cumulative_series,
-    _sum_slot_increments,
-    add_cumulative_s2_split_traces,
 )
 from ui.chart_soc import (
     _soc_from_history_extrapolation,
@@ -377,7 +364,5 @@ __all__ = [
     "clear_consumer_stack_order_cache",
     "get_bar_colors",
     "ordered_active_consumers_for_stack",
-    "render_cumulative_cost_chart",
     "render_power_soc_chart",
-    "render_price_savings_chart",
 ]

@@ -1,4 +1,4 @@
-"""AppTest: Chart 2 with a ledger state file and without one (Ledger P7)."""
+"""AppTest: Chart 2 account view with a ledger state file and without one, anchor switch (Account view P2)."""
 from __future__ import annotations
 
 from datetime import datetime
@@ -9,6 +9,8 @@ from streamlit.testing.v1 import AppTest
 
 from runtime_store import savings_ledger as sl
 from runtime_store import savings_ledger_store as store
+from ui.chart_account_render import SESSION_ANCHOR_MODE
+from ui.chart_account_view import ANCHOR_NOW, ANCHOR_START
 from ui.chart_ledger_savings import HINT_NOT_RUNNING
 
 _SCRIPT = Path(__file__).parent / "scripts" / "run_chart2_ledger.py"
@@ -30,14 +32,21 @@ def _chart_spec(at: AppTest) -> str:
     return at.get("plotly_chart")[0].proto.spec
 
 
-def test_without_ledger_state_the_chart_has_no_savings_line_and_a_hint(tmp_path, monkeypatch):
+def _labels(at: AppTest) -> list[str]:
+    import json
+
+    layout = json.loads(_chart_spec(at))["layout"]
+    return [item["text"] for item in layout.get("annotations", [])]
+
+
+def test_without_ledger_state_the_past_counts_zero_and_the_chart_gives_the_hint(tmp_path, monkeypatch):
     at = _run(tmp_path, monkeypatch)
 
     assert HINT_NOT_RUNNING in _captions(at)
-    assert "Ersparnis bisher" not in _chart_spec(at)
+    assert "Bisher: 0,00 € gespart" in _labels(at)
 
 
-def test_with_ledger_state_the_chart_shows_the_savings_line(tmp_path, monkeypatch):
+def _with_ledger(tmp_path, monkeypatch) -> None:
     start = datetime(2026, 11, 4, 8, 0, tzinfo=_TZ)
     state = sl.LedgerState(
         savings_v=sl.SAVINGS_V,
@@ -71,7 +80,27 @@ def test_with_ledger_state_the_chart_shows_the_savings_line(tmp_path, monkeypatc
         lambda: [{"battery_capacity_kwh": 15.0, "efficiency": 0.94}],
     )
 
+
+
+def test_with_ledger_state_the_chart_draws_the_booked_lines(tmp_path, monkeypatch):
+    _with_ledger(tmp_path, monkeypatch)
     at = _run(tmp_path, monkeypatch)
 
-    assert "Ersparnis bisher" in _chart_spec(at)
+    assert "Mit Earnie (gebucht)" in _chart_spec(at)
     assert not any("Ersparnis-Buch" in text for text in _captions(at))
+    assert "Bisher: 0,20 € gespart" in _labels(at)
+    assert "Erwartet: 0,04 € gespart" in _labels(at)
+
+
+def test_anchor_switch_defaults_to_now_and_keeps_the_choice(tmp_path, monkeypatch):
+    _with_ledger(tmp_path, monkeypatch)
+    at = _run(tmp_path, monkeypatch)
+    assert at.session_state[SESSION_ANCHOR_MODE] == ANCHOR_NOW
+
+    at.radio(key=SESSION_ANCHOR_MODE).set_value(ANCHOR_START).run()
+    assert not at.exception
+    assert "Gesamt: 0,24 € gespart" in _labels(at)
+
+    at.run()
+    assert at.session_state[SESSION_ANCHOR_MODE] == ANCHOR_START
+    assert "Gesamt: 0,24 € gespart" in _labels(at)

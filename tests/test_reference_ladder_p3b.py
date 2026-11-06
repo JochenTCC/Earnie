@@ -141,19 +141,19 @@ def _live_row(meta: dict) -> dict:
 
 def test_saving_column_includes_the_soc_term_and_names_it():
     row = _live_row(_meta(1.35))
-    assert row["Ersparnis vs. Standard-Regeln [€]"] == "+101.35 €"
-    assert "1.35 € gutgeschrieben (80 % gegen 30 %)" in row["Hinweis"]
+    assert row["Ersparnis vs. Standard-Regeln [€]"] == "101,35 € gespart"
+    assert "1,35 € gutgeschrieben (80 % gegen 30 %)" in row["Hinweis"]
 
 
 def test_deducted_term_lowers_the_saving_in_words():
     row = _live_row(_meta(-1.35))
-    assert row["Ersparnis vs. Standard-Regeln [€]"] == "+98.65 €"
-    assert "1.35 € abgezogen" in row["Hinweis"]
+    assert row["Ersparnis vs. Standard-Regeln [€]"] == "98,65 € gespart"
+    assert "1,35 € abgezogen" in row["Hinweis"]
 
 
 def test_log_before_this_valuation_says_so():
     row = _live_row(_meta(None))
-    assert row["Ersparnis vs. Standard-Regeln [€]"] == "+100.00 €"
+    assert row["Ersparnis vs. Standard-Regeln [€]"] == "100,00 € gespart"
     assert "nicht bewertet" in row["Hinweis"]
 
 
@@ -339,16 +339,19 @@ def test_label_scope():
 
 
 def test_chart_2_names_the_baseline():
-    from ui.chart_cumulative import add_cumulative_cost_traces
-    from ui.chart_decorations import _cost_summary_annotations
-    from ui.chart_slot_axis import ChartSlotAxis
-    import plotly.graph_objects as go
+    from ui.chart_account_render import account_slots, build_account_figure
+    from ui.chart_account_view import ANCHOR_START, build_account_view
 
     frame = pd.DataFrame(_chart_rows(_START, 4))
-    axis = ChartSlotAxis.from_dataframe(frame)
-    fig = go.Figure()
+    view_data = {
+        "hourly_optimized_cost_euro": [0.5] * 4,
+        "hourly_matched_baseline_cost_euro": [1.0] * 4,
+        "hourly_optimized_consumption_kwh": [1.0] * 4,
+        "hourly_matched_baseline_consumption_kwh": [1.0] * 4,
+    }
     with chart_baseline_label_context(STANDARD_RULES_LABEL):
-        add_cumulative_cost_traces(fig, frame["Uhrzeit"], axis, [1.0] * 4, [0.5] * 4)
-        texts = [a["text"] for a in _cost_summary_annotations(4.0, 2.0)]
-    assert "Kosten Standard-Regeln" in {trace.name for trace in fig.data}
-    assert "Standard-Regeln: 4.00 €" in texts
+        slots = account_slots(view_data, history_slot_count=0, slot_count=4)
+        view = build_account_view(slots, ANCHOR_START)
+        fig = build_account_figure(frame, slots, view, ledger=None, chart_window=None)
+    assert "Standard-Regeln (Plan)" in {trace.name for trace in fig.data}
+    assert "Plan: 2,00 € gespart" in [a.text for a in fig.layout.annotations]

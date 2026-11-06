@@ -14,7 +14,7 @@ def test_headline_and_expander_render():
     assert at.subheader[0].value == "Ersparnis gegen Standard-Regeln"
     metric = at.metric[0]
     assert metric.label == "Live"
-    assert metric.value == "+100.00 €"
+    assert metric.value == "100,00 € gespart"
     assert metric.delta == "Anteil der Regeln: 83 %"
     assert len(at.expander) == 1
     assert not at.expander[0].proto.expanded

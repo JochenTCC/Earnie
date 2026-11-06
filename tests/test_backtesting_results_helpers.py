@@ -109,7 +109,7 @@ def test_build_annual_cost_rows_reference_kwh_and_delta():
     ref_row = rows[0]
     assert ref_row["Szenario"] == "Historisch (ohne Optimierung)"
     assert ref_row["Jahres Verbrauch [kWh]"] == "5000.0"
-    assert ref_row["Jahres Kosten [€]"] == "1200.00 €"
+    assert ref_row["Jahres Kosten [€]"] == "1200,00 €"
     assert ref_row["Δ vs Referenz [€]"] == "—"
     assert ref_row["Speicher-Standby [kWh]"] == "—"
     live_ref_row = rows[1]
@@ -122,8 +122,8 @@ def test_build_annual_cost_rows_reference_kwh_and_delta():
     assert live_row["Speicher-Standby [kWh]"] == "227.8"
     assert live_row["Gesamtverbrauch [kWh]"] == "5027.8"
     assert ref_row["Gesamtverbrauch [kWh]"] == "5000.0"
-    assert live_row["Jahres Kosten [€]"] == "1000.00 €"
-    assert live_row["Δ vs Referenz [€]"] == "-100.00 €"
+    assert live_row["Jahres Kosten [€]"] == "1000,00 €"
+    assert live_row["Δ vs Referenz [€]"] == "-100,00 €"
     assert live_ref_row["Hinweis"] == "—"
     assert live_row["Hinweis"] == "—"
     assert ref_row["Hinweis"] == "—"
@@ -179,9 +179,9 @@ def test_build_annual_cost_rows_delta_always_vs_live_reference():
     assert by_label[fixed_ref_label]["Δ vs Referenz [€]"] == "—"
     assert by_label[fixed_ref_label]["Jahres Verbrauch [kWh]"] == "5100.0"
     # Delta vs Live Referenz (1100), not vs Fixed Full's own ref (1050)
-    assert by_label["Fixed Full"]["Δ vs Referenz [€]"] == "-120.00 €"
+    assert by_label["Fixed Full"]["Δ vs Referenz [€]"] == "-120,00 €"
     assert by_label["Fixed Full"]["Jahres Verbrauch [kWh]"] == "4950.0"
-    assert by_label["Live"]["Δ vs Referenz [€]"] == "-100.00 €"
+    assert by_label["Live"]["Δ vs Referenz [€]"] == "-100,00 €"
 
 
 def test_ordered_monthly_chart_labels_matches_gesamtkosten():

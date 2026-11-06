@@ -12,7 +12,6 @@ from ui.charts import (
     ChartSlotAxis,
     _LINE_ANCHOR_SLOT_CENTER,
     _LINE_ANCHOR_SLOT_START,
-    add_cumulative_s2_split_traces,
     add_optimized_soc_trace,
     add_power_traces,
     get_bar_colors,
@@ -166,29 +165,3 @@ def test_chart1_soc_uses_slot_start_anchor():
         assert expected in [p[0] for p in soc_points], f"SoC Slot {slot}"
 
 
-def test_chart2_cumulative_traces_use_slot_start_anchor():
-    slots = _mixed_slots()
-    n = len(slots)
-    split = 4
-    uhrzeit = pd.Series(slot.strftime("%d.%m. %H:%M") for slot in slots)
-    axis = ChartSlotAxis.from_dataframe(pd.DataFrame({"slot_datetime": slots}))
-    increments = [0.1 * (index + 1) for index in range(n)]
-    fig = go.Figure()
-    add_cumulative_s2_split_traces(
-        fig,
-        uhrzeit,
-        axis,
-        history_slot_count=split,
-        slot_actual_cost_euro=increments,
-        slot_actual_consumption_kwh=increments,
-        hourly_matched_baseline_cost_euro=[1.0] * n,
-        hourly_optimized_cost_euro=[0.8] * n,
-        hourly_matched_baseline_consumption_kwh=[2.0] * n,
-        hourly_optimized_consumption_kwh=[1.5] * n,
-    )
-    history_cost = next(t for t in fig.data if t.name == "Kosten (Ist bisher)")
-    for index in range(split):
-        expected = _slot_start(axis, index)
-        y_value = sum(increments[: index + 1])
-        points = _points_at_y(history_cost, y_value)
-        assert expected in [p[0] for p in points], f"Ist-Kosten Slot {slots[index]}"

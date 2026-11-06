@@ -14,6 +14,34 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
   - **Tests:** `tests/test_heating_rod_live.py`.
   - **Verify:** not yet on real hardware or HouseSim; with a bound rod check the release in the Live log, the store cap and the Grundlast while the rod runs.
 
+### Account view P3 — Longer periods on the analysis page (2026-11-05)
+
+- [x] **Account view P3 — Longer periods on the analysis page** `[feat]`: spec [`docs/dev/chart2-account-view.md`](../docs/dev/chart2-account-view.md) §§ 6, 9.
+  - "Analyse Verbrauch & Kosten" shows the account view of the page's 7 / 28-day window above the log analysis (`render_period_account_chart`), entirely from the ledger, anchored at the window end, with its own switch state.
+  - Decisions: spec § 6 item 1 — a lower panel with the saving since the window start alone (green / red, own scale) instead of the consumption control; item 2 — 0 € at the window start, as in the Monitor; periods follow the page's selector.
+  - Only incomplete days are marked; a caption sums the SoC corrections of the closed days fully in the window. Orange slots are merged into runs (also in the Monitor).
+  - Tests: `tests/test_chart_account_view.py` (period part), `tests/apptest/test_period_account_apptest.py`.
+  - Docs: user manual § Analyse Verbrauch & Kosten, `docs/ui/charts.md`, page help text, `.github/release-notes/UNRELEASED.md`.
+
+### Account view P2 — Monitor and SE window show the account view (2026-11-05)
+
+- [x] **Account view P2 — Monitor shows the account view** `[feat]`: spec [`docs/dev/chart2-account-view.md`](../docs/dev/chart2-account-view.md) §§ 3–5, 8.
+  - `ui/chart_account_view.py` (pure: balances, anchoring "Ist bei Jetzt" / "Gemeinsamer Start", signed gap, gap runs split at crossings, consumption control zero at the horizon end, energy-difference flag) and `ui/chart_account_render.py` (money panel with green/red gap and labels without a sign, SoC correction label, closed days' "Ergebnis" with "unvollständig", orange skipped / no-data slots, consumption panel, anchor switch in session state).
+  - `ui/chart_ledger_savings.py` gives every slot left of *Jetzt* `cost_with` / `cost_without` and a state, open day from the ledger state, closed days from `savings_ledger_slots.jsonl`; an unreadable slot file is a hint and marks those slots orange. `ui/chart_context.py` adds the plan energy after the window.
+  - Decisions: spec § 6 item 5 — flag the plan energy difference at *Jetzt* from 0.5 kWh and 2 % of the planned consumption; item 6 — the SE window moves to the account view too (no *Jetzt*, both lines from 0 €, baseline L2, label "Plan").
+  - Removed: `ui/chart_cumulative.py`, `ui/chart_cumulative_render.py`, `ui/chart_day_costs.py`, the per-day cost annotations in `ui/chart_decorations.py`, `cost_summary_days` in the display bundle, `ledger_figures_for_day`.
+  - Tests: `tests/test_chart_account_view.py`, `tests/test_chart_ledger_savings.py`, `tests/apptest/test_chart2_ledger_apptest.py` (switch state), `tests/test_reference_ladder_p3b.py`, `tests/test_ledger_kpi.py`.
+  - Docs: `docs/ui/charts.md` § Chart 2, `docs/ui/betriebsmodi.md`, user manual, **?** help text, `.github/release-notes/UNRELEASED.md`.
+
+### Decimal separator in the UI (2026-11-05)
+
+- [x] **Decimal separator in the UI** `[feat]`: euro and cent amounts follow the viewer's browser language.
+  - Decision: the browser language decides, via the request's `Accept-Language` header; the container locale was rejected because Streamlit renders on the server. The reusable part lives in Edibert `v0.1.13` (`edibert.i18n.numbers`, Edibert's languages `en`/`de`, fail loud for others); Earnie's `ui/number_format.py` reads the header, uses `de` when it names neither language (the UI is German) and keeps its own units (`€`, `Cent/kWh`). Pin raised to `v0.1.13`.
+  - `format_euro` / `format_decimal` / `format_cent_kwh` used by `ui/saving_text.py`, Chart 2 annotations (`ui/chart_decorations.py`), the tile, the Scenario Explorer tables and ladder, `ui/pages/page_devices.py` (incl. the Styler table), `ui/consumer_cost_analysis_charts.py`, `ui/price_forecast.py` and the thermal profile price. Chart 2 sets Plotly `layout.separators`, so hovers and axes agree.
+  - No-sign rule (`docs/dev/savings-ledger.md` § 5) extended to the Scenario Explorer savings (headline metric, `Ersparnis vs. Standard-Regeln`, `Ersparnis zur Stufe davor`); differences (`Δ vs Referenz`, end-SoC term, device delta) keep their sign.
+  - Docs: `docs/ui/charts.md`, `docs/ui/betriebsmodi.md`, user manual, `.github/release-notes/UNRELEASED.md`. Follow-up for kWh/kW/% and numeric tables in `Backlog.md`.
+  - Tests: `tests/test_number_format.py`; expectations in the ledger, ladder, Scenario Explorer and device tests switched to the comma.
+
 ### RuleRef P4 — UI ladder and docs (2026-11-05)
 
 - [x] **RuleRef P4 — UI ladder and docs** `[feat]`: spec [`docs/dev/rule-based-reference.md`](../docs/dev/rule-based-reference.md) § 7 O5.

@@ -465,7 +465,7 @@ Der Monitor unter **Live-Cockpit → Monitor** (Sunset-2-Sunset) zeigt Vergangen
 - **Genauigkeit:** Das Ergebnis hängt vom eingestellten Batterie-Wirkungsgrad ab und ist keine Stromrechnung. Einzelne Tage schwanken, aussagekräftig sind längere Zeiträume.
 - **Unvollständige Tage:** Tage mit weniger als 80 % gebuchten Viertelstunden zählen mit. Der Hilfetext der Kachel nennt ihre Anzahl, Chart 2 markiert sie mit „unvollständig“.
 
-**Ersparnis in Chart 2:** Die Kennzahlen gelten **je Sonnenaufgangs-Tag** (Smartphone: der sichtbare Tag; Desktop: zwei Spalten für SA₀→SA₁ und SA₁→SA₂). Beträge stehen ohne Vorzeichen, die Bedeutung als Wort dabei („gespart“, „mehr ausgegeben“). Am laufenden Tag zeigt Chart 2 **Bisher** (seit Sonnenaufgang) und **Erwartet** (bis zum nächsten Sonnenaufgang), ein abgelaufener Tag das **Ergebnis** und ein Tag, der noch nicht begonnen hat, den **Plan**. Der Energievergleich im Expander bezieht sich dagegen auf den vollen Planungshorizont (jetzt bis übernächster Sonnenaufgang).
+**Ersparnis in Chart 2:** Chart 2 ist eine Kontoansicht: Zwei Linien zeigen den Kontostand seit Fensterstart mit und ohne Earnie (links von Jetzt gebucht aus dem Ersparnis-Buch, rechts der Plan gegen BL Ziel); fällt eine Linie, wird bezahlt. Der grüne oder rote Abstand zwischen den Linien ist die Ersparnis. Mit dem Umschalter **Ist bei Jetzt** treffen sich die Linien bei Jetzt (Abstand am Fensterstart = bisher, am Ende = erwartet), mit **Gemeinsamer Start** beginnen beide bei 0 € (Abstand bei Jetzt = bisher, am Ende = gesamt). Das Panel darunter prüft, ob beide Seiten mit demselben Verbrauch gerechnet wurden. Beträge stehen ohne Vorzeichen, die Bedeutung als Wort dabei („gespart“, „mehr ausgegeben“). Das Dezimalzeichen folgt der Sprache des Browsers: Steht in den Spracheinstellungen Englisch vor Deutsch, zeigt Earnie einen Punkt (`2.18 €`), sonst ein Komma (`2,18 €`). Das gilt für Euro- und Cent-Beträge; kWh, kW und Prozent stehen noch mit Punkt. Die SoC-Korrektur steht als eigenes Label, abgeschlossene Tage zeigen ihr **Ergebnis** aus dem Buch, ein Fenster ohne Vergangenheit den **Plan**. Details: [Charts](../ui/charts.md#chart-2-kontostand-mit-und-ohne-earnie). Der Energievergleich im Expander bezieht sich dagegen auf den vollen Planungshorizont (jetzt bis übernächster Sonnenaufgang).
 
 #### Chart 1: SoC-Linien (Plausibilität)
 
@@ -482,9 +482,11 @@ Die Seite **Live-Cockpit → Manuelle Geräte** zeigt alle Verbraucher mit der R
 
 ### Analyse Verbrauch & Kosten
 
-Die Seite **Live-Cockpit → Analyse Verbrauch & Kosten** gibt es nur im Live-Betrieb mit bestehender Smarthome-Verbindung (UI-Modus `live_environment`). Sie wertet das Produktiv-Log aus:
+Die Seite **Live-Cockpit → Analyse Verbrauch & Kosten** gibt es nur im Live-Betrieb mit bestehender Smarthome-Verbindung (UI-Modus `live_environment`). Ganz oben steht der **Kontostand mit und ohne Earnie** für den gewählten Zeitraum, aus dem Ersparnis-Buch und in derselben Darstellung wie Chart 2 im Monitor: Zwei Linien zeigen den Kontostand seit Fensterstart, mit dem Umschalter **Ist bei Jetzt** enden beide am Fensterende (der Abstand am Anfang ist die Ersparnis des Zeitraums), mit **Gemeinsamer Start** beginnen beide bei 0 €. Weil bei mehreren Wochen die Gesamtkosten die Skala bestimmen, zeigt ein Panel darunter die **Ersparnis seit Fensterstart** allein: grün gespart, rot mehr ausgegeben. Unvollständige Tage sind markiert; die SoC-Korrekturen der abgeschlossenen Tage stecken in keinem Abstand, eine Zeile unter dem Chart nennt ihre Summe.
 
-- die letzten **7** oder **28 Tage** (verschiebbar),
+Darunter wertet die Seite das Produktiv-Log aus:
+
+- die letzten **7** oder **28 Tage** (verschiebbar; gilt auch für den Kontostand),
 - eine Kennzahl für die letzten **365 Tage** vorhandener Log-Daten,
 - Batterieflüsse,
 - den **Wärmeinhalt** (Simulation und Ist) aus der Live-Historie.
