@@ -17,6 +17,7 @@ from runtime_store.history_timeline import (
     SLOT_MISSING,
     SLOT_PRESENT,
 )
+from ui.number_format import decimal_separator, format_decimal
 from ui.chart_account_render import render_account_chart
 from ui.chart_baseline_label import chart_baseline_label_context
 from ui.chart_consumer_stack import _chart_flex_consumers, chart_flex_consumers_context
@@ -149,7 +150,7 @@ def render_applied_targets(savings: dict) -> None:
         )
 
         def _format_kwh_cell(kwh: float) -> str:
-            return f"{kwh:.1f} kWh"
+            return f"{format_decimal(kwh, 1)} kWh"
 
         def _format_optimization_cell(kwh: float, source: str) -> str:
             formatted = _format_kwh_cell(kwh)
@@ -376,7 +377,7 @@ def _render_simulation_table(
         styler = _style_simulation_table(display_df, slot_qualities)
     else:
         styler = display_df.style
-    render_frozen_simulation_table(styler)
+    render_frozen_simulation_table(styler.format(decimal=decimal_separator()))
 
 
 def render_simulation_details(

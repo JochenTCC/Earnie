@@ -49,7 +49,7 @@ from ui.chart_legend_mobile import (
 )
 from ui.chart_slot_axis import ChartSlotAxis, _chart_xaxis_config
 from ui.help_hint import render_title_with_help
-from ui.number_format import plotly_separators
+from ui.number_format import format_decimal, localized_figure
 from ui.saving_text import saving_is_loss, saving_text, soc_correction_text
 
 
@@ -411,7 +411,7 @@ def energy_difference_hint(view: AccountView) -> str | None:
     word = "mehr" if diff > 0 else "weniger"
     figure = "Erwartet" if view.has_past else "Plan"
     return (
-        f"Der Plan rechnet für {baseline_label()} mit {abs(diff):.1f} kWh {word} Verbrauch als "
+        f"Der Plan rechnet für {baseline_label()} mit {format_decimal(abs(diff), 1)} kWh {word} Verbrauch als "
         f"für die Optimierung. „{figure}“ enthält deshalb auch den Preis dieser Energie."
     )
 
@@ -463,7 +463,6 @@ def build_account_figure(
     fig.update_yaxes(title="Kontostand seit Fensterstart (€)", zeroline=True, row=1, col=1)
     fig.update_yaxes(title="€" if period else "kWh", row=2, col=1)
     fig.update_layout(
-        separators=plotly_separators(),
         height=520,
         **_collapsible_chart_layout(top_margin=30),
     )
@@ -518,7 +517,7 @@ def render_account_chart(
     kwargs: dict = {"width": "stretch"}
     if chart_key:
         kwargs["key"] = chart_key
-    st.plotly_chart(fig, **kwargs)
+    st.plotly_chart(localized_figure(fig), **kwargs)
     render_collapsible_legend_from_figure(fig)
     hint = energy_difference_hint(view)
     if hint:
@@ -591,7 +590,7 @@ def render_period_account_chart(window_start: datetime, window_end: datetime) ->
     df = pd.DataFrame({"slot_datetime": slot_starts})
     fig = build_account_figure(df, slots, view, ledger=ledger, chart_window=None, period=True)
     inject_mobile_legend_css()
-    st.plotly_chart(fig, width="stretch", key=f"{SESSION_PERIOD_PREFIX}account_chart")
+    st.plotly_chart(localized_figure(fig), width="stretch", key=f"{SESSION_PERIOD_PREFIX}account_chart")
     render_collapsible_legend_from_figure(fig)
     correction, days = period_soc_correction_eur(ledger, window_start, end_exclusive)
     if days:

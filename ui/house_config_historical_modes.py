@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import config
+from ui.number_format import format_decimal
 from ui.house_config_historical_csv import _render_ist_vs_modell
 
 from pathlib import Path
@@ -561,7 +562,7 @@ def _baseload_display_equal(probe, *, annual_kwh: float, resolved: list[dict]):
     caption = (
         f"Grundlast an Ist angepasst: {trimmed['baseload_kwh']:.0f} kWh/a "
         f"(Ziel Ist {trimmed['ist_annual_kwh']:.0f} kWh; "
-        f"effektive Untergrenze {100.0 * trimmed['floor_fraction']:.2f} %, "
+        f"effektive Untergrenze {format_decimal(100.0 * trimmed['floor_fraction'])} %, "
         f"mindestens 1 %)."
     )
     return (

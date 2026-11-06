@@ -4,6 +4,7 @@ from __future__ import annotations
 from optimizer import steuerbefehl_for_mode
 from runtime_store import run_state
 from runtime_store.ehal_setup import active_ehal_backend, backend_label
+from ui.number_format import format_decimal
 from ui.chart_colors import (
     SANKEY_DEFAULT_LINK_COLOR,
     SANKEY_FLEX_MISMATCH_COLOR,
@@ -75,7 +76,7 @@ def produktiv_caption(state: dict | None) -> str:
     caption = (
         f"Letzter Produktiv-Durchlauf: **{completed}** · vor **{age_txt}** · "
         f"Modus: **{mode_label(int(state.get('mode', 0)))}** · "
-        f"Ziel: **{target_power:.2f} kW** / **{target_soc:.0f} % SoC**"
+        f"Ziel: **{format_decimal(target_power)} kW** / **{target_soc:.0f} % SoC**"
     )
     if not produktiv_run_fresh(state):
         caption += " · _Soll-Werte aus diesem Lauf, Live kann abweichen._"
@@ -90,14 +91,14 @@ def battery_node_label(
     current_soc: float | None, battery_kw: float, state: dict
 ) -> str:
     if battery_kw >= 0:
-        live_txt = f"live Entladen {battery_kw:.2f} kW"
+        live_txt = f"live Entladen {format_decimal(battery_kw)} kW"
     else:
-        live_txt = f"live Laden {abs(battery_kw):.2f} kW"
+        live_txt = f"live Laden {format_decimal(abs(battery_kw))} kW"
     mode = int(state.get("mode", 0))
     target_power = float(state.get("target_power_kw", 0.0) or 0.0)
     target_soc = float(state.get("target_soc_percent", 0.0) or 0.0)
     cmd = steuerbefehl_for_mode(mode, target_power)
-    soc_txt = f"{float(current_soc):.1f} %" if current_soc is not None else "SoC —"
+    soc_txt = f"{format_decimal(float(current_soc), 1)} %" if current_soc is not None else "SoC —"
     return (
         f"🔋 Batterie ({soc_txt} · {live_txt} · "
         f"Soll: {cmd} → {target_soc:.0f} % SoC)"
@@ -107,7 +108,7 @@ def battery_node_label(
 def ev_soc_label_suffix(ev_soc_percent: float | None) -> str:
     if ev_soc_percent is None:
         return ""
-    return f" · {float(ev_soc_percent):.1f} % SoC"
+    return f" · {format_decimal(float(ev_soc_percent), 1)} % SoC"
 
 
 def flex_node_label(
@@ -119,7 +120,7 @@ def flex_node_label(
 ) -> str:
     soll_kw = _soll_flex_kw(state, consumer_id)
     return (
-        f"⚡ {name} (live {live_kw:.2f} kW · Soll {soll_kw:.2f} kW"
+        f"⚡ {name} (live {format_decimal(live_kw)} kW · Soll {format_decimal(soll_kw)} kW"
         f"{ev_soc_label_suffix(ev_soc_percent)})"
     )
 
@@ -170,5 +171,5 @@ def flex_link_hover(
 ) -> str:
     if is_placeholder:
         soll = _soll_flex_kw(state, consumer_id)
-        return f"Geplant (inaktiv)<br>Soll: {soll:.2f} kW<br>Ist: 0,00 kW"
-    return f"Ist: {float(live_kw or 0.0):.2f} kW"
+        return f"Geplant (inaktiv)<br>Soll: {format_decimal(soll)} kW<br>Ist: {format_decimal(0.0)} kW"
+    return f"Ist: {format_decimal(float(live_kw or 0.0))} kW"

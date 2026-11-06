@@ -5,6 +5,7 @@ from datetime import datetime
 
 import streamlit as st
 
+from ui.number_format import localized_figure
 from ui.chart_account_render import render_period_account_chart
 from ui.chart_context import live_now
 from ui.consumer_cost_analysis_charts import render_window_analysis
@@ -89,7 +90,7 @@ def _render_heat_content_section(window: TimeWindow) -> None:
             f"für {format_window_label(window)}."
         )
         return
-    st.plotly_chart(fig, width="stretch")
+    st.plotly_chart(localized_figure(fig), width="stretch")
     meta = fig.layout.meta or {}
     if not meta.get("has_measured"):
         st.caption(

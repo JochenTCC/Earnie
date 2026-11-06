@@ -2,6 +2,16 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Decimal separator for non-currency numbers (2026-11-06)
+
+- [x] **Decimal separator for non-currency numbers** `[feat]`: kWh, kW and % follow the viewer's browser language like euro amounts, in text, charts and tables.
+  - Text: `format_decimal` and the new `format_general` (`:g`) replace the decimal f-string fields under `ui/`. Left out: `ui/ehal_write_test.py` (whole-number constants) and the cache key in `ui/house_config_historical_csv.py`.
+  - Charts: `localized_figure` around every `st.plotly_chart` figure; `tests/test_number_format.py` fails on a new call without it.
+  - Tables: numeric columns of the consumer table and the price forecast holdout table use `localized_number_column` and still sort as numbers. Their format comes from the browser's locale, so a browser in neither language can differ from the text. The simulation table sets the separator through its Styler. Tables that were already text columns get the formatted text.
+  - Edibert `v0.1.14`: `format_general`, `edibert.ui.number_columns.localized_number_column`. Pin raised to `v0.1.14`.
+  - Not covered: `st.number_input` writes its printf format with a point; `.0f` values have no decimals; `_kwh` in `ui/house_config_heating_change.py` keeps its German thousands point for every viewer.
+  - Docs: `docs/ui/charts.md`, user manual, `.github/release-notes/UNRELEASED.md`, `docs/dev/edibert-integration.md`.
+
 ### Live price prognosis — Energy-Charts trial, moved from Backlog.md (2026-11-06)
 
 - [x] **Live price prognosis — Energy-Charts `public_power_forecast` trial** `[dev]`: unsuccessful, dropped on 2026-10-02 in `f82da60e`. Product power features remain archive hour-of-day.

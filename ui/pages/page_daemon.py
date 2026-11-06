@@ -25,6 +25,7 @@ from runtime_store.main_daemon import (
 from runtime_store.persist_paths import log_file, resolve_local_settings_json_path
 from runtime_store.shadow.mode import is_shadow_mode
 from settings.system_settings import write_silent_mode_to_local_settings
+from ui.number_format import format_decimal
 from ui.flash import flash
 from ui.help_hint import render_page_title_with_help
 from ui.runtime_config import reload_runtime_config
@@ -121,7 +122,7 @@ def _format_last_run() -> str:
         return f"{completed} (vor {age:.0f} s)"
     if age < 3600:
         return f"{completed} (vor {age / 60:.0f} min)"
-    return f"{completed} (vor {age / 3600:.1f} h)"
+    return f"{completed} (vor {format_decimal(age / 3600, 1)} h)"
 
 
 def _render_status(daemon: DaemonStatus) -> None:

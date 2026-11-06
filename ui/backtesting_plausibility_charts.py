@@ -7,6 +7,7 @@ import pandas as pd
 import plotly.graph_objects as go
 
 from simulation.engine import window_slot_datetimes
+from ui.number_format import format_decimal
 
 _COCKPIT_HINT = (
     "Cockpit-Energiebilanz nicht verfügbar (keine Live-Optimierungshistorie "
@@ -17,7 +18,7 @@ _COCKPIT_HINT = (
 def failure_window_label(failure: dict) -> str:
     window_end = str(failure.get("window_end", "?"))
     diff_kwh = float(failure.get("diff_kwh", 0.0) or 0.0)
-    return f"{window_end} · Δ {diff_kwh:+.2f} kWh"
+    return f"{window_end} · Δ {format_decimal(diff_kwh, signed=True)} kWh"
 
 
 def slice_cons_data_for_window(cons_df: pd.DataFrame, window_end_iso: str) -> pd.DataFrame:

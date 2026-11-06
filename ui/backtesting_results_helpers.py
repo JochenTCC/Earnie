@@ -18,7 +18,7 @@ from simulation.booked_consumption import BOOKED_CONSUMPTION_KEY
 from simulation.reference_costs import LADDER_L2
 from simulation.jahres_verbrauch import jahres_standby_kwh, jahres_verbrauch_kwh
 from ui.consumption_validation_charts import cons_data_monthly_kwh
-from ui.number_format import format_euro
+from ui.number_format import format_decimal, format_euro
 from ui.saving_text import saving_text, soc_correction_text
 
 _DASH = "—"
@@ -124,13 +124,13 @@ def scenario_consumption_subheader(period: dict) -> str:
 def _format_kwh(value: float | None) -> str:
     if value is None:
         return _DASH
-    return f"{value:.1f}"
+    return format_decimal(value, 1)
 
 
 def _format_delta_kwh(value: float | None) -> str:
     if value is None:
         return _DASH
-    return f"{value:+.1f}"
+    return format_decimal(value, 1, signed=True)
 
 
 def _format_plausibility_cell(block: dict | None) -> str:

@@ -15,6 +15,7 @@ from optimizer.slot_duration import DEFAULT_DT_H
 from optimizer.targets import consumer_column_name
 from simulation.backtesting_horizon import naive_backtesting_slot
 from simulation.reference_costs import LADDER_L2
+from ui.number_format import format_general
 
 STANDARD_RULES_LABEL = "Standard-Regeln"
 
@@ -126,7 +127,7 @@ def standard_rules_caption(savings_info: dict) -> str | None:
     outside = int(savings_info["standard_rules_slots_outside_period"])
     if outside:
         text += (
-            f" {outside * float(DEFAULT_DT_H):g} h des Fensters liegen außerhalb des Zeitraums "
+            f" {format_general(outside * float(DEFAULT_DT_H))} h des Fensters liegen außerhalb des Zeitraums "
             "und zählen nicht mit."
         )
     return text

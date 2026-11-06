@@ -1,6 +1,7 @@
 """Backtesting results tables and charts UI."""
 from __future__ import annotations
 
+from ui.number_format import localized_figure
 from ui.backtesting import (
     _HORIZON_MODE_LABELS,
     scenario_labels_map,
@@ -258,7 +259,7 @@ def render_backtesting_monthly_chart(meta: dict) -> None:
         for month in df.index
     }
     st.plotly_chart(
-        scenario_monthly_cost_chart(chart_monthly, scenario_order=chart_columns),
+        localized_figure(scenario_monthly_cost_chart(chart_monthly, scenario_order=chart_columns)),
         width="stretch",
     )
     fee_map = meta.get("monthly_fee_by_scenario") or {}

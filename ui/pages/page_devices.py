@@ -29,7 +29,7 @@ from runtime_store.live_display_loader import (
 )
 from ui.chart_colors import COLOR_COST_SAVINGS, COLOR_COST_SAVINGS_NEGATIVE
 from ui.help_hint import render_page_title_with_help
-from ui.number_format import decimal_separator, format_decimal, format_euro
+from ui.number_format import decimal_separator, format_decimal, format_euro, format_general
 from ui.runtime_config import invalidate_live_optimization_cache
 
 _DEVICES_HELP = (
@@ -218,7 +218,7 @@ def _render_appliance(appliance: dict, matrix: list) -> None:
     runtime_h = _appliance_runtime_h(appliance)
     horizon_h = _recommendation_horizon_h(appliance)
     st.caption(
-        f"Nennleistung: **{power_kw:.2f} kW** · Laufzeit: **{runtime_h:.2f} h** · "
+        f"Nennleistung: **{format_decimal(power_kw)} kW** · Laufzeit: **{format_decimal(runtime_h)} h** · "
         f"Empfehlungshorizont: **{horizon_h} h** (Hausprofil)"
     )
     if appliance.get("power_source") == "loxone":
@@ -249,7 +249,7 @@ def _render_reserve_refill_caption(entry: dict, state: str) -> None:
             f"Nachladen bis **{deadline.astimezone().strftime('%d.%m. %H:%M')}** "
             f"(max. {REFILL_DEADLINE_H:.0f} h, preisoptimal"
             + (
-                f", noch ca. {max(0.0, remaining_h):.1f} h"
+                f", noch ca. {format_decimal(max(0.0, remaining_h), 1)} h"
                 if remaining_h > 0
                 else ", Frist erreicht"
             )
@@ -305,8 +305,8 @@ def _render_reserve_appliance(appliance: dict) -> None:
     state = str(entry.get("state") or "empty")
     stored = float(entry.get("stored_kwh") or 0.0)
     st.caption(
-        f"Powerstation: `{ps_id}` · Ziel: **{target:.2f} kWh** · "
-        f"Vorrat: **{stored:.2f} kWh** · Status: **{state}**"
+        f"Powerstation: `{ps_id}` · Ziel: **{format_decimal(target)} kWh** · "
+        f"Vorrat: **{format_decimal(stored)} kWh** · Status: **{state}**"
     )
     _render_reserve_refill_caption(entry, state)
     st.caption(
@@ -516,7 +516,7 @@ def _render_recommendation_table(
     if active:
         st.caption(
             f"Aktiver Optimierungsplan bis **{active['expires_at'][:16].replace('T', ' ')}** "
-            f"({active['power_kw']} kW × {active['runtime_h']} h)."
+            f"({format_general(active['power_kw'])} kW × {format_general(active['runtime_h'])} h)."
         )
     st.caption(
         "Häkchen vor der Startzeit = sofort in die nächste Optimierung; "

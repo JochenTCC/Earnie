@@ -36,8 +36,8 @@ def test_run_fresh_only_within_threshold():
 
 def test_flex_label_includes_soll():
     label = produktiv.flex_node_label("E-Auto", 0.0, "eauto", _state())
-    assert "live 0.00 kW" in label
-    assert "Soll 11.00 kW" in label
+    assert "live 0,00 kW" in label
+    assert "Soll 11,00 kW" in label
     assert "SoC" not in label
 
 
@@ -45,7 +45,7 @@ def test_flex_label_includes_soc_when_charging():
     label = produktiv.flex_node_label(
         "E-Auto", 3.5, "eauto", _state(), ev_soc_percent=67.3
     )
-    assert label == "⚡ E-Auto (live 3.50 kW · Soll 11.00 kW · 67.3 % SoC)"
+    assert label == "⚡ E-Auto (live 3,50 kW · Soll 11,00 kW · 67,3 % SoC)"
 
 
 def test_caption_keeps_soll_hint_when_stale():
@@ -114,7 +114,7 @@ def test_flex_sankey_link_live_when_drawing():
 
 def test_flex_link_hover_live_without_soc():
     hover = produktiv.flex_link_hover(3.5, "eauto", _state(), False)
-    assert hover == "Ist: 3.50 kW"
+    assert hover == "Ist: 3,50 kW"
 
 
 def test_flex_link_hover_placeholder():

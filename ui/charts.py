@@ -10,6 +10,7 @@ import plotly.graph_objects as go
 
 from data.planning_window import UiChartWindow
 from optimizer.deviation_eval import DeviationEvent
+from ui.number_format import localized_figure
 from ui.chart_decorations import (
     ChartSunMarkers,
     _add_deviation_markers,
@@ -319,7 +320,7 @@ def render_power_soc_chart(
     if chart_key:
         plotly_kwargs["key"] = chart_key
     inject_mobile_legend_css()
-    st.plotly_chart(fig, **plotly_kwargs)
+    st.plotly_chart(localized_figure(fig), **plotly_kwargs)
     render_collapsible_legend_from_figure(fig)
 
 

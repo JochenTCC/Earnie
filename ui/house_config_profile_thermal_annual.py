@@ -1,6 +1,7 @@
 """thermal_annual consumer fields of the house profile editor (split from house_config_profile_thermal)."""
 from __future__ import annotations
 
+from ui.number_format import format_decimal, format_general
 from ui.house_config_profile_session import _live_markers_enabled, _scoped_key
 import streamlit as st
 from house_config.profile_schema_defaults import (
@@ -84,7 +85,7 @@ def _render_heat_source_fields(thermal: dict, index: int, *, session_scope: str)
     default_eff = default_efficiency(heat_source)
     eff_label = "JAZ" if source_type == "heat_pump" else "Nutzungsgrad"
     own_eff = labeled_checkbox(
-        f"Eigene {eff_label} (Standard {default_eff:.2f})",
+        f"Eigene {eff_label} (Standard {format_decimal(default_eff)})",
         value=same_type and existing.get("efficiency") not in (None, ""),
         key=_scoped_key(session_scope, f"hc_heat_eff_use_{index}"),
     )
@@ -101,7 +102,7 @@ def _render_heat_source_fields(thermal: dict, index: int, *, session_scope: str)
         default_price = fuel_price_in_unit({"type": source_type})
         as_of = heat_source_defaults()["fuel_price_as_of"]
         own_price = labeled_checkbox(
-            f"Eigener Brennstoffpreis (Standard {default_price:g} {unit}, Stand {as_of})",
+            f"Eigener Brennstoffpreis (Standard {format_general(default_price)} {unit}, Stand {as_of})",
             value=same_type and existing.get("fuel_price") not in (None, ""),
             key=_scoped_key(session_scope, f"hc_fuel_price_use_{index}"),
         )
@@ -155,8 +156,8 @@ def render_generation_power_fields(
     if power > 0.0:
         eff_label = "JAZ" if heat_source["type"] == "heat_pump" else "Nutzungsgrad"
         st.caption(
-            f"≈ {heating_input_power_kw(heat_source, power):.2f} kW elektrisch bei "
-            f"{eff_label} {heat_source_efficiency(heat_source):.2f} (damit plant der Optimierer)."
+            f"≈ {format_decimal(heating_input_power_kw(heat_source, power))} kW elektrisch bei "
+            f"{eff_label} {format_decimal(heat_source_efficiency(heat_source))} (damit plant der Optimierer)."
         )
     fields["min_on_quarterhours"] = int(
         labeled_number_input(
@@ -254,7 +255,7 @@ def _render_wp_annual_metric(item: dict, *, location: dict) -> None:
         )
     st.caption(
         f"Basis: Open-Meteo-Archiv {ref_year} "
-        f"({latitude:.4f}°N, {longitude:.4f}°E)"
+        f"({format_decimal(latitude, 4)}°N, {format_decimal(longitude, 4)}°E)"
     )
 
 

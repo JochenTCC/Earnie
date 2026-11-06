@@ -16,6 +16,7 @@ from house_config.heating_systems import (
     reference_ids_by_profile,
     variant_system_id,
 )
+from ui.number_format import format_decimal, format_general
 from ui.label_select import label_select_choices, resolve_label_select
 
 NEW_VARIANT_OPTION = "— neue Variante —"
@@ -79,15 +80,15 @@ def _summary_lines(entry: dict) -> list[str]:
     kind = _HEAT_SOURCE_LABELS.get(source["type"], source["type"])
     if source["type"] == "heat_pump":
         kind += f" ({_HEAT_PUMP_LABELS.get(source['heat_pump_type'], source['heat_pump_type'])})"
-    power = f"Heizleistung: {entry[HEATING_POWER_KEY]:g} kW thermisch"
+    power = f"Heizleistung: {format_general(entry[HEATING_POWER_KEY])} kW thermisch"
     if heat_source_is_electric(source):
         electric = heating_input_power_kw(source, entry[HEATING_POWER_KEY])
-        power += f" (≈ {electric:.2f} kW elektrisch)"
+        power += f" (≈ {format_decimal(electric)} kW elektrisch)"
     lines = [f"Wärmequelle: {kind}", power]
     if entry.get("heat_storage"):
-        lines.append(f"Wärmespeicher: {entry['heat_storage']['volume_liters']:g} l")
+        lines.append(f"Wärmespeicher: {format_general(entry['heat_storage']['volume_liters'])} l")
     if entry.get("parts"):
-        lines.append(f"Heizstab: {entry['parts'][0]['nominal_power_kw']:g} kW")
+        lines.append(f"Heizstab: {format_general(entry['parts'][0]['nominal_power_kw'])} kW")
     return lines
 
 

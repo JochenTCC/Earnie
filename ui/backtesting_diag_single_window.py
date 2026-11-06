@@ -8,6 +8,7 @@ from shlex import join as shlex_join
 import pandas as pd
 import streamlit as st
 
+from ui.number_format import format_decimal
 from ui.backtesting_runner import _subprocess_env, project_root, python_executable
 
 
@@ -89,7 +90,7 @@ def render_diag_single_window_panel(
 
     with st.expander("Fenster-Diagnose (diag_single_window)"):
         st.caption(
-            f"Einzelnes 24h-Fenster wie in der CLI — Start-SOC {initial_soc:.1f} % "
+            f"Einzelnes 24h-Fenster wie in der CLI — Start-SOC {format_decimal(initial_soc, 1)} % "
             "aus backtesting.csv."
         )
         st.code(command, language="powershell")

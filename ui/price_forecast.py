@@ -6,6 +6,7 @@ from pathlib import Path
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
+from edibert.ui.number_columns import localized_number_column
 from plotly.subplots import make_subplots
 
 from data.price_forecast_model import peak_regression_metrics
@@ -19,7 +20,7 @@ from data.price_forecast_viz import (
 )
 from ui.help_hint import render_page_title_with_help
 from ui.doc_links import get_page_docs, markdown_doc_link
-from ui.number_format import format_cent_kwh, format_decimal
+from ui.number_format import format_cent_kwh, format_decimal, localized_figure
 
 
 @st.cache_data(ttl=120, show_spinner="Lade Preis-Dataset …")
@@ -181,7 +182,11 @@ def _render_holdout_table(evaluation) -> None:
             ["actual_cent_kwh", "model_cent_kwh", "mirror_cent_kwh", "model_error", "mirror_error"]
         ].copy()
         show.index = show.index.strftime("%Y-%m-%d %H:%M")
-        st.dataframe(show.round(3), width="stretch")
+        st.dataframe(
+            show.round(3),
+            width="stretch",
+            column_config={column: localized_number_column(decimals=3) for column in show.columns},
+        )
 
 
 def _render_live_bias_expander() -> None:
@@ -247,12 +252,12 @@ def render_price_forecast_block() -> None:
     )
     _metric_columns(evaluation.model_metrics, evaluation.mirror_metrics, evaluation.test)
 
-    st.plotly_chart(_price_timeseries_chart(evaluation.test), width="stretch")
+    st.plotly_chart(localized_figure(_price_timeseries_chart(evaluation.test)), width="stretch")
     left, right = st.columns(2)
     with left:
-        st.plotly_chart(_scatter_chart(evaluation.test), width="stretch")
+        st.plotly_chart(localized_figure(_scatter_chart(evaluation.test)), width="stretch")
     with right:
-        st.plotly_chart(_hourly_mae_chart(hourly_error_summary(evaluation.test)), width="stretch")
+        st.plotly_chart(localized_figure(_hourly_mae_chart(hourly_error_summary(evaluation.test))), width="stretch")
 
     _render_holdout_table(evaluation)
     _render_live_bias_expander()

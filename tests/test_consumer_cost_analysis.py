@@ -5,6 +5,7 @@ from datetime import datetime
 
 import pytest
 
+from ui.number_format import format_decimal
 from ui.consumer_cost_analysis_data import (
     BASELOAD_ID,
     aggregate_slots,
@@ -278,7 +279,7 @@ def test_battery_period_metrics_helpers() -> None:
 
     caption = battery_flow_balance_caption(totals, metrics)
     assert "Empfehlung Standby-Leistung" in caption
-    assert f"{metrics.recommended_standby_kw:.3f} kW" in caption
+    assert f"{format_decimal(metrics.recommended_standby_kw, 3)} kW" in caption
 
 
 def test_aggregate_and_week_filter() -> None:

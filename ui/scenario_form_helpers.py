@@ -8,6 +8,7 @@ import streamlit as st
 
 from house_config.id_slug import slug_id
 from runtime_store.persist_paths import resolve_backtesting_scenarios_json_path
+from ui.number_format import format_decimal
 from ui.form_layout import labeled_multiselect, labeled_selectbox
 
 NONE_LABEL = "— keine —"
@@ -144,8 +145,8 @@ def render_profile_geo_caption(profile: dict) -> None:
         return
     st.caption(
         "Standort (Hausprofil): "
-        f"{float(profile.get('latitude', 0.0)):.4f}° N, "
-        f"{float(profile.get('longitude', 0.0)):.4f}° E · "
+        f"{format_decimal(float(profile.get('latitude', 0.0)), 4)}° N, "
+        f"{format_decimal(float(profile.get('longitude', 0.0)), 4)}° E · "
         f"Zeitzone: {profile.get('timezone_name', 'Europe/Vienna')}"
     )
 

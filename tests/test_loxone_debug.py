@@ -261,7 +261,7 @@ def test_build_write_rows_from_trace_maps_set_fields():
     assert rows[0]["Mapping"] == "Ernie_Charge"
     assert rows[0]["Erfolg"] == "Ja"
     assert rows[0]["Wert"] == "1500 W"
-    assert rows[0]["Wert (Hub)"] == "1.5 kW"
+    assert rows[0]["Wert (Hub)"] == "1,5 kW"
 
 
 def test_build_write_rows_includes_unmapped_expected():
@@ -341,7 +341,7 @@ def test_build_intended_write_rows_powerstation_merker_silent():
     assert rows[0]["Mapping"] == "PS_Charge"
     assert rows[0]["Meldung"] == "Nicht gesendet (Silent-Modus)"
     assert rows[0]["Wert"] == "500 W"
-    assert rows[0]["Wert (Hub)"] == "0.5 kW"
+    assert rows[0]["Wert (Hub)"] == "0,5 kW"
 
 
 def test_write_summary_from_rows_matches_table_not_raw_trace():
@@ -568,7 +568,7 @@ def test_build_read_rows_grid_meter_push_lookup():
             expected_fields=["grid.meter.sens_grid_energy_import"],
         )
     assert rows[0]["EHAL-Feld"] == "grid.meter.sens_grid_energy_import"
-    assert rows[0]["Wert"] == "12.5"
+    assert rows[0]["Wert"] == "12,5"
     assert rows[0]["Status"] == STATE_OK
 
 

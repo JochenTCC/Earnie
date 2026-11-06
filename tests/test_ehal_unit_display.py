@@ -28,7 +28,7 @@ def test_units_for_field_missing_spec() -> None:
 
 
 def test_format_value_with_unit() -> None:
-    assert format_value_with_unit(2.5, "kW") == "2.5 kW"
+    assert format_value_with_unit(2.5, "kW") == "2,5 kW"
     assert format_value_with_unit("", "kW") == "—"
     assert format_value_with_unit(65, None) == "65"
 
@@ -52,7 +52,7 @@ def test_live_write_pair_loxone_hub_trace_normalized() -> None:
         value_space="hub",
     )
     assert ehal == "3500 W"
-    assert hub == "3.5 kW"
+    assert hub == "3,5 kW"
 
 
 def test_live_read_pair_ha_ehal_without_entity_unit() -> None:
@@ -74,7 +74,7 @@ def test_live_read_pair_ha_with_entity_unit() -> None:
         value_space="ehal",
         hub_unit_hint="kW",
     )
-    assert hub == "1.2 kW"
+    assert hub == "1,2 kW"
     assert ehal == "1200 W"
 
 
