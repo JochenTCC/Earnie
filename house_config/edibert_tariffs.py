@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Mapping
-from datetime import datetime
+from datetime import date, datetime
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -74,6 +74,9 @@ _MESSAGES_DE: dict[str, str] = {
         "auf einen Wert angleichen oder aus den Tarifen entfernen"
     ),
     "DB_REF_LEGACY": "veraltetes db_ref mit 'database' ({path}) — Konfiguration migrieren",
+    "CAPACITY_CHARGE_MISSING": (
+        "kein Leistungspreis für {month} im Netzbereich '{area_id}' — Eintrag für diesen Monat ergänzen"
+    ),
 }
 
 
@@ -306,6 +309,22 @@ def profile_grid_fee(profile_id: str, profile: dict, catalog: api.GridFeeCatalog
         return api.resolve_grid_fee(config, catalog)
     except api.EdibertError as exc:
         raise EdibertLoadError(f"Hausprofil '{profile_id}' (netznutzung)", exc) from exc
+
+
+def capacity_charge_for_month(fee: api.GridFee, month: date) -> api.CapacityCharge | None:
+    """Capacity charge in effect in the calendar month of ``month``; ``None`` before the first entry starts."""
+    try:
+        return api.charge_for_month(fee.capacity, month, fee.area_id)
+    except api.EdibertError as exc:
+        raise EdibertLoadError(f"Netzbereich '{fee.area_id}'", exc) from exc
+
+
+def capacity_charge_net_eur(charge: api.CapacityCharge, peak_kw: float) -> float:
+    """Net EUR of one month for a month peak of ``peak_kw``, minimum and bands applied by Edibert."""
+    try:
+        return float(api.capacity_charge_eur(charge, peak_kw))
+    except api.EdibertError as exc:
+        raise EdibertLoadError(f"Leistungspreis '{charge.id}'", exc) from exc
 
 
 def host_house_for_profile(profile_id: str, profile: dict, grid_fees_path: str):

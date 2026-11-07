@@ -17,7 +17,7 @@ Verwandt: [Preise und Marktdaten](../konfiguration/preise.md) (Konfiguration und
 | **Netznutzung Arbeitspreis** (`netznutzung` am Hausprofil, inkl. Zeitfenster SNAP) | **ja** (vor USt zum Bezugspreis) | **ja** |
 | **Netzverlust und Abgaben je kWh** (Netzbereich: Netzverlustentgelt, Erneuerbaren-Förderbeitrag, Elektrizitätsabgabe Haushalt) | **ja** (vor USt zum Bezugspreis) | **ja** |
 | **Feste Netzbeträge je Jahr** (Netzbereich: Grundpauschale, Förderbeitrag, Förderpauschale) | **nein** | **ja** (nach Aggregation) |
-| **Netznutzung Leistungspreis** / netzgebietsspezifische Tabellen | **nein** | **nein** |
+| **Netznutzung Leistungspreis** (Netzbereich: `capacity_charges`) | **nein** | **ja** (nach Aggregation, je Kalendermonat) |
 | PLZ-/netzgebietsspezifische Stacks, Konzessionsabgabe | nein | nein |
 
 > **Hinweis:** Der volumetrische **Netznutzung Arbeitspreis** wird am Hausprofil (Standort) gepflegt und ist unabhängig vom Lieferantentarif. Er kann zeitabhängig sein (SNAP, vorbereitet WiNAP). Die Werte stammen aus dem Laufzeitkatalog `earnie_env/config/grid_fees.json`; die Vorlage dafür liegt in `share/config/grid_fees.json`. Ein eigener Arbeitspreis ist ein Benutzer-Netzbereich in `user_grid_fees.json` (siehe [Preise](../konfiguration/preise.md#eigener-arbeitspreis-benutzer-netzbereich)). Alle vier Tarifdateien tragen das Tarifformat `tariff_format: 1`; jeder Tarif braucht einen `vat_percent`. Der Leistungspreis fehlt weiterhin.
@@ -139,7 +139,7 @@ Grundpauschale, Förderbeitrag auf die Grundpauschale und Erneuerbaren-Förderpa
 - **Jahres- und Gesamtwert:** Summe aller Fixkosten über alle Monate plus volumetrische Energiekosten (Bezug minus Einspeiseerlös).
 - **Live-Planung:** Die Fixkosten fehlen im Live-MILP und in den stündlichen `sim_cost`-Kurven.
 - **Netznutzung Arbeitspreis:** Der volumetrische Wert kommt aus dem Hausprofil (`netznutzung`) und dem Netzentgelt-Katalog, nicht aus dem Tarifkatalog.
-- **Leistungspreis:** Earnie modelliert ihn derzeit **nicht**.
+- **Leistungspreis:** Nur wenn der Netzbereich `capacity_charges` trägt. Je Kalendermonat zählt die höchste gebuchte Viertelstunde des Netzbezugs, mindestens die Mindestleistung (`min_kw`). Über der Bandgrenze gilt der höhere Satz nur für den Anteil darüber. Der Betrag kommt netto aus Edibert und erhält die USt des Bezugstarifs. Ein angebrochener Monat zählt voll. Vor dem Beginn des ersten Eintrags fällt kein Leistungspreis an. Eine Lücke danach bricht den Lauf mit einer Fehlermeldung ab. Einträge mit einem Status außerhalb von `include_status` zählen nicht und erscheinen als Hinweis. Lastprofile aus Stundenwerten glätten kurze Spitzen, die echte Spitze kann höher liegen. Die Planung berücksichtigt den Leistungspreis noch nicht.
 
 In der Oberfläche erscheinen die Fixkosten im Szenario-Explorer unter Gesamtkosten und Monatliche Stromkosten. Sind Gebühren vorhanden, zeigt die Seite den Hinweis „Näherung Monatsgebühren“ sowie einen Hinweis zu Netznutzungsentgelten. Zur Fake-Jahresrechnung siehe §1.
 

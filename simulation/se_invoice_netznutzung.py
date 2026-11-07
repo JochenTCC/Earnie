@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 import pandas as pd
+from simulation.capacity_charge import CapacityResult
 from simulation.monthly_fees import GridFixedPart, grid_fixed_parts
 from simulation.se_invoice_format import (
     _fmt_cent,
@@ -152,8 +153,10 @@ def _netznutzung_section_lines(
     fixed: tuple[GridFixedPart, ...],
     skipped: list[dict],
     month_count: int,
+    capacity: CapacityResult | None = None,
 ) -> list[str]:
-    """Separate Netznutzung block (Arbeitspreis breakout, per-kWh parts, fixed amounts)."""
+    """Separate Netznutzung block (Arbeitspreis breakout, per-kWh parts, fixed amounts, capacity)."""
+    capacity = capacity or CapacityResult()
     lines = [
         "## Netznutzung",
         "",
@@ -204,6 +207,7 @@ def _netznutzung_section_lines(
                 f"{_fmt_eur(item.gross_monthly_eur * month_count)} |"
             )
         lines.append("")
+    lines.extend(_capacity_lines(capacity))
     if skipped:
         skipped_text = ", ".join(f"{item['id']} ({item['reason']})" for item in skipped)
         lines.extend([f"Nicht berücksichtigte Regeln: {skipped_text}.", ""])
@@ -214,8 +218,44 @@ def _netznutzung_section_lines(
             "Jahressumme ist er aus dem Energiebezug herausgerechnet (kein "
             "Doppelzählen). Das gilt auch für Netzverlust und Abgaben je kWh. "
             "Feste Netzbeträge zählen je Kalendermonat mit einem Zwölftel des "
-            "Jahresbetrags, mit USt laut Bezugstarif. Leistungspreis fehlt.",
+            "Jahresbetrags, mit USt laut Bezugstarif. "
+            + (
+                "Der Leistungspreis zählt je Kalendermonat mit der höchsten gebuchten "
+                "Viertelstunde, mit USt laut Bezugstarif."
+                if capacity.months
+                else "Für diesen Zeitraum gilt im Netzbereich kein Leistungspreis."
+            ),
             "",
         ]
     )
+    return lines
+
+
+def _capacity_lines(capacity: CapacityResult) -> list[str]:
+    """Month table of the capacity charge, plus entries left out or not convex."""
+    lines: list[str] = []
+    if capacity.months:
+        lines.extend(
+            [
+                "| Leistungspreis | Höchste Viertelstunde | Abgerechnet | Netto | Betrag |",
+                "| --- | ---: | ---: | ---: | ---: |",
+            ]
+        )
+        for month in capacity.months:
+            lines.append(
+                f"| {month.month} | {month.peak_kw:.2f} kW | {month.billed_kw:.2f} kW | "
+                f"{_fmt_eur(month.net_eur)} | {_fmt_eur(month.gross_eur)} |"
+            )
+        lines.append("")
+    if capacity.skipped:
+        text = ", ".join(f"{cid} (status={status})" for cid, status in capacity.skipped.items())
+        lines.extend([f"Nicht berücksichtigter Leistungspreis: {text}.", ""])
+    if capacity.not_convex:
+        lines.extend(
+            [
+                "Leistungspreis mit fallendem Satz im oberen Band: "
+                f"{', '.join(capacity.not_convex)}.",
+                "",
+            ]
+        )
     return lines

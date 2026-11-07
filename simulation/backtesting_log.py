@@ -29,6 +29,7 @@ from .backtesting_snapshots import (
     write_window_snapshots_jsonl,
 )
 from .booked_consumption import BOOKED_CONSUMPTION_KEY
+from .capacity_charge import CAPACITY_KEY, CapacityResult
 from .heat_fuel import HEAT_FUEL_KEY
 from .period_clip import clip_results_map_to_period
 
@@ -125,22 +126,28 @@ def _build_summary(
     results: dict[str, pd.DataFrame],
     labels: dict[str, str],
     monthly_fee_by_scenario: dict[str, float] | None = None,
+    capacity_by_scenario: dict[str, CapacityResult] | None = None,
 ) -> dict:
     fees = monthly_fee_by_scenario or {}
+    capacity = capacity_by_scenario or {}
     total_eur: dict[str, float] = {}
     monthly_eur: dict[str, dict[str, float]] = {}
     for scenario_id, df in results.items():
         label = labels.get(scenario_id, scenario_id)
         fee = float(fees.get(scenario_id, 0.0) or 0.0)
+        capacity_result = capacity.get(scenario_id) or CapacityResult()
+        capacity_by_month = capacity_result.gross_by_month
         month_count = 0
         volumetric_total = float(df["sim_cost"].sum()) if not df.empty else 0.0
         for period, value in df["sim_cost"].resample("ME").sum().items():
             month_key = pd.Timestamp(period).strftime("%Y-%m")
             month_count += 1
             monthly_eur.setdefault(month_key, {})[label] = round(
-                float(value) + fee, 4
+                float(value) + fee + capacity_by_month.get(month_key, 0.0), 4
             )
-        total_eur[scenario_id] = round(volumetric_total + fee * month_count, 4)
+        total_eur[scenario_id] = round(
+            volumetric_total + fee * month_count + capacity_result.gross_eur, 4
+        )
     return {"total_eur": total_eur, "monthly_eur": monthly_eur}
 
 
@@ -443,12 +450,22 @@ def _fee_and_summary_parts(
     labels: dict[str, str],
     monthly_fee_by_scenario: dict[str, float] | None,
     fee_breakdown_by_scenario: dict[str, dict[str, float]] | None,
+    capacity_by_scenario: dict[str, CapacityResult] | None = None,
 ) -> dict:
     """Summary- und Fixkosten-Felder des Metadaten-Payloads (Reihenfolge erhalten)."""
+    capacity_part = (
+        {CAPACITY_KEY: {sid: item.as_dict() for sid, item in capacity_by_scenario.items()}}
+        if capacity_by_scenario
+        else {}
+    )
     return {
         "summary": _build_summary(
-            results, labels, monthly_fee_by_scenario=monthly_fee_by_scenario
+            results,
+            labels,
+            monthly_fee_by_scenario=monthly_fee_by_scenario,
+            capacity_by_scenario=capacity_by_scenario,
         ),
+        **capacity_part,
         "monthly_fee_by_scenario": {
             sid: float(monthly_fee_by_scenario.get(sid, 0.0) or 0.0)
             for sid in results
@@ -591,6 +608,7 @@ def save_backtesting_log(
     *,
     booked_consumption: dict[str, dict],
     heat_fuel: dict[str, dict] | None = None,
+    capacity_by_scenario: dict[str, CapacityResult] | None = None,
 ) -> str:
     """Schreibt Metadaten (JSON) und Stundenwerte (CSV). Gibt den JSON-Pfad zurück.
 
@@ -617,7 +635,11 @@ def save_backtesting_log(
         plausibility_by_scenario,
         period,
         _fee_and_summary_parts(
-            results, labels, monthly_fee_by_scenario, fee_breakdown_by_scenario
+            results,
+            labels,
+            monthly_fee_by_scenario,
+            fee_breakdown_by_scenario,
+            capacity_by_scenario,
         ),
         config_fingerprint=config_fingerprint,
         booked_consumption=booked_consumption,

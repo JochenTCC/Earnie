@@ -61,6 +61,8 @@ Each phase is one chat session and ends with green tests and a commit.
 
 ### P1: Capacity charge in the SE (L2)
 
+**Built 2026-11-07.** Differences from the list below: `check_capacity_coverage` stops a run with a gap before it starts; the German docs changed with it. Measured for D9, on one house with 15 months of 10-minute import counter readings: the hourly peak is 8 % (0.6 kW) below the 15-minute peak in the median month and 15 % (1.2 kW) in the worst full month. Interpolating 10-minute readings makes the 15-minute value a lower bound. D9 stands, and caps compared on hourly profiles look easier to hold than they are. A real one-month SE on a copy of the offline fixture pack produced the log block and the invoices; the logged peaks matched the booked CSV, and every total equalled `sim_cost` plus the amount. That run has no battery cap and low load, so it checks the wiring, not the size of the charge.
+
 - `house_config/edibert_tariffs.py`: wrappers for `charge_for_month` and `capacity_charge_eur`, since it is the only module that calls `edibert.api`. German messages for `CAPACITY_CHARGE_MISSING` and `CAPACITY_STATE_*`.
 - New `simulation/capacity_charge.py`:
   - month peak per result from booked `import_kwh`, `kW = kWh / dt_h`, grouped by local calendar month, one value per slot (`heat_fuel.py` shows the deduplication; the autumn clock change needs its own test);

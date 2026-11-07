@@ -331,7 +331,7 @@ Die Auswertung umfasst unter anderem:
 
 Die Ergebnisse sind eine **Entscheidungsgrundlage** für Investition und Tarifwahl, keine exakte Prognose der nächsten Stromrechnung. Eine Gewähr, dass sie genau so eintreffen, gibt es nicht.
 
-Der volumetrische **Netznutzung Arbeitspreis** (Hausprofil) fließt in die Kosten ein. Leistungspreis und netzgebietsspezifische Tabellen sind nicht berücksichtigt.
+Der volumetrische **Netznutzung Arbeitspreis** (Hausprofil) fließt in die Kosten ein. Trägt der Netzbereich einen **Leistungspreis**, weist der Szenario-Explorer ihn je Kalendermonat aus; die Planung berücksichtigt ihn noch nicht.
 
 <a id="gesamtkosten-jahres-verbrauch-kwh"></a>
 
