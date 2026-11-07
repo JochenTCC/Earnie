@@ -26,9 +26,7 @@
     "speicher_verlust_kw_pro_k": 0.0026
   },
   "netz": {
-    "_zuschlaege": "Je kWh Bezug zusaetzlich zum Netz-Arbeitspreis des Katalogs, netto. Werte der VKW-Seite Strom Duo, gueltig ab 01.04.2026. Nur in den Paketen der Studie.",
-    "zuschlaege_cent_kwh_netto": {"netzverlust": 0.393, "elektrizitaetsabgabe": 0.1, "erneuerbaren_foerderbeitraege": 0.62},
-    "_snap": "SNAP gilt erst ab 01.04.2026. Die Studie rechnet ein fiktives Jahr mit Preisen des Preisjahrs und Tarifstand 2026, daher gilt SNAP dort im ganzen Preisjahr. Der Abschlag gilt nur auf den Arbeitspreis, nicht auf die Zuschlaege.",
+    "_snap": "SNAP gilt erst ab 01.04.2026. Die Studie rechnet ein fiktives Jahr mit Preisen des Preisjahrs und Tarifstand 2026, daher gilt SNAP dort im ganzen Preisjahr. Der Abschlag gilt nur auf den Arbeitspreis, nicht auf Netzverlust und Abgaben im Katalog.",
     "snap_im_preisjahr": true
   },
   "geraete": {

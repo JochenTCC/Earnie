@@ -151,6 +151,7 @@ def _add_milp_objective(
     ev_milp_params_by_id: dict[str, dict[str, float]],
     *,
     wear_cent_per_kwh: float,
+    base_level_start: tuple[int, float] | None = None,
 ) -> None:
     dt_h = validate_dt_h(model.dt_h)
     energy_cost = pulp.lpSum([
@@ -190,7 +191,7 @@ def _add_milp_objective(
         + curtail_cost
         + tie_break
         - _heating_rod_fuel_credit(model)
-        - _base_level_credit(model, matrix)
+        - _base_level_credit(model, matrix, base_level_start)
     )
 
 
@@ -201,14 +202,54 @@ def _base_level_target_kwh(surplus_lookahead_kwh: float, e_min: float, e_max: fl
     return max(e_min, min(room, BASE_LEVEL_MAX_SHARE * e_max))
 
 
-def _base_level_credit(model: MilpHorizonModel, matrix: list[dict[str, Any]]):
+def _base_level_pv_energy(
+    model: MilpHorizonModel,
+    matrix: list[dict[str, Any]],
+    last_slot: int,
+    start: tuple[int, float],
+):
+    """Energy [kWh] in the battery at ``last_slot`` that did not come from the grid since ``start``.
+
+    It grows by what PV can charge beyond the load and falls with the SoC, so a discharge takes
+    grid energy first. Energy at ``start`` counts in full, its origin is not known.
+    """
+    first_slot, energy = start
+    ess_id = model.ess_ids[0]
+    efficiency = float(model.battery_params_by_id[ess_id].get("efficiency") or 1.0)
+    dt_h = float(model.dt_h)
+    for t in range(first_slot, last_slot + 1):
+        spare_kw = max(
+            0.0, float(matrix[t].get("expected_p_pv") or 0.0) - float(matrix[t]["expected_p_act"])
+        )
+        pv_charge = pulp.LpVariable(f"base_level_pv_charge_{t}", lowBound=0.0, upBound=spare_kw)
+        kept = pulp.LpVariable(f"base_level_pv_kwh_{t}", lowBound=0.0)
+        model.prob += pv_charge <= model.p_charge[t], f"base_level_pv_charge_link_{t}"
+        model.prob += kept <= energy + pv_charge * efficiency * dt_h, f"base_level_pv_gain_{t}"
+        model.prob += kept <= model.e_batt[t], f"base_level_pv_soc_{t}"
+        energy = kept
+    return energy
+
+
+def _base_level_credit(
+    model: MilpHorizonModel,
+    matrix: list[dict[str, Any]],
+    start: tuple[int, float] | None,
+):
     """Prototype of the SoC base level: value of the energy held at SA₂ up to the level (off by default).
 
-    Needs the look-ahead: the slots past the book are tomorrow's first hours. The value stays below
-    the cheapest buy price of the plan, so the level is reached from PV and never from the grid.
+    Needs the look-ahead: the slots past the book are tomorrow's first hours. The value is a bonus:
+    the energy can still replace an import past SA₂, so value and use add up and a price below the
+    buy price alone would not keep the grid out. Only energy that did not come from the grid earns
+    it (``_base_level_pv_energy``). ``start`` is the first tracked slot and the energy before it.
     """
     if not os.environ.get(BASE_LEVEL_ENV, "").strip():
         return 0.0
+    if len(model.ess_ids) != 1:
+        raise ValueError(
+            f"{BASE_LEVEL_ENV} kann bisher nur einen Speicher abbilden, gefunden: {model.ess_ids}."
+        )
+    if start is None:
+        raise ValueError(f"{BASE_LEVEL_ENV} braucht den Start-SoC des Plans (base_level_start).")
     lookahead_h = float(os.environ[LOOKAHEAD_ENV])
     lookahead_slots = round(lookahead_h / float(model.dt_h))
     if not 1 <= lookahead_slots < model.horizon:
@@ -231,6 +272,7 @@ def _base_level_credit(model: MilpHorizonModel, matrix: list[dict[str, Any]]):
     value = max(0.0, BASE_LEVEL_VALUE_SHARE * min(float(row["k_act"]) for row in matrix[: model.horizon]))
     held = pulp.LpVariable("base_level_held_kwh", lowBound=0.0, upBound=target)
     model.prob += held <= model.e_batt[sunrise], "base_level_held"
+    model.prob += held <= _base_level_pv_energy(model, matrix, sunrise, start), "base_level_from_pv"
     return value * held
 
 

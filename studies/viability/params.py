@@ -22,7 +22,7 @@ _SECTIONS = {
     "preisjahr", "annahmen", "solver", "regeln", "brennstoffpreise", "heizsysteme", "achsen", "eauto_muster",
     "szenarien", "standard_szenarien", "stichproben", "netz", "geraete",
 }
-_GRID = {"zuschlaege_cent_kwh_netto", "snap_im_preisjahr"}
+_GRID = {"snap_im_preisjahr"}
 _APPLIANCES = {
     "aktiv", "seed", "fenster_start", "haeufungen", "haeufung_gewicht", "haeufung_breite_h", "geraete",
     "laeufe_je_woche",

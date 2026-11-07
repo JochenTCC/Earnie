@@ -2,6 +2,35 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Edibert grid fixed fees in house profile and SE invoice (2026-11-07)
+
+- [x] **Edibert grid fixed fees in house profile and SE invoice** `[feat]` *(2026-10-31, left from the pin v0.1.12)*: Earnie read none of the grid area's fixed amounts, so 76.82 EUR/year net were missing from every SE total, and a fee moved there by the migration was no longer shown.
+  - **Invoice and totals:** `simulation/monthly_fees.py::grid_fixed_parts` reads `GridFee.fixed`: one twelfth per calendar month with the import tariff's VAT, as in Edibert's `grid_fixed_month_eur` (not in its public API, so Earnie has the same one line). `ScenarioFeeBreakdown.grid_monthly_eur` keeps its name, so the log shape stays. Each amount has its line under "Netznutzung", the sum its line under "Jahr". Reference and ladder series bill the same amounts.
+  - **Dropped:** `grid_monthly_fee_eur` from `monthly_fees.py`, `tariffs_store.py`, `tariff_parameter_preview.py` and `tariffs.schema.json`. Edibert has rejected the field on load since `v0.1.12`, so these paths always read 0. `tf1.tariff_format` still moves it.
+  - **House profile:** the caption under a grid area names its per-kWh parts and fixed amounts.
+  - **"Eigener Arbeitspreis" (decided here, no maintainer decision yet):** saving the form replaced the whole area and so dropped time rules, fixed amounts and a migrated fee. It now changes only work price, label and land. The form gets no rule editor: rules go in `user_grid_fees.json`, and a caption shows what the area holds.
+  - **VAT on tariff fees (maintainer's decision):** monthly fees of net tariffs now get their tariff's VAT, as in Edibert's `monthly_fees_eur`, so `awattar_at` counts 5.75 EUR instead of 4.79 EUR a month. Missing VAT facts on a fee are an error. An export tariff with 0 % VAT keeps its fee net, so a supplier that only appears on the export side stays too low.
+  - **Docs:** `preise.md`, `tarife-quellen.md`, user manual, release-note draft.
+  - **Tests:** `tests/test_monthly_fees.py`, `tests/test_edibert_p3b.py`, `tests/test_edibert_p2.py`, `tests/apptest/test_house_profile_grid_fixed_apptest.py`.
+
+### Grid catalog: grid loss, levies and fixed amounts (2026-11-07)
+
+- [x] **Complete the catalog's grid areas** *(from **Edibert grid fixed fees**, decided 2026-11-07, maintainer)*: `share/config/grid_fees.json` held only the work price of its 14 areas, so `k_act` was too low.
+  - **Values:** read from the regulations on RIS: BGBl. II Nr. 305/2025 (work price, flat fee, grid loss), Nr. 301/2025 (renewables contribution, also 3.796 EUR on the flat fee), Nr. 416/2024 (flat fee of 19.02 EUR), BGBl. I Nr. 95/2025 through its summaries (electricity levy at the household rate of 0.1 ct/kWh, limited to 2026). The statute itself, the rate from 2027 and who bills the levy were not confirmed. Fixed amounts: 76.82 EUR/year.
+  - **Prices:** import rises by 1.34 ct/kWh gross in Vorarlberg and 1.70 ct/kWh in Vienna. SNAP takes its 20 % off the work price only.
+  - **Invoice:** the per-kWh parts have their own line, apart from the supplier.
+  - **Study:** `make_houses` no longer adds surcharges; the catalog holds the same 1.113 ct net. The net grid price is the same in all 35,040 slots of the price year.
+  - **Existing installs (maintainer's decision):** wizard step `tf1.grid_area_levies`, an Earnie step because the format stays the same, with its values frozen. An edited work price gets a question per area; "Nicht ergänzen" writes `components: []`. `attended_only` keeps it out of recorder replay and pack import, so recorded plans keep their prices; an imported pack meets it in the wizard.
+  - **Tests:** `tests/test_migration_grid_area_levies.py`, `tests/test_catalog_frozen.py`, fixture `v5_pre_grid_levies`. `tests/fixtures/backtesting/grid_fees.json` keeps its work prices with `components: []`, so the suite's prices stay as pinned. All 12 regression cases pass with no golden changed, as they do not price with the seed. Dry run and run on a temporary copy of a real site pack: no question, one step.
+
+### Bugfix — SoC base level charged from the grid up to the level (2026-11-07)
+
+- [x] **SoC base level: the plan charged from the grid up to the level** *(found by the prototype's tests; SE prototype behind `EARNIE_BASE_LEVEL`, off by default, on in the study's stage 1)*: the value of the energy held at SA₂ was below the cheapest buy price, which was taken to mean the level comes from PV only. But it is a bonus on the SoC at SA₂, and the same energy can still replace an import past SA₂, so value and use add up and grid charging paid. Battery at minimum, no PV, flat 20 ct, load past SA₂: 4.2 kWh charged from the grid, none without the level.
+  - **Fix:** `optimizer/milp_horizon_extras.py::_base_level_pv_energy`: only energy that did not come from the grid since the plan's start earns the value. It grows by what PV can charge beyond the load and falls with the SoC. A plan starts at its SoC hold, and the energy there counts in full, as its origin is not known. Two continuous variables per slot up to SA₂, only with the level on. Grid charging that pays by itself is not blocked. More than one battery now stops with an error; before, only the first one was held.
+  - **Off by default:** without `EARNIE_BASE_LEVEL` no variable is added.
+  - **Limits:** PV counts beyond the load without flex, so PV that runs a flex load while the grid charges the battery still earns the value. Energy charged from the grid in an earlier window counts in full at the next start.
+  - **Tests:** `tests/test_se_prototype_switches.py`. The effect on a study house is under **SoC base level** in `Backlog.md`.
+
 ### HA carrier: fail-safe values for every written signal (2026-11-07)
 
 - [x] **HA carrier: fail-safe values for every written signal** `[feat]` *(follow-up of GitHub #60)*: a discharge lock (`set_ess_discharge_power_limit` = 0) stayed active while Earnie was down, because the watchdog of the generated package only released a forced active power. Fallback behaviour stays device-specific, so the user enters the values. HA only; Loxone and others keep their own logic. Modes and defaults from the house configuration are **HA carrier: fail-safe for modes and defaults** under Version 2.+1.

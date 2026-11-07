@@ -39,6 +39,7 @@ Tariff-track files never carry `earnie_data_model`. Untagged ones are migrated b
 ```
 
 - Tariff-track format changes: change the Edibert spec/library first; Earnie only wraps the step.
+- Exception, a correction of data in a site's catalog copy without a format change (`tf1.grid_area_levies`): an Earnie step with frozen values, `attended_only=True` when it changes what the pack computes, because recorder replay and pack import must not change it.
 - A change of a file that the other side parses strictly (`netznutzung` in `house_profiles.json`, `grid_fees.json`) needs a matching release on both sides.
 
 ## Checklist (new or changed pack shape)

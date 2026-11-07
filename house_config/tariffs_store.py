@@ -193,7 +193,6 @@ def _normalize_dach_fields(raw: dict, spec: dict) -> None:
         "markup_percent",
         "vat_percent",
         "monthly_fee_eur",
-        "grid_monthly_fee_eur",
         "metering_monthly_fee_eur",
         "other_monthly_fee_eur",
     ):

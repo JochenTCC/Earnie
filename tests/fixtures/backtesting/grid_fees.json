@@ -68,169 +68,211 @@
       "id": "AT-BGLD",
       "label": "Burgenland",
       "land": "AT",
-      "regions": ["1"],
+      "regions": [
+        "1"
+      ],
       "base_cent_kwh": {
         "unmetered_power": 8.46,
         "metered_power": 5.83
       },
       "rule_set": "AT_NE7",
-      "source": "Netznutzungsentgelte_Oesterreich_NE7.xlsx (SNE-V 2018, Fassung 01.04.2026; Recherche, nicht gegen Preisblatt geprüft)"
+      "source": "Netznutzungsentgelte_Oesterreich_NE7.xlsx (SNE-V 2018, Fassung 01.04.2026; Recherche, nicht gegen Preisblatt geprüft)",
+      "components": []
     },
     {
       "id": "AT-KTN",
       "label": "Kärnten",
       "land": "AT",
-      "regions": ["2"],
+      "regions": [
+        "2"
+      ],
       "base_cent_kwh": {
         "unmetered_power": 9.67,
         "metered_power": 5.47
       },
       "rule_set": "AT_NE7",
-      "source": "Netznutzungsentgelte_Oesterreich_NE7.xlsx (SNE-V 2018, Fassung 01.04.2026; Recherche, nicht gegen Preisblatt geprüft)"
+      "source": "Netznutzungsentgelte_Oesterreich_NE7.xlsx (SNE-V 2018, Fassung 01.04.2026; Recherche, nicht gegen Preisblatt geprüft)",
+      "components": []
     },
     {
       "id": "AT-KLGF",
       "label": "Klagenfurt",
       "land": "AT",
-      "regions": ["2"],
+      "regions": [
+        "2"
+      ],
       "base_cent_kwh": {
         "unmetered_power": 6.9,
         "metered_power": 4.36
       },
       "rule_set": "AT_NE7",
-      "source": "Netznutzungsentgelte_Oesterreich_NE7.xlsx (SNE-V 2018, Fassung 01.04.2026; Recherche, nicht gegen Preisblatt geprüft)"
+      "source": "Netznutzungsentgelte_Oesterreich_NE7.xlsx (SNE-V 2018, Fassung 01.04.2026; Recherche, nicht gegen Preisblatt geprüft)",
+      "components": []
     },
     {
       "id": "AT-NOE",
       "label": "Niederösterreich",
       "land": "AT",
-      "regions": ["3"],
+      "regions": [
+        "3"
+      ],
       "base_cent_kwh": {
         "unmetered_power": 8.79,
         "metered_power": 6.65
       },
       "rule_set": "AT_NE7",
-      "source": "Netznutzungsentgelte_Oesterreich_NE7.xlsx (SNE-V 2018, Fassung 01.04.2026; Recherche, nicht gegen Preisblatt geprüft)"
+      "source": "Netznutzungsentgelte_Oesterreich_NE7.xlsx (SNE-V 2018, Fassung 01.04.2026; Recherche, nicht gegen Preisblatt geprüft)",
+      "components": []
     },
     {
       "id": "AT-OOE",
       "label": "Oberösterreich",
       "land": "AT",
-      "regions": ["4"],
+      "regions": [
+        "4"
+      ],
       "base_cent_kwh": {
         "unmetered_power": 6.29,
         "metered_power": 4.68
       },
       "rule_set": "AT_NE7",
-      "source": "Netznutzungsentgelte_Oesterreich_NE7.xlsx (SNE-V 2018, Fassung 01.04.2026; Recherche, nicht gegen Preisblatt geprüft)"
+      "source": "Netznutzungsentgelte_Oesterreich_NE7.xlsx (SNE-V 2018, Fassung 01.04.2026; Recherche, nicht gegen Preisblatt geprüft)",
+      "components": []
     },
     {
       "id": "AT-LINZ",
       "label": "Linz",
       "land": "AT",
-      "regions": ["4"],
+      "regions": [
+        "4"
+      ],
       "base_cent_kwh": {
         "unmetered_power": 5.57,
         "metered_power": 3.26
       },
       "rule_set": "AT_NE7",
-      "source": "Netznutzungsentgelte_Oesterreich_NE7.xlsx (SNE-V 2018, Fassung 01.04.2026; Recherche, nicht gegen Preisblatt geprüft)"
+      "source": "Netznutzungsentgelte_Oesterreich_NE7.xlsx (SNE-V 2018, Fassung 01.04.2026; Recherche, nicht gegen Preisblatt geprüft)",
+      "components": []
     },
     {
       "id": "AT-SBG",
       "label": "Salzburg",
       "land": "AT",
-      "regions": ["5"],
+      "regions": [
+        "5"
+      ],
       "base_cent_kwh": {
         "unmetered_power": 6.59,
         "metered_power": 3.91
       },
       "rule_set": "AT_NE7",
-      "source": "Netznutzungsentgelte_Oesterreich_NE7.xlsx (SNE-V 2018, Fassung 01.04.2026; Recherche, nicht gegen Preisblatt geprüft)"
+      "source": "Netznutzungsentgelte_Oesterreich_NE7.xlsx (SNE-V 2018, Fassung 01.04.2026; Recherche, nicht gegen Preisblatt geprüft)",
+      "components": []
     },
     {
       "id": "AT-STMK",
       "label": "Steiermark",
       "land": "AT",
-      "regions": ["6"],
+      "regions": [
+        "6"
+      ],
       "base_cent_kwh": {
         "unmetered_power": 8.82,
         "metered_power": 6.78
       },
       "rule_set": "AT_NE7",
-      "source": "Netznutzungsentgelte_Oesterreich_NE7.xlsx (SNE-V 2018, Fassung 01.04.2026; Recherche, nicht gegen Preisblatt geprüft)"
+      "source": "Netznutzungsentgelte_Oesterreich_NE7.xlsx (SNE-V 2018, Fassung 01.04.2026; Recherche, nicht gegen Preisblatt geprüft)",
+      "components": []
     },
     {
       "id": "AT-GRAZ",
       "label": "Graz",
       "land": "AT",
-      "regions": ["6"],
+      "regions": [
+        "6"
+      ],
       "base_cent_kwh": {
         "unmetered_power": 5.17,
         "metered_power": 4.23
       },
       "rule_set": "AT_NE7",
-      "source": "Netznutzungsentgelte_Oesterreich_NE7.xlsx (SNE-V 2018, Fassung 01.04.2026; Recherche, nicht gegen Preisblatt geprüft)"
+      "source": "Netznutzungsentgelte_Oesterreich_NE7.xlsx (SNE-V 2018, Fassung 01.04.2026; Recherche, nicht gegen Preisblatt geprüft)",
+      "components": []
     },
     {
       "id": "AT-TIROL",
       "label": "Tirol",
       "land": "AT",
-      "regions": ["7"],
+      "regions": [
+        "7"
+      ],
       "base_cent_kwh": {
         "unmetered_power": 6.81,
         "metered_power": 3.66
       },
       "rule_set": "AT_NE7",
-      "source": "Netznutzungsentgelte_Oesterreich_NE7.xlsx (SNE-V 2018, Fassung 01.04.2026; Recherche, nicht gegen Preisblatt geprüft)"
+      "source": "Netznutzungsentgelte_Oesterreich_NE7.xlsx (SNE-V 2018, Fassung 01.04.2026; Recherche, nicht gegen Preisblatt geprüft)",
+      "components": []
     },
     {
       "id": "AT-IBK",
       "label": "Innsbruck",
       "land": "AT",
-      "regions": ["7"],
+      "regions": [
+        "7"
+      ],
       "base_cent_kwh": {
         "unmetered_power": 8.03,
         "metered_power": 5.72
       },
       "rule_set": "AT_NE7",
-      "source": "Netznutzungsentgelte_Oesterreich_NE7.xlsx (SNE-V 2018, Fassung 01.04.2026; Recherche, nicht gegen Preisblatt geprüft)"
+      "source": "Netznutzungsentgelte_Oesterreich_NE7.xlsx (SNE-V 2018, Fassung 01.04.2026; Recherche, nicht gegen Preisblatt geprüft)",
+      "components": []
     },
     {
       "id": "AT-VBG",
       "label": "Vorarlberg",
       "land": "AT",
-      "regions": ["8"],
+      "regions": [
+        "8"
+      ],
       "base_cent_kwh": {
         "unmetered_power": 4.96,
         "metered_power": 2.84
       },
       "rule_set": "AT_NE7",
-      "source": "Netznutzungsentgelte_Oesterreich_NE7.xlsx (SNE-V 2018, Fassung 01.04.2026; Recherche, nicht gegen Preisblatt geprüft)"
+      "source": "Netznutzungsentgelte_Oesterreich_NE7.xlsx (SNE-V 2018, Fassung 01.04.2026; Recherche, nicht gegen Preisblatt geprüft)",
+      "components": []
     },
     {
       "id": "AT-WIEN",
       "label": "Wien",
       "land": "AT",
-      "regions": ["9"],
+      "regions": [
+        "9"
+      ],
       "base_cent_kwh": {
         "unmetered_power": 6.98,
         "metered_power": 4.21
       },
       "rule_set": "AT_NE7",
-      "source": "Netznutzungsentgelte_Oesterreich_NE7.xlsx (SNE-V 2018, Fassung 01.04.2026; Recherche, nicht gegen Preisblatt geprüft)"
+      "source": "Netznutzungsentgelte_Oesterreich_NE7.xlsx (SNE-V 2018, Fassung 01.04.2026; Recherche, nicht gegen Preisblatt geprüft)",
+      "components": []
     },
     {
       "id": "AT-KLWT",
       "label": "Kleinwalsertal",
       "land": "AT",
-      "regions": ["8"],
+      "regions": [
+        "8"
+      ],
       "base_cent_kwh": {
         "unmetered_power": 17.73,
         "metered_power": 11.4
       },
       "rule_set": "AT_NE7",
-      "source": "Netznutzungsentgelte_Oesterreich_NE7.xlsx (SNE-V 2018, Fassung 01.04.2026; Recherche, nicht gegen Preisblatt geprüft)"
+      "source": "Netznutzungsentgelte_Oesterreich_NE7.xlsx (SNE-V 2018, Fassung 01.04.2026; Recherche, nicht gegen Preisblatt geprüft)",
+      "components": []
     }
   ]
 }

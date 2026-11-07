@@ -230,25 +230,17 @@ def _components(house: DerivedHouse, params: dict, *, performance_ratio: float) 
 
 
 def study_grid_fees(catalog: dict, params: dict) -> dict:
-    """Grid fee catalog of a pack: the volumetric surcharges in the base price, SNAP in the study's year.
-
-    The surcharges are not part of the catalog's ``base_cent_kwh``. SNAP takes its 20 % off the
-    catalog's work price only, so the rule becomes a fixed reduction once the base holds them too.
-    """
+    """Grid fee catalog of a pack: SNAP over the whole price year, the catalog's prices as they are."""
     doc = copy.deepcopy(catalog)
-    grid = params["netz"]
     area_id = params["annahmen"]["netzbereich"]
     area = next((a for a in doc["areas"] if a["id"] == area_id), None)
     if area is None:
         raise SystemExit(f"Netzbereich {area_id} fehlt im Netzentgelt-Katalog.")
-    base = area["base_cent_kwh"]["unmetered_power"]
-    area["base_cent_kwh"]["unmetered_power"] = round(base + sum(grid["zuschlaege_cent_kwh_netto"].values()), 4)
-    if grid["snap_im_preisjahr"]:
+    if params["netz"]["snap_im_preisjahr"]:
         snap = next((r for r in doc["rule_sets"][area["rule_set"]] if r["id"] == "SNAP"), None)
-        if snap is None or snap["effect"]["mode"] != "percent_off":
-            raise SystemExit(f"SNAP mit percent_off fehlt im Regelwerk {area['rule_set']}.")
+        if snap is None:
+            raise SystemExit(f"SNAP fehlt im Regelwerk {area['rule_set']}.")
         snap["valid_from"] = f"{params['preisjahr']}-01-01"
-        snap["effect"] = {"mode": "add_cent", "value": round(-base * snap["effect"]["value"] / 100.0, 4)}
     return doc
 
 

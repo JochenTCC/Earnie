@@ -99,6 +99,23 @@ def _add_virtual_reserve_refill(
     )
 
 
+def _base_level_start(
+    battery_params: dict | list[dict],
+    current_soc: float,
+    soc_hold_index: int | None,
+    soc_hold_percent: float | None,
+) -> tuple[int, float]:
+    """First slot the SoC base level tracks and the energy before it.
+
+    With a SoC hold the plan starts for real after the hold: the slots before it are not replayed
+    and only lead there.
+    """
+    capacity = float(_primary_battery_params(battery_params).get("battery_capacity_kwh") or 0.0)
+    if soc_hold_index is not None and soc_hold_percent is not None:
+        return soc_hold_index + 1, float(soc_hold_percent) / 100.0 * capacity
+    return 0, float(current_soc) / 100.0 * capacity
+
+
 def _build_milp_model_with_objective(
     matrix: list[dict[str, Any]],
     battery_params: dict | list[dict],
@@ -113,6 +130,8 @@ def _build_milp_model_with_objective(
     current_soc_by_id: dict[str, float] | None = None,
     inverter_params: dict | list[dict] | None = None,
     pv_systems: list[dict] | None = None,
+    soc_hold_index: int | None = None,
+    soc_hold_percent: float | None = None,
 ) -> MilpHorizonModel:
     """Horizontmodell samt Zielfunktion (Energiekosten + Batterie-Verschleiß)."""
     from .export_power_limit import export_caps_for_horizon
@@ -161,6 +180,9 @@ def _build_milp_model_with_objective(
         k_push,
         inputs.ev_milp_by_id,
         wear_cent_per_kwh=wear_cent_per_kwh,
+        base_level_start=_base_level_start(
+            battery_params, current_soc, soc_hold_index, soc_hold_percent
+        ),
     )
     return model
 
@@ -330,6 +352,8 @@ def _solve_milp_to_model(
         current_soc_by_id=current_soc_by_id,
         inverter_params=inverter_params,
         pv_systems=pv_systems,
+        soc_hold_index=soc_hold_index,
+        soc_hold_percent=soc_hold_percent,
     )
     _add_flex_side_constraints(
         model, matrix, inputs, verbose, consumer_continue_on, thermal_flex_contexts
