@@ -511,6 +511,14 @@ def build_capacity_rows(meta: dict) -> list[dict]:
                 "Leistungspreis [€]": format_euro(
                     sum(float(month["gross_eur"]) for month in months)
                 ),
+                "Bezugsgrenze [kW]": (
+                    format_decimal(float(highest["import_cap_kw"]))
+                    if highest.get("import_cap_kw") is not None
+                    else "–"
+                ),
+                "Viertelstunden über der Grenze": sum(
+                    int(month.get("slots_over_cap", 0)) for month in months
+                ),
             }
         )
     return rows

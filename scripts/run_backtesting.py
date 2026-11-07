@@ -26,6 +26,7 @@ from simulation.engine_scenario import scenario_standby_power_kw
 from simulation.backtesting_horizon import BOOK_PERIOD_KEY
 from simulation.period_clip import clip_results_map_to_period
 from simulation.reference_costs import reference_standby_power_kw
+from house_config.import_cap import parse_import_cap
 from simulation.capacity_charge import capacity_by_result, check_capacity_coverage
 from simulation.monthly_fees import fee_breakdowns_by_result_id
 from simulation.se_invoice_markdown import write_se_invoices
@@ -1416,7 +1417,16 @@ def main(argv: list[str] | None = None):
         HISTORICAL_REFERENCE_ID: reference_params,
     }
     heat_fuel = heat_fuel_by_result(clipped_results, params_by_result)
-    capacity = capacity_by_result(clipped_results, params_by_result)
+    capacity = capacity_by_result(
+        clipped_results,
+        params_by_result,
+        # Only the optimized runs plan with the cap, the references carry the same params.
+        {
+            scenario_id: cap.cap_kw
+            for scenario_id, params in scenarios.items()
+            if (cap := parse_import_cap(params)) is not None
+        },
+    )
     log_path = save_backtesting_log(
         sim_results,
         labels,

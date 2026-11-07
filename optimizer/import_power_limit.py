@@ -5,7 +5,7 @@ charge. Plan: ``docs/dev/max-power-tariff-plan.md`` (P3, decisions D3 and D4).
 """
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
 
@@ -18,6 +18,22 @@ class ImportCaps:
 
     limits_kw: tuple[float | None, ...]
     months: tuple[str | None, ...]
+
+    def from_slot(self, start: int) -> ImportCaps | None:
+        """The limits of a plan that starts at slot ``start``; ``None`` when none is left."""
+        return _caps_or_none(self.limits_kw[start:], self.months[start:])
+
+    def only_at(self, indices: Collection[int]) -> ImportCaps | None:
+        """Keeps the limits of these slots, the others go free; ``None`` when none is left."""
+        return _caps_or_none(
+            tuple(limit if i in indices else None for i, limit in enumerate(self.limits_kw)),
+            tuple(month if i in indices else None for i, month in enumerate(self.months)),
+        )
+
+
+def _caps_or_none(limits: tuple[float | None, ...], months: tuple[str | None, ...]) -> ImportCaps | None:
+    """A plan without any limit gets no ``ImportCaps``, so the model has no extra variables."""
+    return None if all(limit is None for limit in limits) else ImportCaps(limits, months)
 
 
 def import_caps_for_slots(
@@ -43,9 +59,7 @@ def import_caps_for_slots(
         peak = max(0.0, float(peak_by_month.get(month, 0.0)))
         limits.append(max(cap.cap_kw, peak) - cap.margin_kw)
         months.append(month)
-    if all(limit is None for limit in limits):
-        return None
-    return ImportCaps(tuple(limits), tuple(months))
+    return _caps_or_none(tuple(limits), tuple(months))
 
 
 def import_caps_from_params(

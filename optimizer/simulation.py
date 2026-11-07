@@ -22,6 +22,7 @@ from .charging_context import (  # noqa: F401  (consumer_charging_eligible_indic
 from .generic_flex_run import continue_on_from_state, update_generic_flex_run_state
 from .filter_context import adjust_targets_for_native_filter, resolve_filter_contexts
 from .fixed_load import adjust_targets_for_continuous_load
+from .import_power_limit import ImportCaps
 from .milp import milp_horizon_schedule, milp_optimizer
 from .targets import (
     consumer_column_name,
@@ -106,6 +107,7 @@ def _simulate_single_hour_optimizer(
     consumer_continue_on: dict[str, bool] | None = None,
     soc_hold_index: int | None = None,
     soc_hold_percent: float | None = None,
+    import_caps: ImportCaps | None = None,
 ) -> tuple[float, dict, int, float]:
     """Simuliert eine einzelne Stunde im optimierten Pfad (Huawei-Logik für die Batterie)."""
     h = row["hour"]
@@ -138,6 +140,7 @@ def _simulate_single_hour_optimizer(
         consumer_continue_on=consumer_continue_on,
         soc_hold_index=rel_hold,
         soc_hold_percent=soc_hold_percent if rel_hold is not None else None,
+        import_caps=import_caps,
     )
     return _chart_row_from_controls(
         row,
@@ -346,6 +349,7 @@ def _solve_slot_mpc(
         consumer_continue_on=slot_in.continue_on,
         soc_hold_index=options.soc_hold_index,
         soc_hold_percent=options.soc_hold_percent,
+        import_caps=options.import_caps_from(hour_index),
     )
 
 
@@ -391,6 +395,7 @@ def _refill_commit_buffer(
             options.soc_hold_percent if rel_hold is not None else None
         ),
         current_soc_by_id=setup.current_soc_by_id,
+        import_caps=options.import_caps_from(hour_index),
     )
     commit_slots = _commit_slots_for_buffer(
         options.commit_hours,
@@ -593,6 +598,7 @@ def simulate_horizon(
     soc_hold_percent: float | None = None,
     current_soc_by_id: dict[str, float] | None = None,
     booking_matrix: list | None = None,
+    import_caps: ImportCaps | None = None,
 ) -> list:
     """
     Simuliert einen Optimierungshorizont über die gesamte Matrix.
@@ -605,6 +611,8 @@ def simulate_horizon(
     soc_hold_*: optional hard SoC equality (SE SA₁ carry-in); survives disable_horizon_soc_anchor.
     booking_matrix: SE forecast mode, the MILP plans on ``optimization_matrix`` and the schedule
     is applied to these actual rows (open-loop only; ``docs/dev/se-forecast-mode.md``).
+    import_caps: SE import limit per matrix slot. A re-solve inside the matrix keeps these limits
+    and does not lift them by what it already booked (``docs/dev/max-power-tariff-plan.md``, P4).
     """
     if commit_hours < 1:
         raise ValueError(
@@ -625,6 +633,7 @@ def simulate_horizon(
         sunrise_soc_min_index=sunrise_soc_min_index,
         soc_hold_index=soc_hold_index,
         soc_hold_percent=soc_hold_percent,
+        import_caps=import_caps,
     )
     setup = _prepare_horizon_state(
         optimization_matrix,

@@ -6,6 +6,7 @@ Prices, minimum and start date come from the grid area through Edibert.
 """
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass, field
 from datetime import date
 
@@ -15,6 +16,7 @@ from optimizer.slot_duration import DEFAULT_DT_H, validate_dt_h
 from simulation.booked_consumption import _unique_slots
 
 CAPACITY_KEY = "capacity_by_scenario"
+_OVER_CAP_TOLERANCE_KW = 1e-6
 
 
 @dataclass(frozen=True)
@@ -28,6 +30,9 @@ class CapacityMonth:
     billed_kw: float
     net_eur: float
     gross_eur: float  # with the import tariff's VAT, as the fixed grid amounts
+    # Only for a result planned with a cap. The booked rows can differ from the plan.
+    import_cap_kw: float | None = None
+    slots_over_cap: int = 0
 
 
 @dataclass(frozen=True)
@@ -62,12 +67,16 @@ def _pricing_reference(params: dict | None) -> dict | None:
     return ref if isinstance(ref, dict) else None
 
 
-def _month_peaks(df: pd.DataFrame) -> dict[str, tuple[float, pd.Timestamp]]:
-    """Highest booked import power per calendar month; every slot counts once (last booking wins)."""
+def _booked_import_kw(df: pd.DataFrame) -> pd.Series:
+    """Booked import power per slot; every slot counts once (last booking wins)."""
     if "import_kwh" not in df.columns:
         raise ValueError("Leistungspreis: Ergebnisreihe ohne Spalte import_kwh.")
     unique, _duplicates = _unique_slots(df)
-    power_kw = unique["import_kwh"].fillna(0.0).clip(lower=0.0) / validate_dt_h(DEFAULT_DT_H)
+    return unique["import_kwh"].fillna(0.0).clip(lower=0.0) / validate_dt_h(DEFAULT_DT_H)
+
+
+def _month_peaks(power_kw: pd.Series) -> dict[str, tuple[float, pd.Timestamp]]:
+    """Highest booked import power per calendar month."""
     peaks: dict[str, tuple[float, pd.Timestamp]] = {}
     for month, part in power_kw.groupby(power_kw.index.strftime("%Y-%m")):
         slot = part.idxmax()
@@ -75,8 +84,23 @@ def _month_peaks(df: pd.DataFrame) -> dict[str, tuple[float, pd.Timestamp]]:
     return peaks
 
 
-def capacity_for_result(df: pd.DataFrame, params: dict | None) -> CapacityResult:
-    """Capacity charge per calendar month touched by ``df``; a partial month counts in full."""
+def _slots_over_cap(power_kw: pd.Series, month: str, cap_kw: float | None) -> int:
+    if cap_kw is None:
+        return 0
+    return int((power_kw[power_kw.index.strftime("%Y-%m") == month] > cap_kw + _OVER_CAP_TOLERANCE_KW).sum())
+
+
+def capacity_for_result(
+    df: pd.DataFrame,
+    params: dict | None,
+    *,
+    planned_cap_kw: float | None = None,
+) -> CapacityResult:
+    """Capacity charge per calendar month touched by ``df``; a partial month counts in full.
+
+    ``planned_cap_kw``: the cap this result was planned with. L0 to L2 carry the scenario's params
+    but plan without it, so the params alone cannot tell.
+    """
     from data.edibert_slot_prices import grid_fee, tariff
     from house_config.edibert_tariffs import (
         IMPORT,
@@ -92,7 +116,8 @@ def capacity_for_result(df: pd.DataFrame, params: dict | None) -> CapacityResult
     used: dict[str, object] = {}
     if fee.capacity and not df.empty:
         factor = 1.0 + float(tariff(ref, IMPORT).vat_percent) / 100.0
-        for month, (peak_kw, slot) in sorted(_month_peaks(df).items()):
+        power_kw = _booked_import_kw(df)
+        for month, (peak_kw, slot) in sorted(_month_peaks(power_kw).items()):
             charge = capacity_charge_for_month(fee, date.fromisoformat(f"{month}-01"))
             if charge is None:
                 continue
@@ -107,6 +132,8 @@ def capacity_for_result(df: pd.DataFrame, params: dict | None) -> CapacityResult
                     billed_kw=max(peak_kw, float(charge.min_kw)),
                     net_eur=net,
                     gross_eur=net * factor,
+                    import_cap_kw=planned_cap_kw,
+                    slots_over_cap=_slots_over_cap(power_kw, month, planned_cap_kw),
                 )
             )
     return CapacityResult(
@@ -119,13 +146,17 @@ def capacity_for_result(df: pd.DataFrame, params: dict | None) -> CapacityResult
 def capacity_by_result(
     results: dict[str, pd.DataFrame],
     params_by_result: dict[str, dict | None],
+    planned_cap_kw_by_result: Mapping[str, float] | None = None,
 ) -> dict[str, CapacityResult]:
     """Results that have a capacity charge or a skipped entry; the others are left out."""
+    planned = planned_cap_kw_by_result or {}
     out: dict[str, CapacityResult] = {}
     for result_id, df in results.items():
         if df is None or df.empty:
             continue
-        capacity = capacity_for_result(df, params_by_result.get(result_id))
+        capacity = capacity_for_result(
+            df, params_by_result.get(result_id), planned_cap_kw=planned.get(result_id)
+        )
         if capacity.months or capacity.skipped:
             out[result_id] = capacity
     return out

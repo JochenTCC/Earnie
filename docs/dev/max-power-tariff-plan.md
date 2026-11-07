@@ -112,6 +112,35 @@ Penalty sized on one synthetic winter day (96 slots, 10 kWh battery, evening loa
 
 ### P4: Cap in the SE
 
+**Built 2026-11-07.** Live still plans without the cap (P5).
+
+Only booked slots get a limit. A window's lead-in SA₀→SA₁ was booked by the previous window, and a limit there would make the overshoot variable free for the slots that count. Slots over the cap count booked rows against `cap_kw`, not against the cap less the margin.
+
+Measured on the public sample pack `studies/poc_cloud` (2025, AT prices), sunrise window, HiGHS, margin 0.3 kW, four scenarios in parallel, with a made-up capacity charge of 150/300 cent per kW and month (band limit 10 kW, minimum 2 kW):
+
+| Cap | Energy € | Capacity € | Sum € | Highest month peak kW | Slots over the cap | Solver events | Runtime s |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| none | 2179.14 | 176.24 | 2355.39 | 9.62 | – | 153 | 777 |
+| 8 kW | 2182.33 | 165.71 | 2348.04 | 9.62 | 23 | 163 | 793 |
+| 5 kW | 2194.63 | 141.90 | 2336.53 | 8.12 | 611 | 171 | 834 |
+| 3 kW | 2208.82 | 145.58 | 2354.40 | 8.12 | 13783 | 182 | 852 |
+
+- **Runtime:** same order, at most about 10 % longer. No window failed and no solve hung.
+- **Reading the euros:** the price is a placeholder, so only the shape counts. Here 5 kW pays best, and 3 kW costs more energy without lowering the charge further than 5 kW does. This is what the handbook means by a cap that can cost more than it saves.
+- **The sample house is hard to cap:** heat pump and EV each draw 3.5 kW, the EV averages 1.65 kW over the year, and load is hourly. Base load and heat pump alone reach 3.65 kW, so 3 kW cannot hold while the heat pump runs. A peak of 7.12 kW in most months at 5 kW is heat pump plus EV plus base load. A house with less load needs its own run before anyone quotes a saving.
+- **Plan, not replay:** January at 8 kW has 9 slots over the cap, and plan and booked import agree at all of them. So they come from the plan, not from the replay. The plan exceeds even the raised limit in 6 of the month's 2976 slots.
+- **One breach lifts the month:** on 15 January dryer, EV and heat pump meet an empty battery at 9.54 kW. After that the limit is 9.24 kW and the battery charges from the grid at 2.5 kW on top of a 7.12 kW load. That follows the ratchet by design, and it is why a missed cap counts many slots. Why the plan stacks those loads on that evening was not traced.
+
+Known limits:
+
+- A re-solve inside one window does not lift limits by peaks of that same window. The product path has one solve per window.
+- On-demand single-window replay (`simulate_window_snapshot`) starts with no peak, as it starts with no rod store level.
+- The forced grid recharge of fixed_24h at the horizon end is not capped; it only happens with an active SoC anchor.
+- **Strict mode has no time limit:** a 0.1 kW cap did not end in 240 s with `EARNIE_CBC_STRICT=1`, against 5 s without. Importing `scripts.run_regression` sets that variable for the whole process, so all of a full pytest run is strict, which is what hung the suite. `tests/test_se_import_cap.py` removes the variable; the import side effect stays, as a separate change. A regression case with a cap needs a look at this first.
+- **The gap stage has no time limit either** (`optimizer/cbc_solver.py`, `solve_with_strict_fallback`). The year run never got stuck there, but nothing would stop a solve that does. Live needs a decision before P5 ships.
+
+Planned:
+
 - `_HorizonOptions` and `_refill_commit_buffer` pass caps. Peaks per month carry across windows next to the rod store and update from booked rows.
 - Only L3 gets the cap. L0 to L2 stay uncapped and still get their capacity line, so the comparison shows what the cap earns.
 - The booked replay can differ from the plan (Automatik, control mapping). The result therefore reports booked peak, planned cap and slots over the cap per month.

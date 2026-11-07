@@ -4,6 +4,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import NamedTuple
 
+from optimizer.import_power_limit import ImportCaps
+
 
 @dataclass(frozen=True)
 class _HorizonOptions:
@@ -17,6 +19,12 @@ class _HorizonOptions:
     sunrise_soc_min_index: int | None
     soc_hold_index: int | None
     soc_hold_percent: float | None
+    # SE only: one entry per matrix slot, set when the window starts.
+    import_caps: ImportCaps | None = None
+
+    def import_caps_from(self, hour_index: int) -> ImportCaps | None:
+        """Limits of a solve over the rest of the matrix."""
+        return None if self.import_caps is None else self.import_caps.from_slot(hour_index)
 
 
 @dataclass(frozen=True)

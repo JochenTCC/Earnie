@@ -253,7 +253,7 @@ Typische Vergleiche:
 
 **Tarife:** Bezugs- und Einspeisetarif kommen aus dem Tarifkatalog oder werden als **Eigener Festpreis** mit eigenem Wert in Cent/kWh eingetragen (der Wert gehört dann zum Szenario, nicht zum Katalog).
 
-**Bezugsgrenze:** Optionale Grenze für den Netzbezug je Viertelstunde, gedacht für den Leistungspreis. Leer bedeutet keine Grenze. Sie wirkt nur in Monaten, in denen der Netzbereich einen Leistungspreis hat. Eine enge Grenze kann mehr kosten, als sie spart. Das zeigt ein Vergleich von Varianten mit verschiedenen Grenzen im Szenario-Explorer.
+**Bezugsgrenze:** Optionale Grenze für den Netzbezug je Viertelstunde, gedacht für den Leistungspreis. Leer bedeutet keine Grenze. Sie wirkt nur in Monaten, in denen der Netzbereich einen Leistungspreis hat, und bisher nur im Szenario-Explorer, noch nicht im Live-Betrieb. Eine enge Grenze kann mehr kosten, als sie spart. Das zeigt ein Vergleich von Varianten mit verschiedenen Grenzen im Szenario-Explorer.
 
 - Unter jedem gewählten Tarif steht eine **Vorschau**: Hinweise und Preiskurven, gerechnet mit Land, Region und Netzbereich des Hausprofils dieses Szenarios. Bitte die Werte auf Richtigkeit prüfen – für Vollständigkeit und Aktualität gibt es keine Garantie.
 - Eigene Tarife (**· Benutzertarif** in den Listen) entstehen auf der Seite [Tarife](#tarife-benutzertarife). **Benutzertarife verwalten** öffnet sie mit dem Hausprofil des Szenarios; ist ein Benutzertarif gewählt, öffnet **Benutzertarif bearbeiten** genau diesen. Beide Knöpfe sind gesperrt, solange das Szenario ungespeicherte Änderungen hat.
@@ -333,7 +333,7 @@ Die Auswertung umfasst unter anderem:
 
 Die Ergebnisse sind eine **Entscheidungsgrundlage** für Investition und Tarifwahl, keine exakte Prognose der nächsten Stromrechnung. Eine Gewähr, dass sie genau so eintreffen, gibt es nicht.
 
-Der volumetrische **Netznutzung Arbeitspreis** (Hausprofil) fließt in die Kosten ein. Trägt der Netzbereich einen **Leistungspreis**, weist der Szenario-Explorer ihn je Kalendermonat aus; die Planung berücksichtigt ihn noch nicht.
+Der volumetrische **Netznutzung Arbeitspreis** (Hausprofil) fließt in die Kosten ein. Trägt der Netzbereich einen **Leistungspreis**, weist der Szenario-Explorer ihn je Kalendermonat aus. Die Planung kennt den Preis selbst nicht, die SE-Optimierung plant aber unter einer eingetragenen Bezugsgrenze.
 
 <a id="gesamtkosten-jahres-verbrauch-kwh"></a>
 

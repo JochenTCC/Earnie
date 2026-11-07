@@ -326,7 +326,7 @@ def test_the_engine_hands_each_window_the_level_of_the_one_before(monkeypatch):
     anchors = [datetime(2025, 5, 12), datetime(2025, 5, 13), datetime(2025, 5, 14)]
     started_with: list[dict] = []
 
-    def fake_window(_cfg, _anchor, soc, _hours, _plausibility, levels):
+    def fake_window(_cfg, _anchor, soc, _hours, _plausibility, levels, _peaks):
         started_with.append(dict(levels))
         return SimpleNamespace(sim_soc=soc, chart_rows=[], matrix=[])
 
