@@ -19,6 +19,7 @@ from .eauto_milp import (
 from .filter_context import resolve_filter_contexts
 from .milp_consumers import filter_feasible_consumers
 from .milp_horizon import EMPTY_MILP_PLAN
+from .rod_store import ROD_STORE_START_KEY
 from .scenario_planning_scope import planning_runtime_settings
 from .slot_duration import validate_dt_h
 from .thermal_flex_context import (
@@ -127,7 +128,7 @@ def _resolve_thermal_flex_contexts(
 ) -> dict[str, dict]:
     if thermal_flex_contexts is not None:
         return thermal_flex_contexts
-    # A rod beside a fuel source is the only thermal consumer of a gas house; it needs its caps.
+    # A rod beside a fuel source is the only thermal consumer of a gas house; it needs its store.
     if not any(
         is_thermal_flex_consumer(consumer) or is_heating_rod_consumer(consumer)
         for consumer in consumers
@@ -148,6 +149,7 @@ def _resolve_thermal_flex_contexts(
         consumers,
         profile,
         climate=climate,
+        rod_store_start_kwh=settings.get(ROD_STORE_START_KEY),
     )
 
 

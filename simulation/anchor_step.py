@@ -13,9 +13,12 @@ from optimizer import (
     horizon_end_soc_percent,
     _delivered_flex_kwh_from_rows,
 )
+from optimizer.milp_inputs import _resolve_thermal_flex_contexts
+from optimizer.rod_store import ROD_STORE_START_KEY, STORE_BALANCE_CONTEXT_KEY, next_level_kwh
 from optimizer.scenario_planning_scope import planning_scenario_scope
 from optimizer.slot_duration import DEFAULT_DT_H, validate_dt_h
 from optimizer.targets import consumer_column_name
+from optimizer.thermal_flex_context import is_heating_rod_consumer
 from simulation.backtesting_horizon import naive_backtesting_slot
 from simulation.historical_cache import HistoricalDataCache
 from simulation.horizon_mode import FIXED_24H, SUNRISE_WINDOW
@@ -267,6 +270,32 @@ def _optional_full_horizon_snapshot(
     return None, None
 
 
+def rod_store_levels_after_window(
+    book_matrix: list[dict],
+    book_rows: list[dict],
+    consumers: list[dict],
+    scenario_params: dict,
+    levels_kwh: dict[str, float],
+) -> dict[str, float]:
+    """Store level per heating rod after a booked window: the next window starts from it, like the SoC."""
+    rods = [consumer for consumer in consumers if is_heating_rod_consumer(consumer)]
+    if not rods:
+        return {}
+    with planning_scenario_scope({**scenario_params, ROD_STORE_START_KEY: levels_kwh}):
+        contexts = _resolve_thermal_flex_contexts(book_matrix, rods, None)
+    dt_h = validate_dt_h(DEFAULT_DT_H)
+    after: dict[str, float] = {}
+    for rod in rods:
+        balance = contexts[str(rod["id"])][STORE_BALANCE_CONTEXT_KEY]
+        column = consumer_column_name(rod)
+        level = balance.start_kwh
+        for slot, row in enumerate(book_rows):
+            heat_kwh = float(row.get(column, 0.0) or 0.0) * dt_h
+            level = next_level_kwh(level, heat_kwh, balance.drain_kwh[slot], balance.capacity_kwh)
+        after[str(rod["id"])] = level
+    return after
+
+
 def _simulate_anchor_step(
     anchor: datetime,
     sim_soc: float,
@@ -282,6 +311,7 @@ def _simulate_anchor_step(
     price_resources: BacktestingPriceResources | None = None,
     collect_full_horizon: bool = False,
     forecast_planner=None,
+    rod_store_kwh: dict[str, float] | None = None,
 ) -> tuple[
     list[dict],
     list[dict],
@@ -294,7 +324,7 @@ def _simulate_anchor_step(
     """Ein Backtesting-Schritt für fixed_24h oder sunrise_window (Book [SA₁, SA₂) je ready_by-Tag)."""
     step_start_soc = float(sim_soc)
     # Rod bound and thermal contexts read this scenario's house profile, not the Live one.
-    with planning_scenario_scope(scenario_params):
+    with planning_scenario_scope({**scenario_params, ROD_STORE_START_KEY: rod_store_kwh}):
         plan = _build_anchor_window_plan(
             anchor,
             step_start_soc,

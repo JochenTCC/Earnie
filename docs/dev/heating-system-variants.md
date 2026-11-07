@@ -128,8 +128,9 @@ heating. Therefore:
 6. **Fuel variants and the heating rod.** A fuel variant drops the heat-pump electricity and
    books fuel (`simulation/heat_fuel.py`); its rod is an electric MILP consumer that earns the
    avoided fuel cost per kWh (`heating_rod_fuel_credit_cent_per_kwh`). Beside a heat pump the
-   rod competes on efficiency instead. In both cases the rod is capped at the day's heat
-   demand (`optimizer/thermal_flex_context.py`).
+   rod competes on efficiency instead and stays capped at the day's heat. In both cases the
+   store caps the rod in the SE (`optimizer/rod_store.py`): rod heat fills the band and leaves
+   with the source's heat of the year model, and the level carries from window to window.
 
 The calculation functions (`heating_params_from_thermal`, `daily_electric_kwh`,
 `house_year_result`) already depend only on their inputs (building, heating system, climate);
@@ -164,8 +165,8 @@ Live control of the heating rod*). Those bindings stay on the house consumer, no
 entry, in `heating_rod_ehal_bindings` (`house_config/heating_rod_bindings.py`). It is a map of its
 own: in `ehal_bindings`, `canonicalize_consumer_bindings` would rewrite the rod's `set_enable` to
 the heat source's own and `marker_flex_enable` would pick it for the parent. Live caps the rod with
-the store plan (`opp_cap` × efficiency, first calendar day only); the SE keeps the day heat cap, so
-SE results and goldens do not change. No Earnie-side fail-safe for the rod (decided 2026-11-05):
+the store plan (`opp_cap` × efficiency, first calendar day only); the SE has a balance of its own
+over the book (`optimizer/rod_store.py`). No Earnie-side fail-safe for the rod (decided 2026-11-05):
 over-temperature and outage behaviour belong to the smart home.
 
 **Implemented (2026-11-03, backlog item *Heating-system variants — align code with the

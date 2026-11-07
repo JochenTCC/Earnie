@@ -2,6 +2,19 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Heating rod in the SE: cap by the store (2026-11-07)
+
+- [x] **Heating rod in the SE: cap by the store's free capacity** `[feat]` *(from Live control of the heating rod)*: the SE capped the rod by the day's heat demand per matrix date, so a store took more rod heat than it could hold, and a sunny day could not store heat for the next one. Live is unchanged.
+  - **Balance:** `optimizer/rod_store.py`. Rod heat (η = 1) fills a level, the main source's heat of the year model empties it, spread evenly over the day. The level stays between 0 and volume × `tolerance_c` on every book slot, in the MILP as one continuous variable per slot (`_add_rod_store_balance`, no new binaries). A day without source heat keeps the rod off. Beside an electric source the day's heat stays a further cap.
+  - **Across windows:** the level carries like the SoC, in L3 (`simulation/engine.py`, `anchor_step.rod_store_levels_after_window`) and in L2 (`SurplusRod`, same balance). A window outside a chain starts with an empty store. A window snapshot does not hold the level, so a replay of one rod window starts empty.
+  - **Assumptions, each overstating the rod a little:** the whole band counts as free when the level is empty, though a real source also fills it; a store held hotter loses more heat, not modeled.
+  - **Measured (S7 gas 906 l, S8 pellets 776 l, both 30 K, new store, year, without the look-ahead and base-level switches), L2 − L3 with fuel, Duo / Dynamisch:** S7 204.05 → 197.09 € / 312.58 → 294.88 €, S8 52.99 → 46.27 € / 80.80 → 81.72 €. Rod heat rises, since these stores hold more than the old day cap allowed: S7 L3 2655 → 2728 kWh / 3964 → 4054 kWh, L2 1648 → 1763 kWh; S8 L3 2826 → 2937 kWh / 2449 → 2629 kWh, L2 2408 → 2542 kWh. An ex-post balance over the booked series finds no slot above the store now; before it was up to 818 slots (S7 Duo, level 44 kWh in a 31.6 kWh store). Only these two houses; the pack is not rebuilt yet.
+  - **Days with more rod heat than demand (finding of 2026-11-06):** the old prorated cap counted the slots of the whole matrix, so a date booked in two windows could get more than one day of heat. On 4 rod houses of stage 1 this fits the excess: where it was largest, rod heat before 08:00 exceeded it (G1192 Dynamisch 61 kWh excess, 104 kWh before 08:00; G2547 Dynamisch 73 and 91 kWh). Not proven per day. Such days now remain on purpose, as stored heat, and their number rises (S7 Dynamisch 39 → 58, S8 Dynamisch 0 → 49); the rod's total stays within source heat plus one store.
+  - **Regression:** all 12 cases pass unchanged, no case has a rod, so no triage and no golden update. No regression case covers the new path; the tests do.
+  - **Docs:** `flexible-verbraucher.md`, `heating-system-variants.md`, `rule-based-reference.md`, release-note draft.
+  - **Tests:** `tests/test_rod_store.py`, `tests/test_reference_ladder_rod.py`, `tests/test_heat_source.py`, `tests/test_heating_system_variants.py`.
+  - **Follow-up:** **Heat pump in the SE: the store does not limit the shift** ([Backlog](Backlog.md)).
+
 ### Edibert grid fixed fees in house profile and SE invoice (2026-11-07)
 
 - [x] **Edibert grid fixed fees in house profile and SE invoice** `[feat]` *(2026-10-31, left from the pin v0.1.12)*: Earnie read none of the grid area's fixed amounts, so 76.82 EUR/year net were missing from every SE total, and a fee moved there by the migration was no longer shown.

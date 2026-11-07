@@ -84,6 +84,7 @@ from simulation.anchor_step import (
     _hour_cost_without_optimization,
     _simulate_anchor_step,
     _stash_sunrise_full_horizon_flex,
+    rod_store_levels_after_window,
 )
 from simulation.engine_scenario import (  # noqa: F401  (re-exported)
     _brutto_prices_for_slots,
@@ -350,6 +351,7 @@ def _process_anchor_window(
     sim_soc: float,
     hours_done: int,
     plausibility: PlausibilityReport,
+    rod_store_kwh: dict[str, float],
 ) -> _AnchorStepResult:
     """Simuliert ein Anker-Fenster inkl. Plausibilitätsprüfung und Snapshot-Sammlung."""
     if cfg.collect_cbc:
@@ -374,6 +376,7 @@ def _process_anchor_window(
             price_resources=cfg.price_resources,
             collect_full_horizon=collect_snapshots,
             forecast_planner=cfg.forecast_planner,
+            rod_store_kwh=rod_store_kwh,
         )
     )
     if cfg.collect_cbc:
@@ -503,6 +506,7 @@ def run_simulation(
         price_resources = None
     hours_done = 0
     sim_soc = initial_soc
+    rod_store_kwh: dict[str, float] = {}
 
     all_chart_rows: list[dict] = []
     all_timestamps: list[datetime] = []
@@ -527,8 +531,13 @@ def run_simulation(
     )
     try:
         for anchor in anchors:
-            step = _process_anchor_window(cfg, anchor, sim_soc, hours_done, plausibility)
+            step = _process_anchor_window(
+                cfg, anchor, sim_soc, hours_done, plausibility, rod_store_kwh
+            )
             sim_soc = step.sim_soc
+            rod_store_kwh = rod_store_levels_after_window(
+                step.matrix, step.chart_rows, init.flexible_consumers, scenario_params, rod_store_kwh
+            )
             all_chart_rows.extend(step.chart_rows)
             all_timestamps.extend(row["slot_datetime"] for row in step.matrix)
 

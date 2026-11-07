@@ -750,6 +750,7 @@ def test_se_rod_bound_and_contexts_read_the_scenario_house(monkeypatch):
 
 
 def test_se_anchor_step_plans_inside_the_scenario_scope(monkeypatch):
+    from optimizer.rod_store import ROD_STORE_START_KEY
     from optimizer.scenario_planning_scope import planning_runtime_settings
     from simulation import anchor_step
 
@@ -773,6 +774,8 @@ def test_se_anchor_step_plans_inside_the_scenario_scope(monkeypatch):
             feed_in_settings=None,
             hours_done=0,
             collect_cbc=False,
+            rod_store_kwh={"rod": 1.5},
         )
-    assert seen == [scenario]
+    # The scenario, plus the rod's store level carried from the window before.
+    assert seen == [{**scenario, ROD_STORE_START_KEY: {"rod": 1.5}}]
     assert planning_runtime_settings() is not scenario
