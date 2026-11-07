@@ -2,6 +2,14 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix — SoC base level charged from the grid up to the level (2026-11-07)
+
+- [x] **SoC base level: the plan charged from the grid up to the level** *(found by the prototype's tests; SE prototype behind `EARNIE_BASE_LEVEL`, off by default, on in the study's stage 1)*: the value of the energy held at SA₂ was below the cheapest buy price, which was taken to mean the level comes from PV only. But it is a bonus on the SoC at SA₂, and the same energy can still replace an import past SA₂, so value and use add up and grid charging paid. Battery at minimum, no PV, flat 20 ct, load past SA₂: 4.2 kWh charged from the grid, none without the level.
+  - **Fix:** `optimizer/milp_horizon_extras.py::_base_level_pv_energy`: only energy that did not come from the grid since the plan's start earns the value. It grows by what PV can charge beyond the load and falls with the SoC. A plan starts at its SoC hold, and the energy there counts in full, as its origin is not known. Two continuous variables per slot up to SA₂, only with the level on. Grid charging that pays by itself is not blocked. More than one battery now stops with an error; before, only the first one was held.
+  - **Off by default:** without `EARNIE_BASE_LEVEL` no variable is added.
+  - **Limits:** PV counts beyond the load without flex, so PV that runs a flex load while the grid charges the battery still earns the value. Energy charged from the grid in an earlier window counts in full at the next start.
+  - **Tests:** `tests/test_se_prototype_switches.py`. The effect on a study house is under **SoC base level** in `Backlog.md`.
+
 ### HA carrier: fail-safe values for every written signal (2026-11-07)
 
 - [x] **HA carrier: fail-safe values for every written signal** `[feat]` *(follow-up of GitHub #60)*: a discharge lock (`set_ess_discharge_power_limit` = 0) stayed active while Earnie was down, because the watchdog of the generated package only released a forced active power. Fallback behaviour stays device-specific, so the user enters the values. HA only; Loxone and others keep their own logic. Modes and defaults from the house configuration are **HA carrier: fail-safe for modes and defaults** under Version 2.+1.
