@@ -477,6 +477,8 @@ Im Hausprofil (`house_profiles.json`, `type: generic`) legt `earnie_role` (Stand
 
 Die Einstellung liegt im **Hauskonfigurator** unter „Earnie-Berücksichtigung“. Thermische Verbraucher (SwimSpa, Wärmepumpe) und das E-Auto sind davon nicht betroffen.
 
+Ein `flex`- oder `manual`-Gerät läuft in ganzen Blöcken von `schedule.duration_h`. Bleibt im Planungsfenster weniger Platz als ein Block (zum Beispiel, weil das Fenster um 08:00 endet und der Lauf um 07:00 beginnen dürfte), plant Earnie den Lauf im nächsten Fenster; die übrigen Verbraucher werden normal geplant.
+
 ### Leistungsquelle (optional Live-Binding)
 
 Bei `earnie_role: known` oder `manual` lässt sich optional eine **Live-Leistungsquelle** einrichten. Die Config-Keys heißen noch `loxone_*`.
