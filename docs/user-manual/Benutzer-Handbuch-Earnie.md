@@ -253,6 +253,8 @@ Typische Vergleiche:
 
 **Tarife:** Bezugs- und Einspeisetarif kommen aus dem Tarifkatalog oder werden als **Eigener Festpreis** mit eigenem Wert in Cent/kWh eingetragen (der Wert gehört dann zum Szenario, nicht zum Katalog).
 
+**Bezugsgrenze:** Optionale Grenze für den Netzbezug je Viertelstunde, gedacht für den Leistungspreis. Leer bedeutet keine Grenze. Sie wirkt nur in Monaten, in denen der Netzbereich einen Leistungspreis hat. Eine enge Grenze kann mehr kosten, als sie spart. Das zeigt ein Vergleich von Varianten mit verschiedenen Grenzen im Szenario-Explorer.
+
 - Unter jedem gewählten Tarif steht eine **Vorschau**: Hinweise und Preiskurven, gerechnet mit Land, Region und Netzbereich des Hausprofils dieses Szenarios. Bitte die Werte auf Richtigkeit prüfen – für Vollständigkeit und Aktualität gibt es keine Garantie.
 - Eigene Tarife (**· Benutzertarif** in den Listen) entstehen auf der Seite [Tarife](#tarife-benutzertarife). **Benutzertarife verwalten** öffnet sie mit dem Hausprofil des Szenarios; ist ein Benutzertarif gewählt, öffnet **Benutzertarif bearbeiten** genau diesen. Beide Knöpfe sind gesperrt, solange das Szenario ungespeicherte Änderungen hat.
 - Land- und Tariftyp-Filter schränken nur die Liste ein. Ein gespeicherter Tarif bleibt gewählt, auch wenn er nicht zum Filter passt.

@@ -133,6 +133,16 @@
               "type": "boolean",
               "description": "Wenn true: Szenario-Explorer nutzt Hausprofil-pv_profile_csv statt PV aus Wetterdaten (Open-Meteo)."
             },
+            "import_cap_kw": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "description": "Bezugsgrenze in kW für den Leistungspreis, je Viertelstunde. Weglassen = keine Grenze. Wirkt nur in Monaten, in denen der Netzbereich einen Leistungspreis hat. Nur zusammen mit import_cap_margin_kw."
+            },
+            "import_cap_margin_kw": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Sicherheitsmarge in kW: Der Plan zielt auf import_cap_kw minus diese Marge. Kleiner als import_cap_kw."
+            },
             "pv_tilt": {
               "type": "number"
             },

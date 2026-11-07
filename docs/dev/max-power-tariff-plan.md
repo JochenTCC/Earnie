@@ -76,10 +76,13 @@ Each phase is one chat session and ends with green tests and a commit.
 
 ### P2: Cap configuration
 
+**Built 2026-11-07**, without the migration; see below. A profile always has a grid area, so D3's "cap without `netznutzung`" only arises for a scenario without a house profile. `strip_assets_for_reference` drops the cap, so scenarios that differ only in the cap share one reference.
+
 - `import_cap_kw` and `import_cap_margin_kw` in `backtesting_scenarios.json`, validated like `_plant_max_export_kw`: both or neither, cap > 0, margin >= 0 and smaller than the cap.
 - Scenario resolution passes them on; D3 and D5 are checked there.
 - Editor in `ui/pages/scenario_editor_sections.py`, with the minimum billing power and the active months of the grid area shown beside it. Follow `streamlit-ui-state`, `streamlit-apptest`.
-- Migration: bump `earnie_data_model` to 6 with a step and fixture per `config-migration.mdc`, even though the field is optional. Absent means no cap, so the step asks nothing. Release notes get a **Migration** section.
+- Migration: **none, changed on 2026-11-07 while building.** The plan first said to bump `earnie_data_model` to 6. The fields are optional, absent means no cap, and existing files stay valid, so nothing is reshaped; `own_reference` and `heating_system_ids` were added the same way. A bump would close the startup gate on every install and change the stamp in every fixture, with no data to move. An older Earnie ignores the keys, since `settings` allows additional properties.
+- Until P3 and P5 are in, the fields are stored but nothing plans with them; the form's help text already states the final behaviour, so this branch must not ship before those phases.
 - **Tests:** validation, step with fixture, AppTest smoke.
 
 ### P3: Import cap in the MILP (L3)
