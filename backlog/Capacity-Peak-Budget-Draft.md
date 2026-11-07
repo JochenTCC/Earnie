@@ -1,6 +1,6 @@
 # Capacity charge AT 2027 — monthly peak budget: algorithm draft
 
-**Status:** draft (2026-10-14), nothing implemented. Backlog: [Backlog.md](Backlog.md) → **Edibert integration** → **Capacity charge AT 2027** → *Planning loop* and *Expected PV for the rest of the month*.
+**Status:** draft (2026-10-14), nothing implemented. Backlog: [Backlog.md](Backlog.md). Version 2.8 **Implement max-power dependent tariff** covers stage A with a cap the user chooses (decided 2026-11-07); Version 2.+1 **Max-power tariff — automatic peak budget** covers the automatic proposal from part 1 and stages B and C.
 **Related:** Leistungstarif development document (L1→L5, outside this repo: `Earnie-Projekt/Entwicklungsplan/Offen/Earnie-Leistungstarif-AT-2027-Entwicklungsdokument.md`), sections 1.4 (ratchet), 4.3 (SE formula), 5.2 (import cap with slack), 5.5 (cap sweep). Tariff model and ladder: Edibert spec section 5b.
 
 ---
