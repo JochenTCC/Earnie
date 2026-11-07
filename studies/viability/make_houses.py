@@ -363,10 +363,15 @@ def main() -> None:
     parser.add_argument("--liste", type=Path, help="JSON-Datei mit einer Hausliste; baut alle ihre Haeuser")
     parser.add_argument("--out", type=Path, default=STUDY_DIR / "packs")
     parser.add_argument("--allow-network", action="store_true", help="Wetterdaten duerfen nachgeladen werden.")
+    parser.add_argument("--geraete-rolle", choices=params_mod.APPLIANCE_ROLES,
+                        help="Rolle der Geraete fuer diesen Bau statt geraete.rolle der Parameterdatei (known oder flex)")
     args = parser.parse_args()
     if args.params:
         os.environ[params_mod.ENV_VAR] = str(args.params.resolve())
     params = params_mod.load(args.params)
+    if args.geraete_rolle:
+        params["geraete"]["rolle"] = args.geraete_rolle
+        params_mod.check_appliance_window(params["geraete"])
 
     os.environ.setdefault("EARNIE_ENV_PATH", str(REPO_ROOT / "studies" / "poc_cloud" / "pack"))
     check_thermal_year(int(params["preisjahr"]))

@@ -106,6 +106,16 @@ def validate_house(raw: Any, doc: dict, where: str) -> dict:
     return {**data, "szenarien": list(scenarios)}
 
 
+def check_appliance_window(data: dict) -> None:
+    """``rolle`` must be known or flex; a flex window must be symmetric (start hour +- whole hours)."""
+    first, last = data["fenster_start"]
+    if data["rolle"] not in APPLIANCE_ROLES:
+        _fail("geraete.rolle", f"{data['rolle']!r} ist nicht {' oder '.join(APPLIANCE_ROLES)}")
+    if data["rolle"] == "flex" and (last - first) % 2:
+        # Earnie's start window is start_hour +- start_shift_h in whole hours, so it must be symmetric.
+        _fail("geraete.fenster_start", f"bei rolle flex muss die Breite gerade sein, nicht {last - first} h")
+
+
 def _validated_appliances(raw: Any, persons: list[int]) -> dict:
     data = _exact_keys(raw, _APPLIANCES, "geraete")
     specs = {
@@ -116,11 +126,7 @@ def _validated_appliances(raw: Any, persons: list[int]) -> dict:
     first, last = data["fenster_start"]
     if not 0 <= first <= last <= 23:
         _fail("geraete.fenster_start", f"ungueltig: {data['fenster_start']}")
-    if data["rolle"] not in APPLIANCE_ROLES:
-        _fail("geraete.rolle", f"{data['rolle']!r} ist nicht {' oder '.join(APPLIANCE_ROLES)}")
-    if data["rolle"] == "flex" and (last - first) % 2:
-        # Earnie's start window is start_hour +- start_shift_h in whole hours, so it must be symmetric.
-        _fail("geraete.fenster_start", f"bei rolle flex muss die Breite gerade sein, nicht {last - first} h")
+    check_appliance_window(data)
     per_week = _public(data["laeufe_je_woche"], "geraete.laeufe_je_woche")
     data["laeufe_je_woche"] = {
         str(count): _exact_keys(per_week.get(str(count)), set(specs), f"geraete.laeufe_je_woche.{count}")
