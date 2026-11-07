@@ -7,6 +7,7 @@ from types import SimpleNamespace
 import pandas as pd
 import pytest
 
+from optimizer.rod_store import STORE_BALANCE_CONTEXT_KEY, RodStoreBalance
 from optimizer.sim_baseline import (
     DEFAULT_RULE_PARAMS,
     SURPLUS_BATTERY_FIRST,
@@ -61,7 +62,8 @@ def _rod(*, heat_kwh: float = 100.0, eligible: list[int] | None = None) -> Surpl
         cid="rod",
         nominal_kw=ROD_KW,
         eligible=list(range(SLOTS)) if eligible is None else eligible,
-        heat_left_kwh={DAY: heat_kwh},
+        balance=RodStoreBalance(capacity_kwh=heat_kwh, start_kwh=0.0, drain_kwh=[1e-6] * SLOTS),
+        level_kwh=0.0,
     )
 
 
@@ -108,7 +110,7 @@ def test_it_runs_at_nominal_power_on_enough_export() -> None:
     assert _rod_kw(_run(_matrix(pv_kw=0.5 + ROD_KW), _rod())) == [ROD_KW] * SLOTS
 
 
-def test_the_days_heat_caps_it_and_no_slot_runs_in_part() -> None:
+def test_the_store_caps_it_and_no_slot_runs_in_part() -> None:
     per_slot = _run(_matrix(pv_kw=5.0), _rod(heat_kwh=2.5 * ROD_SLOT_KWH))
     assert _rod_kw(per_slot) == [ROD_KW, ROD_KW] + [0.0] * (SLOTS - 2)
 
@@ -167,11 +169,12 @@ def test_ladder_takes_only_rods_beside_a_fuel_source(monkeypatch) -> None:
         {"id": "hp_rod", "daily_target_source": "heating_rod", "parent_heat_electric": True,
          "nominal_power_kw": ROD_KW},
     ]
+    balance = RodStoreBalance(capacity_kwh=7.0, start_kwh=2.0, drain_kwh=[0.1] * SLOTS)
     monkeypatch.setattr(
         reference_ladder,
         "_resolve_thermal_flex_contexts",
         lambda matrix, consumers, contexts: {
-            c["id"]: {"daily_heat_cap_kwh": {DAY: 7.0}} for c in consumers
+            c["id"]: {STORE_BALANCE_CONTEXT_KEY: balance} for c in consumers
         },
     )
     monkeypatch.setattr(reference_ladder, "_eligible_slots", lambda setup, consumer, book: book)
@@ -179,7 +182,8 @@ def test_ladder_takes_only_rods_beside_a_fuel_source(monkeypatch) -> None:
     assert [rod.cid for rod in result] == ["fuel_rod"]
     assert result[0].nominal_kw == ROD_KW
     assert result[0].eligible == [1, 2]
-    assert result[0].heat_left_kwh == {DAY: 7.0}
+    assert result[0].balance is balance
+    assert result[0].level_kwh == 2.0
 
 
 def test_the_rods_heat_lowers_the_fuel(monkeypatch) -> None:

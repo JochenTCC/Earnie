@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 from typing import NamedTuple, Sequence
 from zoneinfo import ZoneInfo
 
@@ -16,6 +16,7 @@ from optimizer.milp_horizon import (
     aggregate_battery_params_for_load,
     coerce_battery_params_list,
 )
+from optimizer.rod_store import RodStoreBalance, next_level_kwh
 from optimizer.slot_duration import DEFAULT_DT_H
 from optimizer.sim_chart_rows import (
     _chart_price_fields,
@@ -374,25 +375,30 @@ class _RuleConsumer:
 class SurplusRod:
     """Heating rod beside a fuel source in L2: on / off on the export left at the meter (spec § 4.3).
 
-    It has no target and no deadline. ``heat_left_kwh``: heat it may still deliver per day (η = 1),
-    the same caps as the MILP's, and like there it never runs part of a slot.
+    It has no target and no deadline. ``balance``: the same store as the MILP's (η = 1), and like
+    there it never runs part of a slot. Call ``run_kw`` for every slot of the book, the store also
+    empties while the rod is off. ``level_kwh`` is what the next window starts from.
     """
 
     cid: str
     nominal_kw: float
     eligible: list[int]
-    heat_left_kwh: dict[date, float]
+    balance: RodStoreBalance
+    level_kwh: float
 
-    def run_kw(self, t: int, day: date, export_kw: float) -> float:
+    def run_kw(self, t: int, export_kw: float) -> float:
         heat_kwh = self.nominal_kw * float(DEFAULT_DT_H)
-        if (
-            t not in self.eligible
-            or export_kw < self.nominal_kw - _POWER_EPSILON_KW
-            or self.heat_left_kwh.get(day, 0.0) < heat_kwh - _ENERGY_EPSILON_KWH
-        ):
-            return 0.0
-        self.heat_left_kwh[day] -= heat_kwh
-        return self.nominal_kw
+        drain_kwh = self.balance.drain_kwh[t]
+        runs = (
+            t in self.eligible
+            and self.balance.has_demand(t)
+            and export_kw >= self.nominal_kw - _POWER_EPSILON_KW
+            and self.level_kwh + heat_kwh - drain_kwh <= self.balance.capacity_kwh + _ENERGY_EPSILON_KWH
+        )
+        self.level_kwh = next_level_kwh(
+            self.level_kwh, heat_kwh if runs else 0.0, drain_kwh, self.balance.capacity_kwh
+        )
+        return self.nominal_kw if runs else 0.0
 
 
 def _contiguous_runs(indices: list[int]) -> list[list[int]]:
@@ -570,7 +576,7 @@ def build_rule_based_flex_kw_per_hour(
                 slot_kw[state.cid] += state.surplus_extra_kw(t, slot_kw[state.cid], available_kw)
         for rod in surplus_rods:
             net_kw = net_before_flex_kw - sum(slot_kw.values())
-            slot_kw[rod.cid] = rod.run_kw(t, row["date"], _export_left_kw(net_kw, soc, battery_params))
+            slot_kw[rod.cid] = rod.run_kw(t, _export_left_kw(net_kw, soc, battery_params))
         soc, _ = bat.vendor_mode_step(
             soc, net_before_flex_kw - sum(slot_kw.values()), battery_params, dt_h=DEFAULT_DT_H
         )

@@ -230,8 +230,8 @@ def resolve_heating_rod_horizon_kwh(
 ) -> float:
     """Upper bound [kWh] for a heating rod: the parent's heat demand over the matrix days.
 
-    The rod has no delivery target; this only lets the MILP plan it (caps per day in
-    ``thermal_flex_context``). Live: the store's free heat, 0 while a signal of the rod is
+    The rod has no delivery target; this only lets the MILP plan it (the store caps it, in the
+    SE ``optimizer.rod_store``). Live: the store's free heat, 0 while a signal of the rod is
     missing. SE: the parent comes from the scenario's profile (``planning_scenario_scope``).
     """
     if not optimization_matrix:

@@ -93,7 +93,9 @@ def heating_system(house: DerivedHouse, params: dict) -> dict:
     if house.storage_liters:
         system["heat_storage"] = {
             "volume_liters": house.storage_liters,
-            "heat_loss_kw_per_k": params["annahmen"]["speicher_verlust_kw_pro_k"],
+            "heat_loss_kw_per_k": house.storage_loss_kw_per_k,
+            "setpoint_c": house.storage_setpoint_c,
+            "tolerance_c": house.storage_tolerance_c,
         }
     if house.axes["_heizstab"]:
         system["parts"] = [

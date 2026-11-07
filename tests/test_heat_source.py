@@ -416,9 +416,9 @@ def test_rod_beside_gas_runs_when_power_is_cheaper_than_gas_heat():
     model, contexts = _solve(matrix, flex, profile, {"wp_heating_heating_rod": 100.0})
     rod_hours = _on_hours(model, "wp_heating_heating_rod")
     assert rod_hours and all(10 <= hour < 14 for hour in rod_hours)
-    cap = sum(contexts["wp_heating_heating_rod"]["daily_heat_cap_kwh"].values())
+    balance = contexts["wp_heating_heating_rod"]["store_balance"]
     rod_kwh = len(rod_hours) * 3.0 * float(model.dt_h)
-    assert rod_kwh <= cap + 1e-6
+    assert rod_kwh <= balance.capacity_kwh + sum(balance.drain_kwh) + 1e-6
 
 
 @pytest.mark.parametrize("mode", ["profile_spec", "logged_day"])
@@ -444,9 +444,9 @@ def test_se_book_without_rod_entry_still_plans_the_rod(monkeypatch, mode):
     book = {"wp_heating_heating_rod": 0.0}  # what resolve_profile_spec_flex_targets books
     targets = resolve_horizon_consumer_targets_kwh(matrix, book, flexible_consumers=flex)
     assert targets["wp_heating_heating_rod"] == pytest.approx(30.0)
-    # The MILP entry builds the rod caps although a gas house has no thermal flex consumer.
+    # The MILP entry builds the rod's store although a gas house has no thermal flex consumer.
     contexts = _resolve_thermal_flex_contexts(matrix, flex, None)
-    assert contexts["wp_heating_heating_rod"]["daily_heat_cap_kwh"]
+    assert contexts["wp_heating_heating_rod"]["store_balance"].capacity_kwh > 0.0
     model, _contexts = _solve(matrix, flex, profile, targets)
     rod_hours = _on_hours(model, "wp_heating_heating_rod")
     assert rod_hours and all(10 <= hour < 14 for hour in rod_hours)

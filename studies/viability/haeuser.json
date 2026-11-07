@@ -21,9 +21,7 @@
     "heizgrenze_c": 15.0,
     "absenkung_c": 6.5,
     "heizstab_kw": 3.0,
-    "kollektor_neigung_grad": 30,
-    "_speicher_verlust": "Annahme: ErP-Klasse C fuer 500 l, rund 117 W bei 45 K, also 2,6 W/K. Earnies Standard von 20 W/K waeren ueber 4.000 kWh Waerme im Jahr.",
-    "speicher_verlust_kw_pro_k": 0.0026
+    "kollektor_neigung_grad": 30
   },
   "netz": {
     "_snap": "SNAP gilt erst ab 01.04.2026. Die Studie rechnet ein fiktives Jahr mit Preisen des Preisjahrs und Tarifstand 2026, daher gilt SNAP dort im ganzen Preisjahr. Der Abschlag gilt nur auf den Arbeitspreis, nicht auf Netzverlust und Abgaben im Katalog.",
@@ -73,8 +71,19 @@
     "heizgradtage_kd": 3044,
     "heizlast_kw_je_person": 0.6,
     "kollektor_m2_je_person": 1.5,
-    "speicher_basis_l": 500,
+    "_speicher": "Plan F19: Heizleistung mal l/kW zwischen Mindest- und Hoechstwert, mit Kollektor mindestens l/m2. Annahme, soll einen Teil des Tagesbedarfs der Uebergangszeit speichern; die Richtwerte der Quellen liegen darunter.",
+    "speicher_l_je_kw": 100,
+    "speicher_min_l": 400,
+    "speicher_max_l": 1000,
     "speicher_l_je_m2_kollektor": 70,
+    "_speicher_band": "Plan F19, je Heizquelle. Die Quelle heizt erst unter 'von' und nur bis 'bis', nutzbar ist also bis minus von. Oberkanten aus SUSI (Warmwasser-Vorlauf 60 Grad, Heizstab 70 Grad), Untergrenze wie Earnies Standard.",
+    "speicher_band_c": {
+      "heat_pump": {"von": 40, "bis": 60},
+      "gas": {"von": 40, "bis": 70},
+      "pellets": {"von": 40, "bis": 70}
+    },
+    "_speicher_verlust": "Annahme: Obergrenze von ErP-Klasse C (VO 812/2013, Anhang II, Tabelle 2), S = basis + faktor * V^exponent in W, gemessen bei bezug_k. 500 l ergeben 117 W, also 2,6 W/K. Earnies Standard von 20 W/K waeren ueber 4.000 kWh Waerme im Jahr.",
+    "speicher_verlust_w": {"basis": 16.66, "faktor": 8.33, "exponent": 0.4, "bezug_k": 45},
     "_dach": "Grundflaeche = BGF / Geschosse; Dachseite = Grundflaeche / 2 / cos(Neigung); Annahme.",
     "dach_geschosse": 1.5,
     "dach_neigung_grad": 30,

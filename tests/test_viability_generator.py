@@ -18,7 +18,13 @@ from house_config.edibert_tariffs import load_grid_fees, profile_grid_fee
 from house_config.netznutzung import default_netznutzung_config
 from studies.viability import params as params_mod
 from studies.viability.appliances import baseload_target_kwh, daily_runs, start_hour_weights
-from studies.viability.derive import all_houses, derive_house, stratified_sample
+from studies.viability.derive import (
+    all_houses,
+    derive_house,
+    storage_liters,
+    storage_loss_kw_per_k,
+    stratified_sample,
+)
 from studies.viability.make_houses import (
     check_thermal_year,
     heating_system,
@@ -62,7 +68,7 @@ def test_derived_values_of_a_hand_calculated_house(params):
     assert house.heat_pump_kwh == pytest.approx((6750 + 1460) / 3.5)
     assert house.heating_power_kw == pytest.approx(6750 * 32 / (3044 * 24) + 1.2, abs=0.01)
     assert house.building_class == 2
-    assert house.storage_liters == 500
+    assert house.storage_liters == 416  # 4.16 kW * 100 l/kW
     assert house.pv_wanted_kwp == pytest.approx(1.25 * (3400 + 8210 / 3.5) / 1000)
     assert house.pv_limit == "verbrauch"
     assert house.battery_kwh == pytest.approx(house.pv_kwp, abs=0.05)
@@ -78,12 +84,67 @@ def test_roof_cap_south_and_east_west(params):
     assert east_west.roof_cap_kwp == pytest.approx(2 * side_kwp)
 
 
-def test_collector_takes_roof_and_can_raise_the_storage(params):
+def test_collector_takes_roof_and_keeps_the_store_of_its_heating_power(params):
     plain = derive_house(_house(personen=5), params)
     collector = derive_house(_house(personen=5, heizsystem="H2"), params)
     assert collector.collector_m2 == 7.5
-    assert collector.storage_liters == 525
+    assert collector.storage_liters == plain.storage_liters == 714  # 525 l for the collector stay below
     assert collector.roof_cap_kwp == pytest.approx(plain.roof_cap_kwp - 7.5 / 5.5)
+
+
+def test_store_volume_stays_within_its_limits_and_a_collector_can_raise_it(params):
+    rules = params["regeln"]
+    assert storage_liters(3.0, 0.0, rules) == 400
+    assert storage_liters(6.46, 0.0, rules) == 646
+    assert storage_liters(10.36, 0.0, rules) == 1000
+    assert storage_liters(6.46, 12.0, rules) == 840  # 70 l/m2 above the power rule
+    big_collector = derive_house(_house(personen=5, heizsystem="H2", huelle="bestand"), params)
+    assert big_collector.storage_liters == 1000
+
+
+def test_store_band_follows_the_heat_source(params):
+    pump = derive_house(_house(), params)
+    assert (pump.storage_setpoint_c, pump.storage_tolerance_c) == (60, 20)  # usable from 40 to 60 degrees
+    for system in ("H6", "H7"):
+        fuel = derive_house(_house(huelle="bestand", heizsystem=system), params)
+        assert (fuel.storage_setpoint_c, fuel.storage_tolerance_c) == (70, 30)
+
+
+def test_store_loss_grows_with_the_volume(params):
+    rules = params["regeln"]
+    assert storage_loss_kw_per_k(500, rules) == pytest.approx(0.0026, abs=0.00005)  # 117 W at 45 K
+    assert storage_loss_kw_per_k(1000, rules) == pytest.approx((16.66 + 8.33 * 1000**0.4) / 45 / 1000)
+
+
+def test_house_without_a_store_writes_no_store(params):
+    house = derive_house(_house(huelle="bestand", heizsystem="H5"), params)
+    assert house.storage_liters == 0
+    assert "heat_storage" not in heating_system(house, params)
+
+
+def test_pack_heating_system_carries_volume_loss_and_band(params):
+    house = derive_house(_house(huelle="bestand", heizsystem="H7", personen=4), params)
+    assert heating_system(house, params)["heat_storage"] == {
+        "volume_liters": 906.0,
+        "heat_loss_kw_per_k": pytest.approx(storage_loss_kw_per_k(906.0, params["regeln"])),
+        "setpoint_c": 70.0,
+        "tolerance_c": 30.0,
+    }
+
+
+def test_invalid_store_band_and_limits_fail_loud():
+    doc = _raw_doc()
+    doc["regeln"]["speicher_band_c"]["gas"]["von"] = 70
+    with pytest.raises(params_mod.ParameterError, match="speicher_band_c.gas"):
+        params_mod.validate(doc)
+    doc = _raw_doc()
+    del doc["regeln"]["speicher_band_c"]["pellets"]
+    with pytest.raises(params_mod.ParameterError, match="pellets"):
+        params_mod.validate(doc)
+    doc = _raw_doc()
+    doc["regeln"]["speicher_min_l"] = 2000
+    with pytest.raises(params_mod.ParameterError, match="speicher_min_l"):
+        params_mod.validate(doc)
 
 
 def test_minimum_kwp_applies(params):

@@ -39,10 +39,10 @@ Schlüssel mit Unterstrich sind Kommentare. Unbekannte und fehlende Schlüssel b
 | Abschnitt | Inhalt |
 |---|---|
 | `preisjahr` | Jahr für Preise, Verbrauchsdaten und Brennstoffpreise |
-| `annahmen` | Feste Werte: Standort, PR, Akku, E-Auto, Wallbox, Solltemperatur, Heizstab, Speicherverlust |
+| `annahmen` | Feste Werte: Standort, PR, Akku, E-Auto, Wallbox, Solltemperatur, Heizstab |
 | `netz` | Ob SNAP im ganzen Preisjahr gilt. `make_houses` schreibt das nur in die `grid_fees.json` des Pakets, der Katalog in `share/config` bleibt unverändert. Netzverlust und Abgaben kommen aus dem Katalog |
 | `geraete` | Waschmaschine, Geschirrspüler, Trockner. Mit `aktiv: true` bekommt jedes Haus je Gerät ein zufälliges Stundenprofil (fester Seed) unter `config/appliances/`. Es gilt in L0 bis L3 als feste Last, die Energie kommt aus dem Haushaltsstrom |
-| `regeln` | Werte der Ableitungsregeln: Wohnfläche, Haushaltsstrom, Hüllen, Heizlast, Kollektor, Speicher, Dach, Mindest-kWp |
+| `regeln` | Werte der Ableitungsregeln: Wohnfläche, Haushaltsstrom, Hüllen, Heizlast, Kollektor, Dach, Mindest-kWp. Speicher: Heizleistung mal `speicher_l_je_kw` zwischen `speicher_min_l` und `speicher_max_l`, mit Kollektor mindestens `speicher_l_je_m2_kollektor`. `speicher_band_c` setzt das Temperaturband je Heizquelle, `speicher_verlust_w` den Verlust aus dem Volumen |
 | `brennstoffpreise` | Je Jahr `gas` (ct/kWh) und `pellets` (€/t) |
 | `heizsysteme` | H1, H2 und H5 bis H7: Quelle, Kollektor, Heizstab, Speicher, erlaubte Hüllen. Wärmepumpe mit Heizstab (früher H3) ist keine erlaubte Konfiguration und bricht ab |
 | `achsen` | Freie Achsen und ihre Stufen |

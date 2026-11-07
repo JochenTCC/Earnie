@@ -32,15 +32,17 @@ _ASSUMPTIONS = {
     "standort", "netzbereich", "pv_neigung_grad", "pv_performance_ratio", "akku_leistung_c",
     "akku_zell_wirkungsgrad", "akku_verschleiss_eur_pro_kwh", "ev_km_pro_jahr", "ev_kwh_pro_100km", "ev_akku_kwh",
     "ev_ziel_soc_prozent", "wallbox_kw", "wallbox_min_kw", "wallbox_phasen", "solltemperatur_c",
-    "heizgrenze_c", "absenkung_c", "heizstab_kw", "kollektor_neigung_grad", "speicher_verlust_kw_pro_k",
+    "heizgrenze_c", "absenkung_c", "heizstab_kw", "kollektor_neigung_grad",
 }
 _RULES = {
     "wohnflaeche_basis_m2", "wohnflaeche_je_person_m2", "bgf_faktor", "haushaltsstrom_kwh",
     "warmwasser_kwh_je_person_tag", "huellen", "heizlast_delta_t_k", "heizgradtage_kd",
-    "heizlast_kw_je_person", "kollektor_m2_je_person", "speicher_basis_l",
-    "speicher_l_je_m2_kollektor", "dach_geschosse", "dach_neigung_grad", "dach_nutzbar",
-    "dach_m2_je_kwp", "pv_min_kwp",
+    "heizlast_kw_je_person", "kollektor_m2_je_person", "speicher_l_je_kw", "speicher_min_l", "speicher_max_l",
+    "speicher_l_je_m2_kollektor", "speicher_band_c", "speicher_verlust_w", "dach_geschosse", "dach_neigung_grad",
+    "dach_nutzbar", "dach_m2_je_kwp", "pv_min_kwp",
 }
+_STORE_LOSS = {"basis", "faktor", "exponent", "bezug_k"}
+_STORE_BAND = {"von", "bis"}
 _AXES = {
     "personen", "heizsystem", "huelle", "pv_kwp_je_mwh", "pv_belegung", "speicher_kwh_je_kwp", "eauto",
 }
@@ -125,10 +127,28 @@ def _validated_appliances(raw: Any, persons: list[int]) -> dict:
     return data
 
 
+def _validated_store_rules(rules: dict) -> dict:
+    """The store's volume limits, band per heat source and loss formula."""
+    if not 0 < rules["speicher_min_l"] <= rules["speicher_max_l"]:
+        _fail("regeln.speicher_min_l", f"{rules['speicher_min_l']} passt nicht zu {rules['speicher_max_l']}")
+    bands = {
+        source: _exact_keys(band, _STORE_BAND, f"regeln.speicher_band_c.{source}")
+        for source, band in _exact_keys(rules["speicher_band_c"], FUELS | {HEAT_PUMP}, "regeln.speicher_band_c").items()
+    }
+    for source, band in bands.items():
+        if band["von"] >= band["bis"]:
+            _fail(f"regeln.speicher_band_c.{source}", f"von {band['von']} muss unter bis {band['bis']} liegen")
+    return {
+        **rules,
+        "speicher_band_c": bands,
+        "speicher_verlust_w": _exact_keys(rules["speicher_verlust_w"], _STORE_LOSS, "regeln.speicher_verlust_w"),
+    }
+
+
 def validate(doc: Any) -> dict:
     data = _exact_keys(doc, _SECTIONS, "haeuser.json")
     data["annahmen"] = _exact_keys(data["annahmen"], _ASSUMPTIONS, "annahmen")
-    data["regeln"] = _exact_keys(data["regeln"], _RULES, "regeln")
+    data["regeln"] = _validated_store_rules(_exact_keys(data["regeln"], _RULES, "regeln"))
     data["solver"] = _exact_keys(data["solver"], {"cbc_gap_rel", "cbc_strict_time_limit_sec"}, "solver")
     data["achsen"] = _exact_keys(data["achsen"], _AXES, "achsen")
     data["szenarien"] = _public(data["szenarien"], "szenarien")
