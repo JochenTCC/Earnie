@@ -94,7 +94,8 @@ def derive_house(house: dict, params: dict) -> DerivedHouse:
     collector = rules["kollektor_m2_je_person"] * persons if system["kollektor"] else 0.0
     storage = storage_liters(heating_power, collector, rules) if system["speicher"] else 0.0
     band = rules["speicher_band_c"][system["quelle"]]
-    cap = roof_cap_kwp(gross, house["pv_belegung"], collector, rules)
+    # A list may fix the roof per house (sensitivity: the roof does not bind); the grid uses the roof rule.
+    cap = house.get("dach_kwp", roof_cap_kwp(gross, house["pv_belegung"], collector, rules))
     wanted = house["pv_kwp_je_mwh"] * demand / 1000.0
     pv, limit = wanted, "verbrauch"
     if pv < rules["pv_min_kwp"]:
@@ -126,7 +127,8 @@ def derive_house(house: dict, params: dict) -> DerivedHouse:
         pv_wanted_kwp=wanted,
         pv_kwp=round(pv, 2),
         pv_limit=limit,
-        battery_kwh=round(pv * house["speicher_kwh_je_kwp"], 1),
+        # A list may fix the battery per house (sensitivity: PV varies, the battery stays); else kWp times the axis.
+        battery_kwh=round(house.get("speicher_kwh", pv * house["speicher_kwh_je_kwp"]), 1),
         ev_patterns=patterns,
     )
 

@@ -48,7 +48,10 @@ _AXES = {
     "personen", "heizsystem", "huelle", "pv_kwp_je_mwh", "pv_belegung", "speicher_kwh_je_kwp", "eauto",
 }
 _HEATING_KEYS = {"quelle", "kollektor", "heizstab", "speicher", "huellen"}
-_HOUSE_KEYS = _AXES | {"id", "szenarien"}
+# Optional per-house values a list may fix for a sensitivity run (the grid never sets them): the roof cap in kWp
+# instead of the roof rule, the battery in kWh instead of kWp times the storage axis.
+HOUSE_OVERRIDES = ("dach_kwp", "speicher_kwh")
+_HOUSE_KEYS = _AXES | {"id", "szenarien"} | set(HOUSE_OVERRIDES)
 FUELS = {"gas", "pellets"}
 HEAT_PUMP = "heat_pump"
 
@@ -103,6 +106,13 @@ def validate_house(raw: Any, doc: dict, where: str) -> dict:
     unknown_scenarios = sorted(set(scenarios) - set(doc["szenarien"]))
     if unknown_scenarios or not scenarios:
         _fail(f"{where}.szenarien", f"ungueltig: {scenarios}")
+    for key in HOUSE_OVERRIDES:
+        value = data.get(key)
+        if value is None:
+            continue
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or value < 0 or (key == "dach_kwp" and value == 0):
+            _fail(f"{where}.{key}", f"{value!r} ist keine Zahl {'ueber' if key == 'dach_kwp' else 'ab'} 0")
+        data[key] = float(value)
     return {**data, "szenarien": list(scenarios)}
 
 

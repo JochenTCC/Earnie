@@ -261,6 +261,22 @@ def test_house_list_rejects_an_invalid_house_and_a_double_id(params, tmp_path):
         load_house_list(_list_file(tmp_path, _house(), _house()), params, tmp_path / "packs")
 
 
+def test_list_may_fix_roof_and_battery_per_house(params):
+    capped = derive_house(params_mod.validate_house(_house(pv_kwp_je_mwh=2.2, eauto="zwei"), params, "t"), params)
+    assert capped.pv_limit == "dach"
+    roof = derive_house(params_mod.validate_house(_house(pv_kwp_je_mwh=2.2, eauto="zwei", dach_kwp=24), params, "t"), params)
+    assert roof.pv_limit == "verbrauch"
+    assert roof.roof_cap_kwp == 24.0
+    assert roof.pv_kwp == round(roof.pv_wanted_kwp, 2) > capped.pv_kwp
+    assert roof.battery_kwh == round(roof.pv_kwp, 1)  # the storage axis still applies
+    fixed = derive_house(params_mod.validate_house(_house(pv_kwp_je_mwh=0.75, speicher_kwh=10), params, "t"), params)
+    assert fixed.battery_kwh == 10.0
+    assert fixed.pv_kwp < 10.0
+    for bad in ({"dach_kwp": 0}, {"speicher_kwh": -1}, {"dach_kwp": "gross"}, {"speicher_kwh": True}):
+        with pytest.raises(ValueError):
+            params_mod.validate_house(_house(**bad), params, "t")
+
+
 def test_house_list_does_not_overwrite_a_pack_with_results(params, tmp_path):
     (tmp_path / "packs" / "T" / "results").mkdir(parents=True)
     with pytest.raises(SystemExit, match="Ergebnisse"):
