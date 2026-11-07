@@ -1,0 +1,3 @@
+from ui.ha_carrier_download import render_ha_carrier_yaml_download
+
+render_ha_carrier_yaml_download()

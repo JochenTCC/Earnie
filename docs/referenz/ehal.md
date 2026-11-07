@@ -281,6 +281,10 @@ When there is no `set_ess_active_power` entity (typical `huawei_solar`), configu
 
 With Elevate permissions enabled in [wlcrs/huawei_solar](https://github.com/wlcrs/huawei_solar), the generated HA YAML package (not the Earnie adapter — push-only) contains automations that react to the `set_ess_active_power` attribute of `sensor.earnie_ehal_status` (`status.json`): `huawei_solar.forcible_discharge` for > 0 W, `forcible_charge` for < 0 W (power W, `duration_min` minutes) and `stop_forcible_charge` for |P| < 1 W (Automatik / Entladesperre). Changing `ha_ess_force` therefore requires re-downloading the YAML package. Together with both limit entities this makes `ess_active` available so the plant can use `control: full`. HouseSim archetype `huawei_en` golden map stays limits-only; force is covered by adapter / mock-service tests.
 
+### HA fail-safe values: `plant.ha_fail_safe_values`
+
+Optional map of qualified `set_*` IDs with a physical unit to a value in EHAL units (W, A), for example `{"ess.house.set_ess_discharge_power_limit": 5000}`. The watchdog automation of the generated HA YAML package writes them when `status.json` is unreachable and converts them to the entity's `unit_of_measurement` at run time. A signal without a value is left alone. Only the active power may be negative. A value without a usable signal (not activated, no unit, or the active power with `ha_ess_force`) fails the package generation. Changing the values requires re-downloading the YAML package. Modes and flags are not covered.
+
 ## Capability-Flags (schema_version 4)
 
 

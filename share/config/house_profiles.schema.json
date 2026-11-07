@@ -61,6 +61,13 @@
             }
           }
         },
+        "ha_fail_safe_values": {
+          "type": "object",
+          "description": "Optional values the generated HA package writes while status.json is unreachable: qualified set_* ID with a unit → value in EHAL units (W, A). A signal without a value is left alone.",
+          "additionalProperties": {
+            "type": "number"
+          }
+        },
         "grid_meter": {
           "type": "object",
           "description": "User assertion for the root balance node (Topology P1): meter at house connection and single tariff boundary. Both must be true on the live path.",

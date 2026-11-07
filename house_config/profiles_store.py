@@ -397,6 +397,11 @@ def _normalize_plant(raw: dict | None) -> dict:
     force = normalize_ha_ess_force(raw.get("ha_ess_force"))
     if force:
         out["ha_ess_force"] = force
+    from house_config.ha_fail_safe import FAIL_SAFE_VALUES_KEY, normalize_ha_fail_safe_values
+
+    fail_safe = normalize_ha_fail_safe_values(raw.get(FAIL_SAFE_VALUES_KEY))
+    if fail_safe:
+        out[FAIL_SAFE_VALUES_KEY] = fail_safe
     grid_meter = _normalize_grid_meter(raw.get("grid_meter"))
     if grid_meter is not None:
         out["grid_meter"] = grid_meter

@@ -2,6 +2,16 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### HA carrier: fail-safe values for every written signal (2026-11-07)
+
+- [x] **HA carrier: fail-safe values for every written signal** `[feat]` *(follow-up of GitHub #60)*: a discharge lock (`set_ess_discharge_power_limit` = 0) stayed active while Earnie was down, because the watchdog of the generated package only released a forced active power. Fallback behaviour stays device-specific, so the user enters the values. HA only; Loxone and others keep their own logic. Modes and defaults from the house configuration are **HA carrier: fail-safe for modes and defaults** under Version 2.+1.
+  - **Storage:** `plant.ha_fail_safe_values`, qualified write ID → value in EHAL units (`house_config/ha_fail_safe.py`), next to `plant.ha_ess_force`. Not in `ehal_bindings`, whose values are activation flags on several entity kinds. An optional key that an old file simply lacks reshapes nothing, so there is no migration step and no version bump.
+  - **Package:** `integrations/ha_carrier_yaml.py::_watchdog_automation` writes the values through the same Jinja conversion as the setpoints; an unknown unit is logged and that signal skipped. Without a value the package stays byte-identical. A value alone now creates the watchdog, also without `set_ess_active_power`. A value for the active power replaces the release to 0.
+  - **Which signals:** those with a physical unit (`ha_units.FIELD_QUANTITY`), so no modes or `set_enable`. The active power is not offered with `ha_ess_force`. A saved value without a usable signal fails the generation with a message; saving the form removes it.
+  - **UI:** form on EHAL-Com → HA Push-Carrier (`ui/ha_carrier_download.py`); it saves together, so an entry is not persisted until the button.
+  - **Not checked:** not run in a real Home Assistant. The YAML is parsed and the conversion rendered with plain Jinja in the tests, with `is_number` stubbed.
+  - **Tests:** `tests/test_ha_fail_safe.py`, `tests/apptest/test_persist_ha_fail_safe_apptest.py`. **Docs:** `docs/einrichtung/ha-evcc.md` (an imported package keeps the old watchdog until it is imported again), `docs/referenz/ehal.md`, `.github/release-notes/UNRELEASED.md`.
+
 ### Ledger P11 — Chart 1 baseline from the shadow chain (2026-11-07)
 
 - [x] **Ledger P11 — Chart 1 baseline from the shadow chain** `[fix]`: spec [`docs/dev/savings-ledger.md`](../docs/dev/savings-ledger.md) § 5. "SoC BL Ziel" no longer restarts from the live SoC in every cycle, which removes D1 from Chart 1 as well. This closes the epic's work in 2.8; P9–P10 are under Version 2.+1.
