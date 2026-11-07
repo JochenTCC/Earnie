@@ -33,6 +33,9 @@ def _extract_milp_plan_at(model: MilpHorizonModel, hour_index: int) -> dict[str,
     curtail_vars = getattr(model, "p_pv_curtail", None)
     if curtail_vars:
         plan["p_pv_curtail"] = _var_value_at(curtail_vars, hour_index)
+    cap_slack = getattr(model, "import_cap_slack", None)
+    if cap_slack and cap_slack[hour_index] is not None:
+        plan["import_cap_slack_kw"] = _var_value_at(cap_slack, hour_index)
     ess_ids = getattr(model, "ess_ids", None) or []
     charge_by = getattr(model, "p_charge_by_ess", None) or {}
     discharge_by = getattr(model, "p_discharge_by_ess", None) or {}

@@ -44,6 +44,8 @@ from .milp_horizon import (
     _build_milp_model,
     _terminal_soc_energy_kwh,
 )
+from .import_power_limit import ImportCaps
+from .milp_import_cap import add_import_cap_constraints
 from .milp_vendor_mode import add_vendor_mode_export_constraints, plan_vendor_mode_enabled
 from .milp_result import (
     _extract_milp_plan,
@@ -322,6 +324,7 @@ def _solve_milp_to_model(
     current_soc_by_id: dict[str, float] | None = None,
     inverter_params: dict | list[dict] | None = None,
     pv_systems: list[dict] | None = None,
+    import_caps: ImportCaps | None = None,
 ) -> tuple[MilpHorizonModel, dict[str, float], dict[str, float], list[int], dict, dict] | None:
     """Baut und löst das MILP; None wenn nicht optimal / leere Matrix."""
     if not matrix:
@@ -376,6 +379,9 @@ def _solve_milp_to_model(
             inverter_params if inverter_params is not None else _default_inverter_params(),
             first_slot=0 if soc_hold_index is None else soc_hold_index + 1,
         )
+
+    if import_caps is not None:
+        add_import_cap_constraints(model, import_caps)
 
     update_cbc_milp_context_from_row(matrix[0])
     status = solve_with_strict_fallback(model.prob, msg=False, verbose=verbose)
@@ -477,6 +483,7 @@ def milp_optimizer(
     current_soc_by_id: dict[str, float] | None = None,
     inverter_params: dict | list[dict] | None = None,
     pv_systems: list[dict] | None = None,
+    import_caps: ImportCaps | None = None,
 ) -> tuple[int, float, float, dict[str, float], dict[str, int], dict[str, float], dict[str, dict]]:
     """
     Berechnet den optimalen Betriebsmodus und die Ziel-Leistung für den Loxone Miniserver.
@@ -522,6 +529,7 @@ def milp_optimizer(
         current_soc_by_id=current_soc_by_id,
         inverter_params=inverter_params,
         pv_systems=pv_systems,
+        import_caps=import_caps,
     )
     if solved is None:
         return _AUTOMATIK_FALLBACK
@@ -580,6 +588,7 @@ def milp_horizon_schedule(
     current_soc_by_id: dict[str, float] | None = None,
     inverter_params: dict | list[dict] | None = None,
     pv_systems: list[dict] | None = None,
+    import_caps: ImportCaps | None = None,
 ) -> list[dict[str, Any]]:
     """
     Ein CBC-Solve über die Matrix; Rückgabe: Stundenplan-Slots für Open-Loop / commit-K.
@@ -626,6 +635,7 @@ def milp_horizon_schedule(
         current_soc_by_id=current_soc_by_id,
         inverter_params=inverter_params,
         pv_systems=pv_systems,
+        import_caps=import_caps,
     )
     if solved is None:
         return [dict(_FALLBACK_SCHEDULE_SLOT)]

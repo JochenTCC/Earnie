@@ -27,6 +27,7 @@ class MilpHorizonModel:
     e_batt_by_ess: dict[str, list] | None = None
     battery_params_by_id: dict[str, dict] | None = None
     p_pv_curtail: list | None = None
+    import_cap_slack: list | None = None  # per slot; None without a limit there
 
 
 @dataclass

@@ -87,6 +87,22 @@ Each phase is one chat session and ends with green tests and a commit.
 
 ### P3: Import cap in the MILP (L3)
 
+**Built 2026-11-07:** model and tests only. Nothing passes caps yet: the SE follows in P4, Live in P5.
+
+Penalty sized on one synthetic winter day (96 slots, 10 kWh battery, evening load 7 kW, price spread 26 cent, with and without a 25 kWh EV), on HiGHS and CBC, in the production flow (3 s strict, then a 10 % gap) and with the gap alone. Pairs are cent per kWh of slack / cent per kW of overshoot.
+
+| Case | 30/50 | 200/500 | 2000/20000 |
+|---|---|---|---|
+| Cap 4 kW, holds: peak | 4.00 kW | 4.00 kW | 4.00 kW |
+| Same, HiGHS gap alone, no EV: energy cost | 349.5 | 349.5 | 361.7 (no cap, strict: 338.2) |
+| Cap 2 kW, EV, cannot hold, HiGHS gap alone: slack | 10.50 kWh | 7.92 kWh | 7.88 kWh |
+| Same, production flow: slack | 7.87 kWh | 7.87 kWh | 7.88 kWh |
+
+- **Chosen: 200/500.** 200 cent is above any price spread this day has, and a test holds at 150 cent. 30/50 buys overshoot under the gap, and at a spread near 60 cent over two hours it would pay off. 2000/20000 widens what the gap allows on the energy cost.
+- On this day, the production flow on both solvers: a 4 kW cap costs 639.3 instead of 638.2 cent and lowers the peak from 16.5 to 4.0 kW. Only one day and made-up numbers, so it says nothing about a year; P4 measures that.
+- **Solve time:** with the EV, a holdable cap takes the production solve from 0.19 s to about 0.4 s. A cap that cannot hold runs into the 3 s strict limit on both solvers (0.10–0.19 s without a cap). An unlimited strict solve across this grid did not finish in 9 minutes and was stopped. So strict mode, used by the regression suite, is a risk for capped cases, and P4 has to measure the year's runtime.
+- A trivial window (no battery, no flex) skips the solve and reports no slack; P6 has to cover that.
+
 - New `optimizer/import_power_limit.py`, pure: `import_caps_for_horizon(slot_datetimes, cap_kw, margin_kw, peak_by_month, active_months)` gives one value per slot. `P_cap = max(import_cap_kw, P_m0) - margin`, `P_m0 = 0` in a later month, `None` in an inactive month.
 - New `optimizer/milp_import_cap.py`, called after the model is built, like the vendor mode: `p_grid_buy[t] <= P_cap[t] + s[t]`, `S_m >= s[t]`, penalty on both in the objective. `s[t]` goes into the plan output.
 - `import_caps_kw` passes through `_solve_milp_to_model`, `milp_optimizer` and `milp_horizon_schedule`.
