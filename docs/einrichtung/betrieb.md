@@ -14,6 +14,8 @@ So läuft die neue Version direkt mit Ihrer bisherigen Konfiguration weiter.
 
 Nach einem Image- oder Add-on-Update startet der Assistent, wenn sich die Form der Pack-Dateien ändert (strukturelle Schritte). Davon zu unterscheiden sind fehlende Keys in `config.json` nach einem Upgrade: Dort fehlen nur neue Einstellungsfelder (siehe [Container → Config-Updates](container.md#config-updates-nach-programm-upgrade)). Eine Ausnahme bildet der Block `scenario_explorer_conf`: Fehlende Einträge dort ergänzt die Migration selbst (siehe unten).
 
+Der Assistent ergänzt außerdem die Netzbereiche Ihrer `grid_fees.json` um Netzverlustentgelt, bundesweite Abgaben und feste Beträge. Ihre Bezugspreise steigen dadurch, in Vorarlberg um rund 1,3 Cent/kWh brutto, und ältere Ergebnisse sind nicht mehr direkt vergleichbar. Weicht Ihr Arbeitspreis von der Verordnung ab, fragt der Assistent je Netzbereich nach. Eigene Netzbereiche in `user_grid_fees.json` bleiben unverändert.
+
 ### Ablauf
 
 1. Earnie startet im **Migrationsmodus**. Verfügbar ist nur der Assistent (plus Log/Debug), **kein** normaler Hauskonfigurator und **kein** Auto-Start von `main.py`.

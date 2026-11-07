@@ -26,6 +26,7 @@ from simulation.se_invoice_netznutzung import (  # noqa: F401  (re-exported)
     InvoiceGridFee,
     _grid_fee_from_params,
     _netznutzung_ap_gross_cent,
+    _netz_part_lines,
     _netznutzung_components,
     _netznutzung_section_lines,
 )
@@ -181,9 +182,11 @@ def _year_summary_lines(
     month_count: int,
     total_year: float,
     netznutzung_ap_eur: float = 0.0,
+    netz_parts_eur: float = 0.0,
 ) -> list[str]:
     nne = max(0.0, min(float(netznutzung_ap_eur), float(import_year)))
-    lieferant_eur = float(import_year) - nne
+    parts = max(0.0, min(float(netz_parts_eur), float(import_year) - nne))
+    lieferant_eur = float(import_year) - nne - parts
     lines = [
         "## Jahr",
         "",
@@ -196,6 +199,8 @@ def _year_summary_lines(
             f"({_fmt_kwh(import_kwh_year)}) |"
         )
         lines.append(f"| Netznutzung Arbeitspreis | {_fmt_eur(nne)} |")
+        if parts > 0.0:
+            lines.append(f"| Netzverlust und Abgaben je kWh | {_fmt_eur(parts)} |")
     else:
         lines.append(
             f"| Energiebezug | {_fmt_eur(import_year)} ({_fmt_kwh(import_kwh_year)}) |"
@@ -227,7 +232,8 @@ def _hinweise_lines(*, has_netznutzung_ap: bool) -> list[str]:
     nne_hint = (
         "- Volumetrische **Netznutzung Arbeitspreis** (Hausprofil) ist in `k_act` "
         "enthalten und in der Jahrestabelle als eigene Position ausgewiesen "
-        "(aus Energiebezug herausgerechnet)."
+        "(aus Energiebezug herausgerechnet); ebenso Netzverlust und Abgaben je kWh "
+        "aus dem Netzbereich."
         if has_netznutzung_ap
         else "- Volumetrische **Netznutzung Arbeitspreis**: am Hausprofil setzen "
         "(`netznutzung`); sonst 0."
@@ -282,6 +288,7 @@ class _InvoiceYearContext:
     ap_gross_cent: float
     netznutzung_ap_eur: float
     netznutzung_components: list[_NetznutzungComponent]
+    netz_parts: list[_NetznutzungComponent]
     netznutzung_skipped: list[dict]
 
     @property
@@ -342,6 +349,7 @@ def _build_invoice_year_context(
         ap_gross_cent=ap_gross,
         netznutzung_ap_eur=nne_eur,
         netznutzung_components=components,
+        netz_parts=_netz_part_lines(df, grid_fee=grid_fee, import_spec=import_spec),
         netznutzung_skipped=list(grid_fee.skipped) if grid_fee else [],
     )
 
@@ -364,6 +372,7 @@ def _invoice_summary_lines(
             month_count=ctx.month_count,
             total_year=ctx.total_year,
             netznutzung_ap_eur=ctx.netznutzung_ap_eur,
+            netz_parts_eur=sum(part.eur for part in ctx.netz_parts),
         )
     )
     if ctx.ap_net_cent > 0.0:
@@ -374,6 +383,7 @@ def _invoice_summary_lines(
                 import_kwh_year=ctx.import_kwh_year,
                 netznutzung_ap_eur=ctx.netznutzung_ap_eur,
                 components=ctx.netznutzung_components,
+                parts=ctx.netz_parts,
                 skipped=ctx.netznutzung_skipped,
                 fees=fees,
                 month_count=ctx.month_count,

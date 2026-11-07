@@ -16,8 +16,10 @@ Verwandt: [Preise und Marktdaten](../konfiguration/preise.md) (Konfiguration und
 | **Messstellengebühr** (`metering_monthly_fee_eur`) | **nein** | **ja** (wenn im Katalog) |
 | **Sonstige Fixkosten** (`other_monthly_fee_eur`) | **nein** | **ja** (wenn im Katalog) |
 | **Netznutzung Arbeitspreis** (`netznutzung` am Hausprofil, inkl. Zeitfenster SNAP) | **ja** (vor USt zum Bezugspreis) | **ja** |
+| **Netzverlust und Abgaben je kWh** (Netzbereich: Netzverlustentgelt, Erneuerbaren-Förderbeitrag, Elektrizitätsabgabe Haushalt) | **ja** (vor USt zum Bezugspreis) | **ja** |
+| **Feste Netzbeträge je Jahr** (Netzbereich: Grundpauschale, Förderbeitrag, Förderpauschale) | **nein** | **noch nicht** |
 | **Netznutzung Leistungspreis** / netzgebietsspezifische Tabellen | **nein** | **nein** |
-| PLZ-/netzgebietsspezifische Stacks, separate Stromsteuer/Konzessionsabgabe | nein | nein |
+| PLZ-/netzgebietsspezifische Stacks, Konzessionsabgabe | nein | nein |
 
 > **Hinweis:** Der volumetrische **Netznutzung Arbeitspreis** wird am Hausprofil (Standort) gepflegt und ist unabhängig vom Lieferantentarif. Er kann zeitabhängig sein (SNAP, vorbereitet WiNAP). Die Werte stammen aus dem Laufzeitkatalog `earnie_env/config/grid_fees.json`; die Vorlage dafür liegt in `share/config/grid_fees.json`. Ein eigener Arbeitspreis ist ein Benutzer-Netzbereich in `user_grid_fees.json` (siehe [Preise](../konfiguration/preise.md#eigener-arbeitspreis-benutzer-netzbereich)). Alle vier Tarifdateien tragen das Tarifformat `tariff_format: 1`; jeder Tarif braucht einen `vat_percent`. Der Leistungspreis fehlt weiterhin. Das optionale Katalogfeld `grid_monthly_fee_eur` dient nur als monatliche Fixgebühr im Szenario-Explorer.
 
@@ -32,7 +34,7 @@ Nach jedem SE-Lauf schreibt Earnie zusätzlich **Fake-Jahresrechnungen** als Mar
 - **Fixkosten:** als eigene Position.
 - **Katalogparameter:** am Ende der Datei.
 
-Ist am Hausprofil ein **Netznutzung Arbeitspreis** gesetzt, erscheint ein Abschnitt **Netznutzung**. Die Jahrestabelle trennt dann **Energiebezug (Lieferant)** und **Netznutzung Arbeitspreis**. Die Summe bleibt dabei gleich, es wird nichts doppelt gezählt.
+Ist am Hausprofil ein **Netznutzung Arbeitspreis** gesetzt, erscheint ein Abschnitt **Netznutzung**. Die Jahrestabelle trennt dann **Energiebezug (Lieferant)**, **Netznutzung Arbeitspreis** und **Netzverlust und Abgaben je kWh**. Die Summe bleibt dabei gleich, es wird nichts doppelt gezählt.
 
 - **Ø Tarif Cent/kWh:** arithmetisches Mittel der stündlichen Tarifpreise über alle Stunden des Monats (`Summe(k_act)/N` bzw. `k_push_act`).
 - **Ø Ist Cent/kWh:** `Energiekosten € / Netzenergie kWh × 100`.
@@ -44,7 +46,7 @@ Für Spot- und aWATTar-Tarife gilt folgende Reihenfolge (Cent/kWh), wie im Katal
 1. **Börsenpreis** des Slots (Day-Ahead, EPEX-Zone zum Land des Tarifs); bei `settlement_mtu: 60min` das Mittel der vier Viertelstunden der Stunde.
 2. Optional **prozentualer Aufschlag** (`markup_percent`), z. B. 3 → Faktor 1,03.
 3. **Fixer Aufschlag des Lieferanten** (`settlement_fee_cent_kwh`) in Cent/kWh. Das Feld gilt nur für Spot-Typen; Netzkosten gehören nicht hierher, sondern in `netznutzung` (Schritt 4).
-4. Optional **Netznutzung Arbeitspreis** aus dem Hausprofil (`netznutzung`, netto, je Slot, mit Zeitregeln wie SNAP).
+4. Optional **Netznutzung Arbeitspreis** aus dem Hausprofil (`netznutzung`, netto, je Slot, mit Zeitregeln wie SNAP) sowie **Netzverlust und Abgaben je kWh** des Netzbereichs (netto, ohne Zeitregeln).
 5. **Umsatzsteuer**, falls `prices_include_vat` = nein: Ergebnis × (1 + `vat_percent`/100). Bei `prices_include_vat` = ja ist der Lieferantenpreis schon brutto; die Netznutzung aus Schritt 4 erhält dann in Schritt 4 selbst die USt (`vat_percent`), weil sie ein Nettopreis ist.
 
 Formel:

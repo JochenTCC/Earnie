@@ -14,6 +14,8 @@ from pathlib import Path
 import pytest
 
 from data.consumption_profiles import _timestamp_hour_key
+from house_config.edibert_tariffs import load_grid_fees, profile_grid_fee
+from house_config.netznutzung import default_netznutzung_config
 from studies.viability import params as params_mod
 from studies.viability.appliances import baseload_target_kwh, daily_runs, start_hour_weights
 from studies.viability.derive import all_houses, derive_house, stratified_sample
@@ -279,14 +281,20 @@ def test_fuel_pack_passes_the_loader_with_more_than_two_scenarios(params, tmp_pa
     assert [s["pv_azimuth"] for s in components["pv_systems"]] == [-90, 90]
 
 
-def test_pack_grid_fee_holds_surcharges_and_snap_in_the_price_year(params, tmp_path):
+def test_pack_grid_fee_takes_levies_from_the_catalog_and_snap_in_the_price_year(params, tmp_path):
     root = write_pack(derive_house(_house(), params), params, tmp_path / "T")
     doc = json.loads((root / "pack/config/grid_fees.json").read_text(encoding="utf-8"))
     area = next(a for a in doc["areas"] if a["id"] == "AT-VBG")
-    assert area["base_cent_kwh"]["unmetered_power"] == pytest.approx(4.96 + 0.393 + 0.1 + 0.62)
+    assert area["base_cent_kwh"]["unmetered_power"] == 4.96  # no surcharge on top of the catalog's
+    fee = profile_grid_fee(
+        "T",
+        {"netznutzung": {**default_netznutzung_config(), "area_id": "AT-VBG"}},
+        load_grid_fees(str(root / "pack/config/grid_fees.json")),
+    )
+    assert sum(part.value for part in fee.components) == pytest.approx(0.393 + 0.1 + 0.62)
     snap = next(r for r in doc["rule_sets"]["AT_NE7"] if r["id"] == "SNAP")
     assert snap["valid_from"] == "2025-01-01"
-    assert snap["effect"] == {"mode": "add_cent", "value": pytest.approx(-0.992)}  # 20 % of 4.96 only
+    assert snap["effect"] == {"mode": "percent_off", "value": 20.0}  # work price only, not the levies
     profile = json.loads((root / "pack/config/house_profiles.json").read_text(encoding="utf-8"))["profiles"][0]
     assert profile["netznutzung"]["power_metering"] == "unmetered_power"
 

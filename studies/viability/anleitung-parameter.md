@@ -40,7 +40,7 @@ Schlüssel mit Unterstrich sind Kommentare. Unbekannte und fehlende Schlüssel b
 |---|---|
 | `preisjahr` | Jahr für Preise, Verbrauchsdaten und Brennstoffpreise |
 | `annahmen` | Feste Werte: Standort, PR, Akku, E-Auto, Wallbox, Solltemperatur, Heizstab, Speicherverlust |
-| `netz` | Zuschläge je kWh Bezug zum Netz-Arbeitspreis und ob SNAP im ganzen Preisjahr gilt. `make_houses` schreibt beides nur in die `grid_fees.json` des Pakets, der Katalog in `share/config` bleibt unverändert |
+| `netz` | Ob SNAP im ganzen Preisjahr gilt. `make_houses` schreibt das nur in die `grid_fees.json` des Pakets, der Katalog in `share/config` bleibt unverändert. Netzverlust und Abgaben kommen aus dem Katalog |
 | `geraete` | Waschmaschine, Geschirrspüler, Trockner. Mit `aktiv: true` bekommt jedes Haus je Gerät ein zufälliges Stundenprofil (fester Seed) unter `config/appliances/`. Es gilt in L0 bis L3 als feste Last, die Energie kommt aus dem Haushaltsstrom |
 | `regeln` | Werte der Ableitungsregeln: Wohnfläche, Haushaltsstrom, Hüllen, Heizlast, Kollektor, Speicher, Dach, Mindest-kWp |
 | `brennstoffpreise` | Je Jahr `gas` (ct/kWh) und `pellets` (€/t) |

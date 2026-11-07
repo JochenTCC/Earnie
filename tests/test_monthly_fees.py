@@ -486,3 +486,33 @@ def test_invoice_netznutzung_ap_split_from_energiebezug() -> None:
     assert "| Netznutzung Arbeitspreis | 6.00 € |" in body_vat
     assert "| Energiebezug (Lieferant) | 6.00 € (100.0 kWh) |" in body_vat
     assert "| **Gesamt** | **14.00 €** |" in body_vat
+
+    # Grid loss 1 ct net: 1.20 € gross out of the supplier line, same total
+    with_parts = InvoiceGridFee(
+        base_cent_kwh=5.0,
+        rule_labels={},
+        skipped=[],
+        work=lambda _slot: (5.0, None),
+        parts=(("Netzverlustentgelt", 1.0),),
+    )
+    body_parts = render_scenario_invoice_markdown(
+        scenario_id="live",
+        label="Live",
+        df=df,
+        fees=fees,
+        import_spec={
+            "id": "spot",
+            "label": "Spot",
+            "type": "spot_hourly",
+            "prices_include_vat": False,
+            "vat_percent": 20.0,
+        },
+        export_spec=None,
+        booked_consumption={"consumption_kwh": 12.5, "standby_kwh": 0.0},
+        grid_fee=with_parts,
+    )
+    assert "| Energiebezug (Lieferant) | 4.80 € (100.0 kWh) |" in body_parts
+    assert "| Netznutzung Arbeitspreis | 6.00 € |" in body_parts
+    assert "| Netzverlust und Abgaben je kWh | 1.20 € |" in body_parts
+    assert "| Netzverlustentgelt | 100.0 kWh | 1.000 | 1.20 € |" in body_parts
+    assert "| **Gesamt** | **14.00 €** |" in body_parts

@@ -219,6 +219,9 @@ def test_invoice_splits_arbeitspreis_by_time_window(profiles_path):
     # (100 kWh * 3.968 ct + 100 kWh * 4.96 ct) * 1.2 (awattar_at is net: VAT on top) = 10.71 EUR
     assert "| Arbeitspreis (Jahr) | 10.71 € |" in body
     assert "WiNAP (status=entwurf)" in body
+    # 200 kWh * 0.393 ct * 1.2 = 0.94 EUR, out of the supplier line
+    assert "| Netzverlustentgelt | 200.0 kWh |" in body
+    assert "| Netzverlust und Abgaben je kWh | 2.67 € |" in body  # 200 kWh * 1.113 ct * 1.2
 
 
 def test_invoice_has_no_grid_line_without_reference():
@@ -350,6 +353,7 @@ def test_feed_in_migration_asks_per_flat_scenario(tmp_path):
         "dm5.vat_deductible",
         "dm5.house_gains",
         "dm5.house_cooling",
+        "tf1.grid_area_levies",
     )
     by_id = {q.id: q for q in plan.questions}
     assert set(by_id) == set(FEED_IN_ANSWERS)  # tariff_with_leftover needs no answer
@@ -378,6 +382,7 @@ def test_feed_in_migration_writes_tariffs_and_drops_flat_keys(tmp_path):
         "dm5.vat_deductible",
         "dm5.house_gains",
         "dm5.house_cooling",
+        "tf1.grid_area_levies",
     )
     doc = json.loads((config_dir / "backtesting_scenarios.json").read_text(encoding="utf-8"))
     settings = {s["id"]: s["settings"] for s in doc["scenarios"]}

@@ -36,6 +36,8 @@ Der Arbeitspreis für die Netznutzung steht am Hausprofil unter Standort im Obje
 - Der Arbeitspreis kann **zeitabhängig** sein (SNAP/WiNAP, siehe unten).
 - Der Leistungspreis ist nicht modelliert.
 - Der monatliche Netz-Grundpreis `grid_monthly_fee_eur` ist nur ein Platzhalter für die SE-Fixkosten.
+- **Netzverlust und Abgaben je kWh:** Der Katalog führt je Netzbereich auch das Netzverlustentgelt und die bundesweiten Abgaben (Erneuerbaren-Förderbeitrag, Elektrizitätsabgabe für Haushalte). Earnie addiert sie wie den Arbeitspreis vor der USt zum Bezugspreis. In Live-MILP und SE zählen sie also mit. Zeitregeln wie SNAP ändern sie nicht.
+- **Feste Beträge je Jahr:** Grundpauschale, Förderbeitrag auf die Grundpauschale und Erneuerbaren-Förderpauschale stehen ebenfalls im Katalog. Der Szenario-Explorer rechnet sie noch nicht ein.
 
 ### Netznutzung am Hausprofil (`netznutzung`)
 
@@ -61,7 +63,7 @@ Passt mehr als eine Regel, gewinnt die erste. Eine einbezogene Regel ohne Wert i
 | **SNAP** (Sommer-Nieder-Arbeitspreis) | 1.4.–30.9., 10–16 Uhr, NE 7 | −20 % auf den Arbeitspreis | verordnet (seit 1.4.2026) |
 | **WiNAP** (Winter-Nieder-Arbeitspreis) | 1.10.–31.3., 22–4 Uhr, NE 7 | Höhe offen | Entwurf, im Katalog vorbereitet, standardmäßig aus |
 
-Die Katalogwerte stammen aus einer Recherche (SNE-V 2018, Fassung 01.04.2026; SNAP-Abschlag laut Netzbetreibern). Sie sind nicht gegen die jeweiligen Preisblätter geprüft. Netzbetreiber können Voraussetzungen (z. B. Opt-in) unterschiedlich handhaben. Der Netzverlust-Anteil ist nicht enthalten.
+Die Katalogwerte stammen aus den Verordnungen für 2026: SNE-V 2018 in der Novelle BGBl. II Nr. 305/2025 (Arbeitspreis, Grundpauschale, Netzverlustentgelt), Erneuerbaren-Förderbeitragsverordnung 2026 (BGBl. II Nr. 301/2025), Erneuerbaren-Förderpauschale-Verordnung 2025 (BGBl. II Nr. 416/2024) und Elektrizitätsabgabegesetz (BGBl. I Nr. 95/2025, Haushaltssatz befristet auf 2026). Der SNAP-Abschlag stammt von den Netzbetreibern. Netzbetreiber können Voraussetzungen (z. B. Opt-in) unterschiedlich handhaben.
 
 ### Eigener Arbeitspreis (Benutzer-Netzbereich)
 

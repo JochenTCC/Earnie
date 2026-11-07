@@ -1,222 +1,606 @@
 {
-    "tariff_format": 1,
-    "description": "Netznutzungsentgelt-Arbeitspreis je Netzbereich (Netzebene 7) und zeitgebundene Regeln. Preise netto, Cent/kWh. Modell: docs/konfiguration/preise.md.",
-    "rule_sets": {
-        "AT_NE7": [
-            {
-                "id": "SNAP",
-                "label": "Sommer-Nieder-Arbeitspreis",
-                "status": "verordnet",
-                "valid_from": "2026-04-01",
-                "valid_to": null,
-                "months": [
-                    4,
-                    5,
-                    6,
-                    7,
-                    8,
-                    9
-                ],
-                "time": {
-                    "from": "10:00",
-                    "to": "16:00"
-                },
-                "weekdays": null,
-                "effect": {
-                    "mode": "percent_off",
-                    "value": 20.0
-                },
-                "requires": [
-                    "quarter_hour_meter"
-                ],
-                "source": "SNE-V 2018, BGBl. II Nr. 305/2025 (§ 5 Abs. 1b); 20 % laut Netzbetreibern/AK (Sekundärquellen)",
-                "note": "Voraussetzung laut Netzbetreibern: Viertelstundenwerte am Zähler. Opt-in je Netzbetreiber möglich - im Preisblatt prüfen."
-            },
-            {
-                "id": "WiNAP",
-                "label": "Winter-Nieder-Arbeitspreis",
-                "status": "entwurf",
-                "valid_from": "2027-01-01",
-                "valid_to": null,
-                "months": [
-                    10,
-                    11,
-                    12,
-                    1,
-                    2,
-                    3
-                ],
-                "time": {
-                    "from": "22:00",
-                    "to": "04:00"
-                },
-                "weekdays": null,
-                "effect": {
-                    "mode": "percent_off",
-                    "value": null
-                },
-                "requires": [
-                    "quarter_hour_meter"
-                ],
-                "source": "SNE-G-V Begutachtungsentwurf 29.06.2026, § 7 Abs. 4",
-                "note": "Höhe und Startdatum offen (Tarifverordnung SNE-T-V erwartet ca. 12/2026; Branche fordert Start 01.10.2027). Wert erst eintragen, wenn verordnet."
-            }
-        ]
-    },
-    "areas": [
-        {
-            "id": "AT-BGLD",
-            "label": "Burgenland",
-            "land": "AT",
-            "base_cent_kwh": {
-                "unmetered_power": 8.46,
-                "metered_power": 5.83
-            },
-            "rule_set": "AT_NE7",
-            "source": "Netznutzungsentgelte_Oesterreich_NE7.xlsx (SNE-V 2018, Fassung 01.04.2026; Recherche, nicht gegen Preisblatt geprüft)"
+  "tariff_format": 1,
+  "description": "Netzentgelte je Netzbereich (Netzebene 7): Arbeitspreis, zeitgebundene Regeln, Netzverlustentgelt, Grundpauschale und bundesweite Abgaben. Preise netto, Cent/kWh und Euro/Jahr. Modell: docs/konfiguration/preise.md.",
+  "rule_sets": {
+    "AT_NE7": [
+      {
+        "id": "SNAP",
+        "label": "Sommer-Nieder-Arbeitspreis",
+        "status": "verordnet",
+        "valid_from": "2026-04-01",
+        "valid_to": null,
+        "months": [
+          4,
+          5,
+          6,
+          7,
+          8,
+          9
+        ],
+        "time": {
+          "from": "10:00",
+          "to": "16:00"
         },
-        {
-            "id": "AT-KTN",
-            "label": "Kärnten",
-            "land": "AT",
-            "base_cent_kwh": {
-                "unmetered_power": 9.67,
-                "metered_power": 5.47
-            },
-            "rule_set": "AT_NE7",
-            "source": "Netznutzungsentgelte_Oesterreich_NE7.xlsx (SNE-V 2018, Fassung 01.04.2026; Recherche, nicht gegen Preisblatt geprüft)"
+        "weekdays": null,
+        "effect": {
+          "mode": "percent_off",
+          "value": 20.0
         },
-        {
-            "id": "AT-KLGF",
-            "label": "Klagenfurt",
-            "land": "AT",
-            "base_cent_kwh": {
-                "unmetered_power": 6.9,
-                "metered_power": 4.36
-            },
-            "rule_set": "AT_NE7",
-            "source": "Netznutzungsentgelte_Oesterreich_NE7.xlsx (SNE-V 2018, Fassung 01.04.2026; Recherche, nicht gegen Preisblatt geprüft)"
+        "requires": [
+          "quarter_hour_meter"
+        ],
+        "source": "SNE-V 2018, BGBl. II Nr. 305/2025 (§ 5 Abs. 1b); 20 % laut Netzbetreibern/AK (Sekundärquellen)",
+        "note": "Voraussetzung laut Netzbetreibern: Viertelstundenwerte am Zähler. Opt-in je Netzbetreiber möglich - im Preisblatt prüfen."
+      },
+      {
+        "id": "WiNAP",
+        "label": "Winter-Nieder-Arbeitspreis",
+        "status": "entwurf",
+        "valid_from": "2027-01-01",
+        "valid_to": null,
+        "months": [
+          10,
+          11,
+          12,
+          1,
+          2,
+          3
+        ],
+        "time": {
+          "from": "22:00",
+          "to": "04:00"
         },
-        {
-            "id": "AT-NOE",
-            "label": "Niederösterreich",
-            "land": "AT",
-            "base_cent_kwh": {
-                "unmetered_power": 8.79,
-                "metered_power": 6.65
-            },
-            "rule_set": "AT_NE7",
-            "source": "Netznutzungsentgelte_Oesterreich_NE7.xlsx (SNE-V 2018, Fassung 01.04.2026; Recherche, nicht gegen Preisblatt geprüft)"
+        "weekdays": null,
+        "effect": {
+          "mode": "percent_off",
+          "value": null
         },
-        {
-            "id": "AT-OOE",
-            "label": "Oberösterreich",
-            "land": "AT",
-            "base_cent_kwh": {
-                "unmetered_power": 6.29,
-                "metered_power": 4.68
-            },
-            "rule_set": "AT_NE7",
-            "source": "Netznutzungsentgelte_Oesterreich_NE7.xlsx (SNE-V 2018, Fassung 01.04.2026; Recherche, nicht gegen Preisblatt geprüft)"
-        },
-        {
-            "id": "AT-LINZ",
-            "label": "Linz",
-            "land": "AT",
-            "base_cent_kwh": {
-                "unmetered_power": 5.57,
-                "metered_power": 3.26
-            },
-            "rule_set": "AT_NE7",
-            "source": "Netznutzungsentgelte_Oesterreich_NE7.xlsx (SNE-V 2018, Fassung 01.04.2026; Recherche, nicht gegen Preisblatt geprüft)"
-        },
-        {
-            "id": "AT-SBG",
-            "label": "Salzburg",
-            "land": "AT",
-            "base_cent_kwh": {
-                "unmetered_power": 6.59,
-                "metered_power": 3.91
-            },
-            "rule_set": "AT_NE7",
-            "source": "Netznutzungsentgelte_Oesterreich_NE7.xlsx (SNE-V 2018, Fassung 01.04.2026; Recherche, nicht gegen Preisblatt geprüft)"
-        },
-        {
-            "id": "AT-STMK",
-            "label": "Steiermark",
-            "land": "AT",
-            "base_cent_kwh": {
-                "unmetered_power": 8.82,
-                "metered_power": 6.78
-            },
-            "rule_set": "AT_NE7",
-            "source": "Netznutzungsentgelte_Oesterreich_NE7.xlsx (SNE-V 2018, Fassung 01.04.2026; Recherche, nicht gegen Preisblatt geprüft)"
-        },
-        {
-            "id": "AT-GRAZ",
-            "label": "Graz",
-            "land": "AT",
-            "base_cent_kwh": {
-                "unmetered_power": 5.17,
-                "metered_power": 4.23
-            },
-            "rule_set": "AT_NE7",
-            "source": "Netznutzungsentgelte_Oesterreich_NE7.xlsx (SNE-V 2018, Fassung 01.04.2026; Recherche, nicht gegen Preisblatt geprüft)"
-        },
-        {
-            "id": "AT-TIROL",
-            "label": "Tirol",
-            "land": "AT",
-            "base_cent_kwh": {
-                "unmetered_power": 6.81,
-                "metered_power": 3.66
-            },
-            "rule_set": "AT_NE7",
-            "source": "Netznutzungsentgelte_Oesterreich_NE7.xlsx (SNE-V 2018, Fassung 01.04.2026; Recherche, nicht gegen Preisblatt geprüft)"
-        },
-        {
-            "id": "AT-IBK",
-            "label": "Innsbruck",
-            "land": "AT",
-            "base_cent_kwh": {
-                "unmetered_power": 8.03,
-                "metered_power": 5.72
-            },
-            "rule_set": "AT_NE7",
-            "source": "Netznutzungsentgelte_Oesterreich_NE7.xlsx (SNE-V 2018, Fassung 01.04.2026; Recherche, nicht gegen Preisblatt geprüft)"
-        },
-        {
-            "id": "AT-VBG",
-            "label": "Vorarlberg",
-            "land": "AT",
-            "base_cent_kwh": {
-                "unmetered_power": 4.96,
-                "metered_power": 2.84
-            },
-            "rule_set": "AT_NE7",
-            "source": "Netznutzungsentgelte_Oesterreich_NE7.xlsx (SNE-V 2018, Fassung 01.04.2026; Recherche, nicht gegen Preisblatt geprüft)"
-        },
-        {
-            "id": "AT-WIEN",
-            "label": "Wien",
-            "land": "AT",
-            "base_cent_kwh": {
-                "unmetered_power": 6.98,
-                "metered_power": 4.21
-            },
-            "rule_set": "AT_NE7",
-            "source": "Netznutzungsentgelte_Oesterreich_NE7.xlsx (SNE-V 2018, Fassung 01.04.2026; Recherche, nicht gegen Preisblatt geprüft)"
-        },
-        {
-            "id": "AT-KLWT",
-            "label": "Kleinwalsertal",
-            "land": "AT",
-            "base_cent_kwh": {
-                "unmetered_power": 17.73,
-                "metered_power": 11.4
-            },
-            "rule_set": "AT_NE7",
-            "source": "Netznutzungsentgelte_Oesterreich_NE7.xlsx (SNE-V 2018, Fassung 01.04.2026; Recherche, nicht gegen Preisblatt geprüft)"
-        }
+        "requires": [
+          "quarter_hour_meter"
+        ],
+        "source": "SNE-G-V Begutachtungsentwurf 29.06.2026, § 7 Abs. 4",
+        "note": "Höhe und Startdatum offen (Tarifverordnung SNE-T-V erwartet ca. 12/2026; Branche fordert Start 01.10.2027). Wert erst eintragen, wenn verordnet."
+      }
     ]
+  },
+  "areas": [
+    {
+      "id": "AT-BGLD",
+      "label": "Burgenland",
+      "land": "AT",
+      "base_cent_kwh": {
+        "unmetered_power": 8.46,
+        "metered_power": 5.83
+      },
+      "rule_set": "AT_NE7",
+      "source": "SNE-V 2018 - Novelle 2026, BGBl. II Nr. 305/2025 (in Kraft ab 01.01.2026): § 5 Abs. 1 Z 6 lit. a (Netzebene 7), § 6 lit. b (Netzverlustentgelt)",
+      "components": [
+        {
+          "id": "grid_loss",
+          "label": "Netzverlustentgelt",
+          "cent_kwh": 0.0
+        }
+      ],
+      "fixed_eur_year": [
+        {
+          "id": "grid_base_fee",
+          "label": "Netznutzungsentgelt Grundpauschale (nicht gemessene Leistung)",
+          "eur_year": {
+            "unmetered_power": 54.0,
+            "metered_power": null
+          },
+          "note": "Gemessene Leistung zahlt stattdessen einen Leistungspreis. Das ist nicht modelliert; ein Haus mit gemessener Leistung trägt eigene Werte ein."
+        }
+      ],
+      "levy_set": "AT_NE7_LEVIES_2026",
+      "check": {
+        "state": "checked",
+        "checked_at": "2026-11-07",
+        "source": "SNE-V 2018 - Novelle 2026, BGBl. II Nr. 305/2025 (in Kraft ab 01.01.2026): § 5 Abs. 1 Z 6 lit. a (Netzebene 7), § 6 lit. b (Netzverlustentgelt)"
+      }
+    },
+    {
+      "id": "AT-KTN",
+      "label": "Kärnten",
+      "land": "AT",
+      "base_cent_kwh": {
+        "unmetered_power": 9.67,
+        "metered_power": 5.47
+      },
+      "rule_set": "AT_NE7",
+      "source": "SNE-V 2018 - Novelle 2026, BGBl. II Nr. 305/2025 (in Kraft ab 01.01.2026): § 5 Abs. 1 Z 6 lit. b (Netzebene 7), § 6 lit. b (Netzverlustentgelt)",
+      "components": [
+        {
+          "id": "grid_loss",
+          "label": "Netzverlustentgelt",
+          "cent_kwh": 0.368
+        }
+      ],
+      "fixed_eur_year": [
+        {
+          "id": "grid_base_fee",
+          "label": "Netznutzungsentgelt Grundpauschale (nicht gemessene Leistung)",
+          "eur_year": {
+            "unmetered_power": 54.0,
+            "metered_power": null
+          },
+          "note": "Gemessene Leistung zahlt stattdessen einen Leistungspreis. Das ist nicht modelliert; ein Haus mit gemessener Leistung trägt eigene Werte ein."
+        }
+      ],
+      "levy_set": "AT_NE7_LEVIES_2026",
+      "check": {
+        "state": "checked",
+        "checked_at": "2026-11-07",
+        "source": "SNE-V 2018 - Novelle 2026, BGBl. II Nr. 305/2025 (in Kraft ab 01.01.2026): § 5 Abs. 1 Z 6 lit. b (Netzebene 7), § 6 lit. b (Netzverlustentgelt)"
+      }
+    },
+    {
+      "id": "AT-KLGF",
+      "label": "Klagenfurt",
+      "land": "AT",
+      "base_cent_kwh": {
+        "unmetered_power": 6.9,
+        "metered_power": 4.36
+      },
+      "rule_set": "AT_NE7",
+      "source": "SNE-V 2018 - Novelle 2026, BGBl. II Nr. 305/2025 (in Kraft ab 01.01.2026): § 5 Abs. 1 Z 6 lit. c (Netzebene 7), § 6 lit. b (Netzverlustentgelt)",
+      "components": [
+        {
+          "id": "grid_loss",
+          "label": "Netzverlustentgelt",
+          "cent_kwh": 0.578
+        }
+      ],
+      "fixed_eur_year": [
+        {
+          "id": "grid_base_fee",
+          "label": "Netznutzungsentgelt Grundpauschale (nicht gemessene Leistung)",
+          "eur_year": {
+            "unmetered_power": 54.0,
+            "metered_power": null
+          },
+          "note": "Gemessene Leistung zahlt stattdessen einen Leistungspreis. Das ist nicht modelliert; ein Haus mit gemessener Leistung trägt eigene Werte ein."
+        }
+      ],
+      "levy_set": "AT_NE7_LEVIES_2026",
+      "check": {
+        "state": "checked",
+        "checked_at": "2026-11-07",
+        "source": "SNE-V 2018 - Novelle 2026, BGBl. II Nr. 305/2025 (in Kraft ab 01.01.2026): § 5 Abs. 1 Z 6 lit. c (Netzebene 7), § 6 lit. b (Netzverlustentgelt)"
+      }
+    },
+    {
+      "id": "AT-NOE",
+      "label": "Niederösterreich",
+      "land": "AT",
+      "base_cent_kwh": {
+        "unmetered_power": 8.79,
+        "metered_power": 6.65
+      },
+      "rule_set": "AT_NE7",
+      "source": "SNE-V 2018 - Novelle 2026, BGBl. II Nr. 305/2025 (in Kraft ab 01.01.2026): § 5 Abs. 1 Z 6 lit. d (Netzebene 7), § 6 lit. b (Netzverlustentgelt)",
+      "components": [
+        {
+          "id": "grid_loss",
+          "label": "Netzverlustentgelt",
+          "cent_kwh": 0.384
+        }
+      ],
+      "fixed_eur_year": [
+        {
+          "id": "grid_base_fee",
+          "label": "Netznutzungsentgelt Grundpauschale (nicht gemessene Leistung)",
+          "eur_year": {
+            "unmetered_power": 54.0,
+            "metered_power": null
+          },
+          "note": "Gemessene Leistung zahlt stattdessen einen Leistungspreis. Das ist nicht modelliert; ein Haus mit gemessener Leistung trägt eigene Werte ein."
+        }
+      ],
+      "levy_set": "AT_NE7_LEVIES_2026",
+      "check": {
+        "state": "checked",
+        "checked_at": "2026-11-07",
+        "source": "SNE-V 2018 - Novelle 2026, BGBl. II Nr. 305/2025 (in Kraft ab 01.01.2026): § 5 Abs. 1 Z 6 lit. d (Netzebene 7), § 6 lit. b (Netzverlustentgelt)"
+      }
+    },
+    {
+      "id": "AT-OOE",
+      "label": "Oberösterreich",
+      "land": "AT",
+      "base_cent_kwh": {
+        "unmetered_power": 6.29,
+        "metered_power": 4.68
+      },
+      "rule_set": "AT_NE7",
+      "source": "SNE-V 2018 - Novelle 2026, BGBl. II Nr. 305/2025 (in Kraft ab 01.01.2026): § 5 Abs. 1 Z 6 lit. e (Netzebene 7), § 6 lit. b (Netzverlustentgelt)",
+      "components": [
+        {
+          "id": "grid_loss",
+          "label": "Netzverlustentgelt",
+          "cent_kwh": 0.528
+        }
+      ],
+      "fixed_eur_year": [
+        {
+          "id": "grid_base_fee",
+          "label": "Netznutzungsentgelt Grundpauschale (nicht gemessene Leistung)",
+          "eur_year": {
+            "unmetered_power": 54.0,
+            "metered_power": null
+          },
+          "note": "Gemessene Leistung zahlt stattdessen einen Leistungspreis. Das ist nicht modelliert; ein Haus mit gemessener Leistung trägt eigene Werte ein."
+        }
+      ],
+      "levy_set": "AT_NE7_LEVIES_2026",
+      "check": {
+        "state": "checked",
+        "checked_at": "2026-11-07",
+        "source": "SNE-V 2018 - Novelle 2026, BGBl. II Nr. 305/2025 (in Kraft ab 01.01.2026): § 5 Abs. 1 Z 6 lit. e (Netzebene 7), § 6 lit. b (Netzverlustentgelt)"
+      }
+    },
+    {
+      "id": "AT-LINZ",
+      "label": "Linz",
+      "land": "AT",
+      "base_cent_kwh": {
+        "unmetered_power": 5.57,
+        "metered_power": 3.26
+      },
+      "rule_set": "AT_NE7",
+      "source": "SNE-V 2018 - Novelle 2026, BGBl. II Nr. 305/2025 (in Kraft ab 01.01.2026): § 5 Abs. 1 Z 6 lit. f (Netzebene 7), § 6 lit. b (Netzverlustentgelt)",
+      "components": [
+        {
+          "id": "grid_loss",
+          "label": "Netzverlustentgelt",
+          "cent_kwh": 0.487
+        }
+      ],
+      "fixed_eur_year": [
+        {
+          "id": "grid_base_fee",
+          "label": "Netznutzungsentgelt Grundpauschale (nicht gemessene Leistung)",
+          "eur_year": {
+            "unmetered_power": 54.0,
+            "metered_power": null
+          },
+          "note": "Gemessene Leistung zahlt stattdessen einen Leistungspreis. Das ist nicht modelliert; ein Haus mit gemessener Leistung trägt eigene Werte ein."
+        }
+      ],
+      "levy_set": "AT_NE7_LEVIES_2026",
+      "check": {
+        "state": "checked",
+        "checked_at": "2026-11-07",
+        "source": "SNE-V 2018 - Novelle 2026, BGBl. II Nr. 305/2025 (in Kraft ab 01.01.2026): § 5 Abs. 1 Z 6 lit. f (Netzebene 7), § 6 lit. b (Netzverlustentgelt)"
+      }
+    },
+    {
+      "id": "AT-SBG",
+      "label": "Salzburg",
+      "land": "AT",
+      "base_cent_kwh": {
+        "unmetered_power": 6.59,
+        "metered_power": 3.91
+      },
+      "rule_set": "AT_NE7",
+      "source": "SNE-V 2018 - Novelle 2026, BGBl. II Nr. 305/2025 (in Kraft ab 01.01.2026): § 5 Abs. 1 Z 6 lit. g (Netzebene 7), § 6 lit. b (Netzverlustentgelt)",
+      "components": [
+        {
+          "id": "grid_loss",
+          "label": "Netzverlustentgelt",
+          "cent_kwh": 0.357
+        }
+      ],
+      "fixed_eur_year": [
+        {
+          "id": "grid_base_fee",
+          "label": "Netznutzungsentgelt Grundpauschale (nicht gemessene Leistung)",
+          "eur_year": {
+            "unmetered_power": 54.0,
+            "metered_power": null
+          },
+          "note": "Gemessene Leistung zahlt stattdessen einen Leistungspreis. Das ist nicht modelliert; ein Haus mit gemessener Leistung trägt eigene Werte ein."
+        }
+      ],
+      "levy_set": "AT_NE7_LEVIES_2026",
+      "check": {
+        "state": "checked",
+        "checked_at": "2026-11-07",
+        "source": "SNE-V 2018 - Novelle 2026, BGBl. II Nr. 305/2025 (in Kraft ab 01.01.2026): § 5 Abs. 1 Z 6 lit. g (Netzebene 7), § 6 lit. b (Netzverlustentgelt)"
+      }
+    },
+    {
+      "id": "AT-STMK",
+      "label": "Steiermark",
+      "land": "AT",
+      "base_cent_kwh": {
+        "unmetered_power": 8.82,
+        "metered_power": 6.78
+      },
+      "rule_set": "AT_NE7",
+      "source": "SNE-V 2018 - Novelle 2026, BGBl. II Nr. 305/2025 (in Kraft ab 01.01.2026): § 5 Abs. 1 Z 6 lit. h (Netzebene 7), § 6 lit. b (Netzverlustentgelt)",
+      "components": [
+        {
+          "id": "grid_loss",
+          "label": "Netzverlustentgelt",
+          "cent_kwh": 0.336
+        }
+      ],
+      "fixed_eur_year": [
+        {
+          "id": "grid_base_fee",
+          "label": "Netznutzungsentgelt Grundpauschale (nicht gemessene Leistung)",
+          "eur_year": {
+            "unmetered_power": 54.0,
+            "metered_power": null
+          },
+          "note": "Gemessene Leistung zahlt stattdessen einen Leistungspreis. Das ist nicht modelliert; ein Haus mit gemessener Leistung trägt eigene Werte ein."
+        }
+      ],
+      "levy_set": "AT_NE7_LEVIES_2026",
+      "check": {
+        "state": "checked",
+        "checked_at": "2026-11-07",
+        "source": "SNE-V 2018 - Novelle 2026, BGBl. II Nr. 305/2025 (in Kraft ab 01.01.2026): § 5 Abs. 1 Z 6 lit. h (Netzebene 7), § 6 lit. b (Netzverlustentgelt)"
+      }
+    },
+    {
+      "id": "AT-GRAZ",
+      "label": "Graz",
+      "land": "AT",
+      "base_cent_kwh": {
+        "unmetered_power": 5.17,
+        "metered_power": 4.23
+      },
+      "rule_set": "AT_NE7",
+      "source": "SNE-V 2018 - Novelle 2026, BGBl. II Nr. 305/2025 (in Kraft ab 01.01.2026): § 5 Abs. 1 Z 6 lit. i (Netzebene 7), § 6 lit. b (Netzverlustentgelt)",
+      "components": [
+        {
+          "id": "grid_loss",
+          "label": "Netzverlustentgelt",
+          "cent_kwh": 0.658
+        }
+      ],
+      "fixed_eur_year": [
+        {
+          "id": "grid_base_fee",
+          "label": "Netznutzungsentgelt Grundpauschale (nicht gemessene Leistung)",
+          "eur_year": {
+            "unmetered_power": 54.0,
+            "metered_power": null
+          },
+          "note": "Gemessene Leistung zahlt stattdessen einen Leistungspreis. Das ist nicht modelliert; ein Haus mit gemessener Leistung trägt eigene Werte ein."
+        }
+      ],
+      "levy_set": "AT_NE7_LEVIES_2026",
+      "check": {
+        "state": "checked",
+        "checked_at": "2026-11-07",
+        "source": "SNE-V 2018 - Novelle 2026, BGBl. II Nr. 305/2025 (in Kraft ab 01.01.2026): § 5 Abs. 1 Z 6 lit. i (Netzebene 7), § 6 lit. b (Netzverlustentgelt)"
+      }
+    },
+    {
+      "id": "AT-TIROL",
+      "label": "Tirol",
+      "land": "AT",
+      "base_cent_kwh": {
+        "unmetered_power": 6.81,
+        "metered_power": 3.66
+      },
+      "rule_set": "AT_NE7",
+      "source": "SNE-V 2018 - Novelle 2026, BGBl. II Nr. 305/2025 (in Kraft ab 01.01.2026): § 5 Abs. 1 Z 6 lit. j (Netzebene 7), § 6 lit. b (Netzverlustentgelt)",
+      "components": [
+        {
+          "id": "grid_loss",
+          "label": "Netzverlustentgelt",
+          "cent_kwh": 0.293
+        }
+      ],
+      "fixed_eur_year": [
+        {
+          "id": "grid_base_fee",
+          "label": "Netznutzungsentgelt Grundpauschale (nicht gemessene Leistung)",
+          "eur_year": {
+            "unmetered_power": 54.0,
+            "metered_power": null
+          },
+          "note": "Gemessene Leistung zahlt stattdessen einen Leistungspreis. Das ist nicht modelliert; ein Haus mit gemessener Leistung trägt eigene Werte ein."
+        }
+      ],
+      "levy_set": "AT_NE7_LEVIES_2026",
+      "check": {
+        "state": "checked",
+        "checked_at": "2026-11-07",
+        "source": "SNE-V 2018 - Novelle 2026, BGBl. II Nr. 305/2025 (in Kraft ab 01.01.2026): § 5 Abs. 1 Z 6 lit. j (Netzebene 7), § 6 lit. b (Netzverlustentgelt)"
+      }
+    },
+    {
+      "id": "AT-IBK",
+      "label": "Innsbruck",
+      "land": "AT",
+      "base_cent_kwh": {
+        "unmetered_power": 8.03,
+        "metered_power": 5.72
+      },
+      "rule_set": "AT_NE7",
+      "source": "SNE-V 2018 - Novelle 2026, BGBl. II Nr. 305/2025 (in Kraft ab 01.01.2026): § 5 Abs. 1 Z 6 lit. k (Netzebene 7), § 6 lit. b (Netzverlustentgelt)",
+      "components": [
+        {
+          "id": "grid_loss",
+          "label": "Netzverlustentgelt",
+          "cent_kwh": 0.453
+        }
+      ],
+      "fixed_eur_year": [
+        {
+          "id": "grid_base_fee",
+          "label": "Netznutzungsentgelt Grundpauschale (nicht gemessene Leistung)",
+          "eur_year": {
+            "unmetered_power": 54.0,
+            "metered_power": null
+          },
+          "note": "Gemessene Leistung zahlt stattdessen einen Leistungspreis. Das ist nicht modelliert; ein Haus mit gemessener Leistung trägt eigene Werte ein."
+        }
+      ],
+      "levy_set": "AT_NE7_LEVIES_2026",
+      "check": {
+        "state": "checked",
+        "checked_at": "2026-11-07",
+        "source": "SNE-V 2018 - Novelle 2026, BGBl. II Nr. 305/2025 (in Kraft ab 01.01.2026): § 5 Abs. 1 Z 6 lit. k (Netzebene 7), § 6 lit. b (Netzverlustentgelt)"
+      }
+    },
+    {
+      "id": "AT-VBG",
+      "label": "Vorarlberg",
+      "land": "AT",
+      "base_cent_kwh": {
+        "unmetered_power": 4.96,
+        "metered_power": 2.84
+      },
+      "rule_set": "AT_NE7",
+      "source": "SNE-V 2018 - Novelle 2026, BGBl. II Nr. 305/2025 (in Kraft ab 01.01.2026): § 5 Abs. 1 Z 6 lit. l (Netzebene 7), § 6 lit. b (Netzverlustentgelt)",
+      "components": [
+        {
+          "id": "grid_loss",
+          "label": "Netzverlustentgelt",
+          "cent_kwh": 0.393
+        }
+      ],
+      "fixed_eur_year": [
+        {
+          "id": "grid_base_fee",
+          "label": "Netznutzungsentgelt Grundpauschale (nicht gemessene Leistung)",
+          "eur_year": {
+            "unmetered_power": 54.0,
+            "metered_power": null
+          },
+          "note": "Gemessene Leistung zahlt stattdessen einen Leistungspreis. Das ist nicht modelliert; ein Haus mit gemessener Leistung trägt eigene Werte ein."
+        }
+      ],
+      "levy_set": "AT_NE7_LEVIES_2026",
+      "check": {
+        "state": "checked",
+        "checked_at": "2026-11-07",
+        "source": "SNE-V 2018 - Novelle 2026, BGBl. II Nr. 305/2025 (in Kraft ab 01.01.2026): § 5 Abs. 1 Z 6 lit. l (Netzebene 7), § 6 lit. b (Netzverlustentgelt)"
+      }
+    },
+    {
+      "id": "AT-WIEN",
+      "label": "Wien",
+      "land": "AT",
+      "base_cent_kwh": {
+        "unmetered_power": 6.98,
+        "metered_power": 4.21
+      },
+      "rule_set": "AT_NE7",
+      "source": "SNE-V 2018 - Novelle 2026, BGBl. II Nr. 305/2025 (in Kraft ab 01.01.2026): § 5 Abs. 1 Z 6 lit. m (Netzebene 7), § 6 lit. b (Netzverlustentgelt)",
+      "components": [
+        {
+          "id": "grid_loss",
+          "label": "Netzverlustentgelt",
+          "cent_kwh": 0.7
+        }
+      ],
+      "fixed_eur_year": [
+        {
+          "id": "grid_base_fee",
+          "label": "Netznutzungsentgelt Grundpauschale (nicht gemessene Leistung)",
+          "eur_year": {
+            "unmetered_power": 54.0,
+            "metered_power": null
+          },
+          "note": "Gemessene Leistung zahlt stattdessen einen Leistungspreis. Das ist nicht modelliert; ein Haus mit gemessener Leistung trägt eigene Werte ein."
+        }
+      ],
+      "levy_set": "AT_NE7_LEVIES_2026",
+      "check": {
+        "state": "checked",
+        "checked_at": "2026-11-07",
+        "source": "SNE-V 2018 - Novelle 2026, BGBl. II Nr. 305/2025 (in Kraft ab 01.01.2026): § 5 Abs. 1 Z 6 lit. m (Netzebene 7), § 6 lit. b (Netzverlustentgelt)"
+      }
+    },
+    {
+      "id": "AT-KLWT",
+      "label": "Kleinwalsertal",
+      "land": "AT",
+      "base_cent_kwh": {
+        "unmetered_power": 17.73,
+        "metered_power": 11.4
+      },
+      "rule_set": "AT_NE7",
+      "source": "SNE-V 2018 - Novelle 2026, BGBl. II Nr. 305/2025 (in Kraft ab 01.01.2026): § 5 Abs. 1 Z 6 lit. n (Netzebene 7), § 6 lit. b (Netzverlustentgelt)",
+      "components": [
+        {
+          "id": "grid_loss",
+          "label": "Netzverlustentgelt",
+          "cent_kwh": 0.401
+        }
+      ],
+      "fixed_eur_year": [
+        {
+          "id": "grid_base_fee",
+          "label": "Netznutzungsentgelt Grundpauschale (nicht gemessene Leistung)",
+          "eur_year": {
+            "unmetered_power": 54.0,
+            "metered_power": null
+          },
+          "note": "Gemessene Leistung zahlt stattdessen einen Leistungspreis. Das ist nicht modelliert; ein Haus mit gemessener Leistung trägt eigene Werte ein."
+        }
+      ],
+      "levy_set": "AT_NE7_LEVIES_2026",
+      "check": {
+        "state": "checked",
+        "checked_at": "2026-11-07",
+        "source": "SNE-V 2018 - Novelle 2026, BGBl. II Nr. 305/2025 (in Kraft ab 01.01.2026): § 5 Abs. 1 Z 6 lit. n (Netzebene 7), § 6 lit. b (Netzverlustentgelt)"
+      }
+    }
+  ],
+  "levy_sets": {
+    "AT_NE7_LEVIES_2026": {
+      "label": "Bundesweite Abgaben, Netzebene 7, 2026",
+      "components": [
+        {
+          "id": "renewables_contribution",
+          "label": "Erneuerbaren-Förderbeitrag auf den Arbeitspreis",
+          "cent_kwh": {
+            "unmetered_power": 0.583,
+            "metered_power": 0.364
+          },
+          "source": "Erneuerbaren-Förderbeitragsverordnung 2026, BGBl. II Nr. 301/2025, § 2 Abs. 2"
+        },
+        {
+          "id": "renewables_contribution_loss",
+          "label": "Erneuerbaren-Förderbeitrag auf das Netzverlustentgelt",
+          "cent_kwh": 0.037,
+          "source": "Erneuerbaren-Förderbeitragsverordnung 2026, BGBl. II Nr. 301/2025, § 2 Abs. 3"
+        },
+        {
+          "id": "electricity_levy",
+          "label": "Elektrizitätsabgabe (Haushalt)",
+          "cent_kwh": 0.1,
+          "source": "Elektrizitätsabgabegesetz, geändert durch BGBl. I Nr. 95/2025",
+          "note": "Satz für Haushalte, befristet auf 2026. Unternehmen zahlen 0,82 Cent/kWh. Der Satz ab 2027 ist hier nicht geprüft."
+        }
+      ],
+      "fixed_eur_year": [
+        {
+          "id": "renewables_contribution_flat",
+          "label": "Erneuerbaren-Förderbeitrag auf die Grundpauschale",
+          "eur_year": {
+            "unmetered_power": 3.796,
+            "metered_power": null
+          },
+          "source": "Erneuerbaren-Förderbeitragsverordnung 2026, BGBl. II Nr. 301/2025, § 2 Abs. 1",
+          "note": "Gemessene Leistung zahlt 5,619 Euro/kW. Das ist nicht modelliert."
+        },
+        {
+          "id": "renewables_flat_fee",
+          "label": "Erneuerbaren-Förderpauschale",
+          "eur_year": 19.02,
+          "source": "Erneuerbaren-Förderpauschale-Verordnung 2025, BGBl. II Nr. 416/2024, § 1 Z 5 (2025 bis 2027)"
+        }
+      ],
+      "source": "Verordnungen für das Kalenderjahr 2026, je Position angegeben"
+    }
+  }
 }

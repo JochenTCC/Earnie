@@ -22,6 +22,7 @@ class InvoiceGridFee:
     rule_labels: dict[str, str]  # rule ID → label, in catalog order
     skipped: list[dict[str, str]]  # {"id", "reason"} of rules not applied
     work: Callable[[datetime], tuple[float, str | None]]  # net cent and rule ID per slot
+    parts: tuple[tuple[str, float], ...] = ()  # label and net cent of the per-kWh components, in k_act too
 
 
 def _skipped_reason(skipped) -> str:
@@ -52,6 +53,7 @@ def _grid_fee_from_params(params: dict | None) -> InvoiceGridFee | None:
         rule_labels={rule.id: rule.label for rule in fee.rules},
         skipped=[{"id": item.rule_id, "reason": _skipped_reason(item)} for item in fee.skipped],
         work=_work,
+        parts=tuple((part.label, float(part.value)) for part in fee.components),
     )
 
 
@@ -116,6 +118,27 @@ def _netznutzung_components(
     ]
 
 
+def _netz_part_lines(
+    df: pd.DataFrame,
+    *,
+    grid_fee: InvoiceGridFee | None,
+    import_spec: dict | None,
+) -> list[_NetznutzungComponent]:
+    """Netzbezug × brutto je kWh-Bestandteil neben dem Arbeitspreis (Netzverlust, Abgaben)."""
+    if grid_fee is None or df.empty or "import_kwh" not in df.columns:
+        return []
+    import_kwh = float(df["import_kwh"].fillna(0.0).clip(lower=0.0).sum())
+    return [
+        _NetznutzungComponent(
+            label,
+            cent,
+            import_kwh,
+            import_kwh * _netznutzung_ap_gross_cent(cent, import_spec) / 100.0,
+        )
+        for label, cent in grid_fee.parts
+    ]
+
+
 def _netznutzung_section_lines(
     *,
     ap_net_cent: float,
@@ -123,6 +146,7 @@ def _netznutzung_section_lines(
     import_kwh_year: float,
     netznutzung_ap_eur: float,
     components: list[_NetznutzungComponent],
+    parts: list[_NetznutzungComponent],
     skipped: list[dict],
     fees: ScenarioFeeBreakdown,
     month_count: int,
@@ -153,6 +177,19 @@ def _netznutzung_section_lines(
                 f"{_fmt_cent(comp.ap_net_cent)} | {_fmt_eur(comp.eur)} |"
             )
         lines.append("")
+    if parts:
+        lines.extend(
+            [
+                "| Netzverlust und Abgaben | Netzbezug | Cent/kWh netto | Betrag |",
+                "| --- | ---: | ---: | ---: |",
+            ]
+        )
+        for part in parts:
+            lines.append(
+                f"| {part.label} | {_fmt_kwh(part.import_kwh)} | "
+                f"{part.ap_net_cent:.3f} | {_fmt_eur(part.eur)} |"
+            )
+        lines.append("")
     if skipped:
         skipped_text = ", ".join(f"{item['id']} ({item['reason']})" for item in skipped)
         lines.extend([f"Nicht berücksichtigte Regeln: {skipped_text}.", ""])
@@ -161,7 +198,8 @@ def _netznutzung_section_lines(
             "Der Arbeitspreis kommt aus dem Hausprofil (`netznutzung`) und dem "
             "Netzentgelt-Katalog, unabhängig vom Lieferantentarif. In der "
             "Jahressumme ist er aus dem Energiebezug herausgerechnet (kein "
-            "Doppelzählen). Leistungspreis fehlt.",
+            "Doppelzählen). Das gilt auch für Netzverlust und Abgaben je kWh. "
+            "Leistungspreis fehlt.",
             "",
         ]
     )

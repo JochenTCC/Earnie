@@ -41,7 +41,20 @@ def _fixture_params() -> list:
     return params
 
 
-def _fixture_points(expected: dict, slots: list[datetime], epex: list[float]) -> list:
+@pytest.fixture(scope="module")
+def work_price_grid_fees(tmp_path_factory) -> str:
+    """The grid catalog without grid loss and levies: the fixture predates them in the catalog."""
+    doc = json.loads(Path(GRID_FEES).read_text(encoding="utf-8"))
+    del doc["levy_sets"]
+    for area in doc["areas"]:
+        for key in ("components", "fixed_eur_year", "levy_set", "check"):
+            del area[key]
+    path = tmp_path_factory.mktemp("parity") / "grid_fees.json"
+    path.write_text(json.dumps(doc, ensure_ascii=False), encoding="utf-8")
+    return str(path)
+
+
+def _fixture_points(expected: dict, slots: list[datetime], epex: list[float], grid_fees: str) -> list:
     """The adapter for one fixture case, ``netznutzung`` as the house profile writes it."""
     profile: dict = {"land": expected["land"]}
     if expected["area_id"]:
@@ -49,7 +62,7 @@ def _fixture_points(expected: dict, slots: list[datetime], epex: list[float]) ->
     direction = expected["direction"]
     ref = pricing_reference(
         tariffs_path=CATALOG,
-        grid_fees_path=GRID_FEES,
+        grid_fees_path=grid_fees,
         import_tariff_id=expected["tariff_id"] if direction == "import" else None,
         export_tariff_id=expected["tariff_id"] if direction == "export" else None,
         timezone_name=_fixture()["timezone"],
@@ -70,9 +83,9 @@ DST_REPEATED_HOUR = {
 
 
 @pytest.mark.parametrize(("window", "expected"), _fixture_params())
-def test_edibert_matches_fixture(window, expected):
+def test_edibert_matches_fixture(window, expected, work_price_grid_fees):
     slots = [datetime.fromisoformat(slot) for slot in window["slots"]]
-    points = _fixture_points(expected, slots, window["epex_cent"])
+    points = _fixture_points(expected, slots, window["epex_cent"], work_price_grid_fees)
     cents = [p.cent for p in points]
     if (window["name"], expected["direction"], expected["tariff_id"]) in DST_REPEATED_HOUR:
         repeated = [slot.hour == 2 for slot in slots]  # 02:00 CEST and 02:00 CET
@@ -155,7 +168,8 @@ def test_import_seam_prices_snap_window(scenario):
     points = price_points("import", slots, epex, kwargs["edibert_pricing"])
     assert k_act == [p.cent for p in points]
     grid = {round(p.grid_cent, 4) for p in points}
-    assert grid == {4.96, 3.968}  # base price outside, SNAP (−20 %) inside 10–16 h
+    # base price outside, SNAP (−20 % on the work price only) inside 10–16 h, 1.113 grid loss and levies in both
+    assert grid == {round(4.96 + 1.113, 4), round(3.968 + 1.113, 4)}
 
 
 def test_export_seam_fills_every_row(scenario):
@@ -203,7 +217,7 @@ def test_user_fixed_price_with_land_vat_on_grid_fee(scenario):
     k_act = import_brutto_cent_for_slots(epex, slots, **pricing_kwargs_from_resolved(resolved))
     matrix = [{"slot_datetime": s, "price_buy": e} for s, e in zip(slots, epex)]
     enrich_matrix_feed_in_prices(matrix, feed_in_settings_from_dict(resolved))
-    assert sorted(set(k_act)) == pytest.approx([30.0 + 3.968 * 1.2, 30.0 + 4.96 * 1.2])
+    assert sorted(set(k_act)) == pytest.approx([30.0 + (3.968 + 1.113) * 1.2, 30.0 + (4.96 + 1.113) * 1.2])
     assert {row["k_push_act"] for row in matrix} == {8.0}
 
 

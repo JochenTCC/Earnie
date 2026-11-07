@@ -2,6 +2,16 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Grid catalog: grid loss, levies and fixed amounts (2026-11-07)
+
+- [x] **Complete the catalog's grid areas** *(from **Edibert grid fixed fees**, decided 2026-11-07, maintainer)*: `share/config/grid_fees.json` held only the work price of its 14 areas, so `k_act` was too low.
+  - **Values:** read from the regulations on RIS: BGBl. II Nr. 305/2025 (work price, flat fee, grid loss), Nr. 301/2025 (renewables contribution, also 3.796 EUR on the flat fee), Nr. 416/2024 (flat fee of 19.02 EUR), BGBl. I Nr. 95/2025 through its summaries (electricity levy at the household rate of 0.1 ct/kWh, limited to 2026). The statute itself, the rate from 2027 and who bills the levy were not confirmed. Fixed amounts: 76.82 EUR/year.
+  - **Prices:** import rises by 1.34 ct/kWh gross in Vorarlberg and 1.70 ct/kWh in Vienna. SNAP takes its 20 % off the work price only.
+  - **Invoice:** the per-kWh parts have their own line, apart from the supplier.
+  - **Study:** `make_houses` no longer adds surcharges; the catalog holds the same 1.113 ct net. The net grid price is the same in all 35,040 slots of the price year.
+  - **Existing installs (maintainer's decision):** wizard step `tf1.grid_area_levies`, an Earnie step because the format stays the same, with its values frozen. An edited work price gets a question per area; "Nicht ergänzen" writes `components: []`. `attended_only` keeps it out of recorder replay and pack import, so recorded plans keep their prices; an imported pack meets it in the wizard.
+  - **Tests:** `tests/test_migration_grid_area_levies.py`, `tests/test_catalog_frozen.py`, fixture `v5_pre_grid_levies`. `tests/fixtures/backtesting/grid_fees.json` keeps its work prices with `components: []`, so the suite's prices stay as pinned. All 12 regression cases pass with no golden changed, as they do not price with the seed. Dry run and run on a temporary copy of a real site pack: no question, one step.
+
 ### Bugfix — SoC base level charged from the grid up to the level (2026-11-07)
 
 - [x] **SoC base level: the plan charged from the grid up to the level** *(found by the prototype's tests; SE prototype behind `EARNIE_BASE_LEVEL`, off by default, on in the study's stage 1)*: the value of the energy held at SA₂ was below the cheapest buy price, which was taken to mean the level comes from PV only. But it is a bonus on the SoC at SA₂, and the same energy can still replace an import past SA₂, so value and use add up and grid charging paid. Battery at minimum, no PV, flat 20 ct, load past SA₂: 4.2 kWh charged from the grid, none without the level.
