@@ -342,16 +342,23 @@ def build_house(house: DerivedHouse, params: dict, out_dir: Path, *, offline_gua
     return record
 
 
-def load_house_list(path: Path, params: dict, out_dir: Path) -> dict[str, dict]:
-    """Houses of a list file ``{"haeuser": [...]}``; a pack that already holds results fails loud."""
+def load_house_list(path: Path, params: dict, out_dir: Path, *, skip_done: bool = False) -> dict[str, dict]:
+    """Houses of a list file ``{"haeuser": [...]}``; a pack that already holds results fails loud, or is left out
+    with ``skip_done`` (a list that grew after its first build)."""
     houses: dict[str, dict] = {}
+    skipped: list[str] = []
     for index, raw in enumerate(_load(path)["haeuser"]):
         house = params_mod.validate_house(raw, params, f"{path.name}[{index}]")
-        if house["id"] in houses:
+        if house["id"] in houses or house["id"] in skipped:
             raise SystemExit(f"{path}: Haus {house['id']} steht doppelt in der Liste.")
         if (out_dir / house["id"] / "results").exists():
-            raise SystemExit(f"{out_dir / house['id']} enthaelt schon Ergebnisse; make_houses wuerde sie loeschen.")
+            if not skip_done:
+                raise SystemExit(f"{out_dir / house['id']} enthaelt schon Ergebnisse; make_houses wuerde sie loeschen.")
+            skipped.append(house["id"])
+            continue
         houses[house["id"]] = house
+    if skipped:
+        print(f"{len(skipped)} Haeuser mit Ergebnissen uebersprungen: {', '.join(skipped)}")
     return houses
 
 
@@ -363,6 +370,8 @@ def main() -> None:
     parser.add_argument("--liste", type=Path, help="JSON-Datei mit einer Hausliste; baut alle ihre Haeuser")
     parser.add_argument("--out", type=Path, default=STUDY_DIR / "packs")
     parser.add_argument("--allow-network", action="store_true", help="Wetterdaten duerfen nachgeladen werden.")
+    parser.add_argument("--ueberspringen", action="store_true",
+                        help="Haeuser der Liste, deren Paket schon Ergebnisse hat, auslassen statt abzubrechen")
     parser.add_argument("--geraete-rolle", choices=params_mod.APPLIANCE_ROLES,
                         help="Rolle der Geraete fuer diesen Bau statt geraete.rolle der Parameterdatei (known oder flex)")
     args = parser.parse_args()
@@ -377,7 +386,8 @@ def main() -> None:
     check_thermal_year(int(params["preisjahr"]))
     if args.liste and (args.ids or args.stichproben):
         raise SystemExit("--liste geht nicht zusammen mit --ids oder --stichproben.")
-    houses = load_house_list(args.liste, params, args.out) if args.liste else {h["id"]: h for h in params["stichproben"]}
+    houses = (load_house_list(args.liste, params, args.out, skip_done=args.ueberspringen) if args.liste
+              else {h["id"]: h for h in params["stichproben"]})
     all_ids = args.stichproben or args.liste
     ids = list(houses) if all_ids else [i.strip() for i in (args.ids or "").split(",") if i.strip()]
     if not ids:

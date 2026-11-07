@@ -281,6 +281,9 @@ def test_house_list_does_not_overwrite_a_pack_with_results(params, tmp_path):
     (tmp_path / "packs" / "T" / "results").mkdir(parents=True)
     with pytest.raises(SystemExit, match="Ergebnisse"):
         load_house_list(_list_file(tmp_path, _house()), params, tmp_path / "packs")
+    # a list that grew after its first build: the built houses are left out, the new ones stay
+    kept = load_house_list(_list_file(tmp_path, _house(), _house(id="N")), params, tmp_path / "packs", skip_done=True)
+    assert list(kept) == ["N"]
 
 
 def test_runner_finds_all_built_packs_and_what_is_done(tmp_path):
