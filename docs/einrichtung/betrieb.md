@@ -157,7 +157,7 @@ Standardverzeichnis: `earnie_env/runtime/`. Es lässt sich mit `EARNIE_RUNTIME_P
 | `flexible_consumers_state.json` | Tagesenergie je Flex-Verbraucher.                                                            |
 | `pv_counter_state.json`         | PV-Zählerstand für das Stunden-Delta.                                                        |
 | `power_interval_sampler_state.json` | Zwischenpuffer der Leistungsproben (≤ 60 s) für Viertelstunden-Mittel im Produktiv-Log. Optional mit Energie-Ankern (`energy_anchors`): Aus Loxone-Zählern (ΔkWh) wird die mittlere Slot-Leistung berechnet. |
-| `capacity_peaks.json`           | Höchster Netzbezug je Kalendermonat (Viertelstunde) für den Leistungspreis, mit Quelle (Zähler oder Mittel der Proben), Messbeginn und Zahl fehlender Viertelstunden. Ein Monat ohne Eintrag ist unbekannt. Die Planung nutzt die Werte noch nicht. Earnie misst selbst, deshalb kann der Wert unter dem des Stromzählers liegen. |
+| `capacity_peaks.json`           | Höchster Netzbezug je Kalendermonat (Viertelstunde) für den Leistungspreis, mit Quelle (Zähler oder Mittel der Proben), Messbeginn und Zahl fehlender Viertelstunden. Ein Monat ohne Eintrag ist unbekannt. Mit Bezugsgrenze plant der Live-Betrieb bis zur gemessenen Spitze des Monats. Earnie misst selbst, deshalb kann der Wert unter dem des Stromzählers liegen. |
 | `cons_data_pending.json`        | Puffer für noch ausstehende `cons_data`-Messwerte (Samples).                                 |
 | `consumption_profiles.csv`      | Berechnete Grundlast-Profile.                                                                |
 | `earnie.log`                    | Rotierendes Python-Log von `main.py` (absoluter Pfad). Rotation monatlich, max. 12 Archive `earnie.log.YYYY-MM-DD_HH-MM-SS`. |
@@ -368,7 +368,7 @@ Ein Dump enthält immer die volle Optimierungshistorie und die aktiven Inputs. D
 | Inhalt | Pflicht / optional |
 | ------ | ------------------ |
 | `runtime/optimization_history.jsonl` | Pflicht (vollständig) |
-| `optimizer_run_state.json`, `live_optimization_debug.json`, `flexible_consumers_state.json`, `pv_counter_state.json`, `powerstation_reserves.json` | Optional, falls vorhanden |
+| `optimizer_run_state.json`, `live_optimization_debug.json`, `flexible_consumers_state.json`, `pv_counter_state.json`, `powerstation_reserves.json`, `capacity_peaks.json` | Optional, falls vorhanden |
 | `recorder/` (Cycle-Recorder-Ringpuffer inkl. Config-Snapshots) | Optional. Fenster = Retention (Default 7 Tage); enthält Lastprofile. |
 | `manifest.chart` | Optional (nur mit Live-Anzeige) |
 | `manifest.recorder` | Optional (`from` / `to` / `cycle_count` / `config_hashes`) |

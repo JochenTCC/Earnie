@@ -641,6 +641,10 @@ def _main_cycle(
             telemetry=telemetry_for_export,
         )
         cycle_recorder.record_export_limits(recorder_token, export_ctx)
+        from optimizer.live_import_cap import resolve_live_import_caps
+
+        import_ctx = resolve_live_import_caps(optimization_matrix)
+        cycle_recorder.record_import_caps(recorder_token, import_ctx)
     with timing.phase("milp_live"):
         mode, target_power, target_soc, consumer_powers, consumer_pv_follow, milp_plan, urgent_obs = optimizer.milp_optimizer(
             optimization_matrix,
@@ -658,6 +662,7 @@ def _main_cycle(
             hk_max_export_kw=export_ctx["hk_max_export_kw"],
             inbound_export_limit_kw=export_ctx["inbound_export_limit_kw"],
             current_soc_by_id=current_soc_by_id or None,
+            import_caps=import_ctx["import_caps"],
         )
     cycle_duration_stats.mark_ready()
     if early_start:

@@ -389,6 +389,7 @@ class _PreparedReplay:
     k_push: float
     hk_max_export_kw: float | None = None
     inbound_export_limit_kw: float | None = None
+    import_caps: Any = None
 
 
 def _prepare_replay_inputs(entry: dict[str, Any], config_module: Any) -> _PreparedReplay:
@@ -454,6 +455,7 @@ def _prepare_replay_inputs(entry: dict[str, Any], config_module: Any) -> _Prepar
         pv_systems=_pv_systems_from_config(config_module),
         k_push=_require_push_price_cent(config_module),
         **_recorded_export_limits(start_state),
+        import_caps=_recorded_import_caps(start_state),
     )
 
 
@@ -561,6 +563,7 @@ def _run_milp_replay(
         current_soc_by_id=ctx.soc_by_id,
         inverter_params=ctx.inverter_params,
         pv_systems=ctx.pv_systems,
+        import_caps=ctx.import_caps,
     )
     primary = _primary_battery_params(ctx.battery_params)
     if solved is None:
@@ -643,6 +646,7 @@ def _replay_from_optimizer_fallback(
         inbound_export_limit_kw=ctx.inbound_export_limit_kw,
         verbose=verbose,
         current_soc_by_id=ctx.soc_by_id,
+        import_caps=ctx.import_caps,
     )
     battery_plan = battery_plan_kw_from_control(
         mode,
@@ -767,6 +771,32 @@ def _recorded_export_limits(start_state: dict[str, Any]) -> dict[str, float | No
         "hk_max_export_kw": _kw("hk_max_export_kw"),
         "inbound_export_limit_kw": _kw("inbound_export_limit_kw"),
     }
+
+
+def _recorded_import_caps(start_state: dict[str, Any]) -> Any:
+    """Import limits of the live cycle, exactly as planned (max-power tariff P5b).
+
+    Cycles recorded before ``import_caps`` existed replay without them, as before.
+    """
+    from optimizer.import_power_limit import ImportCaps
+
+    if "import_caps" not in start_state:
+        return None
+    recorded = start_state["import_caps"]
+    if not isinstance(recorded, dict):
+        raise TypeError("start_state.import_caps must be a dict when present")
+    for key in ("limits_kw", "months"):
+        if key not in recorded:
+            raise ValueError(f"start_state.import_caps missing {key!r}")
+    limits, months = recorded["limits_kw"], recorded["months"]
+    if limits is None and months is None:
+        return None
+    if not isinstance(limits, list) or not isinstance(months, list) or len(limits) != len(months):
+        raise ValueError("start_state.import_caps: limits_kw and months must be lists of one length")
+    return ImportCaps(
+        tuple(None if value is None else float(value) for value in limits),
+        tuple(None if value is None else str(value) for value in months),
+    )
 
 
 def _inverter_params_from_config(config_module: Any) -> list[dict] | None:

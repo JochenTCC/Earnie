@@ -443,6 +443,14 @@ def _extract_optimizer_controls_from_model(
     )
 
 
+def _warn_import_cap_not_planned(import_caps: ImportCaps | None, reason: str) -> None:
+    """Automatik and the trivial window plan nothing, so an import cap is not held by a plan."""
+    if import_caps is None:
+        return
+    limit = next(value for value in import_caps.limits_kw if value is not None)
+    logger.warning("MILP: Bezugsgrenze (%.2f kW) nicht eingeplant: %s.", limit, reason)
+
+
 def _trivial_optimizer_result(current_soc: float) -> (
     tuple[int, float, float, dict[str, float], dict[str, int], dict[str, float], dict[str, dict]]
 ):
@@ -503,6 +511,7 @@ def milp_optimizer(
         spa_remaining_kwh,
     )
     if trivial is not None:
+        _warn_import_cap_not_planned(import_caps, "trivial window, no solve")
         return _trivial_optimizer_result(current_soc)
     fallback_k_push = k_push if k_push is not None else config.get_push_price_cent()
     solved = _solve_milp_to_model(
@@ -532,6 +541,7 @@ def milp_optimizer(
         import_caps=import_caps,
     )
     if solved is None:
+        _warn_import_cap_not_planned(import_caps, "no optimal solve, Automatik")
         return _AUTOMATIK_FALLBACK
 
     model, preset_by_slot, remaining, schedule_indices, contexts, filters = solved
