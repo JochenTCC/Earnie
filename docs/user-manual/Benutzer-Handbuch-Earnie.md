@@ -257,7 +257,7 @@ Typische Vergleiche:
 - Eigene Tarife (**· Benutzertarif** in den Listen) entstehen auf der Seite [Tarife](#tarife-benutzertarife). **Benutzertarife verwalten** öffnet sie mit dem Hausprofil des Szenarios; ist ein Benutzertarif gewählt, öffnet **Benutzertarif bearbeiten** genau diesen. Beide Knöpfe sind gesperrt, solange das Szenario ungespeicherte Änderungen hat.
 - Land- und Tariftyp-Filter schränken nur die Liste ein. Ein gespeicherter Tarif bleibt gewählt, auch wenn er nicht zum Filter passt.
 - Kurz vor Monatsende warnt der Editor, wenn einem Monatstarif (`monthly_table`) der Preis des nächsten Monats fehlt. Bei Katalogtarifen wird er direkt dort eingetragen; bei einem Benutzertarif führt **Im Tarif-Editor öffnen** auf die Seite Tarife.
-- **Monatliche Fixkosten** (Grundpreis des Lieferanten, optional Netz-, Messstellen- und sonstige Kosten) fließen als Näherung in die Gesamt- und Monatskosten des Szenario-Explorers ein, nicht in die Live-Optimierung.
+- **Monatliche Fixkosten** (Grundpreis des Lieferanten, feste Beträge des Netzbereichs, optional Messstellen- und sonstige Kosten) fließen als Näherung in die Gesamt- und Monatskosten des Szenario-Explorers ein, nicht in die Live-Optimierung.
 - Der volumetrische **Netznutzung-Arbeitspreis** wird im Hausprofil (Standort) gepflegt. Er fließt in Live-Betrieb und Szenario-Explorer ein und steht in den Fake-Jahresrechnungen getrennt vom Lieferantenanteil.
 - Nach jedem Lauf des Szenario-Explorers liegen **Fake-Jahresrechnungen** (Markdown) im Log-Ordner unter `invoices/`: Bezug und Einspeisung mit Ø Tarif- und Ø Ist-Preis, die Katalogparameter stehen am Ende.
 

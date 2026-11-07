@@ -186,7 +186,8 @@ def test_tariff_info_carries_catalog_parameters(profiles_path):
 
 
 def test_invoice_splits_arbeitspreis_by_time_window(profiles_path):
-    from simulation.monthly_fees import ScenarioFeeBreakdown
+    from house_config.entity_resolution import strip_assets_for_reference
+    from simulation.monthly_fees import fee_breakdown_from_params
     from simulation.se_invoice_markdown import render_scenario_invoice_markdown
     from simulation.se_invoice_netznutzung import _grid_fee_from_params
 
@@ -209,7 +210,7 @@ def test_invoice_splits_arbeitspreis_by_time_window(profiles_path):
         scenario_id="s",
         label="S",
         df=df,
-        fees=ScenarioFeeBreakdown(),
+        fees=fee_breakdown_from_params(resolved),
         import_spec=resolved["_import_tariff_spec"],
         export_spec=None,
         booked_consumption={"consumption_kwh": 0.5, "standby_kwh": 0.0},
@@ -222,6 +223,15 @@ def test_invoice_splits_arbeitspreis_by_time_window(profiles_path):
     # 200 kWh * 0.393 ct * 1.2 = 0.94 EUR, out of the supplier line
     assert "| Netzverlustentgelt | 200.0 kWh |" in body
     assert "| Netzverlust und Abgaben je kWh | 2.67 € |" in body  # 200 kWh * 1.113 ct * 1.2
+    # 76.816 EUR/year net: one twelfth for the one month, with awattar_at's 20 % VAT
+    assert "| Feste Netzbeträge | 7.68 € |" in body
+    assert "| Lieferant-Grundpreis | 5.75 € |" in body  # awattar_at: 4.79 EUR net, 20 % VAT
+    assert "| **Gesamt** | **33.43 €** |" in body  # 20 EUR energy + 5.75 EUR + 7.68 EUR
+    assert "| 54.00 € | 5.40 € |" in body  # grid base fee: 54 / 12 * 1.2
+    # The reference without assets bills the same fixed amounts
+    assert fee_breakdown_from_params(strip_assets_for_reference(resolved)).grid_monthly_eur == (
+        pytest.approx(76.816 / 12 * 1.2)
+    )
 
 
 def test_invoice_has_no_grid_line_without_reference():

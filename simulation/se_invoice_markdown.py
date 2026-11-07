@@ -8,7 +8,7 @@ from typing import Literal
 import pandas as pd
 
 from data.tariff_parameter_preview import tariff_parameter_rows
-from simulation.monthly_fees import ScenarioFeeBreakdown
+from simulation.monthly_fees import GridFixedPart, ScenarioFeeBreakdown
 from simulation.period_clip import clip_results_to_period
 from simulation.se_invoice_format import (  # noqa: F401  (re-exported)
     _fmt_cent,
@@ -216,7 +216,7 @@ def _year_summary_lines(
     lines.extend(
         [
             f"| Lieferant-Grundpreis | {_fmt_eur(fees.supplier_monthly_eur * month_count)} |",
-            f"| Netzentgelt-Grundpreis | {_fmt_eur(fees.grid_monthly_eur * month_count)} |",
+            f"| Feste Netzbeträge | {_fmt_eur(fees.grid_monthly_eur * month_count)} |",
             f"| Messstellengebühr | {_fmt_eur(fees.metering_monthly_eur * month_count)} |",
             f"| Sonstige Fixkosten | {_fmt_eur(fees.other_monthly_eur * month_count)} |",
             f"| **Gesamt** | **{_fmt_eur(total_year)}** |",
@@ -243,7 +243,7 @@ def _hinweise_lines(*, has_netznutzung_ap: bool) -> list[str]:
         "",
         "- Näherung für Plausibilität im Szenario-Explorer — **keine** echte Stromrechnung.",
         nne_hint,
-        "- **Leistungspreis** und netzgebietsspezifische Lookup-Tabellen werden "
+        "- **Leistungspreis** und PLZ-spezifische Lookup-Tabellen werden "
         "**nicht** modelliert.",
         "- Verbrauch (Info) = gebuchter Verbrauch der Stundenreihe dieses Szenarios "
         "(jeder Zeitslot einmal, ohne Speicher-Standby) – derselbe Wert wie "
@@ -257,11 +257,12 @@ def _hinweise_lines(*, has_netznutzung_ap: bool) -> list[str]:
         "enthält ggf. den Netznutzung-Arbeitspreis.",
         "- Ø Ist Cent/kWh: `Energiekosten € / Netzenergie kWh × 100` "
         "(nur Stunden mit Bezug bzw. Einspeisung wirken über die Summen).",
-        "- Fixkosten: Lieferant-Grundpreis je `supplier_id` einmal; "
-        "Netzentgelt-/Messstellen-/Sonstige Fixkosten einmal je Hausanschluss "
-        "(aus Bezugstarif, sonst Einspeisetarif) — Katalog-Stubs.",
-        "- Nicht modelliert: Leistungspreis, PLZ-/netzgebietsspezifische Stacks, "
-        "separate Stromsteuer/Konzessionsabgabe/Elektrizitätsabgabe (oft im Arbeitspreis).",
+        "- Fixkosten sind brutto: Nettobeträge erhalten die USt ihres Tarifs. "
+        "Lieferant-Grundpreis je `supplier_id` einmal; "
+        "Messstellen-/Sonstige Fixkosten einmal je Hausanschluss "
+        "(aus Bezugstarif, sonst Einspeisetarif); feste Netzbeträge aus dem Netzbereich.",
+        "- Nicht modelliert: Leistungspreis, PLZ-spezifische Stacks, "
+        "separate Stromsteuer und Konzessionsabgabe.",
         "",
     ]
 
@@ -289,6 +290,7 @@ class _InvoiceYearContext:
     netznutzung_ap_eur: float
     netznutzung_components: list[_NetznutzungComponent]
     netz_parts: list[_NetznutzungComponent]
+    netz_fixed: tuple[GridFixedPart, ...]
     netznutzung_skipped: list[dict]
 
     @property
@@ -350,6 +352,7 @@ def _build_invoice_year_context(
         netznutzung_ap_eur=nne_eur,
         netznutzung_components=components,
         netz_parts=_netz_part_lines(df, grid_fee=grid_fee, import_spec=import_spec),
+        netz_fixed=grid_fee.fixed if grid_fee else (),
         netznutzung_skipped=list(grid_fee.skipped) if grid_fee else [],
     )
 
@@ -375,7 +378,7 @@ def _invoice_summary_lines(
             netz_parts_eur=sum(part.eur for part in ctx.netz_parts),
         )
     )
-    if ctx.ap_net_cent > 0.0:
+    if ctx.ap_net_cent > 0.0 or ctx.netz_fixed:
         lines.extend(
             _netznutzung_section_lines(
                 ap_net_cent=ctx.ap_net_cent,
@@ -384,8 +387,8 @@ def _invoice_summary_lines(
                 netznutzung_ap_eur=ctx.netznutzung_ap_eur,
                 components=ctx.netznutzung_components,
                 parts=ctx.netz_parts,
+                fixed=ctx.netz_fixed,
                 skipped=ctx.netznutzung_skipped,
-                fees=fees,
                 month_count=ctx.month_count,
             )
         )

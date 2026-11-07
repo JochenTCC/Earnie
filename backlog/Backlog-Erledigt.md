@@ -2,6 +2,17 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Edibert grid fixed fees in house profile and SE invoice (2026-11-07)
+
+- [x] **Edibert grid fixed fees in house profile and SE invoice** `[feat]` *(2026-10-31, left from the pin v0.1.12)*: Earnie read none of the grid area's fixed amounts, so 76.82 EUR/year net were missing from every SE total, and a fee moved there by the migration was no longer shown.
+  - **Invoice and totals:** `simulation/monthly_fees.py::grid_fixed_parts` reads `GridFee.fixed`: one twelfth per calendar month with the import tariff's VAT, as in Edibert's `grid_fixed_month_eur` (not in its public API, so Earnie has the same one line). `ScenarioFeeBreakdown.grid_monthly_eur` keeps its name, so the log shape stays. Each amount has its line under "Netznutzung", the sum its line under "Jahr". Reference and ladder series bill the same amounts.
+  - **Dropped:** `grid_monthly_fee_eur` from `monthly_fees.py`, `tariffs_store.py`, `tariff_parameter_preview.py` and `tariffs.schema.json`. Edibert has rejected the field on load since `v0.1.12`, so these paths always read 0. `tf1.tariff_format` still moves it.
+  - **House profile:** the caption under a grid area names its per-kWh parts and fixed amounts.
+  - **"Eigener Arbeitspreis" (decided here, no maintainer decision yet):** saving the form replaced the whole area and so dropped time rules, fixed amounts and a migrated fee. It now changes only work price, label and land. The form gets no rule editor: rules go in `user_grid_fees.json`, and a caption shows what the area holds.
+  - **VAT on tariff fees (maintainer's decision):** monthly fees of net tariffs now get their tariff's VAT, as in Edibert's `monthly_fees_eur`, so `awattar_at` counts 5.75 EUR instead of 4.79 EUR a month. Missing VAT facts on a fee are an error. An export tariff with 0 % VAT keeps its fee net, so a supplier that only appears on the export side stays too low.
+  - **Docs:** `preise.md`, `tarife-quellen.md`, user manual, release-note draft.
+  - **Tests:** `tests/test_monthly_fees.py`, `tests/test_edibert_p3b.py`, `tests/test_edibert_p2.py`, `tests/apptest/test_house_profile_grid_fixed_apptest.py`.
+
 ### Grid catalog: grid loss, levies and fixed amounts (2026-11-07)
 
 - [x] **Complete the catalog's grid areas** *(from **Edibert grid fixed fees**, decided 2026-11-07, maintainer)*: `share/config/grid_fees.json` held only the work price of its 14 areas, so `k_act` was too low.

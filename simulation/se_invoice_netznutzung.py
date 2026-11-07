@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 import pandas as pd
-from simulation.monthly_fees import ScenarioFeeBreakdown
+from simulation.monthly_fees import GridFixedPart, grid_fixed_parts
 from simulation.se_invoice_format import (
     _fmt_cent,
     _fmt_eur,
@@ -23,6 +23,7 @@ class InvoiceGridFee:
     skipped: list[dict[str, str]]  # {"id", "reason"} of rules not applied
     work: Callable[[datetime], tuple[float, str | None]]  # net cent and rule ID per slot
     parts: tuple[tuple[str, float], ...] = ()  # label and net cent of the per-kWh components, in k_act too
+    fixed: tuple[GridFixedPart, ...] = ()  # fixed yearly amounts, never in k_act
 
 
 def _skipped_reason(skipped) -> str:
@@ -54,6 +55,7 @@ def _grid_fee_from_params(params: dict | None) -> InvoiceGridFee | None:
         skipped=[{"id": item.rule_id, "reason": _skipped_reason(item)} for item in fee.skipped],
         work=_work,
         parts=tuple((part.label, float(part.value)) for part in fee.components),
+        fixed=grid_fixed_parts(params),
     )
 
 
@@ -147,11 +149,11 @@ def _netznutzung_section_lines(
     netznutzung_ap_eur: float,
     components: list[_NetznutzungComponent],
     parts: list[_NetznutzungComponent],
+    fixed: tuple[GridFixedPart, ...],
     skipped: list[dict],
-    fees: ScenarioFeeBreakdown,
     month_count: int,
 ) -> list[str]:
-    """Separate Netznutzung block (Arbeitspreis breakout + Grundpreis-Stub)."""
+    """Separate Netznutzung block (Arbeitspreis breakout, per-kWh parts, fixed amounts)."""
     lines = [
         "## Netznutzung",
         "",
@@ -161,7 +163,6 @@ def _netznutzung_section_lines(
         f"| Arbeitspreis in k_act (Basis) | {_fmt_cent(ap_gross_cent)} Cent/kWh |",
         f"| Netzbezug | {_fmt_kwh(import_kwh_year)} |",
         f"| Arbeitspreis (Jahr) | {_fmt_eur(netznutzung_ap_eur)} |",
-        f"| Grundpreis (Katalog-Stub) | {_fmt_eur(fees.grid_monthly_eur * month_count)} |",
         "",
     ]
     if len(components) > 1 or any(c.label != "Basis" for c in components):
@@ -190,6 +191,19 @@ def _netznutzung_section_lines(
                 f"{part.ap_net_cent:.3f} | {_fmt_eur(part.eur)} |"
             )
         lines.append("")
+    if fixed:
+        lines.extend(
+            [
+                "| Feste Netzbeträge | Netto je Jahr | Betrag |",
+                "| --- | ---: | ---: |",
+            ]
+        )
+        for item in fixed:
+            lines.append(
+                f"| {item.label} | {_fmt_eur(item.net_eur_year)} | "
+                f"{_fmt_eur(item.gross_monthly_eur * month_count)} |"
+            )
+        lines.append("")
     if skipped:
         skipped_text = ", ".join(f"{item['id']} ({item['reason']})" for item in skipped)
         lines.extend([f"Nicht berücksichtigte Regeln: {skipped_text}.", ""])
@@ -199,7 +213,8 @@ def _netznutzung_section_lines(
             "Netzentgelt-Katalog, unabhängig vom Lieferantentarif. In der "
             "Jahressumme ist er aus dem Energiebezug herausgerechnet (kein "
             "Doppelzählen). Das gilt auch für Netzverlust und Abgaben je kWh. "
-            "Leistungspreis fehlt.",
+            "Feste Netzbeträge zählen je Kalendermonat mit einem Zwölftel des "
+            "Jahresbetrags, mit USt laut Bezugstarif. Leistungspreis fehlt.",
             "",
         ]
     )
