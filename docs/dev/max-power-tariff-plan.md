@@ -157,6 +157,12 @@ Split on 2026-11-07 (maintainer): **P5a** measurement and month store, **P5b** c
 
 **P5b built 2026-11-07.** `optimizer/live_import_cap.py` builds the limits from the resolved Live scenario and the stored month peaks, for every month the horizon touches. A month without an entry is unknown: the plan holds the cap itself (the strictest limit), and the month is named in `unknown_months`. `main.py` passes the limits to `milp_optimizer`; the cycle recorder keeps limits, months, peaks and unknown months in `start_state.import_caps`, and replay plans with the recorded limits, so it needs neither the scenario nor the peak store of that time. Cycles recorded before P5b replay without a cap. The trivial window and the Automatik fallback log that the cap was not planned. `capacity_peaks.json` is in the debug dump. An unreadable peak store or a cap without a grid area fails the cycle instead of planning without a cap; what the daemon does after such a cycle was not changed or checked here.
 
+**P5c, part built 2026-11-07.**
+
+- **Clock:** nothing new. `runtime_store/clock_skew.py` already estimates the offset from the `Date` headers of public HTTPS responses on every platform and warns in `earnie.log` above 2 s, at most hourly. At 2 s the error on the month peak is at most 0.02 kW for a 10 kW step at the boundary, so the warning threshold is enough for this.
+- **Raw log for the field test:** `EARNIE_POWER_SAMPLE_LOG_DAYS=<days>` writes every 30 s sample to `runtime/power_samples/<date>.jsonl`: grid power, import and export counter read at the same moment, clock offset estimate. Files older than the days set are removed; a failure is logged and never stops sampling.
+- **Open, needs the maintainer:** the HouseSim run on HA (Docker testbed with manual HA onboarding) and the two-week field test against the operator's quarter-hour export. The margin stays a placeholder until then.
+
 Planned:
 
 - Sampler: new `grid_import_kw` per quarter hour, from the import counter only (`total`, without `total_neg`), else the mean of `max(grid_kw, 0)` over the samples. `grid_kw` stays as it is. Check the sign convention per backend (`ehal-unit-conversion.mdc`).

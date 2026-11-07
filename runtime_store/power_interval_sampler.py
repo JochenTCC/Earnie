@@ -21,6 +21,7 @@ MIN_SAMPLE_COUNT_FOR_MEAN = 3
 MIN_COUNTER_WINDOW_SEC = 5 * 60
 GRID_IMPORT_SOURCE_COUNTER = "counter"
 GRID_IMPORT_SOURCE_MEAN = "mean"
+SAMPLE_LOG_DIRNAME = "power_samples"
 _SAMPLER_SCHEMA = 1
 
 _PLANT_KEYS = ("pv_kw", "grid_kw", "battery_kw", "house_kw", "baseload_kw", "flex_sum_kw")
@@ -414,7 +415,82 @@ def tick(
     state["last_tick_at"] = _iso(moment)
     state["sample_interval_sec"] = SAMPLE_INTERVAL_SEC
     _save_state(path, state)
+    _log_raw_sample(moment, sample, read_energy=read_energy)
     return True
+
+
+def sample_log_days() -> int:
+    """``EARNIE_POWER_SAMPLE_LOG_DAYS``: days of raw samples to keep; 0 or unset = off."""
+    from runtime_store.env_vars import read_env
+
+    raw = read_env("POWER_SAMPLE_LOG_DAYS")
+    if not raw:
+        return 0
+    days = int(raw)
+    if days < 0:
+        raise ValueError(f"EARNIE_POWER_SAMPLE_LOG_DAYS muss >= 0 sein, ist {raw!r}")
+    return days
+
+
+def sample_log_dir() -> str:
+    from runtime_store.persist_paths import runtime_path
+
+    return runtime_path(SAMPLE_LOG_DIRNAME)
+
+
+def _log_raw_sample(
+    moment: datetime,
+    sample: dict[str, Any],
+    *,
+    read_energy: Callable[[], dict[str, dict[str, float]] | None] | None,
+    log_dir: str | None = None,
+) -> None:
+    """Opt-in raw log for the field test against the meter (max-power tariff P5c).
+
+    One JSON line per sample with the grid power, the grid counters read at the same moment
+    and the clock offset estimate. One file per day; files older than the configured days go.
+    A failure is logged and never stops the sampler.
+    """
+    try:
+        days = sample_log_days()
+        if days == 0:
+            return
+        from runtime_store import clock_skew
+        from integrations.loxone_meter_energy import CHANNEL_GRID
+
+        reader = read_energy if read_energy is not None else _default_read_energy
+        grid = (reader() or {}).get(CHANNEL_GRID) or {}
+        skew = clock_skew.current_estimate()
+        line = {
+            "ts": _iso(moment),
+            "grid_kw": sample["grid_kw"],
+            "grid_import_total_kwh": grid.get("total"),
+            "grid_export_total_kwh": grid.get("total_neg"),
+            "clock_skew_sec": None if skew is None else skew.offset_sec,
+        }
+        folder = log_dir or sample_log_dir()
+        os.makedirs(folder, exist_ok=True)
+        target = os.path.join(folder, f"{moment:%Y-%m-%d}.jsonl")
+        is_new_day = not os.path.exists(target)
+        with open(target, "a", encoding="utf-8", newline="\n") as handle:
+            handle.write(json.dumps(line) + "\n")
+        if is_new_day:
+            _prune_sample_log(folder, keep_from=(moment - timedelta(days=days - 1)).date())
+    except Exception as exc:  # noqa: BLE001 — a diagnostics log never stops sampling
+        logger.warning("power_interval_sampler: raw sample log failed: %s", exc)
+
+
+def _prune_sample_log(folder: str, *, keep_from) -> None:
+    for name in os.listdir(folder):
+        stem, ext = os.path.splitext(name)
+        if ext != ".jsonl":
+            continue
+        try:
+            day = datetime.strptime(stem, "%Y-%m-%d").date()
+        except ValueError:
+            continue
+        if day < keep_from:
+            os.remove(os.path.join(folder, name))
 
 
 def note_decision_sample(

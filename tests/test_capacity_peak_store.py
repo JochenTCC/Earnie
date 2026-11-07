@@ -95,7 +95,8 @@ def test_a_closed_interval_without_import_fails_loud(tmp_path: Path):
         )
 
 
-def test_the_live_cycle_records_each_closed_quarter_hour(monkeypatch):
+def test_the_live_cycle_records_each_closed_quarter_hour(monkeypatch, tmp_path: Path):
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path / "runtime"))
     closed = _closed(START, 3.3)
     monkeypatch.setattr(
         main_module.power_interval_sampler, "finalize_closed_interval", lambda _slot: closed
@@ -104,7 +105,8 @@ def test_the_live_cycle_records_each_closed_quarter_hour(monkeypatch):
     assert store.month_peak("2026-11").peak_kw == 3.3
 
 
-def test_a_store_failure_does_not_stop_the_cycle(monkeypatch, caplog):
+def test_a_store_failure_does_not_stop_the_cycle(monkeypatch, caplog, tmp_path: Path):
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path / "runtime"))
     broken = {"interval_start": START.isoformat(), "sample_count": 30}
     monkeypatch.setattr(
         main_module.power_interval_sampler, "finalize_closed_interval", lambda _slot: broken

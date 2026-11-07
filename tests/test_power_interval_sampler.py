@@ -1,6 +1,8 @@
 """Tests for QH power-interval sampler and closed_interval means."""
 from __future__ import annotations
 
+import json
+import logging
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -259,6 +261,67 @@ def test_import_stays_on_the_mean_without_a_usable_counter_window(
     )
     assert closed["grid_import_source"] == sampler.GRID_IMPORT_SOURCE_MEAN
     assert closed["grid_import_kw"] == pytest.approx(2.0)
+
+
+@pytest.fixture
+def own_runtime(tmp_path: Path, monkeypatch) -> Path:
+    """The raw log goes to the runtime dir; pin it so no other test's files are seen."""
+    runtime = tmp_path / "runtime"
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(runtime))
+    return runtime
+
+
+def _tick_at(state: Path, moment: datetime, grid: float, total: float) -> None:
+    assert sampler.tick(
+        now=moment,
+        force=True,
+        state_path=str(state),
+        read_plant=lambda: _plant(grid=grid),
+        read_soc=lambda: 50.0,
+        read_flex_chart=lambda: {},
+        read_energy=lambda: {"grid": {"total": total, "total_neg": 7.0}},
+    )
+
+
+def test_raw_sample_log_keeps_counters_and_only_the_last_days(tmp_path: Path, monkeypatch, own_runtime):
+    from runtime_store import clock_skew
+
+    monkeypatch.setenv("EARNIE_POWER_SAMPLE_LOG_DAYS", "2")
+    monkeypatch.setattr(
+        clock_skew, "current_estimate", lambda: clock_skew.SkewEstimate(-1.2, 5, ("example.org",))
+    )
+    state = tmp_path / "sampler.json"
+    first = datetime(2026, 11, 5, 23, 59, 30)
+    _tick_at(state, first, 1.5, 100.0)
+    _tick_at(state, first + timedelta(days=1), 2.5, 110.0)
+    folder = Path(sampler.sample_log_dir())
+    lines = (folder / "2026-11-06.jsonl").read_text(encoding="utf-8").splitlines()
+    assert [json.loads(line) for line in lines] == [{
+        "ts": "2026-11-06T23:59:30",
+        "grid_kw": 2.5,
+        "grid_import_total_kwh": 110.0,
+        "grid_export_total_kwh": 7.0,
+        "clock_skew_sec": -1.2,
+    }]
+    _tick_at(state, first + timedelta(days=2), 3.5, 120.0)
+    assert sorted(p.name for p in folder.iterdir()) == ["2026-11-06.jsonl", "2026-11-07.jsonl"]
+
+
+def test_raw_sample_log_is_off_by_default(tmp_path: Path, monkeypatch, own_runtime):
+    monkeypatch.delenv("EARNIE_POWER_SAMPLE_LOG_DAYS", raising=False)
+    _tick_at(tmp_path / "sampler.json", datetime(2026, 11, 7, 18, 0, 30), 1.0, 100.0)
+    assert Path(sampler.sample_log_dir()) == own_runtime / sampler.SAMPLE_LOG_DIRNAME
+    assert not (own_runtime / sampler.SAMPLE_LOG_DIRNAME).exists()
+
+
+def test_a_bad_log_setting_is_reported_and_sampling_goes_on(
+    tmp_path: Path, monkeypatch, caplog, own_runtime
+):
+    monkeypatch.setenv("EARNIE_POWER_SAMPLE_LOG_DAYS", "-1")
+    with caplog.at_level(logging.WARNING):
+        _tick_at(tmp_path / "sampler.json", datetime(2026, 11, 7, 18, 0, 30), 1.0, 100.0)
+    assert "raw sample log failed" in caplog.text
+    assert "POWER_SAMPLE_LOG_DAYS" in caplog.text
 
 
 def test_finalize_overlays_flex_counter_when_anchored(tmp_path: Path):
