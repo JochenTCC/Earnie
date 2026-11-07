@@ -41,11 +41,11 @@ Schlüssel mit Unterstrich sind Kommentare. Unbekannte und fehlende Schlüssel b
 | `preisjahr` | Jahr für Preise, Verbrauchsdaten und Brennstoffpreise |
 | `annahmen` | Feste Werte: Standort, PR, Akku, E-Auto, Wallbox, Solltemperatur, Heizstab |
 | `netz` | Ob SNAP im ganzen Preisjahr gilt. `make_houses` schreibt das nur in die `grid_fees.json` des Pakets, der Katalog in `share/config` bleibt unverändert. Netzverlust und Abgaben kommen aus dem Katalog |
-| `geraete` | Waschmaschine, Geschirrspüler, Trockner. Mit `aktiv: true` bekommt jedes Haus je Gerät ein zufälliges Stundenprofil (fester Seed) unter `config/appliances/`. Es gilt in L0 bis L3 als feste Last, die Energie kommt aus dem Haushaltsstrom |
+| `geraete` | Waschmaschine, Geschirrspüler, Trockner. Mit `aktiv: true` bekommt jedes Haus je Gerät ein zufälliges Stundenprofil (fester Seed) unter `config/appliances/`, die Energie kommt aus dem Haushaltsstrom. `rolle` sagt, was Earnie damit darf: `known` = feste Last in L0 bis L3 (Stufe 1); `flex` = Energie und Lauftage aus dem Profil, L2 nimmt den günstigsten Preisblock und L3 plant den Start im Fenster `fenster_start` desselben Tages (ab Stufe 2). Bei `flex` muss das Fenster eine gerade Breite in Stunden haben, weil Earnie es als Startstunde ± Verschiebung führt |
 | `regeln` | Werte der Ableitungsregeln: Wohnfläche, Haushaltsstrom, Hüllen, Heizlast, Kollektor, Dach, Mindest-kWp. Speicher: Heizleistung mal `speicher_l_je_kw` zwischen `speicher_min_l` und `speicher_max_l`, mit Kollektor mindestens `speicher_l_je_m2_kollektor`. `speicher_band_c` setzt das Temperaturband je Heizquelle, `speicher_verlust_w` den Verlust aus dem Volumen |
 | `brennstoffpreise` | Je Jahr `gas` (ct/kWh) und `pellets` (€/t) |
 | `heizsysteme` | H1, H2 und H5 bis H7: Quelle, Kollektor, Heizstab, Speicher, erlaubte Hüllen. Wärmepumpe mit Heizstab (früher H3) ist keine erlaubte Konfiguration und bricht ab |
-| `achsen` | Freie Achsen und ihre Stufen |
+| `achsen` | Freie Achsen und ihre Stufen. Eine neue Stufe verschiebt die `G`-Nummern von `all_houses`; Hauslisten (`--liste`) tragen Achsen und ID selbst und bleiben gültig |
 | `eauto_muster` | Ladefenster je Muster, Muster je Stufe der Achse `eauto` |
 | `szenarien`, `standard_szenarien` | Tarife je Szenario; welche ein Haus ohne eigene Angabe rechnet |
 | `stichproben` | Die Häuser der Stufe 0, je Haus alle Achsen und optional `szenarien` |

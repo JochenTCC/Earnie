@@ -2,7 +2,10 @@
 
 The energy is part of the household electricity. Each appliance gets one hourly profile per house:
 on which days it runs and when it starts is random, with a fixed seed, so L0 to L3 share the same
-runs and L3 sees them as fixed load: the person starts the appliance, Earnie only uses the battery.
+runs. ``geraete.rolle`` says what Earnie may do with them: ``known`` keeps the profile as fixed load
+in every ladder step (the person starts the appliance, Earnie only uses the battery); ``flex`` keeps
+energy and run days of the profile but lets L2 (cheapest block) and L3 (plan) choose the start inside
+the window ``fenster_start`` of the same day, L0 and L1 keep the profile's times.
 """
 from __future__ import annotations
 
@@ -125,14 +128,33 @@ def baseload_target_kwh(household_kwh: float, profile_consumers: list[dict]) -> 
     return household_kwh - sum(float(c["annual_kwh"]) for c in profile_consumers if c.get("use_profile_csv"))
 
 
+def flex_schedule(appliance: Appliance, params: dict) -> dict:
+    """Earnie schedule of a ``flex`` appliance: start window = ``fenster_start`` as start hour +- shift.
+
+    Energy and run days come from the CSV (``use_profile_csv``); ``runs_per_week`` only has to be a
+    positive integer for Earnie's schedule check, so the weekly runs are rounded up.
+    """
+    first, last = params["geraete"]["fenster_start"]
+    shift = (last - first) // 2
+    return {
+        "runs_per_week": max(1, math.ceil(appliance.runs_per_week - _EPS)),
+        "duration_h": appliance.duration_h,
+        "start_hour": first + shift,
+        "start_shift_h": float(shift),
+    }
+
+
 def appliance_consumer(appliance: Appliance, template: dict, params: dict) -> dict:
-    """House profile row: a ``known`` consumer, its CSV is fixed load in every ladder step."""
+    """House profile row with the role of ``geraete.rolle``; the CSV carries energy and run days."""
+    role = params["geraete"]["rolle"]
     consumer = {k: v for k, v in template.items() if k not in ("appliance_recommendation", "schedule")}
     consumer.update(
         nominal_power_kw=round(appliance.power_kw, 4),
         annual_kwh=appliance.annual_kwh,
-        earnie_role="known",
+        earnie_role=role,
         profile_csv=appliance.profile_csv,
         use_profile_csv=True,
     )
+    if role == "flex":
+        consumer["schedule"] = flex_schedule(appliance, params)
     return consumer

@@ -212,7 +212,7 @@ def test_fuel_source_keeps_its_rod(params):
 
 def test_sample_houses_cover_every_level_without_s5(params):
     houses = params["stichproben"]
-    assert [h["id"] for h in houses] == ["S1", "S2", "S3", "S4", "S6", "S7", "S8"]
+    assert [h["id"] for h in houses] == ["S1", "S2", "S3", "S4", "S6", "S7", "S8", "S9"]
     for axis, levels in params["achsen"].items():
         for level in levels:
             assert any(h[axis] == level for h in houses), (axis, level)
@@ -283,7 +283,7 @@ def test_runner_finds_all_built_packs_and_what_is_done(tmp_path):
 
 
 def test_grid_size_and_sample_is_reproducible_and_covers_every_level(params):
-    assert len(all_houses(params)) == 2688
+    assert len(all_houses(params)) == 3584  # 4 storage levels since stage 2 (F17)
     first = stratified_sample(params, 60, seed=7)
     assert first == stratified_sample(params, 60, seed=7)
     assert first != stratified_sample(params, 60, seed=8)
@@ -430,8 +430,10 @@ def test_start_hours_peak_slightly_at_eight_noon_and_seven_pm(params):
 
 
 def test_pack_with_appliances_reads_back_their_energy_as_fixed_load(params, tmp_path):
-    house = derive_house(_house(), params)
-    root = write_pack(house, params, tmp_path / "T")
+    known = copy.deepcopy(params)
+    known["geraete"]["rolle"] = "known"
+    house = derive_house(_house(), known)
+    root = write_pack(house, known, tmp_path / "T")
     config = root / "pack/config"
     profile = json.loads((config / "house_profiles.json").read_text(encoding="utf-8"))["profiles"][0]
     rows = {c["id"]: c for c in profile["consumers"] if c["type"] == "generic"}
@@ -448,6 +450,39 @@ def test_pack_with_appliances_reads_back_their_energy_as_fixed_load(params, tmp_
     assert in_year == pytest.approx(dryer["annual_kwh"], abs=0.1)
     assert in_year > 0
     assert _timestamp_hour_key(datetime(2025, 3, 1, 12, 15)) in power
+
+
+def test_flex_appliances_keep_the_profile_and_get_the_start_window_as_schedule(params, tmp_path):
+    assert params["geraete"]["rolle"] == "flex"  # the default since stage 2 (plan 5.2)
+    root = write_pack(derive_house(_house(), params), params, tmp_path / "T")
+    profile = json.loads((root / "pack/config/house_profiles.json").read_text(encoding="utf-8"))["profiles"][0]
+    rows = {c["id"]: c for c in profile["consumers"] if c["type"] == "generic"}
+    dish = rows["geschirrspueler"]
+    assert dish["earnie_role"] == "flex" and dish["use_profile_csv"] is True
+    first, last = params["geraete"]["fenster_start"]
+    weekly = params["geraete"]["laeufe_je_woche"][str(_house()["personen"])]["geschirrspueler"]
+    assert dish["schedule"] == {
+        "runs_per_week": math.ceil(weekly),  # a whole number for Earnie's schedule check
+        "duration_h": 2.5,
+        "start_hour": (first + last) // 2,
+        "start_shift_h": float((last - first) // 2),
+    }
+    assert dish["schedule"]["start_hour"] - dish["schedule"]["start_shift_h"] == first
+    assert dish["schedule"]["start_hour"] + dish["schedule"]["start_shift_h"] == last
+    assert "appliance_recommendation" not in dish
+
+
+def test_appliance_role_and_odd_flex_window_fail_loud():
+    doc = json.loads(params_mod.DEFAULT_PATH.read_text(encoding="utf-8"))
+    doc["geraete"]["rolle"] = "manual"
+    with pytest.raises(params_mod.ParameterError, match="geraete.rolle"):
+        params_mod.validate(doc)
+    doc["geraete"]["rolle"] = "flex"
+    doc["geraete"]["fenster_start"] = [7, 20]
+    with pytest.raises(params_mod.ParameterError, match="gerade"):
+        params_mod.validate(doc)
+    doc["geraete"]["rolle"] = "known"
+    params_mod.validate(doc)  # an odd window is fine for fixed load
 
 
 def test_appliance_section_fails_loud_on_a_missing_household_size(params):

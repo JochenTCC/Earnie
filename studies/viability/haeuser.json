@@ -28,8 +28,10 @@
     "snap_im_preisjahr": true
   },
   "geraete": {
-    "_hinweis": "Ohne Quelle fuer die Staffelung nach Personen (Plan F18). Die Energie stammt aus dem Haushaltsstrom. Die zufaelligen Starts gelten in L0 bis L3 als feste Last, Earnie verschiebt sie nicht.",
+    "_hinweis": "Ohne Quelle fuer die Staffelung nach Personen (Plan F18). Die Energie stammt aus dem Haushaltsstrom. Die zufaelligen Starts gelten in L0 und L1 als feste Last.",
     "aktiv": true,
+    "_rolle": "known: feste Last in L0 bis L3 (Stufe 1, packs_stufe1d). flex: L2 und L3 verschieben den Lauf im Startfenster desselben Tages (ab Stufe 2, Plan 5.2).",
+    "rolle": "flex",
     "seed": 7,
     "fenster_start": [7, 21],
     "haeufungen": [8, 12, 19],
@@ -109,7 +111,7 @@
     "huelle": ["neubau", "bestand"],
     "pv_kwp_je_mwh": [0.75, 1.25, 1.75, 2.2],
     "pv_belegung": ["sued", "ost_west"],
-    "speicher_kwh_je_kwp": [0, 1, 1.5],
+    "speicher_kwh_je_kwp": [0, 1, 1.5, 2],
     "eauto": ["keins", "pendler", "zuhause", "zwei"]
   },
   "eauto_muster": {
@@ -135,6 +137,7 @@
     {"id": "S4", "_zweck": "Neubau mit Kollektor, Ost/West, tagsueber zu Hause, drittes Szenario", "personen": 3, "huelle": "neubau", "heizsystem": "H2", "pv_kwp_je_mwh": 1.25, "pv_belegung": "ost_west", "speicher_kwh_je_kwp": 1, "eauto": "zuhause", "szenarien": ["duo", "dynamisch", "duo_pvdyn"]},
     {"id": "S6", "_zweck": "Gas ohne Heizstab, tagsueber zu Hause", "personen": 2, "huelle": "bestand", "heizsystem": "H5", "pv_kwp_je_mwh": 1.25, "pv_belegung": "sued", "speicher_kwh_je_kwp": 1, "eauto": "zuhause"},
     {"id": "S7", "_zweck": "Gas mit Heizstab, Ost/West, Pendler", "personen": 4, "huelle": "bestand", "heizsystem": "H6", "pv_kwp_je_mwh": 1.25, "pv_belegung": "ost_west", "speicher_kwh_je_kwp": 1, "eauto": "pendler"},
-    {"id": "S8", "_zweck": "Pellets mit Heizstab", "personen": 3, "huelle": "bestand", "heizsystem": "H7", "pv_kwp_je_mwh": 1.75, "pv_belegung": "sued", "speicher_kwh_je_kwp": 1, "eauto": "keins"}
+    {"id": "S8", "_zweck": "Pellets mit Heizstab", "personen": 3, "huelle": "bestand", "heizsystem": "H7", "pv_kwp_je_mwh": 1.75, "pv_belegung": "sued", "speicher_kwh_je_kwp": 1, "eauto": "keins"},
+    {"id": "S9", "_zweck": "Speicher 2 kWh je kWp (Stufe 2, F17), Waermepumpe im Neubau, tagsueber zu Hause", "personen": 4, "huelle": "neubau", "heizsystem": "H1", "pv_kwp_je_mwh": 1.75, "pv_belegung": "sued", "speicher_kwh_je_kwp": 2, "eauto": "zuhause"}
   ]
 }
