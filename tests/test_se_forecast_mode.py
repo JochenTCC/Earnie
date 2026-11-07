@@ -356,6 +356,22 @@ def test_pv_forecast_holds_the_hour_on_quarter_hour_slots(monkeypatch):
     assert a == b
 
 
+def test_pv_forecast_holds_the_hour_before_the_spring_clock_change(monkeypatch):
+    utc = pd.date_range("2025-03-01", "2025-04-01", freq="h", inclusive="left", tz="UTC")
+    local = utc.tz_convert("Europe/Vienna").tz_localize(None)
+    source = _pv_source(monkeypatch, pd.Series(np.arange(len(local), dtype=float) + 1.0, index=local))
+    gap, before = source.kw_for_slots([datetime(2025, 3, 30, 2, 15), datetime(2025, 3, 30, 1, 45)])
+    assert gap == before
+
+
+def test_pv_forecast_takes_one_value_for_the_repeated_autumn_hour(monkeypatch):
+    utc = pd.date_range("2025-10-01", "2025-11-01", freq="h", inclusive="left", tz="UTC")
+    local = utc.tz_convert("Europe/Vienna").tz_localize(None)
+    assert local.has_duplicates
+    source = _pv_source(monkeypatch, pd.Series(np.arange(len(local), dtype=float) + 1.0, index=local))
+    assert source.kw_for_slots([datetime(2025, 10, 26, 2, 30)])[0] > 0.0
+
+
 def test_pv_forecast_fails_loud_on_a_missing_run(monkeypatch):
     hours = _june_hours()
     wm2 = pd.Series(100.0, index=hours)

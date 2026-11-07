@@ -79,6 +79,8 @@ class PvForecastSource:
             first = date(year, month, 1)
             last = (first + timedelta(days=32)).replace(day=1) - timedelta(days=1)
             raw = self._raw_month_kw(first, last)
+            # The hour repeated in autumn shows up twice on the wall clock; the slots know one.
+            raw = raw[~raw.index.duplicated(keep="first")]
             archived = raw.dropna()
             actual_kwh = sum(
                 self._cache.get_pv_for_slots(
@@ -102,6 +104,9 @@ class PvForecastSource:
         values: list[float] = []
         for slot in slot_datetimes:
             hour = pd.Timestamp(slot).floor("h")
+            if hour.tz_localize(self._climate.timezone, ambiguous=True, nonexistent="NaT") is pd.NaT:
+                # The spring gap has no forecast hour: hold the last hour before the clock jumps.
+                hour -= pd.Timedelta(hours=1)
             value = self._month_kw(slot.year, slot.month).get(hour)
             if value is None or pd.isna(value):
                 raise ValueError(
