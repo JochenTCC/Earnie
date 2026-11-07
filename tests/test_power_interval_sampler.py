@@ -186,6 +186,81 @@ def test_finalize_overlays_counter_delta_when_anchored(tmp_path: Path):
     assert closed["battery_kw"] == pytest.approx(-0.5)
 
 
+def _sample_grid(state: Path, start: datetime, grids, read_energy=None) -> None:
+    for offset, grid in zip(range(30, 30 * (len(grids) + 1), 30), grids):
+        assert sampler.tick(
+            now=start + timedelta(seconds=offset),
+            force=True,
+            state_path=str(state),
+            read_plant=lambda g=grid: _plant(grid=g),
+            read_soc=lambda: 50.0,
+            read_flex_chart=lambda: {},
+            read_energy=read_energy,
+        )
+
+
+def _energy(open_grid: dict, close_grid: dict):
+    calls = {"n": 0}
+
+    def read_energy():
+        calls["n"] += 1
+        return {"grid": open_grid if calls["n"] == 1 else close_grid}
+
+    return read_energy
+
+
+def test_import_mean_is_not_offset_by_export_in_the_same_slot(tmp_path: Path):
+    state = tmp_path / "sampler.json"
+    start = datetime(2026, 11, 7, 18, 0, 0)
+    _sample_grid(state, start, [3.0, -3.0, 3.0])
+    closed = sampler.finalize_closed_interval(start, state_path=str(state))
+    assert closed["grid_kw"] == pytest.approx(1.0)
+    assert closed["grid_import_kw"] == pytest.approx(2.0)
+    assert closed["grid_import_source"] == sampler.GRID_IMPORT_SOURCE_MEAN
+    assert (closed["grid_import_start"], closed["grid_import_end"]) == (
+        "2026-11-07T18:00:30",
+        "2026-11-07T18:01:30",
+    )
+
+
+def test_import_counter_divides_by_the_real_window(tmp_path: Path):
+    state = tmp_path / "sampler.json"
+    start = datetime(2026, 11, 7, 18, 0, 0)
+    read_energy = _energy({"total": 100.0, "total_neg": 5.0}, {"total": 100.29, "total_neg": 5.2})
+    _sample_grid(state, start, [9.0, 9.0, 9.0], read_energy)
+    closed = sampler.finalize_closed_interval(
+        start, state_path=str(state), read_energy=read_energy, now=start + timedelta(minutes=15)
+    )
+    # 0.29 kWh imported over 870 s (first read 30 s into the slot), export counter left out
+    assert closed["grid_import_kw"] == pytest.approx(1.2)
+    assert closed["grid_import_source"] == sampler.GRID_IMPORT_SOURCE_COUNTER
+    assert (closed["grid_import_start"], closed["grid_import_end"]) == (
+        "2026-11-07T18:00:30",
+        "2026-11-07T18:15:00",
+    )
+    # the net counter value keeps its fixed 0.25 h, as before
+    assert closed["grid_kw"] == pytest.approx(0.36)
+
+
+@pytest.mark.parametrize(
+    ("close_total", "closed_after"),
+    [(99.0, timedelta(minutes=15)), (100.29, timedelta(minutes=4))],
+    ids=["counter reset", "window too short"],
+)
+def test_import_stays_on_the_mean_without_a_usable_counter_window(
+    tmp_path: Path, close_total, closed_after
+):
+    state = tmp_path / "sampler.json"
+    start = datetime(2026, 11, 7, 18, 0, 0)
+    read_energy = _energy({"total": 100.0}, {"total": close_total})
+    _sample_grid(state, start, [2.0, 2.0, 2.0], read_energy)
+    closed = sampler.finalize_closed_interval(
+        start, state_path=str(state), read_energy=read_energy, now=start + closed_after
+    )
+    assert closed["grid_import_source"] == sampler.GRID_IMPORT_SOURCE_MEAN
+    assert closed["grid_import_kw"] == pytest.approx(2.0)
+
+
 def test_finalize_overlays_flex_counter_when_anchored(tmp_path: Path):
     state = tmp_path / "sampler.json"
     start = datetime(2026, 9, 14, 14, 0, 0)

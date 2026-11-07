@@ -230,6 +230,10 @@ def power_interval_sampler_state_file() -> str:
     return runtime_path("power_interval_sampler_state.json")
 
 
+def capacity_peak_store_file() -> str:
+    return runtime_path("capacity_peaks.json")
+
+
 def savings_ledger_file() -> str:
     return runtime_path("savings_ledger.jsonl")
 

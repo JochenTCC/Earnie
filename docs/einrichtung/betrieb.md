@@ -157,6 +157,7 @@ Standardverzeichnis: `earnie_env/runtime/`. Es lässt sich mit `EARNIE_RUNTIME_P
 | `flexible_consumers_state.json` | Tagesenergie je Flex-Verbraucher.                                                            |
 | `pv_counter_state.json`         | PV-Zählerstand für das Stunden-Delta.                                                        |
 | `power_interval_sampler_state.json` | Zwischenpuffer der Leistungsproben (≤ 60 s) für Viertelstunden-Mittel im Produktiv-Log. Optional mit Energie-Ankern (`energy_anchors`): Aus Loxone-Zählern (ΔkWh) wird die mittlere Slot-Leistung berechnet. |
+| `capacity_peaks.json`           | Höchster Netzbezug je Kalendermonat (Viertelstunde) für den Leistungspreis, mit Quelle (Zähler oder Mittel der Proben), Messbeginn und Zahl fehlender Viertelstunden. Ein Monat ohne Eintrag ist unbekannt. Die Planung nutzt die Werte noch nicht. Earnie misst selbst, deshalb kann der Wert unter dem des Stromzählers liegen. |
 | `cons_data_pending.json`        | Puffer für noch ausstehende `cons_data`-Messwerte (Samples).                                 |
 | `consumption_profiles.csv`      | Berechnete Grundlast-Profile.                                                                |
 | `earnie.log`                    | Rotierendes Python-Log von `main.py` (absoluter Pfad). Rotation monatlich, max. 12 Archive `earnie.log.YYYY-MM-DD_HH-MM-SS`. |

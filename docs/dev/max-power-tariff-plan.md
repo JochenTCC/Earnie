@@ -151,6 +151,12 @@ Planned:
 
 ### P5: Month peak and cap in Live
 
+Split on 2026-11-07 (maintainer): **P5a** measurement and month store, **P5b** cap in `main.py`, recorder and replay, **P5c** clock warning, field test and HouseSim. The raw-sample log for the field test is opt-in and belongs to P5c.
+
+**P5a built 2026-11-07.** The sampler adds `grid_import_kw` with `grid_import_source` and the window (`grid_import_start`, `grid_import_end`) to each closed quarter hour. From the import counter it divides by the real time between the two reads, so the window starts up to one sample interval (30 s) late; interpolating to the boundaries waits for the field test. Without a counter, on a reset or with a window under 5 minutes, it is the mean of `max(grid_kw, 0)`. `grid_kw` is unchanged. `runtime_store/capacity_peak_store.py` keeps one entry per month in `capacity_peaks.json`; `main.py` feeds it after each closed quarter hour and logs a failure without stopping the cycle. A sample mean from fewer than 3 samples counts as a missing quarter hour. Nothing plans with the peak yet.
+
+Planned:
+
 - Sampler: new `grid_import_kw` per quarter hour, from the import counter only (`total`, without `total_neg`), else the mean of `max(grid_kw, 0)` over the samples. `grid_kw` stays as it is. Check the sign convention per backend (`ehal-unit-conversion.mdc`).
 - Measure the real window: store the time of both counter reads and divide by the elapsed time, or interpolate to the quarter-hour boundaries, instead of the fixed 0.25 h. The value records its source and window.
 - Clock: Earnie measures on its own host clock and does not try to follow the meter (see **Meter timing** below). Show a warning when the host clock is not synchronised, if the platform can tell.

@@ -111,7 +111,19 @@ def _finalize_previous_interval() -> dict | None:
         minutes=optimization_schedule.QUARTER_HOUR_MINUTES
     )
     _last_closed_interval = power_interval_sampler.finalize_closed_interval(previous_slot)
+    if _last_closed_interval is not None:
+        _record_month_peak(_last_closed_interval)
     return _last_closed_interval
+
+
+def _record_month_peak(closed: dict) -> None:
+    """Month peak for the capacity charge; a failure is logged and never stops the cycle."""
+    from runtime_store import capacity_peak_store
+
+    try:
+        capacity_peak_store.record_closed_interval(closed)
+    except Exception as exc:  # noqa: BLE001 — the cycle must still plan and write
+        logger.warning("capacity_peak_store: %s not recorded: %s", closed.get("interval_start"), exc)
 
 
 def _daemon_wait_poll() -> None:

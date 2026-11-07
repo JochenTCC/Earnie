@@ -17,6 +17,10 @@ logger = logging.getLogger(__name__)
 
 SAMPLE_INTERVAL_SEC = 30
 MIN_SAMPLE_COUNT_FOR_MEAN = 3
+# Shorter counter windows (a restart late in the slot) say too little about the quarter hour.
+MIN_COUNTER_WINDOW_SEC = 5 * 60
+GRID_IMPORT_SOURCE_COUNTER = "counter"
+GRID_IMPORT_SOURCE_MEAN = "mean"
 _SAMPLER_SCHEMA = 1
 
 _PLANT_KEYS = ("pv_kw", "grid_kw", "battery_kw", "house_kw", "baseload_kw", "flex_sum_kw")
@@ -135,6 +139,7 @@ def _overlay_energy_counters(
     interval_start: datetime,
     state: dict[str, Any],
     read_energy: Callable[[], dict[str, dict[str, float]] | None] | None,
+    closed_at: datetime,
 ) -> dict[str, Any]:
     from integrations.loxone_meter_energy import (
         flex_energy_meter_config,
@@ -172,13 +177,17 @@ def _overlay_energy_counters(
     except Exception as exc:  # noqa: BLE001
         logger.debug("power_interval_sampler: energy close read failed: %s", exc)
     flex_cfg = flex_energy_meter_config(load_live_profile_consumers())
-    return overlay_counter_on_closed(
+    out = overlay_counter_on_closed(
         closed,
         open_readings=open_readings,
         end_readings=end_readings,
         dt_h=DEFAULT_DT_H,
         flex_meter_config=flex_cfg,
     )
+    from_counter = _grid_import_from_counter(open_payload, end_readings, closed_at=closed_at)
+    if from_counter is not None:
+        out.update(from_counter)
+    return out
 
 
 def _parse_ts(value: Any) -> datetime | None:
@@ -314,7 +323,54 @@ def _build_closed_interval(
     if socs:
         closed["soc_start_percent"] = round(socs[0], 2)
         closed["soc_end_percent"] = round(socs[-1], 2)
+    closed.update(_grid_import_from_samples(samples))
     return closed
+
+
+def _grid_import_from_samples(samples: list[dict[str, Any]]) -> dict[str, Any]:
+    """Import only, as the capacity charge bills it: export inside the slot does not offset it."""
+    imports = [max(float(s.get("grid_kw") or 0.0), 0.0) for s in samples]
+    return {
+        "grid_import_kw": round(sum(imports) / len(imports), 3),
+        "grid_import_source": GRID_IMPORT_SOURCE_MEAN,
+        "grid_import_start": samples[0].get("ts"),
+        "grid_import_end": samples[-1].get("ts"),
+    }
+
+
+def _grid_import_from_counter(
+    open_payload: dict[str, Any],
+    end_readings: dict[str, dict[str, float]] | None,
+    *,
+    closed_at: datetime,
+) -> dict[str, Any] | None:
+    """Import counter delta over the real time between both reads, not the fixed quarter hour.
+
+    The open read is the first sample in the slot, so the window starts up to one sample
+    interval late. ``None`` without both reads, on a counter reset or an implausible window.
+    """
+    from integrations.loxone_meter_energy import CHANNEL_GRID, mono_delta_kwh
+
+    opened_at = _parse_ts(open_payload.get("open_ts"))
+    start = ((open_payload.get("open") or {}).get(CHANNEL_GRID) or {}).get("total")
+    end = ((end_readings or {}).get(CHANNEL_GRID) or {}).get("total")
+    delta = mono_delta_kwh(start, end)
+    if opened_at is None or delta is None:
+        return None
+    seconds = (closed_at - opened_at).total_seconds()
+    if not MIN_COUNTER_WINDOW_SEC <= seconds <= QUARTER_HOUR_MINUTES * 60 + SAMPLE_INTERVAL_SEC:
+        logger.warning(
+            "power_interval_sampler: counter window %.0f s from %s — import stays on mean.",
+            seconds,
+            _iso(opened_at),
+        )
+        return None
+    return {
+        "grid_import_kw": round(delta / (seconds / 3600.0), 3),
+        "grid_import_source": GRID_IMPORT_SOURCE_COUNTER,
+        "grid_import_start": _iso(opened_at),
+        "grid_import_end": _iso(closed_at),
+    }
 
 
 def tick(
@@ -387,8 +443,14 @@ def finalize_closed_interval(
     *,
     state_path: str | None = None,
     read_energy: Callable[[], dict[str, dict[str, float]] | None] | None = None,
+    now: datetime | None = None,
 ) -> dict[str, Any] | None:
-    """Mean/energy for ``[interval_start, interval_start+QH)``; drop those samples."""
+    """Mean/energy for ``[interval_start, interval_start+QH)``; drop those samples.
+
+    ``now``: time of the closing counter read (default: the clock).
+    """
+    closed_at = now or datetime.now()
+    closed_at = closed_at.replace(tzinfo=None) if closed_at.tzinfo else closed_at
     path = state_path or _state_path()
     start = quarter_hour_slot_start(interval_start)
     start = start.replace(tzinfo=None) if start.tzinfo else start
@@ -403,6 +465,7 @@ def finalize_closed_interval(
         interval_start=start,
         state=state,
         read_energy=read_energy,
+        closed_at=closed_at,
     )
     end = start + timedelta(minutes=QUARTER_HOUR_MINUTES)
     kept: list[dict[str, Any]] = []
