@@ -1778,6 +1778,41 @@
             },
             "monthly_rates": [
                 {
+                    "year": 2024,
+                    "month": 12,
+                    "tariff_cent_kwh": 12.72
+                },
+                {
+                    "year": 2025,
+                    "month": 1,
+                    "tariff_cent_kwh": 12.55
+                },
+                {
+                    "year": 2025,
+                    "month": 2,
+                    "tariff_cent_kwh": 11.92
+                },
+                {
+                    "year": 2025,
+                    "month": 3,
+                    "tariff_cent_kwh": 5.81
+                },
+                {
+                    "year": 2025,
+                    "month": 4,
+                    "tariff_cent_kwh": 2.03
+                },
+                {
+                    "year": 2025,
+                    "month": 5,
+                    "tariff_cent_kwh": 0.89
+                },
+                {
+                    "year": 2025,
+                    "month": 6,
+                    "tariff_cent_kwh": 1.01
+                },
+                {
                     "year": 2025,
                     "month": 7,
                     "tariff_cent_kwh": 5.31
@@ -1858,6 +1893,41 @@
         }
     ],
     "econtrol_referenzmarktwert_pv_monthly": [
+        {
+            "year": 2024,
+            "month": 12,
+            "tariff_cent_kwh": 13.32
+        },
+        {
+            "year": 2025,
+            "month": 1,
+            "tariff_cent_kwh": 13.15
+        },
+        {
+            "year": 2025,
+            "month": 2,
+            "tariff_cent_kwh": 12.52
+        },
+        {
+            "year": 2025,
+            "month": 3,
+            "tariff_cent_kwh": 6.41
+        },
+        {
+            "year": 2025,
+            "month": 4,
+            "tariff_cent_kwh": 2.63
+        },
+        {
+            "year": 2025,
+            "month": 5,
+            "tariff_cent_kwh": 1.49
+        },
+        {
+            "year": 2025,
+            "month": 6,
+            "tariff_cent_kwh": 1.61
+        },
         {
             "year": 2025,
             "month": 7,

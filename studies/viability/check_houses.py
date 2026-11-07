@@ -14,6 +14,7 @@ from pathlib import Path
 import pandas as pd
 
 from simulation.backtesting_log import load_backtesting_log
+from studies.viability.appliances import baseload_target_kwh
 
 STUDY_DIR = Path(__file__).resolve().parent
 ENERGY_BALANCE_TOLERANCE_KWH = 1.0
@@ -61,8 +62,10 @@ def check_house(root: Path, run: str, params: dict) -> tuple[list[str], list[dic
     rule_wp = derived["heat_pump_kwh"]
     if rule_wp and abs(model_wp - rule_wp) / rule_wp > RULE_MODEL_TOLERANCE:
         findings.append(f"AUFFAELLIG WP-Strom: Modell {model_wp:.0f} kWh, Regel {rule_wp:.0f} kWh")
-    if abs(earnie["baseload_kwh"] - derived["household_kwh"]) > 5.0:
-        findings.append(f"FEHLER Grundlast {earnie['baseload_kwh']:.0f} kWh, Regel {derived['household_kwh']:.0f} kWh")
+    profile_rows = json.loads((root / "pack" / "config" / "house_profiles.json").read_text(encoding="utf-8"))["profiles"][0]["consumers"]
+    baseload_target = baseload_target_kwh(derived["household_kwh"], profile_rows)
+    if abs(earnie["baseload_kwh"] - baseload_target) > 5.0:
+        findings.append(f"FEHLER Grundlast {earnie['baseload_kwh']:.0f} kWh, Regel {baseload_target:.0f} kWh")
 
     fuel_blocks = meta.get("heat_fuel") or {}
     rows: list[dict] = []

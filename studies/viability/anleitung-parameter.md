@@ -19,11 +19,14 @@ Befehle laufen im Repo-Root in PowerShell; vorher einmal `$env:PYTHONUTF8='1'` s
 .venv\Scripts\python.exe -m studies.viability.check_houses --packs studies/viability/packs_s0 --run year
 ```
 
+- Stufe 1 baut eine Hausliste statt der Stichproben: `make_houses --liste LISTE.json --out studies/viability/packs_stufe1`. Die Datei hat die Form `{"haeuser": [...]}`, je Haus alle Achsen und `id`; Schlüssel mit Unterstrich sind Kommentare. Enthält ein Paket schon Ergebnisse, bricht `--liste` ab, statt sie zu löschen.
+- `run_houses --alle --ueberspringen` rechnet alle gebauten Pakete und lässt Häuser mit fertigem Lauf aus, so setzt ein abgebrochener Lauf fort. Die Schalter `EARNIE_SE_LOOKAHEAD_H`, `EARNIE_BASE_LEVEL` und `EARNIE_PLAN_VENDOR_MODE` kommen aus der Umgebung und stehen in der ersten Zeile von `run.log`.
 - `make_houses` schreibt `house.json` neben das Paket: abgeleitete Werte, was Earnie daraus ableitet, Earnie-Points. Es
   setzt `annual_kwh` im Hausprofil so, dass genau der Haushaltsstrom der Regel als Grundlast bleibt.
 - `run_houses` legt je Haus `results/<Lauf>/` an, mit SE-Log, `run.log` und den CSVs der Referenzleiter. `--start-month`/`--end-month`
   wählen den Zeitraum, `--sensitivity` rechnet die 8 Regel-Sätze zusätzlich.
 - `--forecast-price-strategy mirror` rechnet einen zweiten Lauf im Forecast-Modus (Untergrenze von L2 − L3, Spalten `*_forecast`, doppelte Laufzeit). Beim ersten Mal braucht er `--allow-network` für die archivierten PV-Prognosen. Für Januar muss die Preisdatei etwa 8 Tage vor dem Jahresanfang beginnen: `python -m studies.poc_cloud.fetch_prices --start 2024-12-20 --end 2026-01-04`.
+- `run_houses` rechnet die Referenz ohne PV und Batterie (`historical_reference`) nicht mit, die Studie nutzt sie nicht. L0 bleibt. Ein Szenario ohne `own_reference` bricht deshalb ab.
 - Mehr Häuser gleichzeitig nutzen die Kerne besser als mehr Worker je Haus: Die Referenzen sind schnell fertig, danach rechnet
   ein Haus nur noch einen MILP-Prozess je Szenario.
 - Ohne `--allow-network` ist das Netz blockiert und ein fehlender Wetter-Cache bricht ab. Mit dem Schalter landen neue
@@ -37,6 +40,8 @@ Schlüssel mit Unterstrich sind Kommentare. Unbekannte und fehlende Schlüssel b
 |---|---|
 | `preisjahr` | Jahr für Preise, Verbrauchsdaten und Brennstoffpreise |
 | `annahmen` | Feste Werte: Standort, PR, Akku, E-Auto, Wallbox, Solltemperatur, Heizstab, Speicherverlust |
+| `netz` | Zuschläge je kWh Bezug zum Netz-Arbeitspreis und ob SNAP im ganzen Preisjahr gilt. `make_houses` schreibt beides nur in die `grid_fees.json` des Pakets, der Katalog in `share/config` bleibt unverändert |
+| `geraete` | Waschmaschine, Geschirrspüler, Trockner. Mit `aktiv: true` bekommt jedes Haus je Gerät ein zufälliges Stundenprofil (fester Seed) unter `config/appliances/`. Es gilt in L0 bis L3 als feste Last, die Energie kommt aus dem Haushaltsstrom |
 | `regeln` | Werte der Ableitungsregeln: Wohnfläche, Haushaltsstrom, Hüllen, Heizlast, Kollektor, Speicher, Dach, Mindest-kWp |
 | `brennstoffpreise` | Je Jahr `gas` (ct/kWh) und `pellets` (€/t) |
 | `heizsysteme` | H1, H2 und H5 bis H7: Quelle, Kollektor, Heizstab, Speicher, erlaubte Hüllen. Wärmepumpe mit Heizstab (früher H3) ist keine erlaubte Konfiguration und bricht ab |

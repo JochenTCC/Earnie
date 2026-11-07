@@ -239,6 +239,11 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         description="Backtesting der Energie-Optimierung auf historischen Loxone-Daten.",
     )
     parser.add_argument(
+        "--skip-historical-reference",
+        action="store_true",
+        help="Referenz ohne PV und Batterie nicht rechnen (Studien). Jedes Szenario braucht dann own_reference.",
+    )
+    parser.add_argument(
         "--start-month",
         type=_parse_month,
         metavar="MONAT",
@@ -1114,6 +1119,12 @@ def main(argv: list[str] | None = None):
     )
     reference_by_scenario = {sid: reference_by_scenario[sid] for sid in scenarios}
     used_references = set(reference_by_scenario.values())
+    if args.skip_historical_reference and HISTORICAL_REFERENCE_ID in used_references:
+        raise SystemExit(
+            "--skip-historical-reference: Ein Szenario nutzt die Referenz ohne PV und Batterie "
+            "(own_reference fehlt): "
+            + ", ".join(sid for sid, ref in reference_by_scenario.items() if ref == HISTORICAL_REFERENCE_ID)
+        )
     extra_ref_specs = [spec for spec in extra_ref_specs if spec[0] in used_references]
     labels.update(extra_ref_labels)
     ladder_by_scenario, ladder_specs = plan_ladder_reference_tasks(
@@ -1127,11 +1138,17 @@ def main(argv: list[str] | None = None):
     ]
     ladder_report: dict[str, dict] = {}
     reference_specs: list[tuple[str, dict | None, str, str]] = [
-        (
-            HISTORICAL_REFERENCE_ID,
-            reference_params,
-            HISTORICAL_REFERENCE_LABEL,
-            "_reference",
+        *(
+            []
+            if args.skip_historical_reference
+            else [
+                (
+                    HISTORICAL_REFERENCE_ID,
+                    reference_params,
+                    HISTORICAL_REFERENCE_LABEL,
+                    "_reference",
+                )
+            ]
         ),
         *[
             (ref_id, params, label, ref_id)
@@ -1181,24 +1198,25 @@ def main(argv: list[str] | None = None):
     sim_results: dict[str, pd.DataFrame] = {}
 
     if args.workers == 1:
-        print(f"Berechne Referenz '{HISTORICAL_REFERENCE_LABEL}'...")
-        ref_progress_path = worker_progress_path(progress_file, "_reference")
-        ref_progress = _make_progress_printer(
-            HISTORICAL_REFERENCE_LABEL,
-            ref_progress_path,
-            phase="reference",
-            result_id=HISTORICAL_REFERENCE_ID,
-        )
-        sim_results[HISTORICAL_REFERENCE_ID] = compute_historical_reference_costs(
-            start,
-            end,
-            prices,
-            ref_settings,
-            cache=cache,
-            scenario_params=reference_params,
-            horizon_mode=horizon_mode,
-            on_progress=ref_progress,
-        )
+        if not args.skip_historical_reference:
+            print(f"Berechne Referenz '{HISTORICAL_REFERENCE_LABEL}'...")
+            ref_progress_path = worker_progress_path(progress_file, "_reference")
+            ref_progress = _make_progress_printer(
+                HISTORICAL_REFERENCE_LABEL,
+                ref_progress_path,
+                phase="reference",
+                result_id=HISTORICAL_REFERENCE_ID,
+            )
+            sim_results[HISTORICAL_REFERENCE_ID] = compute_historical_reference_costs(
+                start,
+                end,
+                prices,
+                ref_settings,
+                cache=cache,
+                scenario_params=reference_params,
+                horizon_mode=horizon_mode,
+                on_progress=ref_progress,
+            )
         extra_refs, _extra_labels, reference_by_scenario = (
             build_per_scenario_reference_costs(
                 start,

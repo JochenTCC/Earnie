@@ -1,24 +1,31 @@
 """Viability study generator: derived values by hand, packs on the current data model."""
 from __future__ import annotations
 
+import argparse
 import copy
 import json
 import math
 import os
 import subprocess
 import sys
+from datetime import datetime
 from pathlib import Path
 
 import pytest
 
+from data.consumption_profiles import _timestamp_hour_key
 from studies.viability import params as params_mod
+from studies.viability.appliances import baseload_target_kwh, daily_runs, start_hour_weights
 from studies.viability.derive import all_houses, derive_house, stratified_sample
 from studies.viability.make_houses import (
     check_thermal_year,
     heating_system,
+    load_house_list,
     price_csv_for_year,
+    study_grid_fees,
     write_pack,
 )
+from studies.viability.run_houses import DONE_FILE, house_ids, is_done
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -171,6 +178,47 @@ def test_price_year_other_than_the_thermal_year_fails_loud():
         check_thermal_year(last_full_archive_year() - 1)
 
 
+def _list_file(tmp_path: Path, *houses: dict) -> Path:
+    path = tmp_path / "liste.json"
+    path.write_text(json.dumps({"_hinweis": "x", "haeuser": list(houses)}), encoding="utf-8")
+    return path
+
+
+def test_house_list_ignores_comment_keys_and_keeps_its_ids(params, tmp_path):
+    path = _list_file(tmp_path, _house(id="G0001", _rolle="kontrolle"), _house(id="G0002"))
+    houses = load_house_list(path, params, tmp_path / "packs")
+    assert list(houses) == ["G0001", "G0002"]
+    assert "_rolle" not in houses["G0001"]
+
+
+def test_house_list_rejects_an_invalid_house_and_a_double_id(params, tmp_path):
+    with pytest.raises(ValueError):
+        load_house_list(_list_file(tmp_path, _house(personen=9)), params, tmp_path / "packs")
+    with pytest.raises(SystemExit, match="doppelt"):
+        load_house_list(_list_file(tmp_path, _house(), _house()), params, tmp_path / "packs")
+
+
+def test_house_list_does_not_overwrite_a_pack_with_results(params, tmp_path):
+    (tmp_path / "packs" / "T" / "results").mkdir(parents=True)
+    with pytest.raises(SystemExit, match="Ergebnisse"):
+        load_house_list(_list_file(tmp_path, _house()), params, tmp_path / "packs")
+
+
+def test_runner_finds_all_built_packs_and_what_is_done(tmp_path):
+    for house_id, done in (("G2", True), ("G1", False)):
+        run_dir = tmp_path / house_id / "results" / "stufe1"
+        run_dir.mkdir(parents=True)
+        (tmp_path / house_id / "house.json").write_text("{}", encoding="utf-8")
+        if done:
+            (run_dir / DONE_FILE).write_text("x", encoding="utf-8")
+    (tmp_path / "no_pack").mkdir()
+    assert house_ids(tmp_path, None) == ["G1", "G2"]
+    assert house_ids(tmp_path, "G2, G1") == ["G2", "G1"]
+    assert is_done(tmp_path, "G2", "stufe1")
+    assert not is_done(tmp_path, "G1", "stufe1")
+    assert not is_done(tmp_path, "G2", "other")
+
+
 def test_grid_size_and_sample_is_reproducible_and_covers_every_level(params):
     assert len(all_houses(params)) == 2688
     first = stratified_sample(params, 60, seed=7)
@@ -231,6 +279,115 @@ def test_fuel_pack_passes_the_loader_with_more_than_two_scenarios(params, tmp_pa
     assert [s["pv_azimuth"] for s in components["pv_systems"]] == [-90, 90]
 
 
+def test_pack_grid_fee_holds_surcharges_and_snap_in_the_price_year(params, tmp_path):
+    root = write_pack(derive_house(_house(), params), params, tmp_path / "T")
+    doc = json.loads((root / "pack/config/grid_fees.json").read_text(encoding="utf-8"))
+    area = next(a for a in doc["areas"] if a["id"] == "AT-VBG")
+    assert area["base_cent_kwh"]["unmetered_power"] == pytest.approx(4.96 + 0.393 + 0.1 + 0.62)
+    snap = next(r for r in doc["rule_sets"]["AT_NE7"] if r["id"] == "SNAP")
+    assert snap["valid_from"] == "2025-01-01"
+    assert snap["effect"] == {"mode": "add_cent", "value": pytest.approx(-0.992)}  # 20 % of 4.96 only
+    profile = json.loads((root / "pack/config/house_profiles.json").read_text(encoding="utf-8"))["profiles"][0]
+    assert profile["netznutzung"]["power_metering"] == "unmetered_power"
+
+
+def test_study_grid_fee_leaves_the_product_catalog_alone(params):
+    catalog = json.loads((REPO_ROOT / "share/config/grid_fees.json").read_text(encoding="utf-8"))
+    before = copy.deepcopy(catalog)
+    study_grid_fees(catalog, params)
+    assert catalog == before
+    assert next(r for r in catalog["rule_sets"]["AT_NE7"] if r["id"] == "SNAP")["valid_from"] == "2026-04-01"
+
+
+def test_study_grid_fee_without_snap_or_with_unknown_area(params):
+    catalog = json.loads((REPO_ROOT / "share/config/grid_fees.json").read_text(encoding="utf-8"))
+    off = copy.deepcopy(params)
+    off["netz"] = {**off["netz"], "snap_im_preisjahr": False}
+    snap = next(r for r in study_grid_fees(catalog, off)["rule_sets"]["AT_NE7"] if r["id"] == "SNAP")
+    assert snap["valid_from"] == "2026-04-01"
+    unknown = copy.deepcopy(params)
+    unknown["annahmen"]["netzbereich"] = "AT-NIRGENDS"
+    with pytest.raises(SystemExit, match="AT-NIRGENDS"):
+        study_grid_fees(catalog, unknown)
+
+
+def test_duo_scenario_uses_flex_with_all_months_of_the_price_year(params):
+    assert params["szenarien"]["duo"]["export_tariff_id"] == "at_vkw_pv_flex"
+    catalog = json.loads((REPO_ROOT / "share/config/tariffs.json").read_text(encoding="utf-8"))
+    flex = next(t for t in catalog["export_tariffs"] if t["id"] == "at_vkw_pv_flex")
+    months = {(r["year"], r["month"]) for r in flex["monthly_rates"]}
+    assert {(2024, 12)} | {(2025, m) for m in range(1, 13)} <= months
+
+
+def test_study_runs_skip_the_reference_without_pv_and_battery():
+    from scripts.run_backtesting import _build_arg_parser
+    from scripts.run_reference_ladder import _backtesting_argv
+
+    parser = _build_arg_parser()
+    assert parser.parse_args(["--workers", "2"]).skip_historical_reference is False
+    assert parser.parse_args(["--workers", "2", "--skip-historical-reference"]).skip_historical_reference is True
+    ladder_args = argparse.Namespace(
+        workers=2, scenario=None, start_month=None, end_month=None, allow_stale_cons_data=False,
+        skip_historical_reference=True,
+    )
+    assert "--skip-historical-reference" in _backtesting_argv(ladder_args, "out")
+    assert '"--skip-historical-reference"' in (REPO_ROOT / "studies/viability/run_houses.py").read_text(encoding="utf-8")
+
+
+def test_appliances_can_be_switched_off(params, tmp_path):
+    off = copy.deepcopy(params)
+    off["geraete"]["aktiv"] = False
+    root = write_pack(derive_house(_house(), off), off, tmp_path / "T")
+    profile = json.loads((root / "pack/config/house_profiles.json").read_text(encoding="utf-8"))["profiles"][0]
+    assert {c["type"] for c in profile["consumers"]} == {"thermal_annual"}
+    assert not (root / "pack/config/appliances").exists()
+
+
+def test_appliance_profiles_are_reproducible_and_stay_in_the_window(params):
+    first = daily_runs("trockner", 2.0, "T", params)
+    assert first == daily_runs("trockner", 2.0, "T", params)
+    assert first != daily_runs("trockner", 2.0, "U", params)
+    assert first != daily_runs("waschmaschine", 2.0, "T", params)
+    assert set(first.values()) <= set(range(7, 22))
+    in_year = sum(1 for day in first if day.year == 2025)
+    assert in_year == pytest.approx(2.0 * 365 / 7, rel=0.2)
+
+
+def test_start_hours_peak_slightly_at_eight_noon_and_seven_pm(params):
+    weights = start_hour_weights(params)
+    assert sorted(weights) == list(range(7, 22))
+    assert weights[8] > weights[10] and weights[12] > weights[10] and weights[19] > weights[16]
+    assert max(weights.values()) < 2.5 * min(weights.values())
+
+
+def test_pack_with_appliances_reads_back_their_energy_as_fixed_load(params, tmp_path):
+    house = derive_house(_house(), params)
+    root = write_pack(house, params, tmp_path / "T")
+    config = root / "pack/config"
+    profile = json.loads((config / "house_profiles.json").read_text(encoding="utf-8"))["profiles"][0]
+    rows = {c["id"]: c for c in profile["consumers"] if c["type"] == "generic"}
+    assert set(rows) == {"waschmaschine", "geschirrspueler", "trockner"}
+    dryer = rows["trockner"]
+    assert dryer["earnie_role"] == "known"
+    assert dryer["nominal_power_kw"] == pytest.approx(1.25)
+    assert "appliance_recommendation" not in dryer
+    assert "schedule" not in dryer
+    # The profile must parse with Earnie's own slot key, a different timestamp text reads as 0 kW.
+    lines = (config / "appliances/trockner.csv").read_text(encoding="utf-8").splitlines()[1:]
+    power = {line.split(";")[0]: float(line.split(";")[1]) for line in lines}
+    in_year = sum(kw for ts, kw in power.items() if ts.startswith("2025"))
+    assert in_year == pytest.approx(dryer["annual_kwh"], abs=0.1)
+    assert in_year > 0
+    assert _timestamp_hour_key(datetime(2025, 3, 1, 12, 15)) in power
+
+
+def test_appliance_section_fails_loud_on_a_missing_household_size(params):
+    doc = json.loads(params_mod.DEFAULT_PATH.read_text(encoding="utf-8"))
+    del doc["geraete"]["laeufe_je_woche"]["3"]
+    with pytest.raises(params_mod.ParameterError, match="laeufe_je_woche.3"):
+        params_mod.validate(doc)
+
+
 def test_pack_price_path_follows_the_price_year(params, tmp_path):
     root = write_pack(derive_house(_house(huelle="bestand", heizsystem="H5"), params), params, tmp_path / "T")
     config = json.loads((root / "pack/config/config.json").read_text(encoding="utf-8"))
@@ -239,3 +396,12 @@ def test_pack_price_path_follows_the_price_year(params, tmp_path):
     other["preisjahr"] = 1999
     with pytest.raises(SystemExit, match="1999"):
         write_pack(derive_house(_house(huelle="bestand", heizsystem="H5"), other), other, tmp_path / "U")
+
+
+def test_baseload_target_leaves_out_only_profile_consumers() -> None:
+    consumers = [
+        {"annual_kwh": 2000.0},
+        {"annual_kwh": 150.0, "use_profile_csv": True},
+        {"annual_kwh": 250.0, "use_profile_csv": True},
+    ]
+    assert baseload_target_kwh(3400.0, consumers) == pytest.approx(3000.0)

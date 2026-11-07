@@ -25,6 +25,33 @@
     "_speicher_verlust": "Annahme: ErP-Klasse C fuer 500 l, rund 117 W bei 45 K, also 2,6 W/K. Earnies Standard von 20 W/K waeren ueber 4.000 kWh Waerme im Jahr.",
     "speicher_verlust_kw_pro_k": 0.0026
   },
+  "netz": {
+    "_zuschlaege": "Je kWh Bezug zusaetzlich zum Netz-Arbeitspreis des Katalogs, netto. Werte der VKW-Seite Strom Duo, gueltig ab 01.04.2026. Nur in den Paketen der Studie.",
+    "zuschlaege_cent_kwh_netto": {"netzverlust": 0.393, "elektrizitaetsabgabe": 0.1, "erneuerbaren_foerderbeitraege": 0.62},
+    "_snap": "SNAP gilt erst ab 01.04.2026. Die Studie rechnet ein fiktives Jahr mit Preisen des Preisjahrs und Tarifstand 2026, daher gilt SNAP dort im ganzen Preisjahr. Der Abschlag gilt nur auf den Arbeitspreis, nicht auf die Zuschlaege.",
+    "snap_im_preisjahr": true
+  },
+  "geraete": {
+    "_hinweis": "Ohne Quelle fuer die Staffelung nach Personen (Plan F18). Die Energie stammt aus dem Haushaltsstrom. Die zufaelligen Starts gelten in L0 bis L3 als feste Last, Earnie verschiebt sie nicht.",
+    "aktiv": true,
+    "seed": 7,
+    "fenster_start": [7, 21],
+    "haeufungen": [8, 12, 19],
+    "_haeufung": "Gewicht einer Startstunde: 1 plus je Haeufung eine Glockenkurve mit dieser Hoehe und Breite, also eine leichte Haeufung.",
+    "haeufung_gewicht": 1.0,
+    "haeufung_breite_h": 1.0,
+    "geraete": {
+      "waschmaschine": {"kwh_je_lauf": 0.8, "dauer_h": 2.0},
+      "geschirrspueler": {"kwh_je_lauf": 0.9, "dauer_h": 2.5},
+      "trockner": {"kwh_je_lauf": 2.5, "dauer_h": 2.0}
+    },
+    "laeufe_je_woche": {
+      "2": {"waschmaschine": 2.5, "geschirrspueler": 3, "trockner": 1},
+      "3": {"waschmaschine": 3.5, "geschirrspueler": 4, "trockner": 2},
+      "4": {"waschmaschine": 4.5, "geschirrspueler": 5, "trockner": 2.5},
+      "5": {"waschmaschine": 5.5, "geschirrspueler": 6, "trockner": 3}
+    }
+  },
   "solver": {
     "_hinweis": "Lueckengroesse und Zeitlimit je MILP-Fenster.",
     "cbc_gap_rel": 0.1,
@@ -87,7 +114,9 @@
   },
   "szenarien": {
     "_hinweis": "Tarif-IDs aus share/config/tariffs.json. Das erste Szenario eines Hauses ist das Live-Szenario.",
-    "duo": {"import_tariff_id": "at_vkw_strom_duo_normalpreis", "export_tariff_id": "at_verbund_v_strom_sonneneinspeisung_fix"},
+    "_duo": "Normalpreis ohne befristeten Rabatt, Einspeisung VKW Flex (Plan F15). duo_fix ist der fruehere Fall mit fixer Einspeisung, nur als Sensitivitaet.",
+    "duo": {"import_tariff_id": "at_vkw_strom_duo_normalpreis", "export_tariff_id": "at_vkw_pv_flex"},
+    "duo_fix": {"import_tariff_id": "at_vkw_strom_duo_normalpreis", "export_tariff_id": "at_verbund_v_strom_sonneneinspeisung_fix"},
     "dynamisch": {"import_tariff_id": "at_vkw_strom_dynamisch", "export_tariff_id": "at_vkw_pv_dynamisch"},
     "duo_pvdyn": {"import_tariff_id": "at_vkw_strom_duo_normalpreis", "export_tariff_id": "at_vkw_pv_dynamisch"}
   },

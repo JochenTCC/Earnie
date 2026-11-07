@@ -7,6 +7,7 @@ to the pack records the derived values and the Earnie-Points (product rule, nomi
 
   python -m studies.viability.make_houses --stichproben --out studies/viability/packs
   python -m studies.viability.make_houses --ids S1,S3 --allow-network
+  python -m studies.viability.make_houses --liste LISTE.json --out studies/viability/packs_stufe1
 """
 from __future__ import annotations
 
@@ -22,6 +23,7 @@ from pathlib import Path
 
 from studies.poc_cloud.run_poc import _env, _install_weather_cache
 from studies.viability import params as params_mod
+from studies.viability.appliances import Appliance, appliance_consumer, baseload_target_kwh, build_appliances
 from studies.viability.derive import DerivedHouse, derive_house
 
 STUDY_DIR = Path(__file__).resolve().parent
@@ -147,7 +149,7 @@ def _ev(index: int, pattern: str, template: dict, params: dict) -> dict:
     return ev
 
 
-def _profile(house: DerivedHouse, params: dict, annual_kwh: float) -> dict:
+def _profile(house: DerivedHouse, params: dict, annual_kwh: float, appliances: list[Appliance]) -> dict:
     assumptions = params["annahmen"]
     doc = _load(SHARE / "house_profiles.example.json")
     profile = doc["profiles"][0]
@@ -157,6 +159,7 @@ def _profile(house: DerivedHouse, params: dict, annual_kwh: float) -> dict:
         _ev(index, pattern, templates["ev"], params)
         for index, pattern in enumerate(house.ev_patterns, start=1)
     ]
+    consumers += [appliance_consumer(a, templates[a.id], params) for a in appliances]
     lat, lon = assumptions["standort"]
     thermal = dict(profile["thermal"])
     thermal.update(
@@ -226,6 +229,29 @@ def _components(house: DerivedHouse, params: dict, *, performance_ratio: float) 
     return doc, [b["id"] for b in batteries], [p["id"] for p in pv_systems]
 
 
+def study_grid_fees(catalog: dict, params: dict) -> dict:
+    """Grid fee catalog of a pack: the volumetric surcharges in the base price, SNAP in the study's year.
+
+    The surcharges are not part of the catalog's ``base_cent_kwh``. SNAP takes its 20 % off the
+    catalog's work price only, so the rule becomes a fixed reduction once the base holds them too.
+    """
+    doc = copy.deepcopy(catalog)
+    grid = params["netz"]
+    area_id = params["annahmen"]["netzbereich"]
+    area = next((a for a in doc["areas"] if a["id"] == area_id), None)
+    if area is None:
+        raise SystemExit(f"Netzbereich {area_id} fehlt im Netzentgelt-Katalog.")
+    base = area["base_cent_kwh"]["unmetered_power"]
+    area["base_cent_kwh"]["unmetered_power"] = round(base + sum(grid["zuschlaege_cent_kwh_netto"].values()), 4)
+    if grid["snap_im_preisjahr"]:
+        snap = next((r for r in doc["rule_sets"][area["rule_set"]] if r["id"] == "SNAP"), None)
+        if snap is None or snap["effect"]["mode"] != "percent_off":
+            raise SystemExit(f"SNAP mit percent_off fehlt im Regelwerk {area['rule_set']}.")
+        snap["valid_from"] = f"{params['preisjahr']}-01-01"
+        snap["effect"] = {"mode": "add_cent", "value": round(-base * snap["effect"]["value"] / 100.0, 4)}
+    return doc
+
+
 def write_pack(house: DerivedHouse, params: dict, root: Path, *, annual_kwh: float | None = None) -> Path:
     """Write the config files of one house (replaces the pack, keeps nothing)."""
     config_dir = root / "pack" / "config"
@@ -233,15 +259,16 @@ def write_pack(house: DerivedHouse, params: dict, root: Path, *, annual_kwh: flo
         shutil.rmtree(root)
     config_dir.mkdir(parents=True)
     (root / "pack" / "runtime").mkdir()
-    for name in ("tariffs.json", "grid_fees.json"):
-        shutil.copy2(SHARE / name, config_dir / name)
+    shutil.copy2(SHARE / "tariffs.json", config_dir / "tariffs.json")
+    _dump(config_dir / "grid_fees.json", study_grid_fees(_load(SHARE / "grid_fees.json"), params))
     shutil.copy2(SHARE / "deviation_rules.example.json", config_dir / "deviation_rules.json")
 
     config = _load(POC_PACK_CONFIG / "config.json")
     config["live_scenario_id"] = house.scenarios[0]
     config["scenario_explorer_conf"]["path_price"] = price_csv_for_year(int(params["preisjahr"]))
     _dump(config_dir / "config.json", config)
-    _dump(config_dir / "house_profiles.json", _profile(house, params, annual_kwh or house.demand_kwh))
+    appliances = build_appliances(house, params, config_dir)
+    _dump(config_dir / "house_profiles.json", _profile(house, params, annual_kwh or house.demand_kwh, appliances))
     components, battery_ids, pv_ids = _components(
         house, params, performance_ratio=params["annahmen"]["pv_performance_ratio"]
     )
@@ -302,16 +329,18 @@ def build_house(house: DerivedHouse, params: dict, out_dir: Path, *, offline_gua
     _migrate(pack_dir / "config")
     annual = house.demand_kwh
     report = {}
+    profile_rows = _load(pack_dir / "config" / "house_profiles.json")["profiles"][0]["consumers"]
+    baseload_target = baseload_target_kwh(house.household_kwh, profile_rows)
     for _ in range(BASELOAD_ITERATIONS):
         report = inspect_pack(pack_dir, offline_guard=offline_guard)
-        if abs(report["baseload_kwh"] - house.household_kwh) <= BASELOAD_TOLERANCE_KWH:
+        if abs(report["baseload_kwh"] - baseload_target) <= BASELOAD_TOLERANCE_KWH:
             break
-        annual = house.household_kwh + report["consumers_kwh"]
+        annual = baseload_target + report["consumers_kwh"]
         _set_annual_kwh(pack_dir, annual)
     else:
         raise SystemExit(
-            f"{house.id}: Grundlast {report['baseload_kwh']:.1f} kWh trifft den Haushaltsstrom "
-            f"{house.household_kwh:.1f} kWh nicht."
+            f"{house.id}: Grundlast {report['baseload_kwh']:.1f} kWh trifft den Zielwert "
+            f"{baseload_target:.1f} kWh nicht."
         )
     record = {"derived": asdict(house), "earnie": report, "annual_kwh": round(annual, 1),
               "preisjahr": params["preisjahr"]}
@@ -319,11 +348,25 @@ def build_house(house: DerivedHouse, params: dict, out_dir: Path, *, offline_gua
     return record
 
 
+def load_house_list(path: Path, params: dict, out_dir: Path) -> dict[str, dict]:
+    """Houses of a list file ``{"haeuser": [...]}``; a pack that already holds results fails loud."""
+    houses: dict[str, dict] = {}
+    for index, raw in enumerate(_load(path)["haeuser"]):
+        house = params_mod.validate_house(raw, params, f"{path.name}[{index}]")
+        if house["id"] in houses:
+            raise SystemExit(f"{path}: Haus {house['id']} steht doppelt in der Liste.")
+        if (out_dir / house["id"] / "results").exists():
+            raise SystemExit(f"{out_dir / house['id']} enthaelt schon Ergebnisse; make_houses wuerde sie loeschen.")
+        houses[house["id"]] = house
+    return houses
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--params", type=Path, help="Parameterdatei (Standard: haeuser.json)")
     parser.add_argument("--ids", help="Kommagetrennte Haus-IDs aus den Stichproben, z. B. S1,S3")
     parser.add_argument("--stichproben", action="store_true", help="Alle Stichproben-Haeuser")
+    parser.add_argument("--liste", type=Path, help="JSON-Datei mit einer Hausliste; baut alle ihre Haeuser")
     parser.add_argument("--out", type=Path, default=STUDY_DIR / "packs")
     parser.add_argument("--allow-network", action="store_true", help="Wetterdaten duerfen nachgeladen werden.")
     args = parser.parse_args()
@@ -333,10 +376,13 @@ def main() -> None:
 
     os.environ.setdefault("EARNIE_ENV_PATH", str(REPO_ROOT / "studies" / "poc_cloud" / "pack"))
     check_thermal_year(int(params["preisjahr"]))
-    houses = {h["id"]: h for h in params["stichproben"]}
-    ids = list(houses) if args.stichproben else [i.strip() for i in (args.ids or "").split(",") if i.strip()]
+    if args.liste and (args.ids or args.stichproben):
+        raise SystemExit("--liste geht nicht zusammen mit --ids oder --stichproben.")
+    houses = load_house_list(args.liste, params, args.out) if args.liste else {h["id"]: h for h in params["stichproben"]}
+    all_ids = args.stichproben or args.liste
+    ids = list(houses) if all_ids else [i.strip() for i in (args.ids or "").split(",") if i.strip()]
     if not ids:
-        raise SystemExit("--ids oder --stichproben angeben.")
+        raise SystemExit("--ids, --stichproben oder --liste angeben.")
     _install_weather_cache(WEATHER_CACHE)
     for house_id in ids:
         if house_id not in houses:

@@ -20,8 +20,14 @@ DEFAULT_PATH = Path(__file__).resolve().parent / "haeuser.json"
 
 _SECTIONS = {
     "preisjahr", "annahmen", "solver", "regeln", "brennstoffpreise", "heizsysteme", "achsen", "eauto_muster",
-    "szenarien", "standard_szenarien", "stichproben",
+    "szenarien", "standard_szenarien", "stichproben", "netz", "geraete",
 }
+_GRID = {"zuschlaege_cent_kwh_netto", "snap_im_preisjahr"}
+_APPLIANCES = {
+    "aktiv", "seed", "fenster_start", "haeufungen", "haeufung_gewicht", "haeufung_breite_h", "geraete",
+    "laeufe_je_woche",
+}
+_APPLIANCE_KEYS = {"kwh_je_lauf", "dauer_h"}
 _ASSUMPTIONS = {
     "standort", "netzbereich", "pv_neigung_grad", "pv_performance_ratio", "akku_leistung_c",
     "akku_zell_wirkungsgrad", "akku_verschleiss_eur_pro_kwh", "ev_km_pro_jahr", "ev_kwh_pro_100km", "ev_akku_kwh",
@@ -97,6 +103,28 @@ def validate_house(raw: Any, doc: dict, where: str) -> dict:
     return {**data, "szenarien": list(scenarios)}
 
 
+def _validated_appliances(raw: Any, persons: list[int]) -> dict:
+    data = _exact_keys(raw, _APPLIANCES, "geraete")
+    specs = {
+        name: _exact_keys(spec, _APPLIANCE_KEYS, f"geraete.geraete.{name}")
+        for name, spec in _public(data["geraete"], "geraete.geraete").items()
+    }
+    data["geraete"] = specs
+    first, last = data["fenster_start"]
+    if not 0 <= first <= last <= 23:
+        _fail("geraete.fenster_start", f"ungueltig: {data['fenster_start']}")
+    per_week = _public(data["laeufe_je_woche"], "geraete.laeufe_je_woche")
+    data["laeufe_je_woche"] = {
+        str(count): _exact_keys(per_week.get(str(count)), set(specs), f"geraete.laeufe_je_woche.{count}")
+        for count in persons
+    }
+    for count, values in data["laeufe_je_woche"].items():
+        for name, runs in values.items():
+            if not 0 < runs < 7:
+                _fail(f"geraete.laeufe_je_woche.{count}.{name}", f"{runs} ist nicht zwischen 0 und 7")
+    return data
+
+
 def validate(doc: Any) -> dict:
     data = _exact_keys(doc, _SECTIONS, "haeuser.json")
     data["annahmen"] = _exact_keys(data["annahmen"], _ASSUMPTIONS, "annahmen")
@@ -104,6 +132,8 @@ def validate(doc: Any) -> dict:
     data["solver"] = _exact_keys(data["solver"], {"cbc_gap_rel", "cbc_strict_time_limit_sec"}, "solver")
     data["achsen"] = _exact_keys(data["achsen"], _AXES, "achsen")
     data["szenarien"] = _public(data["szenarien"], "szenarien")
+    data["netz"] = _exact_keys(data["netz"], _GRID, "netz")
+    data["geraete"] = _validated_appliances(data["geraete"], data["achsen"]["personen"])
     data["heizsysteme"] = {
         sid: _exact_keys(system, _HEATING_KEYS, f"heizsysteme.{sid}")
         for sid, system in _public(data["heizsysteme"], "heizsysteme").items()

@@ -195,6 +195,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         help="Nur den Export, ohne die 7 zusätzlichen L2-Läufe je Setup.",
     )
     parser.add_argument("--allow-stale-cons-data", action="store_true", help="Wie bei run_backtesting.")
+    parser.add_argument("--skip-historical-reference", action="store_true", help="Wie bei run_backtesting.")
     parser.add_argument(
         "--skip-forecast",
         action="store_true",
@@ -248,6 +249,8 @@ def _backtesting_argv(args: argparse.Namespace, output_dir: str) -> list[str]:
         argv += ["--end-month", args.end_month]
     if args.allow_stale_cons_data:
         argv.append("--allow-stale-cons-data")
+    if args.skip_historical_reference:
+        argv.append("--skip-historical-reference")
     return argv
 
 
