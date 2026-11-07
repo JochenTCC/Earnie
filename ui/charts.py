@@ -1,6 +1,7 @@
 """Plotly-Charts für Optimierungsdarstellung (sunrise→sunrise Live, 24h Historie)."""
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -27,6 +28,7 @@ from ui.chart_consumer_stack import get_bar_colors, ordered_active_consumers_for
 from ui.chart_slot_axis import ChartSlotAxis, _chart_xaxis_config
 from ui.chart_soc import (
     add_baseline_soc_traces,
+    add_ledger_baseline_soc_trace,
     add_ess_mode_soc_underlay_traces,
     add_export_price_on_soc_axis_trace,
     add_optimized_soc_trace,
@@ -107,6 +109,7 @@ class _Chart1Options:
     history_slot_count: int | None
     chart_now: datetime | None
     battery_params: dict | None
+    slot_shadow_soc: Sequence[float | None] | None = None
 
 
 def _add_power_layer(
@@ -162,7 +165,16 @@ def _add_soc_price_layer(
         battery_params=options.battery_params,
         chart_soc_entities=chart_soc_entities,
     )
-    if options.show_baseline_soc:
+    if options.show_baseline_soc and options.slot_shadow_soc is not None:
+        add_ledger_baseline_soc_trace(
+            fig,
+            options.matched_baseline_df,
+            axis,
+            options.slot_shadow_soc,
+            history_slot_count=options.history_slot_count,
+            battery_params=options.battery_params,
+        )
+    elif options.show_baseline_soc:
         soc_at_now = _soc_at_chart_now(
             axis, plot_df, options.chart_now, options.history_slot_count,
             battery_params=options.battery_params,
@@ -234,6 +246,7 @@ def build_power_soc_chart_figure(
     optimization_matrix: list[dict] | None = None,
     chart_now: datetime | None = None,
     battery_params: dict | None = None,
+    slot_shadow_soc: Sequence[float | None] | None = None,
 ) -> go.Figure:
     """Baut Chart 1 (Leistung, SoC, Preis) ohne Streamlit-Rendering."""
     options = _Chart1Options(
@@ -247,6 +260,7 @@ def build_power_soc_chart_figure(
         history_slot_count=history_slot_count,
         chart_now=chart_now,
         battery_params=battery_params,
+        slot_shadow_soc=slot_shadow_soc,
     )
     plot_df = _mask_missing_log_slots(df, slot_qualities)
     axis = ChartSlotAxis.from_dataframe(plot_df)
@@ -290,6 +304,7 @@ def render_power_soc_chart(
     slot_deviation_events: tuple[tuple[DeviationEvent, ...], ...] | None = None,
     optimization_matrix: list[dict] | None = None,
     battery_params: dict | None = None,
+    slot_shadow_soc: Sequence[float | None] | None = None,
 ) -> None:
     """Leistungen (PV, Verbrauch, Batterie, Flex) und SoC-Verläufe."""
     if chart_header_label and chart_header_help:
@@ -315,6 +330,7 @@ def render_power_soc_chart(
         optimization_matrix=optimization_matrix,
         chart_now=chart_now,
         battery_params=battery_params,
+        slot_shadow_soc=slot_shadow_soc,
     )
     plotly_kwargs: dict = {"width": "stretch"}
     if chart_key:

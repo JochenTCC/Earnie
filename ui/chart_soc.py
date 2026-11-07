@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import math
 import re
+from collections.abc import Sequence
 from datetime import datetime, timedelta
 
 import config
@@ -464,6 +465,70 @@ def add_baseline_soc_traces(
     )
 
 
+def add_ledger_baseline_soc_trace(
+    fig: go.Figure,
+    matched_baseline_df: pd.DataFrame | None,
+    axis: ChartSlotAxis,
+    slot_shadow_soc: Sequence[float | None],
+    *,
+    history_slot_count: int | None,
+    yaxis: str = "y2",
+    battery_params: dict | None = None,
+) -> None:
+    """Monitor: "SoC BL Ziel" as one line, the ledger's shadow chain up to *Jetzt*, then its plan.
+
+    The plan's baseline starts on the same chain (Ledger P11), so the line needs no
+    anchor at *Jetzt* and does not jump there. A slot the ledger has no value for leaves
+    a gap, except for those not booked yet at the end of the past.
+    """
+    history = max(0, min(int(history_slot_count or 0), len(axis.starts)))
+    times: list = []
+    values: list[float] = []
+    last_index: int | None = None
+    for index in range(min(history, len(slot_shadow_soc))):
+        value = slot_shadow_soc[index]
+        if value is None:
+            continue
+        if last_index is not None and last_index < index - 1:
+            times.append(pd.Timestamp(axis.starts.iloc[index]))
+            values.append(math.nan)
+        times.append(pd.Timestamp(axis.starts.iloc[index]) + axis.slot_duration(index))
+        values.append(float(value))
+        last_index = index
+    uhrzeit = pd.Series([], dtype=str)
+    if matched_baseline_df is not None and not matched_baseline_df.empty:
+        uhrzeit = matched_baseline_df["Uhrzeit"]
+        length = len(matched_baseline_df)
+        if history < length:
+            soc = matched_baseline_df["Simulierter SoC (%)"]
+            plan_x, plan_y = _segment_connected_line_xy(
+                axis,
+                soc,
+                history,
+                length,
+                tail_y=_soc_tail_y_from_row(
+                    matched_baseline_df.iloc[-1], battery_params=battery_params
+                ),
+                step_line=False,
+                bridge_left=False,
+            )
+            times.extend(pd.Timestamp(moment) for moment in plan_x)
+            values.extend(float(value) for value in plan_y)
+    if not times:
+        return
+    line_x = _chart_time_series(times)
+    _add_soc_line_trace(
+        fig,
+        line_x,
+        pd.Series(values, dtype=float),
+        name=f"SoC {baseline_label()}",
+        show_legend=True,
+        yaxis=yaxis,
+        hover_labels=_soc_hover_labels_for_times(line_x, uhrzeit, axis.starts),
+        line=dict(color=COLOR_SOC, width=2.5, dash="dot"),
+    )
+
+
 def _add_counterfactual_soc_segment(
     fig: go.Figure,
     ctx: dict,
@@ -700,6 +765,7 @@ __all__ = [
     "ESS_UNDERLAY_HOLD",
     "add_anchored_counterfactual_soc_traces",
     "add_baseline_soc_traces",
+    "add_ledger_baseline_soc_trace",
     "add_ess_mode_soc_underlay_traces",
     "add_export_price_on_soc_axis_trace",
     "add_optimized_soc_trace",

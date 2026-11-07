@@ -78,7 +78,11 @@ def render_optimization_chart1(
             slot_deviation_events=bundle.slot_deviation_events,
             optimization_matrix=bundle.optimization_matrix,
             battery_params=bundle.battery_params,
+            show_baseline_soc=bundle.show_baseline_soc,
+            slot_shadow_soc=bundle.slot_shadow_soc,
         )
+    if bundle.baseline_soc_hint:
+        st.caption(bundle.baseline_soc_hint)
 
 
 def render_optimization_chart2(

@@ -6,7 +6,7 @@ import pandas as pd
 
 from data import consumer_targets, live_consumption, profile_manager
 from data.edibert_live_market import fetch_live_day_ahead_prices
-from runtime_store import main_daemon, run_state
+from runtime_store import main_daemon, run_state, savings_ledger_store
 from runtime_store.live_display_loader import (
     load_live_display_snapshot,
     snapshot_completed_at,
@@ -274,6 +274,7 @@ def _run_opt_in_live_simulation(
         sim_soc,
         consumer_daily_targets_kwh=targets,
         sunrise_soc_min_index=sunrise_soc_min_index,
+        baseline_initial_soc=savings_ledger_store.current_shadow_soc(),
     )
 
     optimized_df = pd.DataFrame(savings_info["optimized_rows"])

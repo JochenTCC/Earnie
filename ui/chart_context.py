@@ -611,6 +611,13 @@ def build_display_savings_series(
         view[key] = align_hourly_increments_to_display_slots(
             values, matrix, chart, slots
         )
+    soc_correction = matrix_source.get("hourly_soc_correction_euro")
+    if soc_correction:
+        view["hourly_soc_correction_euro"] = align_hourly_increments_to_display_slots(
+            soc_correction, matrix, chart, slots
+        )
+    else:
+        view.pop("hourly_soc_correction_euro", None)
     baseline_after, optimized_after = _plan_kwh_after_window(matrix_source, matrix, chart)
     view["hourly_matched_baseline_consumption_after_window_kwh"] = baseline_after
     view["hourly_optimized_consumption_after_window_kwh"] = optimized_after

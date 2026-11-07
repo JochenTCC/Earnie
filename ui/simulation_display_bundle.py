@@ -10,6 +10,7 @@ import pandas as pd
 import config
 from data.planning_window import ChartSpan, chart_now_in_window, chart_uses_live_zones, ui_chart_zones
 from optimizer.deviation_eval import DeviationEvent
+from optimizer.sim_costs import BASELINE_START_SHADOW_CHAIN
 from optimizer.targets import consumer_column_name, consumer_immediate_charge_column_name
 from runtime_store import live_optimization_debug
 from runtime_store import optimization_history
@@ -68,6 +69,38 @@ class OptimizationDisplayBundle:
     flex_consumers: tuple[dict, ...] | None = None
     show_soc_plausibility: bool = False
     baseline_label: str | None = None
+    show_baseline_soc: bool = True
+    # Monitor only: the ledger's shadow SoC per display slot; None draws the anchored line.
+    slot_shadow_soc: tuple[float | None, ...] | None = None
+    baseline_soc_hint: str | None = None
+
+
+HINT_NO_SHADOW_CHAIN = (
+    "SoC BL Ziel fehlt: Das Ersparnis-Buch hat noch keine Vergleichsbatterie, oder sie ist "
+    "nicht lesbar. Die Linie erscheint, sobald das Buch läuft."
+)
+
+
+def chart1_baseline_soc(
+    savings_info: dict,
+    savings_view: dict,
+) -> tuple[bool, tuple[float | None, ...] | None, str | None]:
+    """``show_baseline_soc``, ``slot_shadow_soc`` and a hint for Chart 1 (Ledger P11).
+
+    The Monitor is the only view with ``ledger_savings``. There the line needs the shadow
+    chain, in the plan and in the ledger; without it there is no line and no fallback to
+    the live SoC. A plant without a battery has no chain to wait for, so no hint either.
+    """
+    ledger = savings_view.get("ledger_savings")
+    if ledger is None:
+        return True, None, None
+    on_chain = (
+        ledger.get("open_day_start") is not None
+        and savings_info.get("baseline_start_source") == BASELINE_START_SHADOW_CHAIN
+    )
+    if on_chain:
+        return True, tuple(ledger["slot_shadow_soc"]), None
+    return False, None, HINT_NO_SHADOW_CHAIN if config.get_battery_params_list() else None
 
 
 def _apply_backtesting_chart_merge(
@@ -334,7 +367,13 @@ def build_optimization_display_bundle(
 
 def _make_optimization_display_bundle(parts: dict) -> OptimizationDisplayBundle:
     merged = parts["merged"]
+    show_baseline_soc, slot_shadow_soc, baseline_soc_hint = chart1_baseline_soc(
+        parts["savings_info"], merged["savings_view"]
+    )
     return OptimizationDisplayBundle(
+        show_baseline_soc=show_baseline_soc,
+        slot_shadow_soc=slot_shadow_soc,
+        baseline_soc_hint=baseline_soc_hint,
         savings_info=parts["savings_info"],
         baseline_df=parts["baseline_df"],
         display_df=merged["display_df"],

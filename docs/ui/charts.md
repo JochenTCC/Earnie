@@ -89,7 +89,7 @@ PV, Last, Netz, Batterieflüsse und **Flex-Verbraucher** zeigen im grauen Bereic
 |------|-------------|-----------|
 | SoC (optimiert) | Grüne Linie (`_HSL_SOC` in `ui/chart_colors.py`). Bei ≥2 SoC-Trägern (Haus-ESS, physische Powerstation, virtuelle Powerstation) eine Linie pro Entität (`SoC · {Bezeichnung}`, Farbvarianten um `_HSL_SOC`). Die **Linienstärke** skaliert mit der Speicherkapazität (≤5 kWh: 1 px, ≤10 kWh: 1,5 px, ≤15 kWh: 2 px, darüber 2,5 px). Virtuelle Powerstations erscheinen zusätzlich als **gestrichelte** Linien (Dash-Zyklus, nie durchgezogen), damit sich überlappende Reserven unterscheiden lassen. | Simulierter Batterie- bzw. Reserve-SOC: Haus-ESS live/MILP; physische `standby_backup`-PS live plus Forecast aus dem Standby-Plan (Inseln/Laden); virtuelle PS = `stored_kwh` / Kapazität, Forecast aus der Attribution des Haus-Batterieplans |
 | ESS-Mode-Underlay | Dickere, halbtransparente Linie hinter dem SoC | Cyan = Entladesperre / Hold bzw. Zwangsleistung unter 5 % von `max_power_kw`; Blau = Zwangsladen ≥ 5 %; Magenta = Zwangsentladen ≥ 5 %; Automatik ohne Underlay. Das Underlay erscheint nur am Primär-SoC. |
-| SoC BL Ziel | Dieselbe Farbe, gestrichelt ab **Jetzt** (nicht davor) | Referenz-SOC (Baseline) der Primärbatterie; Anker ist der Log-SOC am Jetzt-Marker |
+| SoC BL Ziel | Dieselbe Farbe, gepunktet, eine durchgehende Linie | Speicherstand der Vergleichsbatterie aus dem Ersparnis-Buch: links von **Jetzt** der gebuchte Verlauf des laufenden SA-Tages, rechts davon der Plan, der an derselben Stelle weiterläuft. Die Linie springt deshalb weder bei **Jetzt** noch beim SA-Tageswechsel. Ohne Ersparnis-Buch (erster Start, nicht lesbar) gibt es keine Linie, ein Hinweis unter dem Chart sagt das. Im Szenario-Explorer gibt es kein Buch: Dort beginnt die Linie bei **Jetzt** am Log-SOC. |
 | Preis (rot) | Strompreis skaliert | Hover: Cent/kWh |
 | Einspeisepreis (orange, gestrichelt) | Einspeisevergütung skaliert | Hover: Cent/kWh |
 
@@ -154,9 +154,11 @@ Die kompakten Buttons stehen in einer Zeile **ohne** Fließtext dazwischen (mobi
 | Bereich | Mit Earnie | Vergleich |
 |---------|------------|-----------|
 | Links von **Jetzt** | gebuchte Kosten aus dem Ersparnis-Buch („Mit Earnie (gebucht)“) | Vergleichsanlage des Buchs: gleicher Verbrauch, gleiche PV, Batterie im Herstellermodus, gleiche Preise („Ohne Earnie (gebucht)“) |
-| Rechts von **Jetzt** | Plan („Optimiert (Plan)“, gestrichelt) | **BL Ziel** ab dem aktuellen Speicherstand („BL Ziel (Plan)“, gestrichelt) |
+| Rechts von **Jetzt** | Plan („Optimiert (Plan)“, gestrichelt) | **BL Ziel** ab dem Speicherstand der Vergleichsbatterie („BL Ziel (Plan)“, gestrichelt) |
 
 Die Vergleichslinie ändert bei **Jetzt** also ihre Bedeutung: links die Vergleichsanlage des Buchs, rechts BL Ziel. Der **?**-Hilfetext sagt das ebenfalls.
+
+**SoC am Ende.** Plan und BL Ziel starten bei **Jetzt** von verschiedenen Speicherständen. Der Abstand der Linien enthält deshalb auch den Wert der Energie, die der Plan zu Beginn mehr oder weniger im Speicher hat. Das Label „SoC am Ende“ nennt, wie sich der Wert dieses Speicherabstands bis zum Fensterende ändert, mit derselben Formel wie die SoC-Korrektur des Buchs. Es steckt wie diese in keinem Abstand: Erst „Erwartet“ und „SoC am Ende“ zusammen zeigen, was der Plan gegenüber BL Ziel bringt.
 
 **Verankerung.** Ein Umschalter über dem Chart wählt, wie die Vergleichslinie liegt; die Wahl bleibt für die Sitzung erhalten.
 

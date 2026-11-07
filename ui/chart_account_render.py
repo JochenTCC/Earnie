@@ -63,14 +63,15 @@ CHART2_HELP = (
     "Fällt die Linie, wird bezahlt. **Links von Jetzt** stehen die gebuchten Kosten "
     "aus dem Ersparnis-Buch: mit Earnie und ohne Earnie (Batterie im Herstellermodus, "
     "gleicher Verbrauch, gleiche PV, gleiche Preise). **Rechts von Jetzt** steht der Plan: "
-    "optimiert und BL Ziel, das ab dem aktuellen Speicherstand rechnet. Die Vergleichslinie "
-    "ändert bei Jetzt also ihre Bedeutung. **Ist bei Jetzt** verschiebt sie so, dass sich "
+    "optimiert und BL Ziel, das ab dem Speicherstand der Vergleichsbatterie rechnet. Die "
+    "Vergleichslinie ändert bei Jetzt also ihre Bedeutung. **Ist bei Jetzt** verschiebt sie so, dass sich "
     "beide Linien bei Jetzt treffen: Der Abstand am Fensterstart ist das bisher Gesparte, "
     "der Abstand am Fensterende das Erwartete. **Gemeinsamer Start** lässt beide bei 0 € "
     "beginnen: Der Abstand bei Jetzt ist das bisher Gesparte, am Ende das Gesamte. Grün "
     "heißt gespart, rot mehr ausgegeben; Beträge stehen ohne Vorzeichen. Die "
     "**SoC-Korrektur** (Speicherstand gegenüber der Vergleichsbatterie, bewertet) steckt "
-    "in keinem Abstand und steht als eigenes Label. Orange Slots hat das Buch nicht "
+    "in keinem Abstand und steht als eigenes Label, für den Plan als **SoC am Ende**. "
+    "Orange Slots hat das Buch nicht "
     "gezählt (fehlende Messwerte oder Buch nicht gelaufen), sie zählen auf beiden Seiten "
     "null. Die gerade laufende Viertelstunde erscheint, sobald sie gebucht ist. Das untere "
     "Panel prüft den Verbrauch: Vergleich minus optimiert in kWh, null am Horizontende. "
@@ -317,6 +318,26 @@ def _add_ledger_labels(
     )
 
 
+def plan_soc_correction_eur(savings_view: dict, *, anchor: int) -> float | None:
+    """Value of the plan's SoC gap change from *Jetzt* to the window end (Ledger P11), if the plan has one."""
+    increments = savings_view.get("hourly_soc_correction_euro")
+    if not increments:
+        return None
+    return sum(float(value) for value in increments[anchor:])
+
+
+def _add_plan_soc_label(
+    fig: go.Figure, times: list[datetime], view: AccountView, correction: float | None
+) -> None:
+    if correction is None or not view.has_future:
+        return
+    fig.add_annotation(
+        x=times[view.slot_count], y=0.86, xref="x", yref="paper", yanchor="top", xanchor="right",
+        text=f"SoC am Ende: {soc_correction_text(correction)}", showarrow=False,
+        font=dict(**_LABEL_FONT, color=saving_color(correction)),
+    )
+
+
 def _marked_runs(slots: AccountSlots, slot_qualities: tuple[str, ...] | None) -> list[tuple[int, int]]:
     """Runs ``[first, last]`` of slots shown orange; one shape per run keeps long windows light."""
     qualities = slot_qualities if slot_qualities and len(slot_qualities) == len(slots.states) else None
@@ -427,6 +448,7 @@ def build_account_figure(
     slot_qualities: tuple[str, ...] | None = None,
     sun_markers=None,
     period: bool = False,
+    plan_soc_correction: float | None = None,
 ) -> go.Figure:
     """``period``: the analysis page's 7 / 28 days, with the saving panel below (spec § 6, P3)."""
     axis = ChartSlotAxis.from_dataframe(df)
@@ -449,6 +471,7 @@ def build_account_figure(
         _add_sun_markers(fig, sun_markers)
     _add_gap_labels(fig, view, times, so_far_name="Zeitraum" if period else "Bisher")
     _add_ledger_labels(fig, ledger, times, view, period=period)
+    _add_plan_soc_label(fig, times, view, plan_soc_correction)
     xaxis = _chart_xaxis_config(axis, range_start=range_start)
     if period:
         span_days = (times[-1] - times[0]).total_seconds() / 86400
@@ -512,6 +535,7 @@ def render_account_chart(
     fig = build_account_figure(
         df, slots, view, ledger=ledger, chart_window=chart_window, chart_zones=chart_zones,
         slot_qualities=slot_qualities, sun_markers=sun_markers,
+        plan_soc_correction=plan_soc_correction_eur(savings_view, anchor=slots.anchor),
     )
     inject_mobile_legend_css()
     kwargs: dict = {"width": "stretch"}
@@ -615,6 +639,7 @@ __all__ = [
     "account_slots",
     "build_account_figure",
     "energy_difference_hint",
+    "plan_soc_correction_eur",
     "render_account_chart",
     "saving_color",
 ]

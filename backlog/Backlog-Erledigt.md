@@ -2,6 +2,17 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Ledger P11 — Chart 1 baseline from the shadow chain (2026-11-07)
+
+- [x] **Ledger P11 — Chart 1 baseline from the shadow chain** `[fix]`: spec [`docs/dev/savings-ledger.md`](../docs/dev/savings-ledger.md) § 5. "SoC BL Ziel" no longer restarts from the live SoC in every cycle, which removes D1 from Chart 1 as well. This closes the epic's work in 2.8; P9–P10 are under Version 2.+1.
+  - **Past:** the open day's `shadow_soc_end` per slot (`ui/chart_ledger_savings.py`, already in the state, so no state change). Closed days are not drawn, as paging back shows no BL line anyway.
+  - **Horizon:** `savings_ledger_daemon.planning_shadow_soc` steps the chain over the slot the cycle just closed without saving, because `main.py` plans before `on_cycle` books it. All baselines of `calculate_optimization_savings` start there (`baseline_initial_soc`), the plan keeps the live SoC. `add_ledger_baseline_soc_trace` draws one line without an anchor at *Jetzt*.
+  - **Horizon costs:** `soc_correction_increments_euro` uses the ledger formula with `p_ref` from the plan's import. **Differs from the item's wording:** it values the SoC gap at the end minus the gap at the start, not the end alone. With the end alone, a plan that just uses its start energy would show that energy as a saving, although the ledger's open-day correction has already credited it. `savings_matched_euro` and `savings_euro` include it; the slot series do not, so Chart 2 shows it as the label "SoC am Ende".
+  - **No chain:** all runs start at the live SoC and say so (`baseline_start_source: live_soc`). Chart 1 draws no line and shows a hint; Chart 2 keeps its plan figures, which then compare two runs from the same start.
+  - **Scenario Explorer:** unchanged, it has no ledger and keeps the line anchored at *Jetzt*.
+  - **Not checked:** not run on a live plant; Chart 1 and Chart 2 are covered by figure tests, not looked at in the running UI.
+  - **Tests:** `tests/test_ledger_p11_chart1_baseline.py`. **Docs:** `docs/ui/charts.md`, `docs/dev/savings-ledger.md`, `.github/release-notes/UNRELEASED.md`.
+
 ### Decimal separator for non-currency numbers (2026-11-06)
 
 - [x] **Decimal separator for non-currency numbers** `[feat]`: kWh, kW and % follow the viewer's browser language like euro amounts, in text, charts and tables.

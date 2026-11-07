@@ -47,6 +47,7 @@ def _no_ledger(slot_count: int, history_slot_count: int, hint: str) -> dict[str,
         "slot_with_eur": [0.0] * slot_count,
         "slot_without_eur": [0.0] * slot_count,
         "slot_states": [SLOT_NO_DATA] * history + [SLOT_PLAN] * (slot_count - history),
+        "slot_shadow_soc": [None] * slot_count,
         "open_day_start": None,
         "open_day_end": None,
         "saving_euro": None,
@@ -93,6 +94,22 @@ def _slot_series(
         after_booked = state.last_slot_start is None or start > state.last_slot_start
         states[index] = SLOT_PENDING if in_open_day and after_booked else SLOT_NO_DATA
     return with_eur, without_eur, states
+
+
+def _slot_shadow_soc(
+    slot_starts: Sequence[datetime],
+    history_slot_count: int,
+    state: sl.LedgerState,
+) -> list[float | None]:
+    """Shadow SoC at the end of each display slot left of *Jetzt*; the open day only (Chart 1)."""
+    by_start = {
+        datetime.fromisoformat(slot["slot_start"]): float(slot["shadow_soc_end"])
+        for slot in state.slots
+    }
+    values: list[float | None] = [None] * len(slot_starts)
+    for index in range(min(history_slot_count, len(slot_starts))):
+        values[index] = by_start.get(slot_starts[index])
+    return values
 
 
 def open_day_figures(state: sl.LedgerState, battery_params: dict) -> tuple[float, float]:
@@ -149,6 +166,7 @@ def build_ledger_chart_savings(
         "slot_with_eur": with_eur,
         "slot_without_eur": without_eur,
         "slot_states": states,
+        "slot_shadow_soc": _slot_shadow_soc(slot_starts, history_slot_count, state),
         "open_day_start": state.day_start.isoformat(),
         "open_day_end": state.day_end.isoformat(),
         "saving_euro": saving,

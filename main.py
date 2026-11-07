@@ -847,6 +847,7 @@ def _main_cycle(
                 filter_contexts=filter_contexts,
                 consumers=live_consumers,
                 current_soc_by_id=current_soc_by_id or None,
+                baseline_initial_soc=savings_ledger_daemon.planning_shadow_soc(closed_interval),
             )
             savings_snapshot = optimizer.build_savings_snapshot(savings_info)
             logger.info(
