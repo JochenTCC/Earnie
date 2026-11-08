@@ -102,6 +102,9 @@ def derive_house(house: dict, params: dict) -> DerivedHouse:
         pv, limit = rules["pv_min_kwp"], "mindest_kwp"
     if pv > cap:
         pv, limit = cap, "dach"
+    if "pv_kwp" in house:
+        # A list may fix the PV per house (sensitivity: the demand varies, the plant stays); no rule applies then.
+        pv, limit = house["pv_kwp"], "fest"
     return DerivedHouse(
         id=house["id"],
         axes={**{k: house[k] for k in params["achsen"]}, "_quelle": system["quelle"],

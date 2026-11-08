@@ -285,7 +285,10 @@ def test_list_may_fix_roof_and_battery_per_house(params):
     fixed = derive_house(params_mod.validate_house(_house(pv_kwp_je_mwh=0.75, speicher_kwh=10), params, "t"), params)
     assert fixed.battery_kwh == 10.0
     assert fixed.pv_kwp < 10.0
-    for bad in ({"dach_kwp": 0}, {"speicher_kwh": -1}, {"dach_kwp": "gross"}, {"speicher_kwh": True}):
+    plant = derive_house(params_mod.validate_house(_house(personen=2, pv_kwp=9.97, speicher_kwh=10), params, "t"), params)
+    assert (plant.pv_kwp, plant.pv_limit, plant.battery_kwh) == (9.97, "fest", 10.0)
+    assert plant.pv_wanted_kwp < 9.97  # the demand rule would have given less; the fixed plant wins
+    for bad in ({"dach_kwp": 0}, {"speicher_kwh": -1}, {"dach_kwp": "gross"}, {"speicher_kwh": True}, {"pv_kwp": 0}):
         with pytest.raises(ValueError):
             params_mod.validate_house(_house(**bad), params, "t")
 
