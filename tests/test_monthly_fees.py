@@ -392,6 +392,7 @@ def test_write_se_invoices_markdown(tmp_path) -> None:
         booked_consumption_by_scenario={
             "live": {"consumption_kwh": 48.0, "standby_kwh": 0.0}
         },
+        capacity_by_scenario={},
     )
     assert len(paths) == 1
     text = (tmp_path / "invoices" / "Live_jahresrechnung.md").read_text(encoding="utf-8")

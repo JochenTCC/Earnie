@@ -8,6 +8,7 @@ from typing import Literal
 import pandas as pd
 
 from data.tariff_parameter_preview import tariff_parameter_rows
+from simulation.capacity_charge import CapacityResult
 from simulation.monthly_fees import GridFixedPart, ScenarioFeeBreakdown
 from simulation.period_clip import clip_results_to_period
 from simulation.se_invoice_format import (  # noqa: F401  (re-exported)
@@ -183,6 +184,7 @@ def _year_summary_lines(
     total_year: float,
     netznutzung_ap_eur: float = 0.0,
     netz_parts_eur: float = 0.0,
+    capacity_eur: float = 0.0,
 ) -> list[str]:
     nne = max(0.0, min(float(netznutzung_ap_eur), float(import_year)))
     parts = max(0.0, min(float(netz_parts_eur), float(import_year) - nne))
@@ -213,6 +215,8 @@ def _year_summary_lines(
     )
     if standby_kwh_year > 0.0:
         lines.append(f"| Speicher-Standby (Info) | {_fmt_kwh(standby_kwh_year)} |")
+    if capacity_eur > 0.0:
+        lines.append(f"| Leistungspreis | {_fmt_eur(capacity_eur)} |")
     lines.extend(
         [
             f"| Lieferant-Grundpreis | {_fmt_eur(fees.supplier_monthly_eur * month_count)} |",
@@ -243,8 +247,11 @@ def _hinweise_lines(*, has_netznutzung_ap: bool) -> list[str]:
         "",
         "- Näherung für Plausibilität im Szenario-Explorer — **keine** echte Stromrechnung.",
         nne_hint,
-        "- **Leistungspreis** und PLZ-spezifische Lookup-Tabellen werden "
-        "**nicht** modelliert.",
+        "- **Leistungspreis:** aus dem Netzbereich, wenn dort hinterlegt: je Kalendermonat "
+        "die höchste gebuchte Viertelstunde, mindestens die Mindestleistung. Ein angebrochener "
+        "Monat zählt voll. Lastprofile aus Stundenwerten glätten kurze Spitzen, die echte "
+        "Spitze kann höher liegen.",
+        "- PLZ-spezifische Lookup-Tabellen werden **nicht** modelliert.",
         "- Verbrauch (Info) = gebuchter Verbrauch der Stundenreihe dieses Szenarios "
         "(jeder Zeitslot einmal, ohne Speicher-Standby) – derselbe Wert wie "
         "„Jahres Verbrauch“ in der SE-Tabelle Gesamtkosten.",
@@ -261,7 +268,7 @@ def _hinweise_lines(*, has_netznutzung_ap: bool) -> list[str]:
         "Lieferant-Grundpreis je `supplier_id` einmal; "
         "Messstellen-/Sonstige Fixkosten einmal je Hausanschluss "
         "(aus Bezugstarif, sonst Einspeisetarif); feste Netzbeträge aus dem Netzbereich.",
-        "- Nicht modelliert: Leistungspreis, PLZ-spezifische Stacks, "
+        "- Nicht modelliert: PLZ-spezifische Stacks, "
         "separate Stromsteuer und Konzessionsabgabe.",
         "",
     ]
@@ -292,6 +299,7 @@ class _InvoiceYearContext:
     netz_parts: list[_NetznutzungComponent]
     netz_fixed: tuple[GridFixedPart, ...]
     netznutzung_skipped: list[dict]
+    capacity: CapacityResult
 
     @property
     def month_count(self) -> int:
@@ -305,6 +313,7 @@ def _build_invoice_year_context(
     import_spec: dict | None,
     booked_consumption: dict,
     grid_fee: InvoiceGridFee | None,
+    capacity: CapacityResult,
 ) -> _InvoiceYearContext:
     """Monatsreihen plus Jahressummen, Netznutzungs-AP und Gesamtbetrag."""
     (
@@ -323,7 +332,9 @@ def _build_invoice_year_context(
     export_kwh_year = float(export_kwh.sum()) if not df.empty else 0.0
     consumption_kwh_year = float(booked_consumption["consumption_kwh"])
     standby_kwh_year = float(booked_consumption["standby_kwh"])
-    total_year = import_year - export_year + fees.total_monthly_eur * month_count
+    total_year = (
+        import_year - export_year + fees.total_monthly_eur * month_count + capacity.gross_eur
+    )
     components = _netznutzung_components(
         df, grid_fee=grid_fee, import_spec=import_spec
     )
@@ -354,6 +365,7 @@ def _build_invoice_year_context(
         netz_parts=_netz_part_lines(df, grid_fee=grid_fee, import_spec=import_spec),
         netz_fixed=grid_fee.fixed if grid_fee else (),
         netznutzung_skipped=list(grid_fee.skipped) if grid_fee else [],
+        capacity=capacity,
     )
 
 
@@ -376,9 +388,10 @@ def _invoice_summary_lines(
             total_year=ctx.total_year,
             netznutzung_ap_eur=ctx.netznutzung_ap_eur,
             netz_parts_eur=sum(part.eur for part in ctx.netz_parts),
+            capacity_eur=ctx.capacity.gross_eur,
         )
     )
-    if ctx.ap_net_cent > 0.0 or ctx.netz_fixed:
+    if ctx.ap_net_cent > 0.0 or ctx.netz_fixed or ctx.capacity.months or ctx.capacity.skipped:
         lines.extend(
             _netznutzung_section_lines(
                 ap_net_cent=ctx.ap_net_cent,
@@ -390,6 +403,7 @@ def _invoice_summary_lines(
                 fixed=ctx.netz_fixed,
                 skipped=ctx.netznutzung_skipped,
                 month_count=ctx.month_count,
+                capacity=ctx.capacity,
             )
         )
     return lines
@@ -456,6 +470,7 @@ def render_scenario_invoice_markdown(
     export_spec: dict | None,
     booked_consumption: dict,
     grid_fee: InvoiceGridFee | None = None,
+    capacity: CapacityResult | None = None,
 ) -> str:
     """Build one German fake-Jahresrechnung markdown body.
 
@@ -471,6 +486,7 @@ def render_scenario_invoice_markdown(
         import_spec=import_spec,
         booked_consumption=booked_consumption,
         grid_fee=grid_fee,
+        capacity=capacity or CapacityResult(),
     )
     lines = [
         f"# Fake-Jahresrechnung — {label}",
@@ -520,11 +536,13 @@ def write_se_invoices(
     period_start: str | None = None,
     period_end: str | None = None,
     booked_consumption_by_scenario: dict[str, dict],
+    capacity_by_scenario: dict[str, CapacityResult],
 ) -> list[str]:
     """Write one markdown invoice per result scenario under ``log_dir/invoices/``.
 
     ``booked_consumption_by_scenario`` (``booked_consumption_by_result``) feeds
     Verbrauch (Info) / Speicher-Standby — same values as SE Gesamtkosten.
+    ``capacity_by_scenario`` (``capacity_by_result``) is the same source as the SE summary.
     """
     missing = [sid for sid in results if sid not in booked_consumption_by_scenario]
     if missing:
@@ -561,6 +579,7 @@ def write_se_invoices(
             export_spec=export_spec if isinstance(export_spec, dict) else None,
             booked_consumption=booked_consumption_by_scenario[scenario_id],
             grid_fee=_grid_fee_from_params(params),
+            capacity=capacity_by_scenario.get(scenario_id),
         )
         path = os.path.join(
             invoice_dir, f"{_safe_filename(label)}_jahresrechnung.md"

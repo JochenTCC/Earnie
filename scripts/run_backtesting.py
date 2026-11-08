@@ -26,6 +26,8 @@ from simulation.engine_scenario import scenario_standby_power_kw
 from simulation.backtesting_horizon import BOOK_PERIOD_KEY
 from simulation.period_clip import clip_results_map_to_period
 from simulation.reference_costs import reference_standby_power_kw
+from house_config.import_cap import parse_import_cap
+from simulation.capacity_charge import capacity_by_result, check_capacity_coverage
 from simulation.monthly_fees import fee_breakdowns_by_result_id
 from simulation.se_invoice_markdown import write_se_invoices
 from data.data_loader import resolve_simulation_window
@@ -1136,6 +1138,13 @@ def main(argv: list[str] | None = None):
         *extra_ref_specs,
         *((spec.ref_id, spec.params, spec.label) for spec in ladder_specs),
     ]
+    # A gap in a grid area's capacity charge fails here, not after the run.
+    for params in (
+        *scenarios.values(),
+        *(params for _ref_id, params, _label in all_ref_specs),
+        reference_params,
+    ):
+        check_capacity_coverage(params, start, end)
     ladder_report: dict[str, dict] = {}
     reference_specs: list[tuple[str, dict | None, str, str]] = [
         *(
@@ -1402,12 +1411,20 @@ def main(argv: list[str] | None = None):
     )
     from simulation.heat_fuel import heat_fuel_by_result
 
-    heat_fuel = heat_fuel_by_result(
+    params_by_result = {
+        **scenarios,
+        **{ref_id: params for ref_id, params, _label in all_ref_specs},
+        HISTORICAL_REFERENCE_ID: reference_params,
+    }
+    heat_fuel = heat_fuel_by_result(clipped_results, params_by_result)
+    capacity = capacity_by_result(
         clipped_results,
+        params_by_result,
+        # Only the optimized runs plan with the cap, the references carry the same params.
         {
-            **scenarios,
-            **{ref_id: params for ref_id, params, _label in all_ref_specs},
-            HISTORICAL_REFERENCE_ID: reference_params,
+            scenario_id: cap.cap_kw
+            for scenario_id, params in scenarios.items()
+            if (cap := parse_import_cap(params)) is not None
         },
     )
     log_path = save_backtesting_log(
@@ -1426,6 +1443,7 @@ def main(argv: list[str] | None = None):
         prices=prices if sim_cfg.get("export_price_series", False) else None,
         booked_consumption=booked_consumption,
         heat_fuel=heat_fuel,
+        capacity_by_scenario=capacity,
     )
     from runtime_store.usage_ping import note_scenarios_calculated
 
@@ -1443,6 +1461,7 @@ def main(argv: list[str] | None = None):
         period_start=start.date().isoformat(),
         period_end=end.date().isoformat(),
         booked_consumption_by_scenario=booked_consumption,
+        capacity_by_scenario=capacity,
     )
     if progress_file:
         clear_progress_dir(progress_file)

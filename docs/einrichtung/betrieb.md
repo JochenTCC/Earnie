@@ -157,6 +157,8 @@ Standardverzeichnis: `earnie_env/runtime/`. Es lässt sich mit `EARNIE_RUNTIME_P
 | `flexible_consumers_state.json` | Tagesenergie je Flex-Verbraucher.                                                            |
 | `pv_counter_state.json`         | PV-Zählerstand für das Stunden-Delta.                                                        |
 | `power_interval_sampler_state.json` | Zwischenpuffer der Leistungsproben (≤ 60 s) für Viertelstunden-Mittel im Produktiv-Log. Optional mit Energie-Ankern (`energy_anchors`): Aus Loxone-Zählern (ΔkWh) wird die mittlere Slot-Leistung berechnet. |
+| `power_samples/`                | Nur mit `EARNIE_POWER_SAMPLE_LOG_DAYS`: Leistungsproben und Zählerstände je Tag, siehe *Rohdaten für einen Zählervergleich*. |
+| `capacity_peaks.json`           | Höchster Netzbezug je Kalendermonat (Viertelstunde) für den Leistungspreis, mit Quelle (Zähler oder Mittel der Proben), Messbeginn und Zahl fehlender Viertelstunden. Ein Monat ohne Eintrag ist unbekannt. Mit Bezugsgrenze plant der Live-Betrieb bis zur gemessenen Spitze des Monats. Earnie misst selbst, deshalb kann der Wert unter dem des Stromzählers liegen. |
 | `cons_data_pending.json`        | Puffer für noch ausstehende `cons_data`-Messwerte (Samples).                                 |
 | `consumption_profiles.csv`      | Berechnete Grundlast-Profile.                                                                |
 | `earnie.log`                    | Rotierendes Python-Log von `main.py` (absoluter Pfad). Rotation monatlich, max. 12 Archive `earnie.log.YYYY-MM-DD_HH-MM-SS`. |
@@ -241,6 +243,9 @@ Eine Einstellung ist nicht nötig; die Datei bleibt lokal. Voraussetzung ist ein
 - **Warnung:** Weicht die Uhr um mehr als 2 s ab, steht in `earnie.log` höchstens stündlich eine Warnung *„Systemuhr geht ca. … s vor/nach … Zeitsynchronisation (NTP) des Hosts prüfen“*.
 - **Schätzwert:** Er steht je Lauf als `clock_skew_sec` in `runtime/cycle_stats.jsonl`. Positiv heißt, die Systemuhr geht nach. Das Feld bleibt leer, solange weniger als 3 Antworten vorliegen.
 - **Genauigkeit:** etwa ±0,5–1 s.
+- **Leistungspreis:** Die Monatsspitze misst Earnie in Viertelstunden nach der eigenen Systemuhr. Bei 2 s Abweichung ist der Fehler höchstens 0,02 kW, auch wenn sich der Bezug genau an der Viertelstundengrenze um 10 kW ändert.
+
+**Rohdaten für einen Zählervergleich:** Mit `EARNIE_POWER_SAMPLE_LOG_DAYS=<Tage>` in `.env` schreibt Earnie jede Leistungsprobe (alle 30 s) in `runtime/power_samples/JJJJ-MM-TT.jsonl`: Netzleistung, Bezugs- und Einspeisezähler zum selben Zeitpunkt, wann jeder dieser Werte als Push angekommen ist, und die geschätzte Uhrabweichung. Ältere Tage löscht Earnie selbst. Gedacht ist das für einen Vergleich mit dem Viertelstunden-Export aus dem Portal des Netzbetreibers. Leer oder `0` schaltet es aus.
 
 <a id="cycle-recorder-regression-r-rec"></a>
 
@@ -367,7 +372,7 @@ Ein Dump enthält immer die volle Optimierungshistorie und die aktiven Inputs. D
 | Inhalt | Pflicht / optional |
 | ------ | ------------------ |
 | `runtime/optimization_history.jsonl` | Pflicht (vollständig) |
-| `optimizer_run_state.json`, `live_optimization_debug.json`, `flexible_consumers_state.json`, `pv_counter_state.json`, `powerstation_reserves.json` | Optional, falls vorhanden |
+| `optimizer_run_state.json`, `live_optimization_debug.json`, `flexible_consumers_state.json`, `pv_counter_state.json`, `powerstation_reserves.json`, `capacity_peaks.json` | Optional, falls vorhanden |
 | `recorder/` (Cycle-Recorder-Ringpuffer inkl. Config-Snapshots) | Optional. Fenster = Retention (Default 7 Tage); enthält Lastprofile. |
 | `manifest.chart` | Optional (nur mit Live-Anzeige) |
 | `manifest.recorder` | Optional (`from` / `to` / `cycle_count` / `config_hashes`) |

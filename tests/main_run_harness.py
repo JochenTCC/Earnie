@@ -108,6 +108,7 @@ def patch_main_run(monkeypatch, *, silent: bool = True) -> None:
                 "price_buy": 10.0,
                 "k_act": 13.44,
                 "hour": 10,
+                "slot_datetime": datetime(2026, 6, 15, 10, 0),
             }
         ],
     )

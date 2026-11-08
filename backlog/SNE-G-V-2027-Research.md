@@ -35,6 +35,28 @@ Purpose: record what is **final** in the ordinance text, what is still **open**,
 - **§ 34 Abs. 1 interpretation:** see above.
 - **Phase-in steps:** no numbers in the text; E-Control communication varies between "within three years" and "within the next years" [S2].
 
+### Update 2026-11-07
+
+- **SNE-T-V draft:** in consultation since 2026-10-29, comments until 2026-11-20 [S22]. Tariffs are published for both systems; the new one applies only once a Netzbereich has switched. The press release, its charts and the E-Control pages read give **no capacity price per kW** and no link to the draft text, so catalog values (plan D1) are still out of reach. The chart for the new system shows per-kWh equivalents at an assumed 4 kW and 3,500 kWh a year, for example Austrian average 9.55 ct/kWh, Vorarlberg 6.86 ct/kWh, net [S23]. These are preliminary and not usable as tariff data.
+- **Start date:** the press release says the operators decide per Netzbereich, between 2027-01-01 and 2028-07-01 at the latest [S22]. One source gives 2027-12-01 as the default start [S24]. It fits the transition in § 6 Abs. 3a, which ends 2027-11-30, but was not checked against the ordinance. No dates per Netzbereich were published on the pages read; the operators' report is due 2026-11-11.
+- **Next check:** after 2026-11-20 and when the final SNE-T-V is out (expected December 2026).
+
+## 3a. Does the meter count on whole quarter hours? (research 2026-11-07)
+
+Question: can Earnie measure in step with the official meter, without reading it?
+
+| Region | Finding | Source | Level |
+|---|---|---|---|
+| AT | The value is the average power over a 15-minute market interval (SNE-G-V § 2 Abs. 1 Z 17). No statement on start times. Market interval not looked up in the ElWG. | [S1] | law, read |
+| AT | The meter has an internal clock and calendar, remote synchronisation is provided for, values carry a timestamp (IMA-VO § 3 Z 2, Z 9). No alignment, no limit for the deviation, no synchronisation interval. | [S16] | law, read through a fetch summary |
+| AT | Quarter-hour values may be meter readings, energy or average power depending on the meter type; meter readings "at the 15th minute". | [S17] p. 6 ff. | code of conduct, read |
+| AT | Market rules chapter 6, V3.8: time zones and daylight saving of the data format; a text search finds no clock accuracy limit. Newer versions of the rules exist and were not read. | [S18] | market rules, searched |
+| AT | Customer interface in Styria: push every 10 s, meter time with seconds and a summer-time flag, import and export counters in Wh. The example telegram has no running-average or peak register. | [S19] | operator document, 2024, one example |
+| BE-VL | Fixed windows xxh00–xxh15 and so on, on the meter's internal clock. Import direction only, phases added first. The meter clock can be several seconds off the home system's, and it alone counts. P1 exposes the running average and the month peak. | [S20] | operator application note |
+| DE | Time of a meter reading against legal time within ±27 s (3 % of 15 min), spacing of readings within ±9 s (PTB-A 50.8, as quoted in a talk). | [S21] | PTB talk 2016, not the rule itself |
+
+**Conclusion:** clock-aligned quarter hours are the working assumption for Austria, supported by the market interval and by Flanders, but no Austrian text read states them, and none gives a tolerance. An answer would have to come from E-Control, an operator or a meter data sheet. A field comparison with the operator's quarter-hour export tests it in practice. Earnie's error from a clock offset is at most step of import power × offset / 900 s, for example 0.30 kW at 10 kW and 27 s. Consequences: `docs/dev/max-power-tariff-plan.md`, section **Meter timing**.
+
 ## 4. Consequences for the backlog items
 
 - The MILP design (peak variable, convex two-segment ladder, 2 kW minimum, monthly reset) matches the final text. No model change needed.
@@ -64,5 +86,18 @@ Secondary (operator / industry / press, for timelines and examples only):
 - [S13] Oesterreichs Energie, FAQ Systemnutzungsentgelte-Grundsatzverordnung (PDF, not machine-readable in this research; open manually): <https://oesterreichsenergie.at/fileadmin/user_upload/FAQ_Systemnutzungsentgelte-Grundsatzverordnung.pdf>
 - [S14] HLK, "Strom-Kunden sollten ab 2027 auf ihr Nutzungsverhalten achten": <https://hlk.co.at/heizung/strom-kunden-sollten-ab-2027-auf-ihr-nutzungsverhalten-achten/>
 - [S15] photovoltaik-service.at, "Was das SNE-G-V bedeutet" (E-Control household example: 7,000 kWh, 11 kW peak, +21 % / −8.5 %, from the draft): <https://photovoltaik-service.at/was-das-sne-g-v-bedeutet>
+
+Added 2026-11-07 for section 3a:
+
+- [S16] RIS, BGBl. II Nr. 339/2011, Intelligente Messgeräte-Anforderungsverordnung (IMA-VO): <https://www.ris.bka.gv.at/Dokumente/BgblAuth/BGBLA_2011_II_339/BGBLA_2011_II_339.html>
+- [S17] Oesterreichs Energie / VÖEW, Verhaltensregeln Smart Meter (version of 2021-07-27): <https://oesterreichsenergie.at/fileadmin/user_upload/Smart_Meter-Plattform/Verhaltensregeln_idF_27.7.2021.pdf>
+- [S18] E-Control, Sonstige Marktregeln Strom Kapitel 6, Version 3.8: <https://www.e-control.at/documents/1785851/1811582/SoMa_6_V3.8_clean.pdf/7ce1ebeb-8b6a-e93e-4e0e-5bd72e643611?t=1631299918433>
+- [S19] Energienetze Steiermark, Aktivierung und Nutzung der Kundenschnittstelle (03/2024): <https://www.e-netze.at/downloads-data/pdf.aspx?pdf=EN_Update+Kundenschnittstelle+Smart+Meter+%2803_2024%29_WEB_RGB.pdf>
+- [S20] Fluvius, Application note: Usage of maximum demands, month peaks: <https://partner.fluvius.be/sites/fluvius/files/2025-11/usage-of-maximum-demands-month-peaks.pdf>
+- [S21] PTB, C. Leicht and R. Cuerdo, Latenzzeitmesseinrichtung für moderne elektronische Zähler (2016-05-11): <https://www.ptb.de/cms/fileadmin/internet/Veranstaltungen/2016/02_Leicht_Cuerdo.pdf>
+
+- [S22] E-Control, press release on the tariff consultation, 2026-10-29: <https://www.e-control.at/documents/d/guest/2026_10_28_stromnetzentgelte_begutachtung_final_final-pdf>; consultation page: <https://www.e-control.at/begutachtungsentwurf-systemnutzungstarife-verordnung-2027>
+- [S23] E-Control, chart of household grid fees from 2027, new system (consultation draft): <https://www.e-control.at/documents/d/guest/stromnetzengelte-darstellung-neue-systematik-1-jpg>
+- [S24] Wiener Stadtwerke, "Systemnutzungsentgelte neu geregelt", 2026-10-14: <https://positionen.wienerstadtwerke.at/aktuelles/sne-g-vo>
 
 Verification level: [S1] read in full; [S2] read as summary only; [S3]–[S6] located, key figures taken from search excerpts; secondary sources not independently verified. Re-check [S2] and the SNE-T-V when the consultation draft is published.

@@ -28,6 +28,7 @@ _OPTIONAL_RUNTIME = (
     "flexible_consumers_state.json",
     "pv_counter_state.json",
     "powerstation_reserves.json",
+    "capacity_peaks.json",
 )
 
 # Arcnames relative to ZIP root (validate/replay profiles).

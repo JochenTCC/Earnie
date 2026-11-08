@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import os
+import random
 
 import pulp
 import pytest
 
+from optimizer import cbc_solver
 from optimizer.cbc_solver import (
     DEFAULT_CBC_GAP_REL,
     DEFAULT_CBC_STRICT_TIME_LIMIT_SEC,
@@ -68,6 +70,41 @@ def test_solve_with_strict_fallback_uses_gap_on_timeout():
     status = solve_with_strict_fallback(prob, msg=False)
     assert status == "Optimal"
     assert x.value() == pytest.approx(1.0)
+
+
+class _SolverWithoutSolution:
+    def actualSolve(self, lp):
+        lp.status = pulp.LpStatusNotSolved
+        return lp.status
+
+
+def test_gap_stage_runs_with_its_own_time_limit(monkeypatch):
+    limits = []
+
+    def fake_cmd(**kwargs):
+        limits.append(kwargs.get("time_limit"))
+        return _SolverWithoutSolution()
+
+    monkeypatch.setattr(cbc_solver, "_build_solver_cmd", fake_cmd)
+    prob = pulp.LpProblem("t", pulp.LpMinimize)
+    prob += pulp.LpVariable("x", lowBound=0)
+    assert solve_with_strict_fallback(prob, msg=False) == "Not Solved"
+    assert limits == [DEFAULT_CBC_STRICT_TIME_LIMIT_SEC, 15.0]
+
+
+def test_no_solution_within_both_limits_is_not_optimal(monkeypatch):
+    """The real solver: ``milp`` takes anything but ``Optimal`` to its Automatik path."""
+    rng = random.Random(1)
+    items = range(400)
+    choice = [pulp.LpVariable(f"x{i}", cat="Binary") for i in items]
+    prob = pulp.LpProblem("hard", pulp.LpMaximize)
+    prob += pulp.lpSum(rng.randint(100, 999) * choice[i] for i in items)
+    for _ in range(30):
+        weights = [rng.randint(100, 999) for _ in items]
+        prob += pulp.lpSum(weights[i] * choice[i] for i in items) <= sum(weights) // 2
+    os.environ[ENV_STRICT_TIME_LIMIT] = "0.001"
+    monkeypatch.setattr(cbc_solver, "GAP_STAGE_TIME_LIMIT_SEC", 0.001)
+    assert solve_with_strict_fallback(prob, msg=False) == "Not Solved"
 
 
 def test_build_cbc_solver_cmd_solves_with_gap():

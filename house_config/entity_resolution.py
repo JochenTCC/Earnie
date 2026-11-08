@@ -4,6 +4,7 @@ from __future__ import annotations
 from house_config.battery_control import (
     DEFAULT_BATTERY_CONTROL,
 )
+from house_config.import_cap import IMPORT_CAP_KEY, IMPORT_CAP_MARGIN_KEY
 from house_config.inverter import (
     AC_GRID_TIED,
     DEFAULT_AC_CONNECTION,
@@ -62,6 +63,8 @@ def strip_assets_for_reference(params: dict) -> dict:
         "_planning_powerstations",
         "_planning_pv_systems",
         "_planning_inverters",
+        IMPORT_CAP_KEY,
+        IMPORT_CAP_MARGIN_KEY,
     ):
         out.pop(key, None)
     return out

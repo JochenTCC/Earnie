@@ -144,7 +144,21 @@ def resolve_scenario_settings(
         user_cents=user_cents,
         profile=profile,
     )
+    _check_import_cap(out)
     return out
+
+
+def _check_import_cap(out: dict) -> None:
+    """A cap needs a grid area: only there is it known in which months it counts (plan D3)."""
+    from data.edibert_slot_prices import EDIBERT_PRICING_KEY
+    from house_config.import_cap import parse_import_cap
+
+    if parse_import_cap(out) is None:
+        return
+    if (out.get(EDIBERT_PRICING_KEY) or {}).get("netznutzung") is None:
+        raise ValueError(
+            "Szenario: import_cap_kw braucht ein Hausprofil mit Netzbereich (netznutzung)."
+        )
 
 
 def _pop_tariff_id(out: dict, key: str) -> str | None:

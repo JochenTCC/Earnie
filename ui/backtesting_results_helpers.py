@@ -15,6 +15,7 @@ from simulation.engine import (
 )
 from optimizer.slot_duration import DEFAULT_DT_H
 from simulation.booked_consumption import BOOKED_CONSUMPTION_KEY
+from simulation.capacity_charge import CAPACITY_KEY
 from simulation.reference_costs import LADDER_L2
 from simulation.jahres_verbrauch import jahres_standby_kwh, jahres_verbrauch_kwh
 from ui.consumption_validation_charts import cons_data_monthly_kwh
@@ -486,6 +487,51 @@ def _totals_with_fuel(meta: dict, totals: dict) -> dict:
         sid: float(total) + float((fuel.get(sid) or {}).get("fuel_eur") or 0.0)
         for sid, total in totals.items()
     }
+
+
+def build_capacity_rows(meta: dict) -> list[dict]:
+    """One row per result with a capacity charge: highest month peak and the sum over the period."""
+    capacity = meta.get(CAPACITY_KEY) or {}
+    labels = meta.get("labels", {})
+    totals = meta.get("summary", {}).get("total_eur", {})
+    rows: list[dict] = []
+    for scenario_id in _annual_cost_row_order(meta, totals):
+        months = (capacity.get(scenario_id) or {}).get("months") or []
+        if not months:
+            continue
+        highest = max(months, key=lambda month: float(month["peak_kw"]))
+        rows.append(
+            {
+                "Szenario": labels.get(scenario_id, scenario_id),
+                "Höchste Monatsspitze [kW]": format_decimal(float(highest["peak_kw"])),
+                "Monat": highest["month"],
+                "Ø abgerechnet [kW]": format_decimal(
+                    sum(float(month["billed_kw"]) for month in months) / len(months)
+                ),
+                "Leistungspreis [€]": format_euro(
+                    sum(float(month["gross_eur"]) for month in months)
+                ),
+                "Bezugsgrenze [kW]": (
+                    format_decimal(float(highest["import_cap_kw"]))
+                    if highest.get("import_cap_kw") is not None
+                    else "–"
+                ),
+                "Viertelstunden über der Grenze": sum(
+                    int(month.get("slots_over_cap", 0)) for month in months
+                ),
+            }
+        )
+    return rows
+
+
+def capacity_skipped_text(meta: dict) -> str | None:
+    """Entries left out by status, for the notice under the table; ``None`` without any."""
+    skipped: dict[str, str] = {}
+    for block in (meta.get(CAPACITY_KEY) or {}).values():
+        skipped.update(block.get("skipped") or {})
+    if not skipped:
+        return None
+    return ", ".join(f"{cid} (Status {status})" for cid, status in sorted(skipped.items()))
 
 
 def build_annual_cost_rows(meta: dict) -> list[dict]:
