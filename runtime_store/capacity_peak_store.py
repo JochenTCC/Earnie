@@ -19,6 +19,7 @@ from runtime_store.file_metadata import stamp_payload, strip_metadata
 from runtime_store.persist_paths import capacity_peak_store_file
 from runtime_store.power_interval_sampler import (
     GRID_IMPORT_SOURCE_MEAN,
+    MIN_IMPORT_WINDOW_SEC,
     MIN_SAMPLE_COUNT_FOR_MEAN,
 )
 
@@ -76,16 +77,22 @@ def _iso(moment: datetime) -> str:
 
 
 def _measured_kw(closed: dict[str, Any]) -> float | None:
-    """Import of the slot, or ``None`` when a sample mean rests on too few samples to count."""
+    """Import of the slot, or ``None`` when a sample mean covers too little of it to count.
+
+    A mean needs at least ``MIN_SAMPLE_COUNT_FOR_MEAN`` samples over ``MIN_IMPORT_WINDOW_SEC``,
+    the same window a counter needs: after a restart late in the slot, three samples from its
+    last minute would otherwise mark the whole quarter hour as measured.
+    """
     if "grid_import_kw" not in closed or "grid_import_source" not in closed:
         raise ValueError(
             f"capacity_peak_store: closed interval {closed.get('interval_start')} has no grid import"
         )
-    if (
-        closed["grid_import_source"] == GRID_IMPORT_SOURCE_MEAN
-        and int(closed.get("sample_count") or 0) < MIN_SAMPLE_COUNT_FOR_MEAN
-    ):
-        return None
+    if closed["grid_import_source"] == GRID_IMPORT_SOURCE_MEAN:
+        if int(closed.get("sample_count") or 0) < MIN_SAMPLE_COUNT_FOR_MEAN:
+            return None
+        window = _slot(closed["grid_import_end"]) - _slot(closed["grid_import_start"])
+        if window.total_seconds() < MIN_IMPORT_WINDOW_SEC:
+            return None
     return float(closed["grid_import_kw"])
 
 

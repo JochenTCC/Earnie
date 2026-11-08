@@ -17,12 +17,17 @@ from runtime_store.power_interval_sampler import (
 START = datetime(2026, 11, 30, 23, 0)
 
 
-def _closed(slot: datetime, kw: float, *, source=GRID_IMPORT_SOURCE_COUNTER, samples=30) -> dict:
+def _closed(
+    slot: datetime, kw: float, *, source=GRID_IMPORT_SOURCE_COUNTER, samples=30, window_s=870
+) -> dict:
+    opened = slot + timedelta(seconds=30)
     return {
         "interval_start": slot.isoformat(),
         "sample_count": samples,
         "grid_import_kw": kw,
         "grid_import_source": source,
+        "grid_import_start": opened.isoformat(),
+        "grid_import_end": (opened + timedelta(seconds=window_s)).isoformat(),
     }
 
 
@@ -77,6 +82,14 @@ def test_a_mean_of_too_few_samples_counts_as_missing(tmp_path: Path):
         1,
         1,
     )
+
+
+def test_a_mean_over_the_last_minute_after_a_restart_counts_as_missing(tmp_path: Path):
+    """Seen on the HA testbed: three samples in the last 35 s of the slot marked it as measured."""
+    path = tmp_path / "peaks.json"
+    assert _record(path, 0, 0.0, source=GRID_IMPORT_SOURCE_MEAN, samples=3, window_s=35) is None
+    peak = _record(path, 15, 0.3)
+    assert (peak.first_slot, peak.slots_logged, peak.slots_missing) == ("2026-11-30T23:15:00", 1, 0)
 
 
 def test_a_slot_not_after_the_last_one_changes_nothing(tmp_path: Path, caplog):

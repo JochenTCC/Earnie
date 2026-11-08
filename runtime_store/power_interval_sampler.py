@@ -17,8 +17,8 @@ logger = logging.getLogger(__name__)
 
 SAMPLE_INTERVAL_SEC = 30
 MIN_SAMPLE_COUNT_FOR_MEAN = 3
-# Shorter counter windows (a restart late in the slot) say too little about the quarter hour.
-MIN_COUNTER_WINDOW_SEC = 5 * 60
+# Shorter import windows (a restart late in the slot) say too little about the quarter hour.
+MIN_IMPORT_WINDOW_SEC = 5 * 60
 GRID_IMPORT_SOURCE_COUNTER = "counter"
 GRID_IMPORT_SOURCE_MEAN = "mean"
 SAMPLE_LOG_DIRNAME = "power_samples"
@@ -359,7 +359,7 @@ def _grid_import_from_counter(
     if opened_at is None or delta is None:
         return None
     seconds = (closed_at - opened_at).total_seconds()
-    if not MIN_COUNTER_WINDOW_SEC <= seconds <= QUARTER_HOUR_MINUTES * 60 + SAMPLE_INTERVAL_SEC:
+    if not MIN_IMPORT_WINDOW_SEC <= seconds <= QUARTER_HOUR_MINUTES * 60 + SAMPLE_INTERVAL_SEC:
         logger.warning(
             "power_interval_sampler: counter window %.0f s from %s — import stays on mean.",
             seconds,
