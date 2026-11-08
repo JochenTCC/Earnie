@@ -66,12 +66,26 @@ def irradiance_wm2_to_thermal_kwh(
 
 
 def last_full_archive_year(*, reference: date | None = None) -> int:
-    """Letztes vollständiges Archiv-Kalenderjahr (z. B. 2025 bei Referenz 2026-07-13)."""
-    if reference is None:
-        from runtime_store.planning_clock import planning_now
+    """Letztes vollständiges Archiv-Kalenderjahr (z. B. 2025 bei Referenz 2026-07-13).
 
-        reference = planning_now().date()
-    return reference.year - 1
+    Ohne ``reference`` gilt ``EARNIE_CLIMATE_REFERENCE_YEAR``, wenn gesetzt: Ein eingefrorener
+    Lauf (Studie mit anderem Preisjahr) rechnet Wärmemodell, Grundlast und Profile mit diesem
+    Archivjahr. Ein Jahr nach dem letzten vollen Archivjahr ist ein Fehler.
+    """
+    if reference is not None:
+        return reference.year - 1
+    from runtime_store.env_vars import read_climate_reference_year
+    from runtime_store.planning_clock import planning_now
+
+    natural = planning_now().year - 1
+    pinned = read_climate_reference_year()
+    if pinned is None:
+        return natural
+    if pinned > natural:
+        raise ValueError(
+            f"EARNIE_CLIMATE_REFERENCE_YEAR={pinned} liegt nach dem letzten vollen Archivjahr {natural}."
+        )
+    return pinned
 
 
 def archive_latest_complete_date() -> date:

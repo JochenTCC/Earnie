@@ -78,3 +78,14 @@ def is_effective_offline() -> bool:
     if is_explicit_offline():
         return True
     return is_planning_offline_gated()
+
+
+def read_climate_reference_year() -> int | None:
+    """``EARNIE_CLIMATE_REFERENCE_YEAR``: the archive year the climate models take as reference instead of
+    the last full calendar year (frozen study runs). Unset: None. Anything but a four-digit year fails loud."""
+    raw = read_env("CLIMATE_REFERENCE_YEAR")
+    if not raw:
+        return None
+    if not (raw.isdigit() and len(raw) == 4):
+        raise ValueError(f"EARNIE_CLIMATE_REFERENCE_YEAR={raw!r} ist kein Jahr (JJJJ).")
+    return int(raw)
