@@ -4,6 +4,21 @@
     "catalog_as_of": "2026-09-28",
     "oemag_monthly_feed_in_rates": [
         {
+            "year": 2024,
+            "month": 10,
+            "tariff_cent_kwh": 8.7
+        },
+        {
+            "year": 2024,
+            "month": 11,
+            "tariff_cent_kwh": 8.7
+        },
+        {
+            "year": 2024,
+            "month": 12,
+            "tariff_cent_kwh": 8.7
+        },
+        {
             "year": 2025,
             "month": 1,
             "tariff_cent_kwh": 9.73
@@ -1020,6 +1035,21 @@
             },
             "monthly_rates": [
                 {
+                    "year": 2024,
+                    "month": 10,
+                    "tariff_cent_kwh": 8.7
+                },
+                {
+                    "year": 2024,
+                    "month": 11,
+                    "tariff_cent_kwh": 8.7
+                },
+                {
+                    "year": 2024,
+                    "month": 12,
+                    "tariff_cent_kwh": 8.7
+                },
+                {
                     "year": 2025,
                     "month": 1,
                     "tariff_cent_kwh": 9.73
@@ -1143,6 +1173,21 @@
                 "arbeitspreis_kwh_cent": 5.85
             },
             "monthly_rates": [
+                {
+                    "year": 2024,
+                    "month": 10,
+                    "tariff_cent_kwh": 5.6182
+                },
+                {
+                    "year": 2024,
+                    "month": 11,
+                    "tariff_cent_kwh": 5.6182
+                },
+                {
+                    "year": 2024,
+                    "month": 12,
+                    "tariff_cent_kwh": 5.6182
+                },
                 {
                     "year": 2025,
                     "month": 1,
@@ -1268,6 +1313,21 @@
             },
             "monthly_rates": [
                 {
+                    "year": 2024,
+                    "month": 10,
+                    "tariff_cent_kwh": 7.7874
+                },
+                {
+                    "year": 2024,
+                    "month": 11,
+                    "tariff_cent_kwh": 7.7874
+                },
+                {
+                    "year": 2024,
+                    "month": 12,
+                    "tariff_cent_kwh": 7.7874
+                },
+                {
                     "year": 2025,
                     "month": 1,
                     "tariff_cent_kwh": 8.7094
@@ -1391,6 +1451,21 @@
                 "arbeitspreis_kwh_cent": 6.95
             },
             "monthly_rates": [
+                {
+                    "year": 2024,
+                    "month": 10,
+                    "tariff_cent_kwh": 8.4566
+                },
+                {
+                    "year": 2024,
+                    "month": 11,
+                    "tariff_cent_kwh": 8.4566
+                },
+                {
+                    "year": 2024,
+                    "month": 12,
+                    "tariff_cent_kwh": 8.4566
+                },
                 {
                     "year": 2025,
                     "month": 1,
@@ -1543,6 +1618,21 @@
                 "arbeitspreis_kwh_cent": 6.1
             },
             "monthly_rates": [
+                {
+                    "year": 2024,
+                    "month": 10,
+                    "tariff_cent_kwh": 7.4224
+                },
+                {
+                    "year": 2024,
+                    "month": 11,
+                    "tariff_cent_kwh": 7.4224
+                },
+                {
+                    "year": 2024,
+                    "month": 12,
+                    "tariff_cent_kwh": 7.4224
+                },
                 {
                     "year": 2025,
                     "month": 1,
