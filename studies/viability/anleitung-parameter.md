@@ -59,7 +59,7 @@ geschichtete Stichprobe mit festem Seed.
 |---|---|
 | Achsen, Regeln, Annahmen, Tarif-IDs | `make_houses` neu, dann rechnen |
 | Anderer Standort, andere PV- oder Kollektor-Ausrichtung | Einmal mit `--allow-network` bauen und rechnen, damit die Wetterdateien entstehen |
-| Anderes Preisjahr | Preis-CSV holen (`python -m studies.poc_cloud.fetch_prices --start 2024-01-01 --end 2025-01-04`), Brennstoffpreise eintragen. Der Generator bricht ab, solange das Jahr nicht das letzte volle Archivjahr ist: Wärmemodell und Grundlast rechnen mit diesem Jahr (`last_full_archive_year`), nicht mit dem Preisjahr |
+| Anderes Preisjahr | Preis-CSV holen, mit Jahresrand und 8 Tagen Vorlauf für den Forecast-Modus (`python -m studies.poc_cloud.fetch_prices --start 2023-12-20 --end 2025-01-04 --out studies/poc_cloud/cache/prices_AT_2024.csv`; der Generator sucht `prices_AT_<Jahr>.csv`), Brennstoffpreise unter `brennstoffpreise.<Jahr>` eintragen, Monatstabellen der Tarife in `share/config/tariffs.json` prüfen (Duo und VKW Flex beginnen sonst erst im Dezember 2024; die Flex-Werte kommen über `python -m scripts.update_tariff_curves --refmarkt JJJJ-MM=CENT` aus dem E-Control-Referenzmarktwert), Wetter-Cache des Jahres und seiner Nachbarjahre einmal mit `--allow-network` bauen und rechnen. Das Jahr muss ein volles Archivjahr sein. `make_houses` und `run_houses` setzen `EARNIE_CLIMATE_REFERENCE_YEAR` auf das Preisjahr, damit Wärmemodell, Grundlast und Modellprofile mit dessen Klima rechnen statt mit dem letzten vollen Kalenderjahr. Für 2024 ist alles vorbereitet (08.11.2026) |
 
 ## 4. Stolperstellen
 

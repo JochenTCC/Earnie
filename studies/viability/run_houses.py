@@ -14,14 +14,13 @@ from __future__ import annotations
 
 import argparse
 import json
-import shutil
 import subprocess
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-from studies.poc_cloud.run_poc import REPO_ROOT, WEATHER_DST, _env, _install_weather_cache
+from studies.poc_cloud.run_poc import REPO_ROOT, _env, _harvest_weather_cache, _install_weather_cache
 
 STUDY_DIR = Path(__file__).resolve().parent
 WEATHER_CACHE = STUDY_DIR / "cache" / "open_meteo"
@@ -51,7 +50,7 @@ def _run_logged(command: list[str], env: dict[str, str], log) -> None:
 def run_house(root: Path, args: argparse.Namespace) -> float:
     pack_dir = root / "pack"
     year = int(json.loads((root / "house.json").read_text(encoding="utf-8"))["preisjahr"])
-    env = _env(pack_dir, offline_guard=not args.allow_network)
+    env = _env(pack_dir, offline_guard=not args.allow_network, climate_year=year)
     out_dir = root / "results" / args.run
     out_dir.mkdir(parents=True, exist_ok=True)
     command = [
@@ -120,9 +119,7 @@ def main() -> None:
                 failed.append(house_id)
                 print(f"=== {house_id}: FEHLER {exc}", flush=True)
     if args.allow_network:
-        for src in WEATHER_DST.glob("*.json"):
-            if src.stat().st_mtime >= started_at and not (WEATHER_CACHE / src.name).exists():
-                shutil.copy2(src, WEATHER_CACHE / src.name)
+        _harvest_weather_cache(WEATHER_CACHE, started_at)
     if failed:
         raise SystemExit(f"Fehlgeschlagen: {', '.join(failed)}")
 

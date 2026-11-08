@@ -752,6 +752,66 @@
             "monthly_fee_eur": 3.0,
             "monthly_rates": [
                 {
+                    "year": 2023,
+                    "month": 12,
+                    "tariff_cent_kwh": 12.2
+                },
+                {
+                    "year": 2024,
+                    "month": 1,
+                    "tariff_cent_kwh": 12.2
+                },
+                {
+                    "year": 2024,
+                    "month": 2,
+                    "tariff_cent_kwh": 12.2
+                },
+                {
+                    "year": 2024,
+                    "month": 3,
+                    "tariff_cent_kwh": 12.2
+                },
+                {
+                    "year": 2024,
+                    "month": 4,
+                    "tariff_cent_kwh": 11.95
+                },
+                {
+                    "year": 2024,
+                    "month": 5,
+                    "tariff_cent_kwh": 11.95
+                },
+                {
+                    "year": 2024,
+                    "month": 6,
+                    "tariff_cent_kwh": 11.95
+                },
+                {
+                    "year": 2024,
+                    "month": 7,
+                    "tariff_cent_kwh": 11.95
+                },
+                {
+                    "year": 2024,
+                    "month": 8,
+                    "tariff_cent_kwh": 11.95
+                },
+                {
+                    "year": 2024,
+                    "month": 9,
+                    "tariff_cent_kwh": 11.95
+                },
+                {
+                    "year": 2024,
+                    "month": 10,
+                    "tariff_cent_kwh": 12.2
+                },
+                {
+                    "year": 2024,
+                    "month": 11,
+                    "tariff_cent_kwh": 12.2
+                },
+                {
                     "year": 2024,
                     "month": 12,
                     "tariff_cent_kwh": 12.2
@@ -892,7 +952,7 @@
                     "tariff_cent_kwh": 12.2
                 }
             ],
-            "notes": "Dez 2024 = Normaltarif als Kontinuitaetswert (Sonnenaufgangs-Fenster beginnt am Tag vor dem Lauf-Start 2025-01-01). Vorarlberg (ohne Kleinwalsertal). Strom Duo zum Normalpreis ohne befristeten Sonderrabatt (-2,80 ct netto bis 31.03.2027; rabattierte Variante: at_vkw_strom_duo). Normaltarif 12,20 ct netto (14,64 brutto); reduzierter Sommertarif 11,20 ct netto (13,44 brutto; 1.4.–30.9., taeglich 10–16 Uhr). Als monthly_table: Okt–Mar = 12,20; Apr–Sep = 11,95 (75%×12,20 + 25%×11,20; flache Tageslast, Fenster 6/24 h). Offiziell ab 01.04.2026; fruehere Monate mit Normaltarif fuer SE-Kontinuitaet. Grundpreis 36 EUR/Jahr netto (3,00 EUR/Monat). Quelle: vkw.at Produktblatt Strom Duo, Stand 04/2026.",
+            "notes": "Dez 2024 = Normaltarif als Kontinuitaetswert (Sonnenaufgangs-Fenster beginnt am Tag vor dem Lauf-Start 2025-01-01). Vorarlberg (ohne Kleinwalsertal). Strom Duo zum Normalpreis ohne befristeten Sonderrabatt (-2,80 ct netto bis 31.03.2027; rabattierte Variante: at_vkw_strom_duo). Normaltarif 12,20 ct netto (14,64 brutto); reduzierter Sommertarif 11,20 ct netto (13,44 brutto; 1.4.–30.9., taeglich 10–16 Uhr). Als monthly_table: Okt–Mar = 12,20; Apr–Sep = 11,95 (75%×12,20 + 25%×11,20; flache Tageslast, Fenster 6/24 h). Offiziell ab 01.04.2026; fruehere Monate mit Normaltarif fuer SE-Kontinuitaet. Grundpreis 36 EUR/Jahr netto (3,00 EUR/Monat). Quelle: vkw.at Produktblatt Strom Duo, Stand 04/2026. Dez 2023 bis Nov 2024 (Preisjahr 2024 der Wirtschaftlichkeitsstudie, 08.11.2026) mit demselben Tarifstand 04/2026 fortgeschrieben, kein historischer VKW-Preis 2024.",
             "supplier_id": "vkw"
         },
         {
@@ -1778,6 +1838,66 @@
             },
             "monthly_rates": [
                 {
+                    "year": 2023,
+                    "month": 12,
+                    "tariff_cent_kwh": 6.88
+                },
+                {
+                    "year": 2024,
+                    "month": 1,
+                    "tariff_cent_kwh": 7.43
+                },
+                {
+                    "year": 2024,
+                    "month": 2,
+                    "tariff_cent_kwh": 5.58
+                },
+                {
+                    "year": 2024,
+                    "month": 3,
+                    "tariff_cent_kwh": 4.02
+                },
+                {
+                    "year": 2024,
+                    "month": 4,
+                    "tariff_cent_kwh": 2.52
+                },
+                {
+                    "year": 2024,
+                    "month": 5,
+                    "tariff_cent_kwh": 2.74
+                },
+                {
+                    "year": 2024,
+                    "month": 6,
+                    "tariff_cent_kwh": 3.64
+                },
+                {
+                    "year": 2024,
+                    "month": 7,
+                    "tariff_cent_kwh": 3.67
+                },
+                {
+                    "year": 2024,
+                    "month": 8,
+                    "tariff_cent_kwh": 5.15
+                },
+                {
+                    "year": 2024,
+                    "month": 9,
+                    "tariff_cent_kwh": 5.26
+                },
+                {
+                    "year": 2024,
+                    "month": 10,
+                    "tariff_cent_kwh": 5.59
+                },
+                {
+                    "year": 2024,
+                    "month": 11,
+                    "tariff_cent_kwh": 11.48
+                },
+                {
                     "year": 2024,
                     "month": 12,
                     "tariff_cent_kwh": 12.72
@@ -1893,6 +2013,66 @@
         }
     ],
     "econtrol_referenzmarktwert_pv_monthly": [
+        {
+            "year": 2023,
+            "month": 12,
+            "tariff_cent_kwh": 7.48
+        },
+        {
+            "year": 2024,
+            "month": 1,
+            "tariff_cent_kwh": 8.03
+        },
+        {
+            "year": 2024,
+            "month": 2,
+            "tariff_cent_kwh": 6.18
+        },
+        {
+            "year": 2024,
+            "month": 3,
+            "tariff_cent_kwh": 4.62
+        },
+        {
+            "year": 2024,
+            "month": 4,
+            "tariff_cent_kwh": 3.12
+        },
+        {
+            "year": 2024,
+            "month": 5,
+            "tariff_cent_kwh": 3.34
+        },
+        {
+            "year": 2024,
+            "month": 6,
+            "tariff_cent_kwh": 4.24
+        },
+        {
+            "year": 2024,
+            "month": 7,
+            "tariff_cent_kwh": 4.27
+        },
+        {
+            "year": 2024,
+            "month": 8,
+            "tariff_cent_kwh": 5.75
+        },
+        {
+            "year": 2024,
+            "month": 9,
+            "tariff_cent_kwh": 5.86
+        },
+        {
+            "year": 2024,
+            "month": 10,
+            "tariff_cent_kwh": 6.19
+        },
+        {
+            "year": 2024,
+            "month": 11,
+            "tariff_cent_kwh": 12.08
+        },
         {
             "year": 2024,
             "month": 12,

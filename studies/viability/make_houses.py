@@ -18,10 +18,12 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 from dataclasses import asdict
+from datetime import date
 from pathlib import Path
 
-from studies.poc_cloud.run_poc import _env, _install_weather_cache
+from studies.poc_cloud.run_poc import _env, _harvest_weather_cache, _install_weather_cache
 from studies.viability import params as params_mod
 from studies.viability.appliances import Appliance, appliance_consumer, baseload_target_kwh, build_appliances
 from studies.viability.derive import DerivedHouse, derive_house
@@ -65,13 +67,15 @@ def price_csv_for_year(year: int) -> str:
 
 
 def check_thermal_year(year: int) -> None:
-    """Earnie's thermal model takes its climate from the last full archive year, not the study's."""
+    """Earnie's climate reference (thermal model, baseload, modeled profiles) follows the price year through
+    ``EARNIE_CLIMATE_REFERENCE_YEAR`` in the pack's environment (``_env``), so it must be a full archive year."""
     from data.open_meteo_solar_archive import last_full_archive_year
 
-    if year != last_full_archive_year():
+    latest = last_full_archive_year(reference=date.today())
+    if year > latest:
         raise SystemExit(
-            f"Preisjahr {year} weicht vom letzten vollen Archivjahr {last_full_archive_year()} ab, das "
-            "Waermemodell und Grundlast rechnen. Ein anderes Preisjahr braucht erst eine Anpassung dort."
+            f"Preisjahr {year} ist kein volles Archivjahr (letztes: {latest}); Waermemodell und Grundlast "
+            "brauchen das ganze Klimajahr."
         )
 
 
@@ -297,11 +301,11 @@ def _migrate(config_dir: Path) -> None:
     shutil.rmtree(config_dir / "backups", ignore_errors=True)
 
 
-def inspect_pack(pack_dir: Path, *, offline_guard: bool) -> dict:
+def inspect_pack(pack_dir: Path, *, offline_guard: bool, climate_year: int) -> dict:
     """Load the pack with Earnie in a process of its own and read back what Earnie derives."""
     result = subprocess.run(
         [sys.executable, "-m", "studies.viability.inspect_pack"],
-        cwd=REPO_ROOT, env=_env(pack_dir, offline_guard=offline_guard),
+        cwd=REPO_ROOT, env=_env(pack_dir, offline_guard=offline_guard, climate_year=climate_year),
         capture_output=True, text=True, encoding="utf-8",
     )
     if result.returncode != 0:
@@ -326,7 +330,7 @@ def build_house(house: DerivedHouse, params: dict, out_dir: Path, *, offline_gua
     profile_rows = _load(pack_dir / "config" / "house_profiles.json")["profiles"][0]["consumers"]
     baseload_target = baseload_target_kwh(house.household_kwh, profile_rows)
     for _ in range(BASELOAD_ITERATIONS):
-        report = inspect_pack(pack_dir, offline_guard=offline_guard)
+        report = inspect_pack(pack_dir, offline_guard=offline_guard, climate_year=int(params["preisjahr"]))
         if abs(report["baseload_kwh"] - baseload_target) <= BASELOAD_TOLERANCE_KWH:
             break
         annual = baseload_target + report["consumers_kwh"]
@@ -393,6 +397,7 @@ def main() -> None:
     if not ids:
         raise SystemExit("--ids, --stichproben oder --liste angeben.")
     _install_weather_cache(WEATHER_CACHE)
+    started_at = time.time()
     for house_id in ids:
         if house_id not in houses:
             raise SystemExit(f"Unbekanntes Haus {house_id}. Bekannt: {', '.join(houses)}")
@@ -400,6 +405,8 @@ def main() -> None:
                              offline_guard=not args.allow_network)
         print(f"{house_id}: {record['derived']['pv_kwp']} kWp ({record['derived']['pv_limit']}), "
               f"{record['earnie']['consumers_kwh']:.0f} kWh Verbraucher, {record['earnie']['points']['total']} Punkte")
+    if args.allow_network:
+        _harvest_weather_cache(WEATHER_CACHE, started_at)
 
 
 if __name__ == "__main__":

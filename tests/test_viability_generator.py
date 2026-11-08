@@ -224,8 +224,8 @@ def test_unknown_key_and_missing_fuel_year_fail_loud():
     with pytest.raises(params_mod.ParameterError, match="tippfehler"):
         params_mod.validate(doc)
     doc = _raw_doc()
-    doc["preisjahr"] = 2024
-    with pytest.raises(params_mod.ParameterError, match="2024"):
+    doc["preisjahr"] = 2023
+    with pytest.raises(params_mod.ParameterError, match="2023"):
         params_mod.validate(doc)
 
 
@@ -234,11 +234,24 @@ def test_missing_price_data_fails_loud():
         price_csv_for_year(1999)
 
 
-def test_price_year_other_than_the_thermal_year_fails_loud():
+def test_price_year_must_be_a_full_archive_year():
+    from datetime import date
+
     from data.open_meteo_solar_archive import last_full_archive_year
 
+    latest = last_full_archive_year(reference=date.today())
+    check_thermal_year(latest)
+    check_thermal_year(latest - 1)  # an earlier price year is fine: the pack's environment pins the climate year
     with pytest.raises(SystemExit, match="Archivjahr"):
-        check_thermal_year(last_full_archive_year() - 1)
+        check_thermal_year(latest + 1)
+
+
+def test_pack_environment_pins_the_climate_year_to_the_price_year(tmp_path):
+    from studies.poc_cloud.run_poc import _env
+
+    env = _env(tmp_path, offline_guard=True, climate_year=2024)
+    assert env["EARNIE_CLIMATE_REFERENCE_YEAR"] == "2024"
+    assert env["EARNIE_ENV_PATH"] == str(tmp_path)
 
 
 def _list_file(tmp_path: Path, *houses: dict) -> Path:

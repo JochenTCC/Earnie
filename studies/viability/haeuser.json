@@ -94,8 +94,10 @@
     "pv_min_kwp": 5.0
   },
   "brennstoffpreise": {
-    "_2025": "Plan F7: Oktober 2025, aus Oktober 2026 und der Vorjahresaenderung zurueckgerechnet (Biomasseverband). Gas in ct/kWh, Pellets in EUR/t.",
-    "2025": {"gas": 14.1, "pellets": 343.0}
+    "_2025": "Plan F7: Oktober 2025, aus Oktober 2026 und der Vorjahresaenderung zurueckgerechnet (Biomasseverband). Gas in ct/kWh, Pellets in EUR/t. Bestaetigt durch den Energietraegervergleich Oktober 2025 (Stand 20.10.2025): Gas 14,10, Pellets 6,98 ct/kWh.",
+    "2025": {"gas": 14.1, "pellets": 343.0},
+    "_2024": "Wie 2025: Biomasseverband, Energietraegervergleich Oktober 2024 (Stand 21.10.2024, Quelle proPellets / E-Control; Heizwert, 15.000 kWh Gas, 6 t Pellets): Gas 14,20 ct/kWh, Pellets 6,07 ct/kWh = 297 EUR/t bei 4.900 kWh/t.",
+    "2024": {"gas": 14.2, "pellets": 297.0}
   },
   "heizsysteme": {
     "H1": {"quelle": "heat_pump", "kollektor": false, "heizstab": false, "speicher": true, "huellen": ["neubau", "bestand"]},
