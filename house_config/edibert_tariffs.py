@@ -93,6 +93,19 @@ class EdibertLoadError(ValueError):
             detail = str(exc)
         super().__init__(f"{source}: {detail} (Edibert {self.code}).")
 
+    def __reduce__(self):
+        # Worker processes hand the error back through pickle; the default would replay __init__ with the
+        # finished message alone and fail, hiding the real cause behind a BrokenProcessPool.
+        return (_restore_load_error, (self.args[0], self.code, self.params))
+
+
+def _restore_load_error(message: str, code: str, params: dict[str, Any]) -> "EdibertLoadError":
+    error = EdibertLoadError.__new__(EdibertLoadError)
+    ValueError.__init__(error, message)
+    error.code = code
+    error.params = dict(params)
+    return error
+
 
 def load_tariff_set(tariffs_path: str, user_path: str | None = None) -> api.TariffSet:
     """Catalog and optional user file as one Edibert set (missing user file = no user tariffs)."""
