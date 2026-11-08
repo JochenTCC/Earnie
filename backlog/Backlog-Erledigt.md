@@ -2,6 +2,14 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix Chart 1: battery export up bar during Zwangsentladen (2026-11-08)
+
+- [x] **Chart 1: battery export had no up bar during Zwangsentladen** `[bug]` *(dump `debug_dump_20261030_055437`, 2.7.0-beta.1, Loxone; fixed 2026-11-01 on `main`)*: during Zwangsentladen 5 kW (29.10. 17:15–17:45, Ist −4.2 / −5 / −5 kW) Chart 1 drew „Batterie entladen (Verbrauch)“ above zero only for the house share (~0.4–0.5 kW); the rest (~3.8–4.5 kW) appeared only as „Einspeisung (Batterie)“ below zero. A bug, not a design choice: `docs/ui/charts.md` requires equal up and down columns since the first Rauf/Runter commit (`466decd9`); PV export was always balanced (the PV up bar holds the exported share). No scenario covered battery export, so the balance check never saw it.
+  - **Fix:** `ui/chart_flow_segments.py` adds the up segment „Batterie entladen (Einspeisung)“ (`battery_discharge_export`, same kW as `flows.export_from_battery`, color `MUTED_BATTERY_EXPORT`), stacked on „Batterie entladen (Verbrauch)“; the down bar stays. Trace order in `ui/chart_flow_traces.py` / `ui/chart_flow_balance.py`. Tests: scenario J in `scripts/flow_balance_test_data.py` (balance check), `tests/test_chart_flow_balance.py::test_forced_discharge_export_has_matching_up_segment`. Docs: `docs/ui/charts.md`.
+  - **Not fixed in `release/2.7`** (owner, 2026-11-01); the known-limitation hint is not in the 2.7.0 release notes (maintainer decision, 2026-11-02).
+  - **Verify:** Monitor on a slot with Zwangsentladen into the grid: up and down columns equal height, cyan up segment above the green one.
+  - **Checked (2026-11-08, replay of the original dump with `main` 76239ae7, `scripts.replay_debug_dump`):** in the Zwangsentladen slots of 29.10. the up segment „Batterie entladen (Einspeisung)“ equals „Einspeisung (Batterie)“ below (3.77 / 4.50 / 4.52 kW), cyan on top of the green consumption segment; up and down stacks agree within 0.04 kW, a load share of the data not assigned to any consumer. Not checked live in the Monitor; archived on the maintainer's go (2026-11-08).
+
 ### Bugfix Hauskonfigurator: open without rewrite, keep heating system, plant auto-save (2026-11-08)
 
 - [x] **Hauskonfigurator: opening the page rewrote `house_profiles.json` and claimed „Gespeichert“ (O3)** `[bug]` *(found in the profiling session 2026-11-03, fix committed 2026-11-04, `main` 57fe5a9; live acceptance pending)*: `auto_persist` knew no fingerprint on the first render of a profile, so every open wrote the house file (and `components.json` through the save path), changed the file stamp — which makes other open sessions re-seed their form — and showed „Gespeichert“ three times (profile plus the two plant writers) without any edit.
