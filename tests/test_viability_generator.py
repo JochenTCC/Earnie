@@ -327,11 +327,15 @@ def test_grid_size_and_sample_is_reproducible_and_covers_every_level(params):
             assert sum(h[axis] == level for h in first) >= 10, (axis, level)
 
 
+CLIMATE_FIXTURE_YEAR = 2025  # thermal reference year of the committed climate (tests/fixtures/viability_open_meteo)
+
+
 def _load_pack(pack_dir: Path) -> dict:
     env = {
         **os.environ,
         "EARNIE_ENV_PATH": str(pack_dir),
         "EARNIE_OFFLINE": "1",
+        "EARNIE_CLIMATE_REFERENCE_YEAR": str(CLIMATE_FIXTURE_YEAR),
         "PYTHONUTF8": "1",
         "PYTHONIOENCODING": "utf-8",
     }
@@ -342,10 +346,12 @@ def _load_pack(pack_dir: Path) -> dict:
         "EARNIE_BACKTESTING_SCENARIOS_PATH",
         "EARNIE_COMPONENTS_PATH",
         "EARNIE_TARIFFS_PATH",
+        "EARNIE_OPEN_METEO_CACHE_PATH",
     ):
         env.pop(key, None)
+    # Climate comes from the committed fixture only; CI has no cache and the archive times out there.
     result = subprocess.run(
-        [sys.executable, "-m", "studies.viability.inspect_pack"],
+        [sys.executable, "-m", "tests.fixtures.viability_inspect_offline"],
         cwd=REPO_ROOT, env=env, capture_output=True, text=True, encoding="utf-8",
     )
     assert result.returncode == 0, result.stdout + result.stderr
