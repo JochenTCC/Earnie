@@ -142,7 +142,9 @@ def test_cycles_book_slots_and_close_the_day(ledger):
     assert row is not None
     assert row["day_end"] == datetime(2026, 11, 2, 7, 0, tzinfo=TZ).isoformat()
     assert row["slots_present"] == 1
-    assert row["slots_skipped"] == {sl.SKIP_NO_PRICE: 1}
+    # 94 quarter hours of the day lie before the chain start at 06:30
+    assert row["slots_skipped"] == {sl.SKIP_BEFORE_CHAIN: 94, sl.SKIP_NO_PRICE: 1}
+    assert row["slots_present"] + sum(row["slots_skipped"].values()) == row["slots_total"]
     assert row["chain_start_reason"] == sl.CHAIN_FIRST_RUN
     assert row["flex_planned_kwh"] == {"wp": pytest.approx(0.1)}
     assert row["errors"] == 0

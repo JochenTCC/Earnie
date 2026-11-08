@@ -2,6 +2,14 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix Ledger: unbooked slots missing from slots_skipped (2026-11-08)
+
+- [x] **Ledger: slots without a booked cycle are missing from `slots_skipped`** `[bug]` *(found 2026-11-04 in the Ledger P5 live check; fixed 2026-11-08 on branch `fix/ledger-missing-slots`)*: spec `docs/dev/savings-ledger.md` § 4 counts a slot without its own log entry as skipped and stores the skipped slots per reason in the row. `runtime_store/savings_ledger.py::advance` only records the slots the daemon hook hands it, so a quarter hour without a completed cycle leaves no trace. First live row (SA-day starting 2026-11-02 07:06): `slots_total` 96, `slots_present` 69, `slots_skipped` empty, so none of the 27 missing slots has a reason.
+  - **The 27 slots, reconstructed from the log:** 24 lie before the chain start (07:15–13:00). Two quarter hours have no completed cycle: 15:30 (cause not checked) and 16:30 (inside the `prod_feed_stale` phase 16:29–16:48). One slot is unexplained.
+  - **Proposal:** the day close counts missing slots under their own reasons (for example `before_chain`, `no_cycle`). Costs and shadow SoC stay as they are.
+  - Done when `slots_present` plus the sum of `slots_skipped` equals `slots_total` on every closed day, pinned by a test with a gap in the slots.
+  - **Fix:** `runtime_store/savings_ledger.py::close_day` counts every grid slot of the day without a booked row under `before_chain` (before the chain start) or `no_cycle`. Rows closed before the fix keep their old `slots_skipped` (`--rebuild` recomputes them). Spec `docs/dev/savings-ledger.md` § 4; tests `tests/test_savings_ledger_day.py` (gap and missing tail), `tests/test_savings_ledger_daemon.py`.
+
 ### Bugfix SE: generic flex consumer whose cycle did not fit the book (2026-11-08)
 
 - [x] **SE: a generic flex consumer whose cycle did not fit the book made the whole step infeasible** `[bug]` *(found 2026-11-07 in the viability study, `packs_stufe1d_app`; fixed 2026-11-07 on `main`)*: the first SE book runs from the period start to SA₂ (00:00 to 08:00). A CSV-backed flex appliance whose run started at 07:00 (2.5 h) got the book target 0.36 kWh, but inside the book only the four slots 07:00 to 07:45 were eligible while `min_on_quarterhours` asked for a block of ten and `block_flex_outside_book` forced the rest to 0. `_max_deliverable_kwh` counted slots, not blocks, so the delivery constraint `≥ 0.36 kWh` was infeasible; the strict solve failed, the gap fallback cannot help against infeasibility, and every hourly step of that book booked `_AUTOMATIK_FALLBACK` (192 fallbacks per scenario in G1112 and G2296, L2 − L3 of G2296 on 1 January off by 2.8 €).

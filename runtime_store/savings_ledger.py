@@ -42,6 +42,9 @@ SKIP_NO_POWER = "no_power"
 SKIP_NO_PRICE = "no_price"
 SKIP_DEAD_TELEMETRY = "dead_telemetry"
 SKIP_ERROR = "error"
+# Slots of the day that were never booked (counted only at the day close, spec § 4).
+SKIP_BEFORE_CHAIN = "before_chain"
+SKIP_NO_CYCLE = "no_cycle"
 
 
 @dataclass(frozen=True)
@@ -460,19 +463,40 @@ def _slot_row(inp: LedgerInput, slot: LedgerSlot, dt_h: float) -> dict[str, Any]
     return row
 
 
-def _slots_in_day(day_start: datetime, day_end: datetime, dt_h: float) -> int:
+def _grid_slot_starts(day_start: datetime, day_end: datetime, dt_h: float) -> list[datetime]:
     """Slot starts in ``[day_start, day_end)`` on the quarter-hour grid."""
     step = timedelta(hours=dt_h)
     minutes = int(step.total_seconds() // 60)
     first = day_start.replace(minute=(day_start.minute // minutes) * minutes, second=0, microsecond=0)
     if first < day_start:
         first += step
-    count = 0
+    starts = []
     moment = first
     while moment < day_end:
-        count += 1
+        starts.append(moment)
         moment += step
-    return count
+    return starts
+
+
+def _slots_in_day(day_start: datetime, day_end: datetime, dt_h: float) -> int:
+    """Number of slot starts in ``[day_start, day_end)`` on the quarter-hour grid."""
+    return len(_grid_slot_starts(day_start, day_end, dt_h))
+
+
+def _unbooked_slot_reasons(state: LedgerState, dt_h: float) -> dict[str, int]:
+    """Grid slots of the open day without a booked slot row, per reason.
+
+    A slot before the chain start is ``before_chain``; any other slot without a
+    row had no completed cycle (``no_cycle``).
+    """
+    booked = {datetime.fromisoformat(str(s["slot_start"])) for s in state.slots}
+    reasons: dict[str, int] = {}
+    for moment in _grid_slot_starts(state.day_start, state.day_end, dt_h):
+        if moment in booked:
+            continue
+        reason = SKIP_BEFORE_CHAIN if moment < state.chain_start else SKIP_NO_CYCLE
+        reasons[reason] = reasons.get(reason, 0) + 1
+    return reasons
 
 
 def _sum_flex(rows: list[dict[str, Any]], key: str) -> dict[str, float]:
@@ -525,7 +549,7 @@ def close_day(
         correction = energy_kwh * p_ref / 100.0
     saving = cost_without - cost_with
     coverage = len(counted) / slots_total if slots_total else 0.0
-    skipped: dict[str, int] = {}
+    skipped = _unbooked_slot_reasons(state, dt_h)
     for s in state.slots:
         if not s["counted"]:
             skipped[s["skip_reason"]] = skipped.get(s["skip_reason"], 0) + 1

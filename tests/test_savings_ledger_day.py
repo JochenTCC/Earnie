@@ -144,6 +144,33 @@ def test_incomplete_day_is_flagged_and_counted():
     assert total["saving_adjusted_eur"] == pytest.approx(row["saving_adjusted_eur"])
 
 
+def test_unbooked_slots_are_skipped_before_chain_or_without_cycle():
+    """Live row 2026-11-02: slots before the chain start and quarter hours without a cycle left no trace."""
+    slots = _slots(DAY1)
+    chain_start = 24  # chain starts at 13:00
+    gaps = {34, 38}  # 15:30 and 16:30 without a completed cycle
+    inputs = [_inp(s, _closed()) for i, s in enumerate(slots) if i >= chain_start and i not in gaps]
+    inputs.append(_inp(DAY1 + timedelta(days=1), _closed()))
+    _, rows = _run(inputs)
+
+    (row,) = rows
+    assert row["slots_total"] == 96
+    assert row["slots_present"] == 70
+    assert row["slots_skipped"] == {sl.SKIP_BEFORE_CHAIN: 24, sl.SKIP_NO_CYCLE: 2}
+    assert row["slots_present"] + sum(row["slots_skipped"].values()) == row["slots_total"]
+    assert row["errors"] == 0
+
+
+def test_missing_tail_of_the_day_counts_as_no_cycle():
+    inputs = [_inp(s, _closed()) for s in _slots(DAY1, 90)]
+    inputs.append(_inp(DAY1 + timedelta(days=1), _closed()))
+    _, rows = _run(inputs)
+
+    (row,) = rows
+    assert row["slots_skipped"] == {sl.SKIP_NO_CYCLE: 6}
+    assert row["slots_present"] + sum(row["slots_skipped"].values()) == row["slots_total"]
+
+
 def test_day_without_import_uses_the_time_mean():
     inputs = []
     for i, s in enumerate(_slots(DAY1)):

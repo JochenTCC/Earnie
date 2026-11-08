@@ -32,10 +32,6 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## New Bugs (Do not remove this chapter — even if empty)
 
-- [ ] **Ledger: slots without a booked cycle are missing from `slots_skipped`** *(found 2026-11-04 in the Ledger P5 live check)*: spec `docs/dev/savings-ledger.md` § 4 counts a slot without its own log entry as skipped and stores the skipped slots per reason in the row. `runtime_store/savings_ledger.py::advance` only records the slots the daemon hook hands it, so a quarter hour without a completed cycle leaves no trace. First live row (SA-day starting 2026-11-02 07:06): `slots_total` 96, `slots_present` 69, `slots_skipped` empty, so none of the 27 missing slots has a reason.
-  - **The 27 slots, reconstructed from the log:** 24 lie before the chain start (07:15–13:00). Two quarter hours have no completed cycle: 15:30 (cause not checked) and 16:30 (inside the `prod_feed_stale` phase 16:29–16:48). One slot is unexplained.
-  - **Proposal:** the day close counts missing slots under their own reasons (for example `before_chain`, `no_cycle`). Costs and shadow SoC stay as they are.
-  - Done when `slots_present` plus the sum of `slots_skipped` equals `slots_total` on every closed day, pinned by a test with a gap in the slots.
 - [ ] **Ledger: negative saving on the first live SA-days, cause not checked** *(found 2026-11-04 in the Ledger P5 live check; shadow on the maintainer's plant, driven by the 2.7 instance)*: the actual plant cost more than the shadow battery in vendor mode on both closed days. The ledger only reports this; the plan behind it was not examined.
   - **SA-day starting 2026-11-02 (coverage 0.72):** cost 7.43 € with, 6.33 € without, saving −1.10 €, adjusted −0.49 €, import 19.9 / 17.0 kWh, end SoC actual 17 % / shadow 5 %.
   - **SA-day starting 2026-11-03 (coverage 1.00):** cost 12.13 € with, 11.49 € without, saving −0.64 €, adjusted −0.69 €, import 29.4 / 27.6 kWh, end SoC actual 15 % / shadow 5 %.
