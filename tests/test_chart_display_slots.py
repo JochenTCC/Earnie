@@ -33,6 +33,22 @@ def test_align_rows_to_display_slots_splits_hour_into_quarters():
     assert [row["slot_datetime"] for row in rows] == list(slots)
 
 
+def test_align_rows_to_display_slots_uses_quarter_rows_of_a_plan_starting_mid_hour():
+    """A plan from *Jetzt* (18:15) has no 18:00 row; each quarter keeps its own value."""
+    plan = [
+        {"slot_datetime": _dt(18, 15), "Simulierter SoC (%)": 9.4},
+        {"slot_datetime": _dt(18, 30), "Simulierter SoC (%)": 7.9},
+        {"slot_datetime": _dt(18, 45), "Simulierter SoC (%)": 5.8},
+        {"slot_datetime": _dt(19, 0), "Simulierter SoC (%)": 5.0},
+        {"slot_datetime": _dt(19, 15), "Simulierter SoC (%)": 4.5},
+    ]
+    slots = (_dt(18, 0), _dt(18, 15), _dt(18, 30), _dt(18, 45), _dt(19, 0), _dt(19, 15))
+    rows = align_rows_to_display_slots(plan, slots)
+    assert pd.isna(rows[0].get("Simulierter SoC (%)"))
+    assert [row["Simulierter SoC (%)"] for row in rows[1:]] == [9.4, 7.9, 5.8, 5.0, 4.5]
+    assert [row["slot_datetime"] for row in rows] == list(slots)
+
+
 def test_align_hourly_increments_splits_hour_evenly():
     from data.planning_window import compute_ui_chart_window
 

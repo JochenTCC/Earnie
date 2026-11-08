@@ -467,17 +467,24 @@ def align_rows_to_display_slots(
     sim_rows: list[dict],
     slot_datetimes: tuple[datetime, ...],
 ) -> list[dict]:
-    """Stündliche MILP-Zeilen auf beliebige Display-Slots (inkl. Viertelstunden) abbilden."""
-    by_hour: dict[datetime, dict] = {}
+    """MILP-Zeilen auf beliebige Display-Slots (inkl. Viertelstunden) abbilden.
+
+    A row for the exact slot wins; only without one does the row of the full hour fill
+    the slot (hourly rows). Quarter-hour plans start at *Jetzt*, e.g. 18:15: looking up
+    the hour alone found no 18:00 row and left 18:15-18:45 empty (gap in SoC BL Ziel).
+    """
+    by_slot: dict[datetime, dict] = {}
     for row in sim_rows:
         slot = _row_slot(row)
         if slot is not None:
-            by_hour[slot] = row
+            by_slot[slot] = row
     aligned: list[dict] = []
     for slot in slot_datetimes:
-        hour = normalize_hour_slot(slot)
-        if hour in by_hour:
-            aligned.append(_quarter_row_from_milp(by_hour[hour], slot))
+        row = by_slot.get(slot)
+        if row is None:
+            row = by_slot.get(normalize_hour_slot(slot))
+        if row is not None:
+            aligned.append(_quarter_row_from_milp(row, slot))
         else:
             aligned.append(_empty_chart_row(slot))
     return aligned
