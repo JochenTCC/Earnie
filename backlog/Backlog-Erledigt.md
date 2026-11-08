@@ -2,6 +2,165 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Heating rod in the SE: cap by the store (2026-11-07)
+
+- [x] **Heating rod in the SE: cap by the store's free capacity** `[feat]` *(from Live control of the heating rod)*: the SE capped the rod by the day's heat demand per matrix date, so a store took more rod heat than it could hold, and a sunny day could not store heat for the next one. Live is unchanged.
+  - **Balance:** `optimizer/rod_store.py`. Rod heat (η = 1) fills a level, the main source's heat of the year model empties it, spread evenly over the day. The level stays between 0 and volume × `tolerance_c` on every book slot, in the MILP as one continuous variable per slot (`_add_rod_store_balance`, no new binaries). A day without source heat keeps the rod off. Beside an electric source the day's heat stays a further cap.
+  - **Across windows:** the level carries like the SoC, in L3 (`simulation/engine.py`, `anchor_step.rod_store_levels_after_window`) and in L2 (`SurplusRod`, same balance). A window outside a chain starts with an empty store. A window snapshot does not hold the level, so a replay of one rod window starts empty.
+  - **Assumptions, each overstating the rod a little:** the whole band counts as free when the level is empty, though a real source also fills it; a store held hotter loses more heat, not modeled.
+  - **Measured (S7 gas 906 l, S8 pellets 776 l, both 30 K, new store, year, without the look-ahead and base-level switches), L2 − L3 with fuel, Duo / Dynamisch:** S7 204.05 → 197.09 € / 312.58 → 294.88 €, S8 52.99 → 46.27 € / 80.80 → 81.72 €. Rod heat rises, since these stores hold more than the old day cap allowed: S7 L3 2655 → 2728 kWh / 3964 → 4054 kWh, L2 1648 → 1763 kWh; S8 L3 2826 → 2937 kWh / 2449 → 2629 kWh, L2 2408 → 2542 kWh. An ex-post balance over the booked series finds no slot above the store now; before it was up to 818 slots (S7 Duo, level 44 kWh in a 31.6 kWh store). Only these two houses; the pack is not rebuilt yet.
+  - **Days with more rod heat than demand (finding of 2026-11-06):** the old prorated cap counted the slots of the whole matrix, so a date booked in two windows could get more than one day of heat. On 4 rod houses of stage 1 this fits the excess: where it was largest, rod heat before 08:00 exceeded it (G1192 Dynamisch 61 kWh excess, 104 kWh before 08:00; G2547 Dynamisch 73 and 91 kWh). Not proven per day. Such days now remain on purpose, as stored heat, and their number rises (S7 Dynamisch 39 → 58, S8 Dynamisch 0 → 49); the rod's total stays within source heat plus one store.
+  - **Regression:** all 12 cases pass unchanged, no case has a rod, so no triage and no golden update. No regression case covers the new path; the tests do.
+  - **Docs:** `flexible-verbraucher.md`, `heating-system-variants.md`, `rule-based-reference.md`, release-note draft.
+  - **Tests:** `tests/test_rod_store.py`, `tests/test_reference_ladder_rod.py`, `tests/test_heat_source.py`, `tests/test_heating_system_variants.py`.
+  - **Follow-up:** **Heat pump in the SE: the store does not limit the shift** ([Backlog](Backlog.md)).
+
+### Edibert grid fixed fees in house profile and SE invoice (2026-11-07)
+
+- [x] **Edibert grid fixed fees in house profile and SE invoice** `[feat]` *(2026-10-31, left from the pin v0.1.12)*: Earnie read none of the grid area's fixed amounts, so 76.82 EUR/year net were missing from every SE total, and a fee moved there by the migration was no longer shown.
+  - **Invoice and totals:** `simulation/monthly_fees.py::grid_fixed_parts` reads `GridFee.fixed`: one twelfth per calendar month with the import tariff's VAT, as in Edibert's `grid_fixed_month_eur` (not in its public API, so Earnie has the same one line). `ScenarioFeeBreakdown.grid_monthly_eur` keeps its name, so the log shape stays. Each amount has its line under "Netznutzung", the sum its line under "Jahr". Reference and ladder series bill the same amounts.
+  - **Dropped:** `grid_monthly_fee_eur` from `monthly_fees.py`, `tariffs_store.py`, `tariff_parameter_preview.py` and `tariffs.schema.json`. Edibert has rejected the field on load since `v0.1.12`, so these paths always read 0. `tf1.tariff_format` still moves it.
+  - **House profile:** the caption under a grid area names its per-kWh parts and fixed amounts.
+  - **"Eigener Arbeitspreis" (decided here, no maintainer decision yet):** saving the form replaced the whole area and so dropped time rules, fixed amounts and a migrated fee. It now changes only work price, label and land. The form gets no rule editor: rules go in `user_grid_fees.json`, and a caption shows what the area holds.
+  - **VAT on tariff fees (maintainer's decision):** monthly fees of net tariffs now get their tariff's VAT, as in Edibert's `monthly_fees_eur`, so `awattar_at` counts 5.75 EUR instead of 4.79 EUR a month. Missing VAT facts on a fee are an error. An export tariff with 0 % VAT keeps its fee net, so a supplier that only appears on the export side stays too low.
+  - **Docs:** `preise.md`, `tarife-quellen.md`, user manual, release-note draft.
+  - **Tests:** `tests/test_monthly_fees.py`, `tests/test_edibert_p3b.py`, `tests/test_edibert_p2.py`, `tests/apptest/test_house_profile_grid_fixed_apptest.py`.
+
+### Grid catalog: grid loss, levies and fixed amounts (2026-11-07)
+
+- [x] **Complete the catalog's grid areas** *(from **Edibert grid fixed fees**, decided 2026-11-07, maintainer)*: `share/config/grid_fees.json` held only the work price of its 14 areas, so `k_act` was too low.
+  - **Values:** read from the regulations on RIS: BGBl. II Nr. 305/2025 (work price, flat fee, grid loss), Nr. 301/2025 (renewables contribution, also 3.796 EUR on the flat fee), Nr. 416/2024 (flat fee of 19.02 EUR), BGBl. I Nr. 95/2025 through its summaries (electricity levy at the household rate of 0.1 ct/kWh, limited to 2026). The statute itself, the rate from 2027 and who bills the levy were not confirmed. Fixed amounts: 76.82 EUR/year.
+  - **Prices:** import rises by 1.34 ct/kWh gross in Vorarlberg and 1.70 ct/kWh in Vienna. SNAP takes its 20 % off the work price only.
+  - **Invoice:** the per-kWh parts have their own line, apart from the supplier.
+  - **Study:** `make_houses` no longer adds surcharges; the catalog holds the same 1.113 ct net. The net grid price is the same in all 35,040 slots of the price year.
+  - **Existing installs (maintainer's decision):** wizard step `tf1.grid_area_levies`, an Earnie step because the format stays the same, with its values frozen. An edited work price gets a question per area; "Nicht ergänzen" writes `components: []`. `attended_only` keeps it out of recorder replay and pack import, so recorded plans keep their prices; an imported pack meets it in the wizard.
+  - **Tests:** `tests/test_migration_grid_area_levies.py`, `tests/test_catalog_frozen.py`, fixture `v5_pre_grid_levies`. `tests/fixtures/backtesting/grid_fees.json` keeps its work prices with `components: []`, so the suite's prices stay as pinned. All 12 regression cases pass with no golden changed, as they do not price with the seed. Dry run and run on a temporary copy of a real site pack: no question, one step.
+
+### Bugfix — SoC base level charged from the grid up to the level (2026-11-07)
+
+- [x] **SoC base level: the plan charged from the grid up to the level** *(found by the prototype's tests; SE prototype behind `EARNIE_BASE_LEVEL`, off by default, on in the study's stage 1)*: the value of the energy held at SA₂ was below the cheapest buy price, which was taken to mean the level comes from PV only. But it is a bonus on the SoC at SA₂, and the same energy can still replace an import past SA₂, so value and use add up and grid charging paid. Battery at minimum, no PV, flat 20 ct, load past SA₂: 4.2 kWh charged from the grid, none without the level.
+  - **Fix:** `optimizer/milp_horizon_extras.py::_base_level_pv_energy`: only energy that did not come from the grid since the plan's start earns the value. It grows by what PV can charge beyond the load and falls with the SoC. A plan starts at its SoC hold, and the energy there counts in full, as its origin is not known. Two continuous variables per slot up to SA₂, only with the level on. Grid charging that pays by itself is not blocked. More than one battery now stops with an error; before, only the first one was held.
+  - **Off by default:** without `EARNIE_BASE_LEVEL` no variable is added.
+  - **Limits:** PV counts beyond the load without flex, so PV that runs a flex load while the grid charges the battery still earns the value. Energy charged from the grid in an earlier window counts in full at the next start.
+  - **Tests:** `tests/test_se_prototype_switches.py`. The effect on a study house is under **SoC base level** in `Backlog.md`.
+
+### HA carrier: fail-safe values for every written signal (2026-11-07)
+
+- [x] **HA carrier: fail-safe values for every written signal** `[feat]` *(follow-up of GitHub #60)*: a discharge lock (`set_ess_discharge_power_limit` = 0) stayed active while Earnie was down, because the watchdog of the generated package only released a forced active power. Fallback behaviour stays device-specific, so the user enters the values. HA only; Loxone and others keep their own logic. Modes and defaults from the house configuration are **HA carrier: fail-safe for modes and defaults** under Version 2.+1.
+  - **Storage:** `plant.ha_fail_safe_values`, qualified write ID → value in EHAL units (`house_config/ha_fail_safe.py`), next to `plant.ha_ess_force`. Not in `ehal_bindings`, whose values are activation flags on several entity kinds. An optional key that an old file simply lacks reshapes nothing, so there is no migration step and no version bump.
+  - **Package:** `integrations/ha_carrier_yaml.py::_watchdog_automation` writes the values through the same Jinja conversion as the setpoints; an unknown unit is logged and that signal skipped. Without a value the package stays byte-identical. A value alone now creates the watchdog, also without `set_ess_active_power`. A value for the active power replaces the release to 0.
+  - **Which signals:** those with a physical unit (`ha_units.FIELD_QUANTITY`), so no modes or `set_enable`. The active power is not offered with `ha_ess_force`. A saved value without a usable signal fails the generation with a message; saving the form removes it.
+  - **UI:** form on EHAL-Com → HA Push-Carrier (`ui/ha_carrier_download.py`); it saves together, so an entry is not persisted until the button.
+  - **Not checked:** not run in a real Home Assistant. The YAML is parsed and the conversion rendered with plain Jinja in the tests, with `is_number` stubbed.
+  - **Tests:** `tests/test_ha_fail_safe.py`, `tests/apptest/test_persist_ha_fail_safe_apptest.py`. **Docs:** `docs/einrichtung/ha-evcc.md` (an imported package keeps the old watchdog until it is imported again), `docs/referenz/ehal.md`, `.github/release-notes/UNRELEASED.md`.
+
+### Ledger P11 — Chart 1 baseline from the shadow chain (2026-11-07)
+
+- [x] **Ledger P11 — Chart 1 baseline from the shadow chain** `[fix]`: spec [`docs/dev/savings-ledger.md`](../docs/dev/savings-ledger.md) § 5. "SoC BL Ziel" no longer restarts from the live SoC in every cycle, which removes D1 from Chart 1 as well. This closes the epic's work in 2.8; P9–P10 are under Version 2.+1.
+  - **Past:** the open day's `shadow_soc_end` per slot (`ui/chart_ledger_savings.py`, already in the state, so no state change). Closed days are not drawn, as paging back shows no BL line anyway.
+  - **Horizon:** `savings_ledger_daemon.planning_shadow_soc` steps the chain over the slot the cycle just closed without saving, because `main.py` plans before `on_cycle` books it. All baselines of `calculate_optimization_savings` start there (`baseline_initial_soc`), the plan keeps the live SoC. `add_ledger_baseline_soc_trace` draws one line without an anchor at *Jetzt*.
+  - **Horizon costs:** `soc_correction_increments_euro` uses the ledger formula with `p_ref` from the plan's import. **Differs from the item's wording:** it values the SoC gap at the end minus the gap at the start, not the end alone. With the end alone, a plan that just uses its start energy would show that energy as a saving, although the ledger's open-day correction has already credited it. `savings_matched_euro` and `savings_euro` include it; the slot series do not, so Chart 2 shows it as the label "SoC am Ende".
+  - **No chain:** all runs start at the live SoC and say so (`baseline_start_source: live_soc`). Chart 1 draws no line and shows a hint; Chart 2 keeps its plan figures, which then compare two runs from the same start.
+  - **Scenario Explorer:** unchanged, it has no ledger and keeps the line anchored at *Jetzt*.
+  - **Not checked:** not run on a live plant; Chart 1 and Chart 2 are covered by figure tests, not looked at in the running UI.
+  - **Tests:** `tests/test_ledger_p11_chart1_baseline.py`. **Docs:** `docs/ui/charts.md`, `docs/dev/savings-ledger.md`, `.github/release-notes/UNRELEASED.md`.
+
+### Decimal separator for non-currency numbers (2026-11-06)
+
+- [x] **Decimal separator for non-currency numbers** `[feat]`: kWh, kW and % follow the viewer's browser language like euro amounts, in text, charts and tables.
+  - Text: `format_decimal` and the new `format_general` (`:g`) replace the decimal f-string fields under `ui/`. Left out: `ui/ehal_write_test.py` (whole-number constants) and the cache key in `ui/house_config_historical_csv.py`.
+  - Charts: `localized_figure` around every `st.plotly_chart` figure; `tests/test_number_format.py` fails on a new call without it.
+  - Tables: numeric columns of the consumer table and the price forecast holdout table use `localized_number_column` and still sort as numbers. Their format comes from the browser's locale, so a browser in neither language can differ from the text. The simulation table sets the separator through its Styler. Tables that were already text columns get the formatted text.
+  - Edibert `v0.1.14`: `format_general`, `edibert.ui.number_columns.localized_number_column`. Pin raised to `v0.1.14`.
+  - Not covered: `st.number_input` writes its printf format with a point; `.0f` values have no decimals; `_kwh` in `ui/house_config_heating_change.py` keeps its German thousands point for every viewer.
+  - Docs: `docs/ui/charts.md`, user manual, `.github/release-notes/UNRELEASED.md`, `docs/dev/edibert-integration.md`.
+
+### Live price prognosis — Energy-Charts trial, moved from Backlog.md (2026-11-06)
+
+- [x] **Live price prognosis — Energy-Charts `public_power_forecast` trial** `[dev]`: unsuccessful, dropped on 2026-10-02 in `f82da60e`. Product power features remain archive hour-of-day.
+  - The branch `archive/energy-charts-forecast-research` named in the old entry no longer exists, locally or on `origin`. The full implementation, including async `runtime/cache` warmup, is in the history at `f82da60e^`.
+
+### RuleRef follow-up — Fuel cost in the ladder and study export (2026-11-06)
+
+- [x] **RuleRef follow-up — Fuel cost in the ladder and study export** `[feat]`: spec [`docs/dev/rule-based-reference.md`](../docs/dev/rule-based-reference.md) § 5, O4, O5.
+  - `reference_ladder_summary.csv` and `reference_ladder_daily.csv` carry per step `l*_fuel_eur`, `l*_total_eur` and the quantities import, export, fuel, rod and battery throughput. `saving_l2_l3_with_fuel_eur` and `rule_share_with_fuel` compare electricity plus fuel; `saving_l2_l3_eur` and `rule_share` stay electricity only. The forecast columns and the sensitivity file carry fuel too, and "best in hindsight" now counts it. L0–L2 must match between perfect and forecast run in fuel as well.
+  - `simulation/heat_fuel.py` writes the fuel per day into the log (`heat_fuel.<result>.daily`), so a log from before this change fails loud in the daily export and needs a new run. Daily fuel is not floored: in L3 a rod can deliver more heat than its day needs, and only the period's total is floored. L1 and L2 already had the block.
+  - Measured on `results/rod` (S7, S8), L2 − L3 with fuel without the end-SoC term, Duo / Dynamisch: S7 +149 / +313 €, S8 +22 / +98 €; the new code reproduces the logged fuel on every step. The L3 rod delivers more heat than its calendar day needs on 17 / 36 days in S7 and 0 / 3 in S8, cause not examined. A floor per day would raise L3's fuel by up to 23 € (S7 Dynamisch), so **Heating rod in the SE: cap by the store's free capacity** should check this if stage 1 depends on the rod.
+  - A real S7 run over July with the sensitivity: daily fuel and rod sum to the summary on every step, and the sensitivity worker's L2 fuel equals the log's.
+  - `studies/poc_cloud/run_poc.py::_summarize` is unchanged: the study reads the ladder CSVs.
+  - Tests: `tests/test_reference_ladder_export.py`, `tests/test_se_forecast_mode.py`. Docs: `docs/ui/betriebsmodi.md`, `docs/dev/se-forecast-mode.md`, `studies/viability/anleitung-parameter.md`, `.github/release-notes/UNRELEASED.md`.
+
+### Viability study — drop H3 (heat pump with rod) (2026-11-06)
+
+- [x] **Viability study — drop H3 (heat pump with rod)** `[dev]`: a heat pump with a rod will not be an allowed configuration.
+  - Removed from `studies/viability/haeuser.json`, and S5 from the sample. `params.py::validate_heating_system` rejects the combination when the file loads, and `derive_house` and `all_houses` reject it too. The house space drops from 3,456 to 2,688 combinations. IDs H5–H7 and S6–S8 keep their numbers. The built pack `studies/viability/packs_s1/S5` stays on disk.
+  - Tests: `tests/test_viability_generator.py` (generator rejects the combination; the sample and the 60-house draw cover every level).
+
+### Viability study — house generator on data model 5 (2026-11-06)
+
+- [x] **Viability study — house generator on data model 5 with derived houses** `[dev]`: `studies/viability/make_houses.py`, `derive.py`, `params.py`, `haeuser.json`, `run_houses.py`.
+  - Packs on data model 5 with free axes and derived values, each rule and value in the parameter file; invalid combinations fail loud. Commuter and at-home EV pattern, price year read by generator and runner, stratified sample with a fixed seed.
+  - `backtesting_year` in the log now follows the run's start.
+  - Limit: a price year other than the last full archive year fails loud, because the thermal model and baseload still use that archive year (`check_thermal_year`).
+  - Tests: `tests/test_viability_generator.py`. Sample packs S1–S8 ran a full year. Follow-up: **Viability study — drop H3**.
+
+### RuleRef follow-up — L2 PV surplus rule for the heating rod (2026-11-06)
+
+- [x] **RuleRef follow-up — L2 PV surplus rule for the heating rod** `[feat]`: spec [`docs/dev/rule-based-reference.md`](../docs/dev/rule-based-reference.md) §§ 3.1, 4.1, 4.3, O2, O4.
+  - L2 runs a rod beside a fuel source on the export left at the meter, after all consumers and the battery in both surplus priorities, on / off at nominal power, within the MILP's window and day heat cap (`optimizer/sim_baseline.py::SurplusRod`, `simulation/reference_ladder.py::_surplus_rods`). No price check, lock or deadline. L1 stays at 0 kWh.
+  - Decision (maintainer, 2026-11-06): a heat pump with a rod will not be an allowed configuration, checked elsewhere, so L2 has no rule for it and such a rod stays at 0 kWh. Study house S5 still has this combination.
+  - Measured on sample houses S7 (gas) and S8 (pellets), year run: the rod runs 1,664 and 2,362 kWh in L2, no plausibility failures. Electricity only, L2 − L3 on Duo / Dynamisch: S7 +1 / −83 €, S8 −71 / +86 € (before −108 / −119 and −225 / −17 €). With fuel from the log: S7 +149 / +313 €, S8 +22 / +98 €.
+  - Tests: `tests/test_reference_ladder_rod.py`. Docs: `docs/ui/betriebsmodi.md`, `.github/release-notes/UNRELEASED.md`.
+
+### SE forecast mode — plan on forecasts, book on actuals (2026-11-05)
+
+- [x] **SE forecast mode** `[dev]`: spec [`docs/dev/se-forecast-mode.md`](../docs/dev/se-forecast-mode.md), RuleRef decision O1. A run plans each window from what was known then and books on actuals, giving the lower end of the L3 range; perfect foresight stays the upper end.
+  - Plan inputs, each switchable (`--plan-forecast price,pv,load`): prices as of SA₁ with `mirror` or `forecast`; PV from Open-Meteo Previous Runs (forecast 24 h earlier), scaled per calendar month to the booked PV (maintainer decision); baseload from the profile. Flex targets stay actual.
+  - Booking: `simulate_horizon(booking_matrix=...)` applies the schedule to actual rows through the live battery control mapping; flex runs at the planned power.
+  - Export: `run_reference_ladder` runs both and adds `*_forecast` columns; `run_houses --forecast-price-strategy`.
+  - Tests: `tests/test_se_forecast_mode.py`. Checked on one study house for February and June 2025.
+  - Open for the study: the January run needs a price file that starts before the year (spec § 3.5).
+
+### SUSI P1 follow-up — Live control of the heating rod (2026-11-05)
+
+- [x] **SUSI P1 follow-up — Live control of the heating rod** `[feat]` *(branch `feat/heating-rod-live-control`)*: Live plans and switches the rod part once its signals are bound. Design note: [heating-system-variants.md](../docs/dev/heating-system-variants.md) § Heating rod with measured data.
+  - **Bindings:** `consumers[].heating_rod_ehal_bindings`, keys `heatpump.<consumer_id>_heating_rod.{set_enable,sens_power_act,sens_consumer_active}` (`house_config/heating_rod_bindings.py`). A map of its own, not `ehal_bindings`: `canonicalize_consumer_bindings` and `marker_flex_enable` would treat the rod's keys as the heat source's own. Optional field, no migration step. Signal catalog, push sources, mapping page, rename and clear-names know it; the rod is an EHAL entity of its own (`consumer_namespace`: `heating_rod` → `heatpump`).
+  - **Gate (decided 2026-11-05):** Live plans the rod only with `set_enable`, `sens_power_act` or `sens_consumer_active`, and the store temperature; otherwise target 0 and one log line per cycle (`missing_live_signals`).
+  - **Cap (decided 2026-11-05):** Live only. Rod heat ≤ store plan `opp_cap` × efficiency on the first calendar day, also beside a fuel source. The SE keeps the day heat cap, so SE results and goldens do not change.
+  - **Pulse limit:** at most 4 starts per day in Live (`_add_live_rod_pulse_limit`), none in the SE.
+  - **Live power:** `_read_consumer_meter_kw` reads the rod's meter as kW, or run state × nominal power; before, `sens_consumer_active` was not read at all and a kW value was read as 0/1.
+  - **Fail-safe (decided 2026-11-05):** none on the Earnie side. Over-temperature and outage behaviour belong to the smart home (German docs).
+  - **Tests:** `tests/test_heating_rod_live.py`.
+  - **Verify:** not yet on real hardware or HouseSim; with a bound rod check the release in the Live log, the store cap and the Grundlast while the rod runs.
+
+### Account view P3 — Longer periods on the analysis page (2026-11-05)
+
+- [x] **Account view P3 — Longer periods on the analysis page** `[feat]`: spec [`docs/dev/chart2-account-view.md`](../docs/dev/chart2-account-view.md) §§ 6, 9.
+  - "Analyse Verbrauch & Kosten" shows the account view of the page's 7 / 28-day window above the log analysis (`render_period_account_chart`), entirely from the ledger, anchored at the window end, with its own switch state.
+  - Decisions: spec § 6 item 1 — a lower panel with the saving since the window start alone (green / red, own scale) instead of the consumption control; item 2 — 0 € at the window start, as in the Monitor; periods follow the page's selector.
+  - Only incomplete days are marked; a caption sums the SoC corrections of the closed days fully in the window. Orange slots are merged into runs (also in the Monitor).
+  - Tests: `tests/test_chart_account_view.py` (period part), `tests/apptest/test_period_account_apptest.py`.
+  - Docs: user manual § Analyse Verbrauch & Kosten, `docs/ui/charts.md`, page help text, `.github/release-notes/UNRELEASED.md`.
+
+### Account view P2 — Monitor and SE window show the account view (2026-11-05)
+
+- [x] **Account view P2 — Monitor shows the account view** `[feat]`: spec [`docs/dev/chart2-account-view.md`](../docs/dev/chart2-account-view.md) §§ 3–5, 8.
+  - `ui/chart_account_view.py` (pure: balances, anchoring "Ist bei Jetzt" / "Gemeinsamer Start", signed gap, gap runs split at crossings, consumption control zero at the horizon end, energy-difference flag) and `ui/chart_account_render.py` (money panel with green/red gap and labels without a sign, SoC correction label, closed days' "Ergebnis" with "unvollständig", orange skipped / no-data slots, consumption panel, anchor switch in session state).
+  - `ui/chart_ledger_savings.py` gives every slot left of *Jetzt* `cost_with` / `cost_without` and a state, open day from the ledger state, closed days from `savings_ledger_slots.jsonl`; an unreadable slot file is a hint and marks those slots orange. `ui/chart_context.py` adds the plan energy after the window.
+  - Decisions: spec § 6 item 5 — flag the plan energy difference at *Jetzt* from 0.5 kWh and 2 % of the planned consumption; item 6 — the SE window moves to the account view too (no *Jetzt*, both lines from 0 €, baseline L2, label "Plan").
+  - Removed: `ui/chart_cumulative.py`, `ui/chart_cumulative_render.py`, `ui/chart_day_costs.py`, the per-day cost annotations in `ui/chart_decorations.py`, `cost_summary_days` in the display bundle, `ledger_figures_for_day`.
+  - Tests: `tests/test_chart_account_view.py`, `tests/test_chart_ledger_savings.py`, `tests/apptest/test_chart2_ledger_apptest.py` (switch state), `tests/test_reference_ladder_p3b.py`, `tests/test_ledger_kpi.py`.
+  - Docs: `docs/ui/charts.md` § Chart 2, `docs/ui/betriebsmodi.md`, user manual, **?** help text, `.github/release-notes/UNRELEASED.md`.
+
+### Decimal separator in the UI (2026-11-05)
+
+- [x] **Decimal separator in the UI** `[feat]`: euro and cent amounts follow the viewer's browser language.
+  - Decision: the browser language decides, via the request's `Accept-Language` header; the container locale was rejected because Streamlit renders on the server. The reusable part lives in Edibert `v0.1.13` (`edibert.i18n.numbers`, Edibert's languages `en`/`de`, fail loud for others); Earnie's `ui/number_format.py` reads the header, uses `de` when it names neither language (the UI is German) and keeps its own units (`€`, `Cent/kWh`). Pin raised to `v0.1.13`.
+  - `format_euro` / `format_decimal` / `format_cent_kwh` used by `ui/saving_text.py`, Chart 2 annotations (`ui/chart_decorations.py`), the tile, the Scenario Explorer tables and ladder, `ui/pages/page_devices.py` (incl. the Styler table), `ui/consumer_cost_analysis_charts.py`, `ui/price_forecast.py` and the thermal profile price. Chart 2 sets Plotly `layout.separators`, so hovers and axes agree.
+  - No-sign rule (`docs/dev/savings-ledger.md` § 5) extended to the Scenario Explorer savings (headline metric, `Ersparnis vs. Standard-Regeln`, `Ersparnis zur Stufe davor`); differences (`Δ vs Referenz`, end-SoC term, device delta) keep their sign.
+  - Docs: `docs/ui/charts.md`, `docs/ui/betriebsmodi.md`, user manual, `.github/release-notes/UNRELEASED.md`. Follow-up for kWh/kW/% and numeric tables in `Backlog.md`.
+  - Tests: `tests/test_number_format.py`; expectations in the ledger, ladder, Scenario Explorer and device tests switched to the comma.
+
 ### RuleRef P4 — UI ladder and docs (2026-11-05)
 
 - [x] **RuleRef P4 — UI ladder and docs** `[feat]`: spec [`docs/dev/rule-based-reference.md`](../docs/dev/rule-based-reference.md) § 7 O5.

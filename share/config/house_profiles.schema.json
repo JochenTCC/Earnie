@@ -61,6 +61,13 @@
             }
           }
         },
+        "ha_fail_safe_values": {
+          "type": "object",
+          "description": "Optional values the generated HA package writes while status.json is unreachable: qualified set_* ID with a unit → value in EHAL units (W, A). A signal without a value is left alone.",
+          "additionalProperties": {
+            "type": "number"
+          }
+        },
         "grid_meter": {
           "type": "object",
           "description": "User assertion for the root balance node (Topology P1): meter at house connection and single tariff boundary. Both must be true on the live path.",
@@ -585,6 +592,10 @@
         },
         "ehal_bindings": {
           "$ref": "#/definitions/ehal_bindings"
+        },
+        "heating_rod_ehal_bindings": {
+          "$ref": "#/definitions/ehal_bindings",
+          "description": "Nur thermal_annual: EHAL-Felder des Heizstabs (heatpump.<consumer_id>_heating_rod.set_enable, .sens_power_act, .sens_consumer_active). Eigene Map, damit sie nicht als Felder des Wärmeerzeugers gelten."
         },
         "loxone_inputs": {
           "$ref": "#/definitions/loxone_inputs"

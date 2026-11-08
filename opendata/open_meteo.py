@@ -14,6 +14,7 @@ from opendata.http import Session
 
 ARCHIVE_URL = "https://archive-api.open-meteo.com/v1/archive"
 FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
+PREVIOUS_RUNS_URL = "https://previous-runs-api.open-meteo.com/v1/forecast"
 MAX_FORECAST_DAYS = 16
 # The archive fills the most recent days from forecast models and replaces them with
 # reanalysis data (ERA5) about five days later.
@@ -66,6 +67,35 @@ def archive(
             ARCHIVE_URL, params, last_day=end_date, settle_days=ARCHIVE_SETTLE_DAYS
         )
     return session.get_json(ARCHIVE_URL, params)
+
+
+def previous_runs(
+    session: Session,
+    *,
+    latitude: float,
+    longitude: float,
+    start_date: date,
+    end_date: date,
+    hourly: str | Sequence[str],
+    extra_params: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Archived forecasts for the UTC days ``start_date`` … ``end_date``; settled days are cached.
+
+    A variable ending in ``_previous_day1`` is the value forecast 24 h earlier, available from
+    2024-01-19. Hours without a value come back as ``null``.
+    """
+    params: dict[str, Any] = {
+        "latitude": latitude,
+        "longitude": longitude,
+        "start_date": start_date.isoformat(),
+        "end_date": end_date.isoformat(),
+        "hourly": _hourly(hourly),
+        "timezone": "UTC",
+        **(extra_params or {}),
+    }
+    return session.get_json_cached(
+        PREVIOUS_RUNS_URL, params, last_day=end_date, settle_days=ARCHIVE_SETTLE_DAYS
+    )
 
 
 def forecast(

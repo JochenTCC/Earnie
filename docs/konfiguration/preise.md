@@ -20,8 +20,9 @@ Quellen und rechtliche Grundlagen: [Tarife und Preise nachrechnen](../referenz/t
 ### Fixkosten (nur SE)
 
 - **Lieferanten-Grundpreis:** `monthly_fee_eur`; doppelte Einträge fasst Earnie über `supplier_id` zusammen.
-- **Weitere Monatsgebühren (optional):** `grid_monthly_fee_eur`, `metering_monthly_fee_eur` und `other_monthly_fee_eur`. Sie zählen einmal je Hausanschluss, und zwar aus dem Bezugstarif, sonst aus dem Einspeisetarif.
-- **Netto oder brutto:** **EPEX-/Spot-Tarife** immer **netto** speichern und `prices_include_vat` = false setzen (gleiche Basis wie Settlement und Markup). Bei Festpreisen richtet sich netto/brutto nach `prices_include_vat`.
+- **Weitere Monatsgebühren (optional):** `metering_monthly_fee_eur` und `other_monthly_fee_eur`. Sie zählen einmal je Hausanschluss, und zwar aus dem Bezugstarif, sonst aus dem Einspeisetarif.
+- **Feste Netzbeträge:** Sie kommen nicht aus dem Tarif, sondern aus dem Netzbereich (siehe unten).
+- **Netto oder brutto:** **EPEX-/Spot-Tarife** immer **netto** speichern und `prices_include_vat` = false setzen (gleiche Basis wie Settlement und Markup). Bei Festpreisen richtet sich netto/brutto nach `prices_include_vat`. Bei `prices_include_vat` = false schlägt Earnie den `vat_percent` des Tarifs auf die Monatsgebühren auf; bei true zählen sie unverändert.
 - **Wirkung:** Die Fixkosten erscheinen nur in den Gesamt- und Monatskosten des **Szenario-Explorers** und in den Fake-Jahresrechnungen unter `{Log}/invoices/`. Live-MILP und stündliche `sim_cost` enthalten sie nicht.
 
 Details: [tarife-quellen.md](../referenz/tarife-quellen.md) §4.
@@ -34,8 +35,11 @@ Der Arbeitspreis für die Netznutzung steht am Hausprofil unter Standort im Obje
 - Earnie addiert ihn **vor** der USt zum Bezugspreis. Das gilt für Live-MILP und SE und für alle Import-Typen.
 - In Fake-Jahresrechnungen erscheint er als eigene Position. Earnie rechnet ihn dafür aus dem Energiebezug heraus; bei Zeitfenstern ist er je Fenster aufgeschlüsselt.
 - Der Arbeitspreis kann **zeitabhängig** sein (SNAP/WiNAP, siehe unten).
-- Der Leistungspreis ist nicht modelliert.
-- Der monatliche Netz-Grundpreis `grid_monthly_fee_eur` ist nur ein Platzhalter für die SE-Fixkosten.
+- **Leistungspreis:** Trägt der Netzbereich `capacity_charges`, weist der Szenario-Explorer den Betrag je Kalendermonat aus, siehe [Tarife und Preise nachrechnen](../referenz/tarife-quellen.md). Die Planung kennt den Preis selbst nicht. Die SE-Optimierung und der Live-Betrieb planen aber unter einer eingetragenen Bezugsgrenze. Der Katalog enthält noch keine Werte, bis zur endgültigen Tarifverordnung gehen sie nur über einen eigenen Netzbereich in `user_grid_fees.json`.
+- **Netzverlust und Abgaben je kWh:** Der Katalog führt je Netzbereich auch das Netzverlustentgelt und die bundesweiten Abgaben (Erneuerbaren-Förderbeitrag, Elektrizitätsabgabe für Haushalte). Earnie addiert sie wie den Arbeitspreis vor der USt zum Bezugspreis. In Live-MILP und SE zählen sie also mit. Zeitregeln wie SNAP ändern sie nicht.
+- **Feste Beträge je Jahr:** Grundpauschale, Förderbeitrag auf die Grundpauschale und Erneuerbaren-Förderpauschale stehen ebenfalls im Katalog, in Österreich zusammen 76,82 € netto je Jahr. Der Szenario-Explorer zählt je Kalendermonat ein Zwölftel davon, mit der USt des Bezugstarifs; bei 20 % USt sind das 7,68 € je Monat. Die Fake-Jahresrechnung zeigt jeden Betrag einzeln. Live-MILP und Slotpreise enthalten sie nicht.
+- **Anzeige im Hauskonfigurator:** Unter dem gewählten Netzbereich steht, was er neben dem Arbeitspreis je kWh und je Jahr kostet.
+- **Früheres Feld `grid_monthly_fee_eur`:** Tarife dürfen es nicht mehr enthalten. Der Migrations-Assistent verschiebt es aus Benutzertarifen in den eigenen Netzbereich, wenn alle Hausprofile denselben Benutzer-Netzbereich nutzen; sonst nennt er, was zu tun ist.
 
 ### Netznutzung am Hausprofil (`netznutzung`)
 
@@ -61,13 +65,15 @@ Passt mehr als eine Regel, gewinnt die erste. Eine einbezogene Regel ohne Wert i
 | **SNAP** (Sommer-Nieder-Arbeitspreis) | 1.4.–30.9., 10–16 Uhr, NE 7 | −20 % auf den Arbeitspreis | verordnet (seit 1.4.2026) |
 | **WiNAP** (Winter-Nieder-Arbeitspreis) | 1.10.–31.3., 22–4 Uhr, NE 7 | Höhe offen | Entwurf, im Katalog vorbereitet, standardmäßig aus |
 
-Die Katalogwerte stammen aus einer Recherche (SNE-V 2018, Fassung 01.04.2026; SNAP-Abschlag laut Netzbetreibern). Sie sind nicht gegen die jeweiligen Preisblätter geprüft. Netzbetreiber können Voraussetzungen (z. B. Opt-in) unterschiedlich handhaben. Der Netzverlust-Anteil ist nicht enthalten.
+Die Katalogwerte stammen aus den Verordnungen für 2026: SNE-V 2018 in der Novelle BGBl. II Nr. 305/2025 (Arbeitspreis, Grundpauschale, Netzverlustentgelt), Erneuerbaren-Förderbeitragsverordnung 2026 (BGBl. II Nr. 301/2025), Erneuerbaren-Förderpauschale-Verordnung 2025 (BGBl. II Nr. 416/2024) und Elektrizitätsabgabegesetz (BGBl. I Nr. 95/2025, Haushaltssatz befristet auf 2026). Der SNAP-Abschlag stammt von den Netzbetreibern. Netzbetreiber können Voraussetzungen (z. B. Opt-in) unterschiedlich handhaben.
 
 ### Eigener Arbeitspreis (Benutzer-Netzbereich)
 
 Im Hauskonfigurator (Standort → **Netzbereich (Netznutzung)**) gibt es neben den Katalog-Netzbereichen die Auswahl **Eigener Arbeitspreis**. Earnie speichert den Wert als eigenen Netzbereich `user_<Hausprofil-ID>` in `user_grid_fees.json` (neben `grid_fees.json`) und trägt diese ID als `area_id` im Hausprofil ein.
 
-- Ein eigener Arbeitspreis gilt für beide Messarten und hat keine Zeitregeln.
+- Ein neu angelegter eigener Arbeitspreis gilt für beide Messarten und hat keine Zeitregeln und keine festen Beträge.
+- Das Formular ändert nur den Arbeitspreis. Steht im eigenen Netzbereich in `user_grid_fees.json` mehr, zum Beispiel Zeitregeln oder eine vom Migrations-Assistenten verschobene Grundgebühr, bleibt das beim Speichern erhalten. Eine Zeile unter dem Eingabefeld zeigt es an.
+- Zeitregeln bearbeitet das Formular nicht. Dafür trägt man sie in `user_grid_fees.json` ein. Jeder Netzbereich aus dieser Datei steht auch in der Auswahl.
 - `0` Cent/kWh heißt bewusst „kein Netzentgelt“.
 - IDs in `user_grid_fees.json` beginnen mit `user_`. Dieselbe ID in `grid_fees.json` und `user_grid_fees.json` ist ein Ladefehler.
 - Ein neues Hausprofil hat keinen vorausgewählten Netzbereich; ohne Auswahl speichert der Hauskonfigurator das Profil nicht.

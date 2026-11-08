@@ -133,7 +133,7 @@ def ev_in_modus_b(
     remaining_kwh: float,
     params: dict[str, float] | None,
 ) -> bool:
-    """Backtesting immer Modus B; Live wenn remaining ≤ Schwelle."""
+    """SE: small targets go through the preset path, see ``ev_modus_b_uses_milp``; Live wenn remaining ≤ Schwelle."""
     if not is_ev_milp_consumer(consumer):
         return False
     if is_logged_day_matrix(matrix):
@@ -151,13 +151,18 @@ def milp_uses_power_setpoint(
     remaining_kwh: float,
     params: dict[str, float] | None,
 ) -> bool:
-    """True, wenn der MILP kontinuierliche kW-Variablen (power_setpoint) nutzt."""
+    """True, wenn der MILP kontinuierliche kW-Variablen (power_setpoint) nutzt.
+
+    SE (logged_day / profile_spec): always continuous, so the plan holds the target exactly.
+    On / off at nominal power with min_on would plan up to a whole minimum run too much;
+    the booking drops that energy, and the plan's battery no longer matches the book.
+    """
     if not uses_power_setpoint(consumer):
         return False
     if not is_ev_milp_consumer(consumer):
         return True
     if is_logged_day_matrix(matrix):
-        return False
+        return True
     if params is None:
         raise missing_live_params_error(consumer)
     return ev_modus_a_active(consumer, matrix, remaining_kwh, params)

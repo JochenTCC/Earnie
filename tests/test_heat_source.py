@@ -416,9 +416,9 @@ def test_rod_beside_gas_runs_when_power_is_cheaper_than_gas_heat():
     model, contexts = _solve(matrix, flex, profile, {"wp_heating_heating_rod": 100.0})
     rod_hours = _on_hours(model, "wp_heating_heating_rod")
     assert rod_hours and all(10 <= hour < 14 for hour in rod_hours)
-    cap = sum(contexts["wp_heating_heating_rod"]["daily_heat_cap_kwh"].values())
+    balance = contexts["wp_heating_heating_rod"]["store_balance"]
     rod_kwh = len(rod_hours) * 3.0 * float(model.dt_h)
-    assert rod_kwh <= cap + 1e-6
+    assert rod_kwh <= balance.capacity_kwh + sum(balance.drain_kwh) + 1e-6
 
 
 @pytest.mark.parametrize("mode", ["profile_spec", "logged_day"])
@@ -444,9 +444,9 @@ def test_se_book_without_rod_entry_still_plans_the_rod(monkeypatch, mode):
     book = {"wp_heating_heating_rod": 0.0}  # what resolve_profile_spec_flex_targets books
     targets = resolve_horizon_consumer_targets_kwh(matrix, book, flexible_consumers=flex)
     assert targets["wp_heating_heating_rod"] == pytest.approx(30.0)
-    # The MILP entry builds the rod caps although a gas house has no thermal flex consumer.
+    # The MILP entry builds the rod's store although a gas house has no thermal flex consumer.
     contexts = _resolve_thermal_flex_contexts(matrix, flex, None)
-    assert contexts["wp_heating_heating_rod"]["daily_heat_cap_kwh"]
+    assert contexts["wp_heating_heating_rod"]["store_balance"].capacity_kwh > 0.0
     model, _contexts = _solve(matrix, flex, profile, targets)
     rod_hours = _on_hours(model, "wp_heating_heating_rod")
     assert rod_hours and all(10 <= hour < 14 for hour in rod_hours)
@@ -465,9 +465,13 @@ def test_plausibility_counts_rod_as_parent_energy():
     assert out == {"a_heating_rod": 0.0, "b_heating_rod": pytest.approx(2.0), "b": 3.0}
 
 
-def test_rod_is_not_planned_in_live(monkeypatch):
+def test_rod_without_signals_is_not_planned_in_live(monkeypatch):
     from optimizer.targets import resolve_heating_rod_horizon_kwh
 
+    profile = _profile(_thermal_consumer({"type": "gas"}))
+    monkeypatch.setattr(
+        "config.get_resolved_runtime_settings", lambda: {"_house_profile": profile}
+    )
     monkeypatch.setattr(
         "optimizer.live_cycle_scope.is_live_thermal_planning", lambda _matrix: True
     )
@@ -532,8 +536,8 @@ def test_annual_cost_rows_add_fuel_to_jahres_kosten():
         },
     }
     row = build_annual_cost_rows(meta)[0]
-    assert row["Jahres Kosten [€]"] == "2250.00 €"
-    assert row["Brennstoffkosten [€]"] == "1250.00 €"
+    assert row["Jahres Kosten [€]"] == "2250,00 €"
+    assert row["Brennstoffkosten [€]"] == "1250,00 €"
     assert row["CO2 [kg]"] == "4000"
 
 

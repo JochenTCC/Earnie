@@ -100,6 +100,9 @@ def _consumers_from_house_doc(house_doc: dict) -> list[dict]:
         for consumer in profile.get("consumers") or []:
             if isinstance(consumer, dict):
                 out.append(consumer)
+        from house_config.heating_rod_bindings import rod_binding_entities
+
+        out.extend(rod_binding_entities(profile.get("consumers") or []))
     return out
 
 

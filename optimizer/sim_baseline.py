@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import NamedTuple
+from typing import NamedTuple, Sequence
 from zoneinfo import ZoneInfo
 
 import numpy as np
@@ -16,6 +16,7 @@ from optimizer.milp_horizon import (
     aggregate_battery_params_for_load,
     coerce_battery_params_list,
 )
+from optimizer.rod_store import RodStoreBalance, next_level_kwh
 from optimizer.slot_duration import DEFAULT_DT_H
 from optimizer.sim_chart_rows import (
     _chart_price_fields,
@@ -320,6 +321,7 @@ class _RuleConsumer:
     min_on_slots: int
     backlog_kwh: float = 0.0
     hold_slots: int = 0
+    waits_for_surplus: bool = False
 
     def later_kwh(self, t: int) -> float:
         return sum(self.planned_kw[s] for s in self.eligible if s > t) * float(DEFAULT_DT_H)
@@ -367,6 +369,36 @@ class _RuleConsumer:
         extra_kw = min(max(0.0, wanted_kw - power_kw), open_kwh / dt_h)
         self.draw(extra_kw * dt_h, t)
         return extra_kw
+
+
+@dataclass
+class SurplusRod:
+    """Heating rod beside a fuel source in L2: on / off on the export left at the meter (spec § 4.3).
+
+    It has no target and no deadline. ``balance``: the same store as the MILP's (η = 1), and like
+    there it never runs part of a slot. Call ``run_kw`` for every slot of the book, the store also
+    empties while the rod is off. ``level_kwh`` is what the next window starts from.
+    """
+
+    cid: str
+    nominal_kw: float
+    eligible: list[int]
+    balance: RodStoreBalance
+    level_kwh: float
+
+    def run_kw(self, t: int, export_kw: float) -> float:
+        heat_kwh = self.nominal_kw * float(DEFAULT_DT_H)
+        drain_kwh = self.balance.drain_kwh[t]
+        runs = (
+            t in self.eligible
+            and self.balance.has_demand(t)
+            and export_kw >= self.nominal_kw - _POWER_EPSILON_KW
+            and self.level_kwh + heat_kwh - drain_kwh <= self.balance.capacity_kwh + _ENERGY_EPSILON_KWH
+        )
+        self.level_kwh = next_level_kwh(
+            self.level_kwh, heat_kwh if runs else 0.0, drain_kwh, self.balance.capacity_kwh
+        )
+        return self.nominal_kw if runs else 0.0
 
 
 def _contiguous_runs(indices: list[int]) -> list[list[int]]:
@@ -446,7 +478,14 @@ def _rule_consumer(
         surplus=not fixed_timing and (is_ev or thermal),
         threshold_kw=_surplus_threshold_kw(consumer, max_kw),
         min_on_slots=max(1, int(consumer.get("min_on_quarterhours", 1) or 1)),
+        waits_for_surplus=is_ev and not fixed_timing,
     )
+
+
+def _export_left_kw(net_kw: float, soc: float, battery_params: dict) -> float:
+    """What goes to the grid after the battery took its part of ``net_kw``."""
+    _, batt_kw = bat.vendor_mode_step(soc, net_kw, battery_params, dt_h=DEFAULT_DT_H)
+    return max(0.0, net_kw - max(0.0, batt_kw))
 
 
 def _available_surplus_kw(
@@ -462,8 +501,7 @@ def _available_surplus_kw(
         others_kw = sum(kw for cid, kw in slot_kw.items() if cid != consumer_id)
         return net_before_flex_kw - others_kw
     net_kw = net_before_flex_kw - sum(slot_kw.values())
-    _, batt_kw = bat.vendor_mode_step(soc, net_kw, battery_params, dt_h=DEFAULT_DT_H)
-    return slot_kw[consumer_id] + max(0.0, net_kw - max(0.0, batt_kw))
+    return slot_kw[consumer_id] + _export_left_kw(net_kw, soc, battery_params)
 
 
 def build_rule_based_flex_kw_per_hour(
@@ -478,13 +516,16 @@ def build_rule_based_flex_kw_per_hour(
     book_indices: list[int],
     battery_params: dict,
     initial_soc: float,
+    surplus_rods: Sequence[SurplusRod] = (),
 ) -> RuleBasedFlex:
     """L2: standard rules move the energy of the L1 profile, the total per consumer stays exact.
 
     Spec ``docs/dev/rule-based-reference.md`` § 4. ``price_series``: end-customer price per
     slot, up to the last published day-ahead day of the book's last slot or the end of the
-    data. With no rule firing the result equals ``build_shaped_flex_kw_per_slot``. A missing
-    price inside the series or an undeliverable target raises.
+    data. An EV waits for the surplus or its deadline; other consumers equal
+    ``build_shaped_flex_kw_per_slot`` when no rule fires. ``surplus_rods`` come last in a slot
+    and only take what would be exported, so they change neither the others nor the battery.
+    A missing price inside the series or an undeliverable target raises.
     """
     quantile, priority = _validated_rule_params(rule_params)
     shaped = build_shaped_flex_kw_per_slot(
@@ -506,7 +547,8 @@ def build_rule_based_flex_kw_per_hour(
 
     dt_h = float(DEFAULT_DT_H)
     per_slot: list[dict[str, float]] = [
-        {state.cid: 0.0 for state in states} for _ in range(len(matrix))
+        {state.cid: 0.0 for state in states} | {rod.cid: 0.0 for rod in surplus_rods}
+        for _ in range(len(matrix))
     ]
     soc = float(initial_soc)
     truncated_lock_slots = 0
@@ -523,7 +565,8 @@ def build_rule_based_flex_kw_per_hour(
             if state.price_lock and locked is None:
                 locked = _price_locked(row["slot_datetime"], price_series, quantile)
                 truncated_lock_slots += _lock_horizon_truncated(row["slot_datetime"], price_series)
-            slot_kw[state.cid] = state.base_power_kw(t, bool(state.price_lock and locked))
+            holds = state.waits_for_surplus or bool(state.price_lock and locked)
+            slot_kw[state.cid] = state.base_power_kw(t, holds)
         net_before_flex_kw = float(row["expected_p_pv"]) - bat.effective_p_act(row, battery_params)
         for state in running:
             if state.surplus:
@@ -531,6 +574,9 @@ def build_rule_based_flex_kw_per_hour(
                     state.cid, net_before_flex_kw, slot_kw, priority, soc, battery_params
                 )
                 slot_kw[state.cid] += state.surplus_extra_kw(t, slot_kw[state.cid], available_kw)
+        for rod in surplus_rods:
+            net_kw = net_before_flex_kw - sum(slot_kw.values())
+            slot_kw[rod.cid] = rod.run_kw(t, _export_left_kw(net_kw, soc, battery_params))
         soc, _ = bat.vendor_mode_step(
             soc, net_before_flex_kw - sum(slot_kw.values()), battery_params, dt_h=DEFAULT_DT_H
         )

@@ -93,12 +93,12 @@ def test_format_deviation_delta_kwh():
         "kind": "milp_no_optimal",
         "window_consumption_diff_kwh": 0.006,
     }
-    assert format_deviation_delta_kwh(plaus) == "+1.25 (+5.0%)"
+    assert format_deviation_delta_kwh(plaus) == "+1,25 (+5,0%)"
     assert format_deviation_delta_kwh(cbc) == "—"
-    assert format_deviation_delta_kwh(cbc_with_window) == "+0.01"
+    assert format_deviation_delta_kwh(cbc_with_window) == "+0,01"
     assert format_deviation_delta_kwh(
         {"kind": "consumption_tolerance", "diff_kwh": 1.93}
-    ) == "+1.93"
+    ) == "+1,93"
 
 
 def test_kind_label_known_and_unknown():

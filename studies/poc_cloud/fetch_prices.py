@@ -18,7 +18,7 @@ from pathlib import Path
 import pandas as pd
 import requests
 
-from data.data_loader import energy_charts_price_column
+from data.edibert_market_range import energy_charts_price_column
 
 STUDY_DIR = Path(__file__).resolve().parent
 CACHE_DIR = STUDY_DIR / "cache"
@@ -67,13 +67,15 @@ def main() -> None:
     parser.add_argument("--zone", default="AT")
     parser.add_argument("--start", type=date.fromisoformat, required=True)
     parser.add_argument("--end", type=date.fromisoformat, required=True)
-    parser.add_argument("--out", type=Path, default=CACHE_DIR / "prices_AT_2025.csv")
+    parser.add_argument("--out", type=Path, default=None, help="Default: cache/prices_AT_<start year>.csv")
     args = parser.parse_args()
 
+    if args.out is None:
+        args.out = CACHE_DIR / f"prices_{args.zone}_{args.start.year}.csv"
     frame = fetch(args.zone, args.start, args.end)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     with open(args.out, "w", encoding="utf-8", newline="") as handle:
-        handle.write(f"Datum (MEZ),{LOADER_PRICE_COLUMN}\n")
+        handle.write(f"Datum (MEZ),{energy_charts_price_column(args.zone)}\n")
         handle.write("Datum,EUR/MWh\n")  # units row, skipped by the loader (skiprows=[1])
         for ts, price in zip(frame["ts"], frame["eur_mwh"]):
             handle.write(f"{ts.isoformat()},{price}\n")

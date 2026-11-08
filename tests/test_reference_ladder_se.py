@@ -207,8 +207,8 @@ def _rows(meta: dict) -> dict[str, dict]:
 
 def test_saving_column_is_l2_minus_l3_and_the_old_delta_stays():
     row = _rows(_meta())["live"]
-    assert row["Ersparnis vs. Standard-Regeln [€]"] == "+100.00 €"
-    assert row["Δ vs Referenz [€]"] == "-600.00 €"
+    assert row["Ersparnis vs. Standard-Regeln [€]"] == "100,00 € gespart"
+    assert row["Δ vs Referenz [€]"] == "-600,00 €"
 
 
 def test_reference_rows_have_no_saving_and_come_before_the_optimized_row():
@@ -227,7 +227,7 @@ def test_saving_counts_fuel_on_both_sides():
         "l2:live": {"fuel_eur": 50.0, "co2_kg": 1.0},
         "live": {"fuel_eur": 20.0, "co2_kg": 1.0},
     }
-    assert _rows(meta)["live"]["Ersparnis vs. Standard-Regeln [€]"] == "+130.00 €"
+    assert _rows(meta)["live"]["Ersparnis vs. Standard-Regeln [€]"] == "130,00 € gespart"
 
 
 def test_log_without_a_ladder_shows_no_saving():

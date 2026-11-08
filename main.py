@@ -111,7 +111,19 @@ def _finalize_previous_interval() -> dict | None:
         minutes=optimization_schedule.QUARTER_HOUR_MINUTES
     )
     _last_closed_interval = power_interval_sampler.finalize_closed_interval(previous_slot)
+    if _last_closed_interval is not None:
+        _record_month_peak(_last_closed_interval)
     return _last_closed_interval
+
+
+def _record_month_peak(closed: dict) -> None:
+    """Month peak for the capacity charge; a failure is logged and never stops the cycle."""
+    from runtime_store import capacity_peak_store
+
+    try:
+        capacity_peak_store.record_closed_interval(closed)
+    except Exception as exc:  # noqa: BLE001 — the cycle must still plan and write
+        logger.warning("capacity_peak_store: %s not recorded: %s", closed.get("interval_start"), exc)
 
 
 def _daemon_wait_poll() -> None:
@@ -629,6 +641,10 @@ def _main_cycle(
             telemetry=telemetry_for_export,
         )
         cycle_recorder.record_export_limits(recorder_token, export_ctx)
+        from optimizer.live_import_cap import resolve_live_import_caps
+
+        import_ctx = resolve_live_import_caps(optimization_matrix)
+        cycle_recorder.record_import_caps(recorder_token, import_ctx)
     with timing.phase("milp_live"):
         mode, target_power, target_soc, consumer_powers, consumer_pv_follow, milp_plan, urgent_obs = optimizer.milp_optimizer(
             optimization_matrix,
@@ -646,6 +662,7 @@ def _main_cycle(
             hk_max_export_kw=export_ctx["hk_max_export_kw"],
             inbound_export_limit_kw=export_ctx["inbound_export_limit_kw"],
             current_soc_by_id=current_soc_by_id or None,
+            import_caps=import_ctx["import_caps"],
         )
     cycle_duration_stats.mark_ready()
     if early_start:
@@ -847,6 +864,7 @@ def _main_cycle(
                 filter_contexts=filter_contexts,
                 consumers=live_consumers,
                 current_soc_by_id=current_soc_by_id or None,
+                baseline_initial_soc=savings_ledger_daemon.planning_shadow_soc(closed_interval),
             )
             savings_snapshot = optimizer.build_savings_snapshot(savings_info)
             logger.info(

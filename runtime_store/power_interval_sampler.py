@@ -17,6 +17,12 @@ logger = logging.getLogger(__name__)
 
 SAMPLE_INTERVAL_SEC = 30
 MIN_SAMPLE_COUNT_FOR_MEAN = 3
+# Shorter import windows (a restart late in the slot) say too little about the quarter hour.
+MIN_IMPORT_WINDOW_SEC = 5 * 60
+GRID_IMPORT_SOURCE_COUNTER = "counter"
+GRID_IMPORT_SOURCE_MEAN = "mean"
+SAMPLE_LOG_DIRNAME = "power_samples"
+FIELD_GRID_POWER = "sens_grid_power_active"
 _SAMPLER_SCHEMA = 1
 
 _PLANT_KEYS = ("pv_kw", "grid_kw", "battery_kw", "house_kw", "baseload_kw", "flex_sum_kw")
@@ -135,6 +141,7 @@ def _overlay_energy_counters(
     interval_start: datetime,
     state: dict[str, Any],
     read_energy: Callable[[], dict[str, dict[str, float]] | None] | None,
+    closed_at: datetime,
 ) -> dict[str, Any]:
     from integrations.loxone_meter_energy import (
         flex_energy_meter_config,
@@ -172,13 +179,17 @@ def _overlay_energy_counters(
     except Exception as exc:  # noqa: BLE001
         logger.debug("power_interval_sampler: energy close read failed: %s", exc)
     flex_cfg = flex_energy_meter_config(load_live_profile_consumers())
-    return overlay_counter_on_closed(
+    out = overlay_counter_on_closed(
         closed,
         open_readings=open_readings,
         end_readings=end_readings,
         dt_h=DEFAULT_DT_H,
         flex_meter_config=flex_cfg,
     )
+    from_counter = _grid_import_from_counter(open_payload, end_readings, closed_at=closed_at)
+    if from_counter is not None:
+        out.update(from_counter)
+    return out
 
 
 def _parse_ts(value: Any) -> datetime | None:
@@ -314,7 +325,54 @@ def _build_closed_interval(
     if socs:
         closed["soc_start_percent"] = round(socs[0], 2)
         closed["soc_end_percent"] = round(socs[-1], 2)
+    closed.update(_grid_import_from_samples(samples))
     return closed
+
+
+def _grid_import_from_samples(samples: list[dict[str, Any]]) -> dict[str, Any]:
+    """Import only, as the capacity charge bills it: export inside the slot does not offset it."""
+    imports = [max(float(s.get("grid_kw") or 0.0), 0.0) for s in samples]
+    return {
+        "grid_import_kw": round(sum(imports) / len(imports), 3),
+        "grid_import_source": GRID_IMPORT_SOURCE_MEAN,
+        "grid_import_start": samples[0].get("ts"),
+        "grid_import_end": samples[-1].get("ts"),
+    }
+
+
+def _grid_import_from_counter(
+    open_payload: dict[str, Any],
+    end_readings: dict[str, dict[str, float]] | None,
+    *,
+    closed_at: datetime,
+) -> dict[str, Any] | None:
+    """Import counter delta over the real time between both reads, not the fixed quarter hour.
+
+    The open read is the first sample in the slot, so the window starts up to one sample
+    interval late. ``None`` without both reads, on a counter reset or an implausible window.
+    """
+    from integrations.loxone_meter_energy import CHANNEL_GRID, mono_delta_kwh
+
+    opened_at = _parse_ts(open_payload.get("open_ts"))
+    start = ((open_payload.get("open") or {}).get(CHANNEL_GRID) or {}).get("total")
+    end = ((end_readings or {}).get(CHANNEL_GRID) or {}).get("total")
+    delta = mono_delta_kwh(start, end)
+    if opened_at is None or delta is None:
+        return None
+    seconds = (closed_at - opened_at).total_seconds()
+    if not MIN_IMPORT_WINDOW_SEC <= seconds <= QUARTER_HOUR_MINUTES * 60 + SAMPLE_INTERVAL_SEC:
+        logger.warning(
+            "power_interval_sampler: counter window %.0f s from %s — import stays on mean.",
+            seconds,
+            _iso(opened_at),
+        )
+        return None
+    return {
+        "grid_import_kw": round(delta / (seconds / 3600.0), 3),
+        "grid_import_source": GRID_IMPORT_SOURCE_COUNTER,
+        "grid_import_start": _iso(opened_at),
+        "grid_import_end": _iso(closed_at),
+    }
 
 
 def tick(
@@ -358,7 +416,93 @@ def tick(
     state["last_tick_at"] = _iso(moment)
     state["sample_interval_sec"] = SAMPLE_INTERVAL_SEC
     _save_state(path, state)
+    _log_raw_sample(moment, sample, read_energy=read_energy)
     return True
+
+
+def sample_log_days() -> int:
+    """``EARNIE_POWER_SAMPLE_LOG_DAYS``: days of raw samples to keep; 0 or unset = off."""
+    from runtime_store.env_vars import read_env
+
+    raw = read_env("POWER_SAMPLE_LOG_DAYS")
+    if not raw:
+        return 0
+    days = int(raw)
+    if days < 0:
+        raise ValueError(f"EARNIE_POWER_SAMPLE_LOG_DAYS muss >= 0 sein, ist {raw!r}")
+    return days
+
+
+def sample_log_dir() -> str:
+    from runtime_store.persist_paths import runtime_path
+
+    return runtime_path(SAMPLE_LOG_DIRNAME)
+
+
+def _log_raw_sample(
+    moment: datetime,
+    sample: dict[str, Any],
+    *,
+    read_energy: Callable[[], dict[str, dict[str, float]] | None] | None,
+    log_dir: str | None = None,
+) -> None:
+    """Opt-in raw log for the field test against the meter (max-power tariff P5c).
+
+    One JSON line per sample with the grid power, the grid counters read at the same moment,
+    when each of these values arrived as a push (``*_pushed_at``) and the clock offset estimate.
+    In Shadow mode the values come through Prod's feed, up to one feed flush late; the push
+    times are Prod's, so the analysis can take that delay out. One file per day; files older
+    than the configured days go. A failure is logged and never stops the sampler.
+    """
+    try:
+        days = sample_log_days()
+        if days == 0:
+            return
+        from ehal.qualified_ids import qualified_plant_id
+        from integrations.loxone_meter_energy import (
+            CHANNEL_GRID,
+            FIELD_GRID_EXPORT,
+            FIELD_GRID_IMPORT,
+        )
+        from runtime_store import clock_skew
+        from runtime_store.ehal_push_inbox import push_last_ts
+
+        reader = read_energy if read_energy is not None else _default_read_energy
+        grid = (reader() or {}).get(CHANNEL_GRID) or {}
+        skew = clock_skew.current_estimate()
+        line = {
+            "ts": _iso(moment),
+            "grid_kw": sample["grid_kw"],
+            "grid_power_pushed_at": push_last_ts(qualified_plant_id(FIELD_GRID_POWER)),
+            "grid_import_total_kwh": grid.get("total"),
+            "grid_import_pushed_at": push_last_ts(qualified_plant_id(FIELD_GRID_IMPORT)),
+            "grid_export_total_kwh": grid.get("total_neg"),
+            "grid_export_pushed_at": push_last_ts(qualified_plant_id(FIELD_GRID_EXPORT)),
+            "clock_skew_sec": None if skew is None else skew.offset_sec,
+        }
+        folder = log_dir or sample_log_dir()
+        os.makedirs(folder, exist_ok=True)
+        target = os.path.join(folder, f"{moment:%Y-%m-%d}.jsonl")
+        is_new_day = not os.path.exists(target)
+        with open(target, "a", encoding="utf-8", newline="\n") as handle:
+            handle.write(json.dumps(line) + "\n")
+        if is_new_day:
+            _prune_sample_log(folder, keep_from=(moment - timedelta(days=days - 1)).date())
+    except Exception as exc:  # noqa: BLE001 — a diagnostics log never stops sampling
+        logger.warning("power_interval_sampler: raw sample log failed: %s", exc)
+
+
+def _prune_sample_log(folder: str, *, keep_from) -> None:
+    for name in os.listdir(folder):
+        stem, ext = os.path.splitext(name)
+        if ext != ".jsonl":
+            continue
+        try:
+            day = datetime.strptime(stem, "%Y-%m-%d").date()
+        except ValueError:
+            continue
+        if day < keep_from:
+            os.remove(os.path.join(folder, name))
 
 
 def note_decision_sample(
@@ -387,8 +531,14 @@ def finalize_closed_interval(
     *,
     state_path: str | None = None,
     read_energy: Callable[[], dict[str, dict[str, float]] | None] | None = None,
+    now: datetime | None = None,
 ) -> dict[str, Any] | None:
-    """Mean/energy for ``[interval_start, interval_start+QH)``; drop those samples."""
+    """Mean/energy for ``[interval_start, interval_start+QH)``; drop those samples.
+
+    ``now``: time of the closing counter read (default: the clock).
+    """
+    closed_at = now or datetime.now()
+    closed_at = closed_at.replace(tzinfo=None) if closed_at.tzinfo else closed_at
     path = state_path or _state_path()
     start = quarter_hour_slot_start(interval_start)
     start = start.replace(tzinfo=None) if start.tzinfo else start
@@ -403,6 +553,7 @@ def finalize_closed_interval(
         interval_start=start,
         state=state,
         read_energy=read_energy,
+        closed_at=closed_at,
     )
     end = start + timedelta(minutes=QUARTER_HOUR_MINUTES)
     kept: list[dict[str, Any]] = []

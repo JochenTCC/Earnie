@@ -1,12 +1,15 @@
 """Savings as text: the amount without a sign, its meaning in words.
 
 One place for the wording, so the Monitor tile and Chart 2 write a figure the same way.
+The decimal separator follows the viewer's browser language (`ui/number_format.py`).
 """
 from __future__ import annotations
 
+from ui.number_format import format_euro
+
 
 def euro_amount(euro: float) -> str:
-    return f"{abs(euro):.2f} €"
+    return format_euro(abs(euro))
 
 
 def saving_is_loss(euro: float) -> bool:

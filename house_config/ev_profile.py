@@ -7,8 +7,15 @@ from settings.ev_power import merge_ev_power_conversion_fields
 from settings.flexible_consumers import normalize_day_schedule, target_kwh_from_rest_soc
 
 _REFERENCE_YEAR_DAYS = 365
-# Same rule as last_full_archive_year(); avoid importing open_meteo (config import cycle).
-_REFERENCE_YEAR_START = date(date.today().year - 1, 1, 1)
+
+
+def _reference_year_start() -> date:
+    """Jan 1 of the reference year: same rule as ``last_full_archive_year()`` including the
+    ``EARNIE_CLIMATE_REFERENCE_YEAR`` pin; avoids importing open_meteo (config import cycle)."""
+    from runtime_store.env_vars import read_climate_reference_year
+
+    pinned = read_climate_reference_year()
+    return date(date.today().year - 1 if pinned is None else pinned, 1, 1)
 
 
 def normalize_ev_milp_block(raw: dict | None) -> dict | None:
@@ -79,8 +86,9 @@ def ev_daily_kwh(consumer: dict, day: date) -> float:
 def estimate_ev_annual_kwh(consumer: dict) -> float:
     """Jahresenergie als Summe der täglichen Ladeziele über ein Referenzjahr."""
     total = 0.0
+    start = _reference_year_start()
     for offset in range(_REFERENCE_YEAR_DAYS):
-        day = _REFERENCE_YEAR_START + timedelta(days=offset)
+        day = start + timedelta(days=offset)
         total += ev_daily_kwh(consumer, day)
     return round(total, 3)
 

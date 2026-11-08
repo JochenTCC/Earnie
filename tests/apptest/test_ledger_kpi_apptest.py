@@ -24,7 +24,7 @@ _SLOT = datetime(2026, 11, 4, 8, 0, tzinfo=_TZ)
 _DAY_START = datetime(2026, 11, 4, 7, 9, tzinfo=_TZ)
 _DAY_END = datetime(2026, 11, 5, 7, 10, tzinfo=_TZ)
 _NOW = datetime(2026, 11, 4, 12, 0, tzinfo=_TZ)
-_TODAY_LINE = "Heute bisher: 0.20 € gespart · SoC-Korrektur: 0.00 € gutgeschrieben"
+_TODAY_LINE = "Heute bisher: 0,20 € gespart · SoC-Korrektur: 0,00 € gutgeschrieben"
 
 
 @pytest.fixture
@@ -109,7 +109,7 @@ def test_saved_total_with_date_days_and_today(runtime):
     at = _run(_chart_ledger())
 
     assert at.metric[0].label == "Mit Earnie gespart"
-    assert at.metric[0].value == "12.34 €"
+    assert at.metric[0].value == "12,34 €"
     assert "gleiche PV" in at.metric[0].proto.help
     captions = _captions(at)
     assert "seit 16.09.2026 (2 Tage)" in captions
@@ -122,7 +122,7 @@ def test_without_a_bundle_there_is_no_today_line_but_the_total(runtime):
 
     at = _run()
 
-    assert at.metric[0].value == "1.00 €"
+    assert at.metric[0].value == "1,00 €"
     assert not any(text.startswith("Heute bisher") for text in _captions(at))
 
 
@@ -135,7 +135,7 @@ def test_today_line_shows_the_snapshot_while_the_total_reads_the_files(runtime):
 
     at = _run(ledger)
 
-    assert at.metric[0].value == "3.00 €"
+    assert at.metric[0].value == "3,00 €"
     assert _TODAY_LINE in _captions(at)
 
 
@@ -178,7 +178,7 @@ def test_live_fragment_without_a_bundle_shows_no_today_line(runtime, monkeypatch
 
     at, drawn = _run_live_fragment(monkeypatch, None)
 
-    assert at.metric[0].value == "1.00 €"
+    assert at.metric[0].value == "1,00 €"
     assert not any(text.startswith("Heute bisher") for text in _captions(at))
     assert drawn == []
 
@@ -190,7 +190,7 @@ def test_negative_total_changes_the_words_and_drops_the_sign(runtime):
     at = _run()
 
     assert at.metric[0].label == "Mit Earnie mehr ausgegeben"
-    assert at.metric[0].value == "2.18 €"
+    assert at.metric[0].value == "2,18 €"
     assert "seit 16.09.2026 (1 Tag)" in _captions(at)
 
 

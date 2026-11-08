@@ -89,7 +89,7 @@ PV, Last, Netz, Batterieflüsse und **Flex-Verbraucher** zeigen im grauen Bereic
 |------|-------------|-----------|
 | SoC (optimiert) | Grüne Linie (`_HSL_SOC` in `ui/chart_colors.py`). Bei ≥2 SoC-Trägern (Haus-ESS, physische Powerstation, virtuelle Powerstation) eine Linie pro Entität (`SoC · {Bezeichnung}`, Farbvarianten um `_HSL_SOC`). Die **Linienstärke** skaliert mit der Speicherkapazität (≤5 kWh: 1 px, ≤10 kWh: 1,5 px, ≤15 kWh: 2 px, darüber 2,5 px). Virtuelle Powerstations erscheinen zusätzlich als **gestrichelte** Linien (Dash-Zyklus, nie durchgezogen), damit sich überlappende Reserven unterscheiden lassen. | Simulierter Batterie- bzw. Reserve-SOC: Haus-ESS live/MILP; physische `standby_backup`-PS live plus Forecast aus dem Standby-Plan (Inseln/Laden); virtuelle PS = `stored_kwh` / Kapazität, Forecast aus der Attribution des Haus-Batterieplans |
 | ESS-Mode-Underlay | Dickere, halbtransparente Linie hinter dem SoC | Cyan = Entladesperre / Hold bzw. Zwangsleistung unter 5 % von `max_power_kw`; Blau = Zwangsladen ≥ 5 %; Magenta = Zwangsentladen ≥ 5 %; Automatik ohne Underlay. Das Underlay erscheint nur am Primär-SoC. |
-| SoC BL Ziel | Dieselbe Farbe, gestrichelt ab **Jetzt** (nicht davor) | Referenz-SOC (Baseline) der Primärbatterie; Anker ist der Log-SOC am Jetzt-Marker |
+| SoC BL Ziel | Dieselbe Farbe, gepunktet, eine durchgehende Linie | Speicherstand der Vergleichsbatterie aus dem Ersparnis-Buch: links von **Jetzt** der gebuchte Verlauf des laufenden SA-Tages, rechts davon der Plan, der an derselben Stelle weiterläuft. Die Linie springt deshalb weder bei **Jetzt** noch beim SA-Tageswechsel. Ohne Ersparnis-Buch (erster Start, nicht lesbar) gibt es keine Linie, ein Hinweis unter dem Chart sagt das. Im Szenario-Explorer gibt es kein Buch: Dort beginnt die Linie bei **Jetzt** am Log-SOC. |
 | Preis (rot) | Strompreis skaliert | Hover: Cent/kWh |
 | Einspeisepreis (orange, gestrichelt) | Einspeisevergütung skaliert | Hover: Cent/kWh |
 
@@ -147,20 +147,31 @@ Die Wärmepumpe („Freigabe, aber nicht angesprungen“) bewertet Earnie genaus
 
 Die kompakten Buttons stehen in einer Zeile **ohne** Fließtext dazwischen (mobil-tauglich) und liegen **zwischen Chart 1 und Sankey**; Chart 2 folgt darunter. Der Desktop zeigt standardmäßig SA₀→SA₂, mobil bleibt es bei 24-h-Segmenten.
 
-## Chart 2: Kumulierte Kosten & Verbrauch
+## Chart 2: Kontostand mit und ohne Earnie
 
-**Überschrift** mit **?** (Ist vs. Prognose, orange Lücken). Im Sunset-2-Sunset-Fenster sind Ist und Prognose getrennte Kurven:
+**Überschrift** „Kontostand: mit und ohne Earnie“ mit **?**. Chart 2 ist eine Kontoansicht: Die Linien zeigen den **Kontostand seit Fensterstart**, also Stromkosten und Einspeiseerlöse zu den Preisen des Ersparnis-Buchs, ohne Grund- und Netzgebühren. Beide Linien beginnen bei 0 €; fällt eine Linie, wird bezahlt, steigt sie, kommt Geld durch Einspeisung herein. Es ist weder ein Bankkonto noch die Stromrechnung.
 
-| Bereich | Kurven |
-|---------|--------|
-| Grau (Log) | **Ist bisher:** kumuliert aus dem Produktiv-Log. **Ersparnis bisher:** aus dem Ersparnis-Buch: Kosten ohne Earnie minus Ist-Kosten der gebuchten Slots des laufenden SA-Tags. Positiv heißt gespart. Ohne Buch fehlt die Linie, und unter dem Chart steht ein kurzer Hinweis. |
-| Neutral/Grün | **Prognose:** BL Ziel / optimiert ab der Log-Grenze (an die Ist-Kurve angeschlossen) |
+| Bereich | Mit Earnie | Vergleich |
+|---------|------------|-----------|
+| Links von **Jetzt** | gebuchte Kosten aus dem Ersparnis-Buch („Mit Earnie (gebucht)“) | Vergleichsanlage des Buchs: gleicher Verbrauch, gleiche PV, Batterie im Herstellermodus, gleiche Preise („Ohne Earnie (gebucht)“) |
+| Rechts von **Jetzt** | Plan („Optimiert (Plan)“, gestrichelt) | **BL Ziel** ab dem Speicherstand der Vergleichsbatterie („BL Ziel (Plan)“, gestrichelt) |
 
-Fehlende Log-Slots sind orange markiert; die Ist-Kurven haben dort Lücken.
+Die Vergleichslinie ändert bei **Jetzt** also ihre Bedeutung: links die Vergleichsanlage des Buchs, rechts BL Ziel. Der **?**-Hilfetext sagt das ebenfalls.
 
-Die Kennzahlen stehen **pro SA-Tag** im Chart: mobil nur für den sichtbaren Tag, am Desktop (SA₀→SA₂) in zwei Spalten (SA₀→SA₁ | SA₁→SA₂). Am **laufenden Tag** gelten **BL Ziel**, **Optimiert** und **Erwartet** für den Rest des Tages; **Bisher** kommt aus dem Ersparnis-Buch, darunter steht als **SoC** die SoC-Korrektur (Unterschied im Speicherstand gegenüber der Vergleichsbatterie, bewertet zum mittleren Bezugspreis). **Abgelaufene Tage** zeigen nur das **Ergebnis** aus dem Buch, ohne Linie und ohne Planwerte; Tage mit weniger als 80 % gebuchten Slots sind als „unvollständig“ markiert. Ein **Tag, der noch nicht begonnen hat**, zeigt als **Plan** die geplante Ersparnis. Der Szenario-Explorer nennt seine Ersparnis ebenfalls **Plan**.
+**SoC am Ende.** Plan und BL Ziel starten bei **Jetzt** von verschiedenen Speicherständen. Der Abstand der Linien enthält deshalb auch den Wert der Energie, die der Plan zu Beginn mehr oder weniger im Speicher hat. Das Label „SoC am Ende“ nennt, wie sich der Wert dieses Speicherabstands bis zum Fensterende ändert, mit derselben Formel wie die SoC-Korrektur des Buchs. Es steckt wie diese in keinem Abstand: Erst „Erwartet“ und „SoC am Ende“ zusammen zeigen, was der Plan gegenüber BL Ziel bringt.
 
-Beträge stehen ohne Vorzeichen, die Bedeutung als Wort dabei: „gespart“ oder „mehr ausgegeben“, bei der SoC-Korrektur „gutgeschrieben“ oder „abgezogen“. Nur die Kurve **Ersparnis bisher** braucht die Achse und liegt unter 0, wenn mehr ausgegeben wurde.
+**Verankerung.** Ein Umschalter über dem Chart wählt, wie die Vergleichslinie liegt; die Wahl bleibt für die Sitzung erhalten.
+
+- **Ist bei Jetzt** (Standard): Die Vergleichslinie ist so verschoben, dass sich beide Linien bei Jetzt treffen. Der Abstand am Fensterstart ist das **bisher** Gesparte, der Abstand am Fensterende das **erwartete**.
+- **Gemeinsamer Start**: Beide Linien beginnen bei 0 €. Der Abstand bei Jetzt ist das **bisher** Gesparte, am Fensterende das **Gesamte**.
+
+Die Fläche zwischen den Linien ist **grün**, wo gespart wurde, und **rot**, wo mehr ausgegeben wurde. Bei „Ist bei Jetzt“ liegt links und rechts von Jetzt jeweils eine andere Linie oben; Farbe und Labels sagen, was gemeint ist. Liegt das Fenster ganz in der Vergangenheit (Blättern), steht der Anker an seinem Ende; liegt es ganz in der Zukunft (Smartphone, zweiter Tag), gibt es keinen Umschalter und das Label heißt **Plan**.
+
+**Labels.** **Bisher**, **Erwartet** bzw. **Gesamt** stehen am jeweiligen Abstand. Die **SoC-Korrektur** des laufenden Tags (Speicherstand gegenüber der Vergleichsbatterie, bewertet zum mittleren Bezugspreis) steckt in keinem Abstand und steht als eigenes Label bei Jetzt. Abgeschlossene Tage im Fenster zeigen oben ihr **Ergebnis** aus dem Buch; Tage mit weniger als 80 % gebuchten Slots sind als „unvollständig“ markiert. Beträge stehen ohne Vorzeichen, die Bedeutung als Wort dabei: „gespart“ oder „mehr ausgegeben“, bei der SoC-Korrektur „gutgeschrieben“ oder „abgezogen“. Das Dezimalzeichen folgt der Sprache des Browsers: Steht in den Spracheinstellungen Englisch vor Deutsch, zeigt Earnie einen Punkt (`2.18 €`), sonst ein Komma (`2,18 €`). Das gilt auch für kWh, kW und Prozent, für Tabellen und für die Achsen der Charts. Nur Eingabefelder zeigen weiter einen Punkt.
+
+**Orange Slots** hat das Buch nicht gezählt (fehlende Messwerte, Buch nicht gelaufen, fehlende Log-Daten). Sie zählen auf beiden Seiten null. Die gerade laufende Viertelstunde erscheint erst, wenn sie gebucht ist. Läuft das Buch nicht oder ist es nicht lesbar, steht unter dem Chart ein kurzer Hinweis.
+
+**Verbrauchskontrolle.** Das kleine Panel darunter prüft nur, ob beide Seiten mit demselben Verbrauch gerechnet wurden; es ist kein zweites Ergebnis. Es zeigt Vergleich minus optimiert in kWh, **null am Horizontende** (auch wenn das sichtbare Fenster früher endet). Der Wert bei Jetzt ist der Energieunterschied des Plans über den restlichen Horizont. Rechts von Jetzt zeigt die Linie auch zeitlich verschobene Verbraucher: Sie verlässt null, solange eine Seite früher verbraucht, und kehrt zurück, wenn die andere aufholt. Links von Jetzt ist sie flach, weil beide Seiten denselben gemessenen Verbrauch nutzen. Unterscheidet sich die Energie bei Jetzt um mindestens 0,5 kWh und mindestens 2 % des geplanten Verbrauchs, nennt ein Hinweis unter dem Chart den Unterschied: „Erwartet“ enthält dann auch den Preis dieser Energie.
 
 ### Kachel „Mit Earnie gespart“
 
@@ -204,7 +215,9 @@ Sind PV, Netz, Batterie und Haus alle exakt 0 kW, zeichnet Earnie keinen Sankey,
 
 ## Analyse Verbrauch & Kosten (Live-Cockpit)
 
-Die Auswertung nutzt dieselbe Slot-Zuordnung wie Chart 1 (`allocate_slot_flows`, siehe [Rauf/Runter-Algorithmus](#raufrunter-algorithmus-wasserfall)).
+**Kontostand mit und ohne Earnie** (oben): dieselbe Kontoansicht wie [Chart 2](#chart-2-kontostand-mit-und-ohne-earnie), für das gewählte 7- oder 28-Tage-Fenster und ganz aus dem Ersparnis-Buch (abgeschlossene Tage aus der Slot-Datei, der laufende Tag aus dem Buch-Zustand). Das Fenster liegt in der Vergangenheit, der Anker steht deshalb am Fensterende: Bei **Ist bei Jetzt** enden beide Linien dort, der Abstand am Fensterstart ist die Ersparnis des Zeitraums (Label **Zeitraum**); **Gemeinsamer Start** lässt beide bei 0 € beginnen. Der Umschalter ist unabhängig von dem im Monitor. Die y-Achse beginnt bei 0 € am Fensterstart, ihre Werte ändern sich also beim Blättern. Statt der Verbrauchskontrolle (links von Jetzt immer flach) zeigt das Panel darunter die **Ersparnis seit Fensterstart** auf eigener Skala, grün oder rot gefüllt; bei mehreren Wochen wäre der Abstand im oberen Panel sonst kaum zu sehen. Statt eines Ergebnis-Labels je Tag sind nur **unvollständige** Tage markiert; die SoC-Korrekturen der Tage, die ganz im Zeitraum liegen, nennt eine Zeile unter dem Chart. Orange Bereiche hat das Buch nicht gezählt (z. B. vor seinem Start).
+
+Die übrige Auswertung nutzt dieselbe Slot-Zuordnung wie Chart 1 (`allocate_slot_flows`, siehe [Rauf/Runter-Algorithmus](#raufrunter-algorithmus-wasserfall)).
 
 - **Verteilung:** Die Zuordnung wird anteilig (pro rata) auf Grundlast und gemessene Flex-Verbraucher verteilt.
 - **Kosten am Verbrauchsort:** Kosten entstehen nur für den **Netzanteil** (Netzanteil × Importpreis); PV und Batterie-Entladung zählen mit 0 €.

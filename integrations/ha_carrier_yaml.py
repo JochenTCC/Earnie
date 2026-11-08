@@ -3,8 +3,8 @@
 From activated ``ehal_bindings`` keys: rest_command + periodic push automations
 (``time_pattern`` = ``EARNIE_PUSH_REPEAT_S``), heartbeat, REST sensor on
 ``status.json``, setpoint automations with ``ENTITY_*`` placeholders, Jinja unit
-conversion to canonical EHAL units, and optional ``plant.ha_ess_force`` Huawei
-setpoint automations.
+conversion to canonical EHAL units, optional ``plant.ha_ess_force`` Huawei setpoint
+automations, and a watchdog that also writes ``plant.ha_fail_safe_values``.
 """
 from __future__ import annotations
 
@@ -20,6 +20,7 @@ from ehal.push_signals import (
     write_signals_from_docs,
 )
 from ehal.qualified_ids import field_kind
+from house_config.ha_fail_safe import FAIL_SAFE_VALUES_KEY, normalize_ha_fail_safe_values
 from integrations.ha_units import QUANTITY_BASE_UNIT, field_quantity
 from scripts.pilot_vo_template_gen import TOKEN_PLACEHOLDER
 
@@ -97,16 +98,64 @@ def _active_power_write_ids(writes: list[Signal]) -> list[str]:
     return [s.ehal_id for s in writes if field_kind(s.ehal_id) == "set_ess_active_power"]
 
 
-def _header(repeat_s: float, watchdog_s: float = 0.0) -> list[str]:
-    watchdog = (
-        [
+def fail_safe_signals(writes: list[Signal], force: dict[str, Any] | None) -> list[Signal]:
+    """Written signals that can take a fail-safe value: numbers with a physical unit.
+
+    Modes and flags have no unit. With a vendor force the active power has no entity to
+    write to, the watchdog calls the vendor's stop service instead.
+    """
+    return [
+        sig
+        for sig in writes
+        if ehal_base_unit(sig.ehal_id)
+        and not (force and field_kind(sig.ehal_id) == "set_ess_active_power")
+    ]
+
+
+def fail_safe_signals_from_docs(house: dict, components: dict) -> list[Signal]:
+    return fail_safe_signals(write_signals_from_docs(house, components), _ha_ess_force(house))
+
+
+def _fail_safe_values(
+    house: dict,
+    writes: list[Signal],
+    force: dict[str, Any] | None,
+) -> dict[str, float]:
+    """Saved values in signal order. A value the package cannot apply is an error."""
+    plant = house.get("plant") if isinstance(house, dict) else None
+    raw = plant.get(FAIL_SAFE_VALUES_KEY) if isinstance(plant, dict) else None
+    values = normalize_ha_fail_safe_values(raw) or {}
+    usable = [sig.ehal_id for sig in fail_safe_signals(writes, force)]
+    unusable = sorted(set(values) - set(usable))
+    if unusable:
+        raise ValueError(
+            f"Fail-safe-Wert ohne passendes Signal: {', '.join(unusable)}. Das Signal ist nicht "
+            "aktiviert oder wird nicht als Zahl geschrieben. Die Fail-safe-Werte auf EHAL-Com "
+            f"einmal speichern entfernt ihn (plant.{FAIL_SAFE_VALUES_KEY})."
+        )
+    return {ehal_id: values[ehal_id] for ehal_id in usable if ehal_id in values}
+
+
+def _header(
+    repeat_s: float,
+    watchdog_s: float = 0.0,
+    *,
+    fail_safe_ids: list[str] | None = None,
+) -> list[str]:
+    fail_safe_list = ", ".join(fail_safe_ids or [])
+    if watchdog_s > 0:
+        watchdog = [
             f"# Watchdog: automation {WATCHDOG_AUTOMATION_ID} releases a forced ESS active "
             f"power when status.json is unreachable for {watchdog_s:g}s.",
+            *([f"# It also writes the fail-safe values of: {fail_safe_list}."] if fail_safe_list else []),
             "# Disable: delete that automation or generate with --watchdog-s 0.",
         ]
-        if watchdog_s > 0
-        else []
-    )
+    else:
+        watchdog = (
+            [f"# Fail-safe values are not applied, no watchdog: {fail_safe_list}."]
+            if fail_safe_list
+            else []
+        )
     return [
         *watchdog,
         "# Earnie HA push carrier package (Binding P5c)",
@@ -222,26 +271,14 @@ def _jinja_to_ehal_vars(entity: str, ehal_unit: str | None) -> list[str]:
 _UNIT_CONVERTED = ("W", "kWh", "%", "A")
 
 
-def _jinja_from_ehal_vars(attr: str, entity: str, ehal_unit: str | None) -> list[str]:
-    """Variables: status attribute (EHAL) → ``hub_value`` for the target entity."""
-    ehal_expr = f"state_attr('{STATUS_SENSOR_ENTITY}', '{attr}')"
-    unit = f"state_attr('{entity}', 'unit_of_measurement') | default('', true) | lower"
-    lines = [
-        "      - variables:",
-        f"          ehal_raw: {_q('{{ ' + ehal_expr + ' }}')}",
-        f"          entity_unit: {_q('{{ ' + unit + ' }}')}",
-    ]
-    if ehal_unit is None:
-        lines.append(
-            "          hub_value: "
-            + _q(
-                "{% if ehal_raw is not none and ehal_raw | is_number %}"
-                "{{ ehal_raw | float }}{% else %}{{ none }}{% endif %}"
-            )
-        )
-        return lines
+def _entity_unit_template(entity: str) -> str:
+    return "{{ " + f"state_attr('{entity}', 'unit_of_measurement') | default('', true) | lower" + " }}"
+
+
+def _hub_value_template(ehal_unit: str | None) -> str:
+    """Jinja: variable ``ehal_raw`` (EHAL unit) → value for the target entity's unit."""
     if ehal_unit == "W":
-        conv = (
+        return (
             "{% set u = entity_unit %}"
             "{% if ehal_raw is none or not (ehal_raw | is_number) %}{{ none }}"
             "{% elif u in ['w', 'watt', 'watts'] %}{{ ehal_raw | float }}"
@@ -249,8 +286,8 @@ def _jinja_from_ehal_vars(attr: str, entity: str, ehal_unit: str | None) -> list
             "{% elif u in ['mw', 'megawatt', 'megawatts'] %}{{ (ehal_raw | float) / 1000000 }}"
             "{% else %}{{ none }}{% endif %}"
         )
-    elif ehal_unit == "kWh":
-        conv = (
+    if ehal_unit == "kWh":
+        return (
             "{% set u = entity_unit %}"
             "{% if ehal_raw is none or not (ehal_raw | is_number) %}{{ none }}"
             "{% elif u in ['kwh', 'kilowatt-hour', 'kilowatt-hours'] %}{{ ehal_raw | float }}"
@@ -260,28 +297,36 @@ def _jinja_from_ehal_vars(attr: str, entity: str, ehal_unit: str | None) -> list
             "{{ (ehal_raw | float) / 1000 }}"
             "{% else %}{{ none }}{% endif %}"
         )
-    elif ehal_unit == "%":
-        conv = (
+    if ehal_unit == "%":
+        return (
             "{% set u = entity_unit %}"
             "{% if ehal_raw is none or not (ehal_raw | is_number) %}{{ none }}"
             "{% elif u in ['%', 'percent'] %}{{ ehal_raw | float }}"
             "{% else %}{{ none }}{% endif %}"
         )
-    elif ehal_unit == "A":
-        conv = (
+    if ehal_unit == "A":
+        return (
             "{% set u = entity_unit %}"
             "{% if ehal_raw is none or not (ehal_raw | is_number) %}{{ none }}"
             "{% elif u in ['a', 'amp', 'amps', 'ampere'] %}{{ ehal_raw | float }}"
             "{% elif u in ['ma', 'milliampere'] %}{{ (ehal_raw | float) * 1000 }}"
             "{% else %}{{ none }}{% endif %}"
         )
-    else:
-        conv = (
-            "{% if ehal_raw is not none and ehal_raw | is_number %}"
-            "{{ ehal_raw | float }}{% else %}{{ none }}{% endif %}"
-        )
-    lines.append(f"          hub_value: {_q(conv)}")
-    return lines
+    return (
+        "{% if ehal_raw is not none and ehal_raw | is_number %}"
+        "{{ ehal_raw | float }}{% else %}{{ none }}{% endif %}"
+    )
+
+
+def _jinja_from_ehal_vars(attr: str, entity: str, ehal_unit: str | None) -> list[str]:
+    """Variables: status attribute (EHAL) → ``hub_value`` for the target entity."""
+    ehal_expr = f"state_attr('{STATUS_SENSOR_ENTITY}', '{attr}')"
+    return [
+        "      - variables:",
+        f"          ehal_raw: {_q('{{ ' + ehal_expr + ' }}')}",
+        f"          entity_unit: {_q(_entity_unit_template(entity))}",
+        f"          hub_value: {_q(_hub_value_template(ehal_unit))}",
+    ]
 
 
 def _log_skip_unknown_unit(message: str) -> list[str]:
@@ -559,24 +604,66 @@ def _ha_ess_force_automations(
     return lines
 
 
+def _fail_safe_write(ehal_id: str, value: float) -> list[str]:
+    """Write one fail-safe value, converted to the entity's unit at run time."""
+    entity = entity_placeholder(ehal_id)
+    unit = ehal_base_unit(ehal_id)
+    skip_msg = (
+        f"Earnie fail-safe value for {ehal_id} not written: unknown or incompatible "
+        f"unit_of_measurement on {entity} (need {unit})"
+    )
+    return [
+        "      - variables:",
+        f"          ehal_raw: {json.dumps(value)}",
+        f"          entity_unit: {_q(_entity_unit_template(entity))}",
+        f"          hub_value: {_q(_hub_value_template(unit))}",
+        "      - if:",
+        "          - condition: template",
+        f"            value_template: {_q('{{ hub_value is none }}')}",
+        "        then:",
+        "          - action: system_log.write",
+        "            data:",
+        "              level: warning",
+        f"              logger: {_LOGGER}",
+        f"              message: {_q(skip_msg)}",
+        "        else:",
+        f"          - action: {_q(set_value_action(entity))}",
+        "            continue_on_error: true",
+        "            target:",
+        f"              entity_id: {entity}",
+        "            data:",
+        f"              value: {_q('{{ hub_value }}')}",
+    ]
+
+
 def _watchdog_automation(
     writes: list[Signal],
     force: dict[str, Any] | None,
     *,
     timeout_s: float,
+    fail_safe: dict[str, float] | None = None,
 ) -> list[str]:
     """Release a forced active power while Earnie is unreachable (issue #60 c).
 
-    Only the sticky force: caps and modes stay as they are. The trigger is the REST
-    status sensor going ``unavailable`` / ``unknown`` for ``timeout_s``; HA then has no
-    attributes, so the periodic setpoint automations stop re-asserting the old force.
+    Caps stay as they are unless the user entered a fail-safe value for them; modes
+    always do. A fail-safe value of the active power replaces the release to 0. The
+    trigger is the REST status sensor going ``unavailable`` / ``unknown`` for
+    ``timeout_s``; HA then has no attributes, so the periodic setpoint automations stop
+    re-asserting Earnie's values.
     """
     active_ids = _active_power_write_ids(writes)
-    if timeout_s <= 0 or not (active_ids or force):
+    values = fail_safe or {}
+    if timeout_s <= 0 or not (active_ids or force or values):
         return []
+    alias = (
+        "Earnie watchdog: write fail-safe values when Earnie is unreachable"
+        if values
+        else "Earnie watchdog: release forced power when Earnie is unreachable"
+    )
+    outcome = "fail-safe values written" if values else "forced active power released"
     lines = [
         f"  - id: {WATCHDOG_AUTOMATION_ID}",
-        f"    alias: {_q('Earnie watchdog: release forced power when Earnie is unreachable')}",
+        f"    alias: {_q(alias)}",
         "    mode: single",
         "    triggers:",
         "      - trigger: state",
@@ -598,6 +685,8 @@ def _watchdog_automation(
         ]
     else:
         for qid in active_ids:
+            if qid in values:
+                continue
             entity = entity_placeholder(qid)
             lines += [
                 f"      - action: {_q(set_value_action(entity))}",
@@ -607,12 +696,14 @@ def _watchdog_automation(
                 "        data:",
                 "          value: 0",
             ]
+    for ehal_id, value in values.items():
+        lines += _fail_safe_write(ehal_id, value)
     lines += [
         "      - action: system_log.write",
         "        data:",
         "          level: warning",
         f"          logger: {_LOGGER}",
-        f"          message: {_q(f'Earnie unreachable for {int(timeout_s)}s: forced active power released')}",
+        f"          message: {_q(f'Earnie unreachable for {int(timeout_s)}s: {outcome}')}",
     ]
     return lines
 
@@ -624,6 +715,7 @@ def _automations(
     repeat_s: float,
     force: dict[str, Any] | None,
     watchdog_s: float = 0.0,
+    fail_safe: dict[str, float] | None = None,
 ) -> list[str]:
     lines = ["automation:"]
     for sig in reads:
@@ -640,7 +732,7 @@ def _automations(
         )
     if force:
         lines += _ha_ess_force_automations(force, active_ids)
-    lines += _watchdog_automation(writes, force, timeout_s=watchdog_s)
+    lines += _watchdog_automation(writes, force, timeout_s=watchdog_s, fail_safe=fail_safe)
     lines.append("")
     return lines
 
@@ -658,7 +750,8 @@ def build_carrier_yaml(
     """Return a full HA YAML package for activated push signals.
 
     ``watchdog_s``: seconds of an unreachable ``status.json`` after which a forced ESS
-    active power is released (0 = no watchdog automation).
+    active power is released and ``plant.ha_fail_safe_values`` are written (0 = no
+    watchdog automation). Raises ``ValueError`` for a saved value without a usable signal.
     """
     cadence = _repeat_s(repeat_s)
     base = f"http://{earnie_host}:{earnie_port}"
@@ -666,18 +759,30 @@ def build_carrier_yaml(
     reads = read_signals_from_docs(house, components)
     writes = write_signals_from_docs(house, components)
     force = _ha_ess_force(house)
+    fail_safe = _fail_safe_values(house, writes, force)
     force_attrs = _active_power_write_ids(writes) if force else []
     if force and not force_attrs:
         force_attrs = ["ess.house.set_ess_active_power"]
 
     parts: list[str] = []
-    has_watchdog = bool(_watchdog_automation(writes, force, timeout_s=watchdog_s))
-    parts.extend(_header(cadence, watchdog_s if has_watchdog else 0.0))
+    has_watchdog = bool(
+        _watchdog_automation(writes, force, timeout_s=watchdog_s, fail_safe=fail_safe)
+    )
+    parts.extend(
+        _header(cadence, watchdog_s if has_watchdog else 0.0, fail_safe_ids=list(fail_safe))
+    )
     parts.extend(_rest_commands(reads, base=base, token_q=token_q))
     parts.extend(
         _status_sensor(base, token_q, writes, cadence, extra_attrs=force_attrs)
     )
     parts.extend(
-        _automations(reads, writes, repeat_s=cadence, force=force, watchdog_s=watchdog_s)
+        _automations(
+            reads,
+            writes,
+            repeat_s=cadence,
+            force=force,
+            watchdog_s=watchdog_s,
+            fail_safe=fail_safe,
+        )
     )
     return "\n".join(parts)

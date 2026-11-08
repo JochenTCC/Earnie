@@ -6,6 +6,7 @@ from datetime import datetime
 import pandas as pd
 import streamlit as st
 
+from ui.number_format import localized_figure
 from ui.consumption_display.adapters import (
     actual_monthly_from_csv,
     bundle_from_cons_data,
@@ -82,17 +83,17 @@ def render_consumption_display(
         iso_year, iso_week = week
         if scenario_consumer_overlays is not None:
             st.plotly_chart(
-                week_scenario_consumer_timeseries_chart(
+                localized_figure(week_scenario_consumer_timeseries_chart(
                     bundle.timestamps,
                     scenario_consumer_overlays,
                     iso_year=iso_year,
                     iso_week=iso_week,
-                ),
+                )),
                 width="stretch",
             )
         else:
             st.plotly_chart(
-                week_timeseries_chart(bundle, iso_year=iso_year, iso_week=iso_week),
+                localized_figure(week_timeseries_chart(bundle, iso_year=iso_year, iso_week=iso_week)),
                 width="stretch",
             )
 
@@ -166,7 +167,7 @@ def _render_monthly_chart(
             return
         actual_monthly = actual_monthly_from_csv(csv_series)
         st.plotly_chart(
-            csv_validation_monthly_chart(bundle, actual_monthly),
+            localized_figure(csv_validation_monthly_chart(bundle, actual_monthly)),
             width="stretch",
         )
         return
@@ -175,4 +176,4 @@ def _render_monthly_chart(
         if mode == ConsumptionDisplayMode.CONS_DATA
         else "Monatsverbrauch: Modell (kWh)"
     )
-    st.plotly_chart(stacked_monthly_chart(bundle, title=title), width="stretch")
+    st.plotly_chart(localized_figure(stacked_monthly_chart(bundle, title=title)), width="stretch")

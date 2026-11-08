@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import io
 import json
+import pickle
 import shutil
 import zipfile
 from pathlib import Path
@@ -174,6 +175,16 @@ def test_bad_user_file_fails_loud(catalog_dir: Path, entry: dict, code: str) -> 
         load_tariffs_document(str(catalog_dir / "tariffs.json"))
     assert info.value.code == code
     assert "user_tariffs.json" in str(info.value)
+
+
+def test_load_error_survives_pickling(catalog_dir: Path) -> None:
+    """Backtesting workers return the error through a process pool."""
+    _write_user(catalog_dir, [USER_FIXED, USER_FIXED])
+    with pytest.raises(EdibertLoadError) as info:
+        load_tariffs_document(str(catalog_dir / "tariffs.json"))
+    restored = pickle.loads(pickle.dumps(info.value))
+    assert isinstance(restored, EdibertLoadError)
+    assert (str(restored), restored.code, restored.params) == (str(info.value), info.value.code, info.value.params)
 
 
 def test_duplicate_user_tariff_fails_loud(catalog_dir: Path) -> None:

@@ -25,7 +25,6 @@ from ui.charts import (
     add_optimized_soc_trace,
     add_price_on_soc_axis_trace,
     build_sun_markers,
-    render_cumulative_cost_chart,
 )
 from ui.chart_trace_segments import _EXPORT_PRICE_COLUMN
 from runtime_store.history_timeline import SLOT_MISSING
@@ -553,62 +552,6 @@ def test_green_zone_left_at_quarter_to_hour_transition():
     assert green is not None
     assert green.x0 == axis.legacy_index_time(idx - 0.5)
     assert green.x1 == x_right
-
-
-def test_chart2_s2_split_mode_shows_cost_summary_annotations(monkeypatch):
-    """Chart 2 annotations use day-scoped totals (visible SA-day / columns)."""
-    from ui.chart_day_costs import DayCostTotals
-
-    captured: dict = {}
-
-    def _capture_chart(fig, **_kwargs):
-        captured["fig"] = fig
-
-    monkeypatch.setattr("ui.charts.st.plotly_chart", _capture_chart)
-    monkeypatch.setattr("ui.charts.render_title_with_help", lambda *_a, **_k: None)
-
-    slots = [_dt(2026, 6, 15, hour, 0) for hour in range(8, 14)]
-    slot_count = len(slots)
-    history_slot_count = 3
-    df = pd.DataFrame({
-        "slot_datetime": slots,
-        "Uhrzeit": [slot.strftime("%d.%m. %H:%M") for slot in slots],
-        "Preis extrapoliert": [False] * slot_count,
-    })
-    day = DayCostTotals(
-        label="SA₀→SA₁ · 15.06.",
-        matched_baseline_cost_euro=2.50,
-        optimized_cost_euro=1.80,
-        achieved_saving_euro=0.30,
-        achieved_soc_correction_euro=-0.05,
-        show_split_savings=True,
-    )
-    render_cumulative_cost_chart(
-        df,
-        hourly_matched_baseline_cost_euro=[0.1] * slot_count,
-        hourly_optimized_cost_euro=[0.08] * slot_count,
-        hourly_matched_baseline_consumption_kwh=[0.5] * slot_count,
-        hourly_optimized_consumption_kwh=[0.45] * slot_count,
-        ledger_savings={
-            "cumulative_euro": [0.1, 0.2, 0.3] + [float("nan")] * (slot_count - 3),
-            "hint": None,
-        },
-        cost_summary_days=(day,),
-        history_slot_count=history_slot_count,
-        slot_actual_cost_euro=[0.05] * history_slot_count,
-        slot_actual_consumption_kwh=[0.2] * history_slot_count,
-        chart_window=_fake_chart_window(slots),
-    )
-    texts = [
-        getattr(item, "text", "")
-        for item in (captured["fig"].layout.annotations or [])
-    ]
-    assert any("BL Ziel: 2.50" in text for text in texts)
-    assert any("Optimiert: 1.80" in text for text in texts)
-    assert any(text.startswith("Bisher:") for text in texts)
-    assert any(text.startswith("Erwartet:") for text in texts)
-    trace_names = [trace.name for trace in captured["fig"].data]
-    assert "Ersparnis bisher" in trace_names
 
 
 def _fake_chart_window(slots):

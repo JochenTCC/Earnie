@@ -12,14 +12,15 @@ Verwandt: [Preise und Marktdaten](../konfiguration/preise.md) (Konfiguration und
 | Einspeisevergütung (€/kWh × Netzeinspeisung) | ja | ja |
 | Aufschläge am Tarif (`settlement_fee_cent_kwh`, `markup_percent`, USt) | ja | ja |
 | **Lieferant-Grundpreis** (`monthly_fee_eur`, Näherung) | **nein** | **ja** (nach Aggregation) |
-| **Netzentgelt-Grundpreis** (`grid_monthly_fee_eur`) | **nein** | **ja** (wenn im Katalog) |
 | **Messstellengebühr** (`metering_monthly_fee_eur`) | **nein** | **ja** (wenn im Katalog) |
 | **Sonstige Fixkosten** (`other_monthly_fee_eur`) | **nein** | **ja** (wenn im Katalog) |
 | **Netznutzung Arbeitspreis** (`netznutzung` am Hausprofil, inkl. Zeitfenster SNAP) | **ja** (vor USt zum Bezugspreis) | **ja** |
-| **Netznutzung Leistungspreis** / netzgebietsspezifische Tabellen | **nein** | **nein** |
-| PLZ-/netzgebietsspezifische Stacks, separate Stromsteuer/Konzessionsabgabe | nein | nein |
+| **Netzverlust und Abgaben je kWh** (Netzbereich: Netzverlustentgelt, Erneuerbaren-Förderbeitrag, Elektrizitätsabgabe Haushalt) | **ja** (vor USt zum Bezugspreis) | **ja** |
+| **Feste Netzbeträge je Jahr** (Netzbereich: Grundpauschale, Förderbeitrag, Förderpauschale) | **nein** | **ja** (nach Aggregation) |
+| **Netznutzung Leistungspreis** (Netzbereich: `capacity_charges`) | **nein** | **ja** (nach Aggregation, je Kalendermonat) |
+| PLZ-/netzgebietsspezifische Stacks, Konzessionsabgabe | nein | nein |
 
-> **Hinweis:** Der volumetrische **Netznutzung Arbeitspreis** wird am Hausprofil (Standort) gepflegt und ist unabhängig vom Lieferantentarif. Er kann zeitabhängig sein (SNAP, vorbereitet WiNAP). Die Werte stammen aus dem Laufzeitkatalog `earnie_env/config/grid_fees.json`; die Vorlage dafür liegt in `share/config/grid_fees.json`. Ein eigener Arbeitspreis ist ein Benutzer-Netzbereich in `user_grid_fees.json` (siehe [Preise](../konfiguration/preise.md#eigener-arbeitspreis-benutzer-netzbereich)). Alle vier Tarifdateien tragen das Tarifformat `tariff_format: 1`; jeder Tarif braucht einen `vat_percent`. Der Leistungspreis fehlt weiterhin. Das optionale Katalogfeld `grid_monthly_fee_eur` dient nur als monatliche Fixgebühr im Szenario-Explorer.
+> **Hinweis:** Der volumetrische **Netznutzung Arbeitspreis** wird am Hausprofil (Standort) gepflegt und ist unabhängig vom Lieferantentarif. Er kann zeitabhängig sein (SNAP, vorbereitet WiNAP). Die Werte stammen aus dem Laufzeitkatalog `earnie_env/config/grid_fees.json`; die Vorlage dafür liegt in `share/config/grid_fees.json`. Ein eigener Arbeitspreis ist ein Benutzer-Netzbereich in `user_grid_fees.json` (siehe [Preise](../konfiguration/preise.md#eigener-arbeitspreis-benutzer-netzbereich)). Alle vier Tarifdateien tragen das Tarifformat `tariff_format: 1`; jeder Tarif braucht einen `vat_percent`. Der Leistungspreis fehlt weiterhin.
 
 Earnie liefert **ausreichend genaue Eurobeträge** für Vergleiche und Demos. Eine Abrechnung gegen echte Stromrechnungen ist damit **nicht** möglich. Katalogwerte können unvollständig oder veraltet sein; die Parameter im Szenarienkonfigurator daher prüfen.
 
@@ -32,7 +33,7 @@ Nach jedem SE-Lauf schreibt Earnie zusätzlich **Fake-Jahresrechnungen** als Mar
 - **Fixkosten:** als eigene Position.
 - **Katalogparameter:** am Ende der Datei.
 
-Ist am Hausprofil ein **Netznutzung Arbeitspreis** gesetzt, erscheint ein Abschnitt **Netznutzung**. Die Jahrestabelle trennt dann **Energiebezug (Lieferant)** und **Netznutzung Arbeitspreis**. Die Summe bleibt dabei gleich, es wird nichts doppelt gezählt.
+Ist am Hausprofil ein **Netznutzung Arbeitspreis** gesetzt, erscheint ein Abschnitt **Netznutzung**. Die Jahrestabelle trennt dann **Energiebezug (Lieferant)**, **Netznutzung Arbeitspreis** und **Netzverlust und Abgaben je kWh**. Die Summe bleibt dabei gleich, es wird nichts doppelt gezählt. Die **Festen Netzbeträge** stehen als eigene Fixkosten-Position in der Jahrestabelle und je Betrag im Abschnitt Netznutzung.
 
 - **Ø Tarif Cent/kWh:** arithmetisches Mittel der stündlichen Tarifpreise über alle Stunden des Monats (`Summe(k_act)/N` bzw. `k_push_act`).
 - **Ø Ist Cent/kWh:** `Energiekosten € / Netzenergie kWh × 100`.
@@ -44,7 +45,7 @@ Für Spot- und aWATTar-Tarife gilt folgende Reihenfolge (Cent/kWh), wie im Katal
 1. **Börsenpreis** des Slots (Day-Ahead, EPEX-Zone zum Land des Tarifs); bei `settlement_mtu: 60min` das Mittel der vier Viertelstunden der Stunde.
 2. Optional **prozentualer Aufschlag** (`markup_percent`), z. B. 3 → Faktor 1,03.
 3. **Fixer Aufschlag des Lieferanten** (`settlement_fee_cent_kwh`) in Cent/kWh. Das Feld gilt nur für Spot-Typen; Netzkosten gehören nicht hierher, sondern in `netznutzung` (Schritt 4).
-4. Optional **Netznutzung Arbeitspreis** aus dem Hausprofil (`netznutzung`, netto, je Slot, mit Zeitregeln wie SNAP).
+4. Optional **Netznutzung Arbeitspreis** aus dem Hausprofil (`netznutzung`, netto, je Slot, mit Zeitregeln wie SNAP) sowie **Netzverlust und Abgaben je kWh** des Netzbereichs (netto, ohne Zeitregeln).
 5. **Umsatzsteuer**, falls `prices_include_vat` = nein: Ergebnis × (1 + `vat_percent`/100). Bei `prices_include_vat` = ja ist der Lieferantenpreis schon brutto; die Netznutzung aus Schritt 4 erhält dann in Schritt 4 selbst die USt (`vat_percent`), weil sie ein Nettopreis ist.
 
 Formel:
@@ -69,7 +70,7 @@ Im Szenarienkonfigurator enthalten die Dropdowns für Bezug und Einspeisung den 
 | Bezug | Lieferanten-Arbeitspreis inkl. USt (wie Katalog-`fixed_cent`); **Netznutzung Arbeitspreis** aus dem Hausprofil wird weiterhin addiert |
 | Einspeisung | eingegebene Vergütung ohne weitere Aufschläge |
 
-Für den eigenen Festpreis gibt es keine Katalog-Vorschau und keine Lieferant- oder Netz-Fixkosten aus dem Tarifkatalog. Die Fixkosten in den SE-Gesamtkosten bleiben daher 0, sofern sie nicht über andere Szenario- oder Hauswerte abgebildet sind. Details: [Preise und Marktdaten](../konfiguration/preise.md).
+Für den eigenen Festpreis gibt es keine Katalog-Vorschau und keine Fixkosten aus dem Tarifkatalog. In den SE-Gesamtkosten zählen dann nur die festen Netzbeträge des Netzbereichs (siehe §4). Details: [Preise und Marktdaten](../konfiguration/preise.md).
 
 ### Beispiel: aWATTar HOURLY (AT)
 
@@ -116,27 +117,35 @@ Details zu Typen und JSON: [Preise und Marktdaten](../konfiguration/preise.md).
 
 | Feld | Bedeutung |
 | ---- | --------- |
-| `grid_monthly_fee_eur` | Netznutzungs-/Netzentgelt-Grundpreis |
 | `metering_monthly_fee_eur` | Messstellenbetrieb / Zählergebühr |
 | `other_monthly_fee_eur` | Sonstige Fixkosten (z. B. bekannte Abgabenpauschale) |
 
-Earnie übernimmt jeden Wert aus dem **Bezugstarif**. Fehlt er dort, kommt er aus dem Einspeisetarif; die beiden Werte werden **nicht** summiert. Tabellen nach PLZ oder Netzgebiet sind nicht hinterlegt, fehlende Werte zählen als 0.
+Earnie übernimmt jeden Wert aus dem **Bezugstarif**. Fehlt er dort, kommt er aus dem Einspeisetarif; die beiden Werte werden **nicht** summiert. Tabellen nach PLZ sind nicht hinterlegt, fehlende Werte zählen als 0.
+
+### Feste Netzbeträge (aus dem Netzbereich)
+
+Grundpauschale, Förderbeitrag auf die Grundpauschale und Erneuerbaren-Förderpauschale stehen je Jahr und netto im Netzbereich des Hausprofils, nicht im Tarif. Earnie zählt je Kalendermonat ein Zwölftel davon und schlägt die USt des Bezugstarifs auf:
+
+`Jahresbetrag / 12 × (1 + vat_percent/100)`
+
+**Beispiel:** Die österreichischen Katalogbereiche führen 54,00 + 3,796 + 19,02 = 76,816 € netto je Jahr. Mit 20 % USt ergibt das 7,68 € je Monat, also 92,18 € je Jahr. Ohne Netzbereich am Szenario entfällt die Position.
 
 ### Gemeinsame Regeln
 
-- **EPEX-/Spot-Tarife:** `prices_include_vat` = nein. Volumetrische Aufschläge **und** `monthly_fee_eur` immer **netto** speichern; die USt kommt nur über `vat_percent` auf den Arbeitspreis.
+- **EPEX-/Spot-Tarife:** `prices_include_vat` = nein. Volumetrische Aufschläge **und** Monatsgebühren immer **netto** speichern; die USt kommt über `vat_percent` auf beide. Beispiel: `awattar_at` führt 4,79 € netto und zählt mit 20 % USt 5,75 € je Monat. Die Vorschau im Szenarienkonfigurator zeigt den gespeicherten Wert.
 - **Festpreis-Tarife:** Netto oder brutto je nach `prices_include_vat` (oft brutto, also `true`).
+- **Einspeisetarife:** Sie führen meist `vat_percent` 0, ihre Monatsgebühr bleibt dann netto. Ist derselbe Anbieter auch Bezugslieferant, zählt der höhere Bruttowert, also meist der des Bezugstarifs.
 - **Abrechnung je Kalendermonat:** Für jeden Kalendermonat im SE-Zeitraum fällt **eine volle** Gebühr an, ohne anteilige Kürzung.
 - **Jahres- und Gesamtwert:** Summe aller Fixkosten über alle Monate plus volumetrische Energiekosten (Bezug minus Einspeiseerlös).
 - **Live-Planung:** Die Fixkosten fehlen im Live-MILP und in den stündlichen `sim_cost`-Kurven.
 - **Netznutzung Arbeitspreis:** Der volumetrische Wert kommt aus dem Hausprofil (`netznutzung`) und dem Netzentgelt-Katalog, nicht aus dem Tarifkatalog.
-- **Leistungspreis:** Earnie modelliert ihn derzeit **nicht**.
+- **Leistungspreis:** Nur wenn der Netzbereich `capacity_charges` trägt. Je Kalendermonat zählt die höchste gebuchte Viertelstunde des Netzbezugs, mindestens die Mindestleistung (`min_kw`). Über der Bandgrenze gilt der höhere Satz nur für den Anteil darüber. Der Betrag kommt netto aus Edibert und erhält die USt des Bezugstarifs. Ein angebrochener Monat zählt voll. Vor dem Beginn des ersten Eintrags fällt kein Leistungspreis an. Eine Lücke danach bricht den Lauf mit einer Fehlermeldung ab. Einträge mit einem Status außerhalb von `include_status` zählen nicht und erscheinen als Hinweis. Lastprofile aus Stundenwerten glätten kurze Spitzen, die echte Spitze kann höher liegen. Die Planung berücksichtigt den Leistungspreis noch nicht.
 
 In der Oberfläche erscheinen die Fixkosten im Szenario-Explorer unter Gesamtkosten und Monatliche Stromkosten. Sind Gebühren vorhanden, zeigt die Seite den Hinweis „Näherung Monatsgebühren“ sowie einen Hinweis zu Netznutzungsentgelten. Zur Fake-Jahresrechnung siehe §1.
 
 ## 5. Katalogparameter prüfen
 
-Nach der Tarifwahl zeigt der Szenarienkonfigurator eine **Vorschau ohne Bearbeitungsmöglichkeit**. Sie enthält Land, `supplier_id`, Aufschläge, USt-Flag und ggf. die ungefähren Lieferant-, Netz- und Messstellen-Fixkosten.
+Nach der Tarifwahl zeigt der Szenarienkonfigurator eine **Vorschau ohne Bearbeitungsmöglichkeit**. Sie enthält Land, `supplier_id`, Aufschläge, USt-Flag und ggf. die ungefähren Lieferant- und Messstellen-Fixkosten.
 
 Besonders lohnt sich ein Blick auf diese Punkte:
 

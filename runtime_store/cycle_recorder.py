@@ -484,6 +484,29 @@ def record_export_limits(
         logger.warning("cycle_recorder: record_export_limits failed: %s", exc)
 
 
+def record_import_caps(
+    token: CycleToken | None,
+    import_ctx: dict[str, Any],
+) -> None:
+    """Store the import limits the live MILP planned with, and the month peaks behind them.
+
+    ``limits_kw`` / ``months`` are kept as planned, so replay needs neither the scenario nor the
+    peak store of that time. ``None`` limits when the scenario has no cap or no active month.
+    """
+    if token is None:
+        return
+    try:
+        caps = import_ctx["import_caps"]
+        token.start_state["import_caps"] = {
+            "limits_kw": None if caps is None else [_json_safe(v) for v in caps.limits_kw],
+            "months": None if caps is None else list(caps.months),
+            "peak_by_month": {k: _json_safe(v) for k, v in import_ctx["peak_by_month"].items()},
+            "unknown_months": list(import_ctx["unknown_months"]),
+        }
+    except Exception as exc:  # noqa: BLE001 — never abort the live run
+        logger.warning("cycle_recorder: record_import_caps failed: %s", exc)
+
+
 def _default_flags() -> dict[str, bool]:
     return {
         "override": False,

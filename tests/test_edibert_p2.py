@@ -62,6 +62,7 @@ def test_plan_lists_both_steps_and_all_questions(tmp_path: Path) -> None:
         "dm5.house_gains",
         "dm5.house_cooling",
         "tf1.tariff_format",
+        "tf1.grid_area_levies",
     )
     by_id = {q.id: q for q in plan.questions}
     assert set(by_id) == set(ANSWERS)
@@ -90,6 +91,7 @@ def test_one_run_one_backup_matches_golden_and_is_idempotent(tmp_path: Path) -> 
         "dm5.house_gains",
         "dm5.house_cooling",
         "tf1.tariff_format",
+        "tf1.grid_area_levies",
     )
     backups = list((config_dir / "backups").iterdir())
     assert len(backups) == 1 and backups[0].name.startswith("pre-migration-dm4-dm5-")
@@ -243,6 +245,66 @@ def test_own_grid_fee_writes_user_area(tmp_path: Path) -> None:
     areas = _json(tmp_path / "user_grid_fees.json")["areas"]
     assert [a["id"] for a in areas] == ["user_home"]
     assert areas[0]["base_cent_kwh"]["unmetered_power"] == 0.0
+
+
+def test_own_grid_fee_keeps_what_the_form_does_not_edit(tmp_path: Path) -> None:
+    """A migrated grid base fee and time rules survive saving the house profile."""
+    from house_config.edibert_tariffs import load_grid_fees, profile_grid_fee
+    from house_config.own_grid_fee import OWN_AREA, OWN_BASE_KEY, persist_own_grid_fee
+
+    shutil.copy(Path("share/config/grid_fees.json"), tmp_path / "grid_fees.json")
+    user_path = tmp_path / "user_grid_fees.json"
+    user_path.write_text(
+        json.dumps(
+            {
+                "tariff_format": 1,
+                "rule_sets": {
+                    "user_night": [
+                        {
+                            "id": "night",
+                            "label": "Nacht",
+                            "status": "verordnet",
+                            "time": {"from": "22:00", "to": "06:00"},
+                            "effect": {"mode": "absolute_cent", "value": 1.0},
+                        }
+                    ]
+                },
+                "areas": [
+                    {
+                        "id": "user_home",
+                        "label": "Alt",
+                        "base_cent_kwh": {"unmetered_power": 4.2, "metered_power": 4.2},
+                        "rule_set": "user_night",
+                        "fixed_eur_year": [
+                            {"id": "grid_base_fee", "label": "Grundgebühr", "eur_year": 36.0}
+                        ],
+                    },
+                    {"id": "user_other", "base_cent_kwh": {"unmetered_power": 1.0, "metered_power": 1.0}},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    out = persist_own_grid_fee(
+        {
+            "area_id": OWN_AREA,
+            OWN_BASE_KEY: 5.0,
+            "power_metering": "unmetered_power",
+            "quarter_hour_meter": True,
+            "include_status": ["verordnet"],
+        },
+        profile_id="home",
+        profile_label="Haus",
+        land="AT",
+        grid_fees_path=str(tmp_path / "grid_fees.json"),
+    )
+    catalog = load_grid_fees(str(tmp_path / "grid_fees.json"), str(user_path))
+    fee = profile_grid_fee("home", {"netznutzung": out}, catalog)
+    assert fee.base_cent_kwh == pytest.approx(5.0)
+    assert fee.fixed_eur_year == pytest.approx(36.0)
+    assert [rule.id for rule in fee.rules] == ["night"]
+    assert catalog.areas["user_home"].label == "Eigener Arbeitspreis – Haus"
+    assert "user_other" in catalog.areas
 
 
 def test_catalog_area_is_passed_through_unchanged(tmp_path: Path) -> None:

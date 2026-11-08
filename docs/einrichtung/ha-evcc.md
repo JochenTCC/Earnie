@@ -35,7 +35,16 @@ Die Komponenten tragen unter `ehal_bindings` nur **Aktivierungsschlüssel** ohne
 
 Die Werte im Push sind bereits in EHAL-Einheiten (z. B. W, kWh, %). Die Umrechnung aus den HA-Einheiten übernimmt das YAML-Paket.
 
-**Watchdog bei Ausfall von Earnie:** Ein Zwangs-Sollwert für die Batterieleistung (`set_ess_active_power`) bleibt in Home Assistant stehen, wenn Earnie ausfällt. Das Paket enthält deshalb die Automation `earnie_watchdog_release_force`: Ist `status.json` länger als 300 s nicht erreichbar (der Sensor `sensor.earnie_ehal_status` steht auf `unavailable` oder `unknown`), setzt sie die Batterieleistung auf 0 und gibt den Zwang damit frei. Bei `ha_ess_force` (Huawei) ruft sie stattdessen `huawei_solar.stop_forcible_charge` auf. Lade- und Entladegrenzen, Modus und EV-Strom bleiben unverändert. Sobald Earnie wieder antwortet, setzen die Sollwert-Automationen den Wert neu. Abschalten: die Automation im Paket löschen oder das Paket mit `python -m scripts.ha_carrier_yaml_gen --watchdog-s 0` erzeugen; die Zeit lässt sich mit `--watchdog-s <Sekunden>` ändern. Viele Wechselrichter haben zusätzlich einen eigenen Timeout für Zwangsladen. In `config.json` stehen unter `ehal.ha` nur die optionalen Einstellungen `sign` und `boolean_invert`.
+**Watchdog bei Ausfall von Earnie:** Ein Zwangs-Sollwert für die Batterieleistung (`set_ess_active_power`) bleibt in Home Assistant stehen, wenn Earnie ausfällt. Das Paket enthält deshalb die Automation `earnie_watchdog_release_force`: Ist `status.json` länger als 300 s nicht erreichbar (der Sensor `sensor.earnie_ehal_status` steht auf `unavailable` oder `unknown`), setzt sie die Batterieleistung auf 0 und gibt den Zwang damit frei. Bei `ha_ess_force` (Huawei) ruft sie stattdessen `huawei_solar.stop_forcible_charge` auf. Lade- und Entladegrenzen und EV-Strom bleiben unverändert, solange kein Fail-safe-Wert für sie eingetragen ist; der Modus bleibt immer unverändert. Sobald Earnie wieder antwortet, setzen die Sollwert-Automationen den Wert neu. Abschalten: die Automation im Paket löschen oder das Paket mit `python -m scripts.ha_carrier_yaml_gen --watchdog-s 0` erzeugen; die Zeit lässt sich mit `--watchdog-s <Sekunden>` ändern. Viele Wechselrichter haben zusätzlich einen eigenen Timeout für Zwangsladen. In `config.json` stehen unter `ehal.ha` nur die optionalen Einstellungen `sign` und `boolean_invert`.
+
+**Fail-safe-Werte:** Eine Entladesperre (`set_ess_discharge_power_limit` = 0) bleibt ohne Fail-safe-Wert aktiv, solange Earnie ausgefallen ist, und die Batterie bleibt gesperrt. Unter **HA Push-Carrier** lässt sich deshalb für jedes geschriebene Signal mit Einheit (Leistung, Strom) ein Wert eintragen, zum Beispiel Entladegrenze = maximale Entladeleistung. Was sicher ist, hängt vom Gerät ab; Earnie prüft die Werte nicht gegen das Gerät.
+
+- Die Werte stehen in EHAL-Einheiten (W, A) in `house_profiles.json` unter `plant.ha_fail_safe_values`. Der Watchdog schreibt sie nach derselben Zeit und rechnet sie in die Einheit der Entity um. Passt die Einheit nicht, überspringt er das Signal und schreibt eine Warnung ins HA-Log.
+- Ein Signal ohne Wert bleibt, wie es ist. Das Paket enthält den Watchdog auch dann, wenn es kein `set_ess_active_power` gibt, sobald ein Wert eingetragen ist.
+- Bei `set_ess_active_power` ersetzt der Wert die 0. Ein Wert ungleich 0 hält die Batterie im Zwang, bis Earnie wieder antwortet. Mit `ha_ess_force` lässt sich hier kein Wert eintragen.
+- Modi und Schalter (`set_ess_mode`, `set_evcs_mode`, `set_ess_source_select`, `set_enable`) können noch keinen Wert annehmen.
+- Sobald Earnie wieder antwortet, setzen die Sollwert-Automationen die Werte neu, die Earnie vorgibt. Ein Signal, für das Earnie gerade keinen Wert vorgibt, bleibt auf dem Fail-safe-Wert.
+- **Ein schon importiertes Paket behält den alten Watchdog**, bis es neu heruntergeladen und in Home Assistant importiert ist. Das gilt auch nach jeder Änderung der Werte.
 
 ### Mindestsignale
 
@@ -60,6 +69,7 @@ Damit evcc und Earnie sich nicht in die Quere kommen, gilt die folgende Checklis
 Lokale Strategien des Hubs für Überschuss, Preise oder Laden dürfen Earnies 48-h-Fahrplan nicht überschreiben:
 
 - [ ] In **evcc** ist keine eigenständige Surplus- oder Spotpreis-Ladeplanung aktiv (kein Smart Cost, kein konkurrierender Planner).
+- [ ] Der **Automatikmodus des evcc-Optimizers** (ab evcc 0.318, in den Optimizer-Einstellungen) ist ausgeschaltet. Eingeschaltet entscheidet evcc selbst, wann das E-Auto lädt und wie sich die Hausbatterie verhält.
 - [ ] Der Loadpoint ist so eingestellt, dass Earnie den Maxstrom (HA-`number`-Entity) setzen kann.
 - [ ] Keine HA-Automation schreibt auf dieselben Setpoint-Entities wie die Automationen aus dem Earnie-YAML-Paket.
 - [ ] Spotpreise und Fahrpläne kommen aus **Earnie**, nicht aus dem Hub.

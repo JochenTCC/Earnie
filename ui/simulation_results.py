@@ -17,6 +17,8 @@ from runtime_store.history_timeline import (
     SLOT_MISSING,
     SLOT_PRESENT,
 )
+from ui.number_format import decimal_separator, format_decimal
+from ui.chart_account_render import render_account_chart
 from ui.chart_baseline_label import chart_baseline_label_context
 from ui.chart_consumer_stack import _chart_flex_consumers, chart_flex_consumers_context
 from ui.chart_context import (
@@ -34,7 +36,6 @@ from ui.charts import (
     _mask_missing_log_slots,
     build_sun_markers,
     render_power_soc_chart,
-    render_price_savings_chart,
 )
 from ui.simulation_table_view import render_frozen_simulation_table
 from ui.history_navigation import render_s2_nav_buttons, s2_zone_help_text
@@ -77,7 +78,11 @@ def render_optimization_chart1(
             slot_deviation_events=bundle.slot_deviation_events,
             optimization_matrix=bundle.optimization_matrix,
             battery_params=bundle.battery_params,
+            show_baseline_soc=bundle.show_baseline_soc,
+            slot_shadow_soc=bundle.slot_shadow_soc,
         )
+    if bundle.baseline_soc_hint:
+        st.caption(bundle.baseline_soc_hint)
 
 
 def render_optimization_chart2(
@@ -85,26 +90,22 @@ def render_optimization_chart2(
     *,
     chart_key: str = "live_price_savings_chart",
 ) -> None:
+    """Chart 2 as an account view (spec ``docs/dev/chart2-account-view.md``)."""
     with chart_baseline_label_context(bundle.baseline_label):
-        render_price_savings_chart(
-            bundle.display_df,
-            bundle.savings_view.get("hourly_matched_baseline_cost_euro"),
-            bundle.savings_view.get("hourly_optimized_cost_euro"),
-            bundle.savings_view.get("hourly_matched_baseline_consumption_kwh"),
-            bundle.savings_view.get("hourly_optimized_consumption_kwh"),
-            matched_baseline_cost_euro=bundle.matched_cost,
-            optimized_cost_euro=bundle.optimized_cost,
-            cost_summary_days=bundle.cost_summary_days or None,
-            ledger_savings=bundle.savings_view.get("ledger_savings"),
-            chart_window=bundle.chart_context.chart_window if bundle.chart_context else None,
-            chart_now=bundle.chart_context.zone_reference if bundle.chart_context else None,
-            chart_zones=bundle.chart_zones,
-            slot_qualities=bundle.chart_qualities,
-            history_slot_count=bundle.history_slot_count,
-            slot_actual_cost_euro=bundle.savings_view.get("slot_actual_cost_euro"),
-            slot_actual_consumption_kwh=bundle.savings_view.get("slot_actual_consumption_kwh"),
-            chart_key=chart_key,
-        )
+        try:
+            render_account_chart(
+                bundle.display_df,
+                bundle.savings_view,
+                history_slot_count=int(bundle.history_slot_count or 0),
+                chart_window=bundle.chart_context.chart_window if bundle.chart_context else None,
+                chart_zones=bundle.chart_zones,
+                slot_qualities=bundle.chart_qualities,
+                sun_markers=bundle.sun_markers,
+                chart_key=chart_key,
+            )
+        except ValueError as exc:
+            logger.warning("Chart 2 cannot be drawn: %s", exc)
+            st.error(f"Chart 2 kann nicht gezeichnet werden: {exc}")
 
 
 def render_optimization_results_tail(bundle: OptimizationDisplayBundle) -> None:
@@ -153,7 +154,7 @@ def render_applied_targets(savings: dict) -> None:
         )
 
         def _format_kwh_cell(kwh: float) -> str:
-            return f"{kwh:.1f} kWh"
+            return f"{format_decimal(kwh, 1)} kWh"
 
         def _format_optimization_cell(kwh: float, source: str) -> str:
             formatted = _format_kwh_cell(kwh)
@@ -380,7 +381,7 @@ def _render_simulation_table(
         styler = _style_simulation_table(display_df, slot_qualities)
     else:
         styler = display_df.style
-    render_frozen_simulation_table(styler)
+    render_frozen_simulation_table(styler.format(decimal=decimal_separator()))
 
 
 def render_simulation_details(

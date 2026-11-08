@@ -18,7 +18,7 @@ def test_failure_window_label_contains_delta():
         {"window_end": "2025-06-15T07:00:00", "diff_kwh": 1.25}
     )
     assert "2025-06-15" in label
-    assert "+1.25" in label
+    assert "+1,25" in label
 
 
 def test_slice_cons_data_for_window_returns_24_rows():

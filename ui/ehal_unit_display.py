@@ -18,6 +18,7 @@ from ehal.field_registry import (
 )
 from ehal.qualified_ids import field_kind
 from integrations.ha_units import QUANTITY_BASE_UNIT, field_quantity, from_ehal
+from ui.number_format import decimal_separator, format_general
 
 Backend = Literal["loxone", "ha", "openems"]
 ValueSpace = Literal["hub", "ehal"]
@@ -60,6 +61,15 @@ def units_for_field(
     return FieldUnits(hub or None, ehal_u)
 
 
+def _number_text_with_viewer_separator(text: str) -> str:
+    """A raw value without a unit keeps all its digits; only the separator follows the viewer."""
+    try:
+        float(text)
+    except ValueError:
+        return text
+    return text.replace(".", decimal_separator())
+
+
 def format_value_with_unit(value: Any, unit: str | None) -> str:
     """Format a numeric/string value with an optional unit suffix."""
     if value is None:
@@ -68,13 +78,13 @@ def format_value_with_unit(value: Any, unit: str | None) -> str:
     if not text:
         return _DASH
     if unit is None or not str(unit).strip():
-        return text
+        return _number_text_with_viewer_separator(text)
     # Already has the unit suffix (e.g. ready-by display strings).
     if text.endswith(str(unit).strip()):
         return text
     try:
         num = float(text.replace(",", "."))
-        text = f"{num:g}"
+        text = format_general(num)
     except (TypeError, ValueError):
         pass
     return f"{text} {unit}".strip()

@@ -74,9 +74,12 @@ def migrate_docs_unattended(
     Fails loud when a step blocks or needs an answer — an archived config is never guessed.
     Exception: dm4 questions keep their 2.7 unattended meaning (no answer = keep as is, e.g.
     Loxone Merker names); from data model 5 on a missing answer stops the run.
+    Steps marked ``attended_only`` do not run here.
     Returns the migrated docs (new files such as ``user_grid_fees.json`` included).
     """
-    registry = tuple(steps) if steps is not None else STEPS
+    registry = tuple(
+        step for step in (steps if steps is not None else STEPS) if not step.attended_only
+    )
     data_model_by_step = {step.id: step.data_model for step in registry}
     level = plan_level_blockers(docs)
     if level:

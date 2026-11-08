@@ -6,6 +6,7 @@ from pathlib import Path
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
+from edibert.ui.number_columns import localized_number_column
 from plotly.subplots import make_subplots
 
 from data.price_forecast_model import peak_regression_metrics
@@ -19,6 +20,7 @@ from data.price_forecast_viz import (
 )
 from ui.help_hint import render_page_title_with_help
 from ui.doc_links import get_page_docs, markdown_doc_link
+from ui.number_format import format_cent_kwh, format_decimal, localized_figure
 
 
 @st.cache_data(ttl=120, show_spinner="Lade Preis-Dataset …")
@@ -72,22 +74,23 @@ def _metric_columns(model_metrics: dict, mirror_metrics: dict, test: pd.DataFram
     actual = test["actual_cent_kwh"].to_numpy(dtype=float)
     model_peak = peak_regression_metrics(actual, test["model_cent_kwh"].to_numpy(dtype=float))
     mirror_peak = peak_regression_metrics(actual, test["mirror_cent_kwh"].to_numpy(dtype=float))
+    mae_gain = mirror_metrics["mae_cent_kwh"] - model_metrics["mae_cent_kwh"]
     cols = st.columns(4)
     cols[0].metric(
         "Modell MAE",
-        f"{model_metrics['mae_cent_kwh']:.2f} Cent/kWh",
-        delta=f"{mirror_metrics['mae_cent_kwh'] - model_metrics['mae_cent_kwh']:+.2f} vs Spiegel",
+        format_cent_kwh(model_metrics['mae_cent_kwh']),
+        delta=f"{format_decimal(mae_gain, signed=True)} vs Spiegel",
         delta_color="normal",
     )
-    cols[1].metric("Spiegel MAE", f"{mirror_metrics['mae_cent_kwh']:.2f} Cent/kWh")
+    cols[1].metric("Spiegel MAE", format_cent_kwh(mirror_metrics['mae_cent_kwh']))
     cols[2].metric(
         "Peak-MAE Modell",
-        f"{model_peak['mae_cent_kwh']:.2f} Cent/kWh",
-        help=f"Obere {model_peak['peak_percentile']:.0f} % der Ist-Preise (≥ {model_peak['peak_threshold_cent_kwh']:.1f} Cent/kWh)",
+        format_cent_kwh(model_peak['mae_cent_kwh']),
+        help=f"Obere {model_peak['peak_percentile']:.0f} % der Ist-Preise (≥ {format_cent_kwh(model_peak['peak_threshold_cent_kwh'], 1)})",
     )
     cols[3].metric(
         "Peak-MAE Spiegel",
-        f"{mirror_peak['mae_cent_kwh']:.2f} Cent/kWh",
+        format_cent_kwh(mirror_peak['mae_cent_kwh']),
     )
 
 
@@ -179,7 +182,11 @@ def _render_holdout_table(evaluation) -> None:
             ["actual_cent_kwh", "model_cent_kwh", "mirror_cent_kwh", "model_error", "mirror_error"]
         ].copy()
         show.index = show.index.strftime("%Y-%m-%d %H:%M")
-        st.dataframe(show.round(3), width="stretch")
+        st.dataframe(
+            show.round(3),
+            width="stretch",
+            column_config={column: localized_number_column(decimals=3) for column in show.columns},
+        )
 
 
 def _render_live_bias_expander() -> None:
@@ -240,17 +247,17 @@ def render_price_forecast_block() -> None:
         f"Dataset: `{dataset_path.name}` · {len(frame)} h gesamt · "
         f"Holdout: {len(evaluation.test)} h · Modell: {evaluation.model.feature_variant} "
         f"({evaluation.model.training_rows} Trainingszeilen) · "
-        f"Bias-Korrektur: {evaluation.model.bias_correction_cent_kwh:+.3f} Cent/kWh "
+        f"Bias-Korrektur: {format_cent_kwh(evaluation.model.bias_correction_cent_kwh, 3, signed=True)} "
         f"(Nicht-Peak < P{evaluation.model.bias_correction_peak_percentile:.0f})"
     )
     _metric_columns(evaluation.model_metrics, evaluation.mirror_metrics, evaluation.test)
 
-    st.plotly_chart(_price_timeseries_chart(evaluation.test), width="stretch")
+    st.plotly_chart(localized_figure(_price_timeseries_chart(evaluation.test)), width="stretch")
     left, right = st.columns(2)
     with left:
-        st.plotly_chart(_scatter_chart(evaluation.test), width="stretch")
+        st.plotly_chart(localized_figure(_scatter_chart(evaluation.test)), width="stretch")
     with right:
-        st.plotly_chart(_hourly_mae_chart(hourly_error_summary(evaluation.test)), width="stretch")
+        st.plotly_chart(localized_figure(_hourly_mae_chart(hourly_error_summary(evaluation.test))), width="stretch")
 
     _render_holdout_table(evaluation)
     _render_live_bias_expander()

@@ -33,8 +33,9 @@ def main(argv: list[str] | None = None) -> int:
         "--watchdog-s",
         type=float,
         default=DEFAULT_WATCHDOG_TIMEOUT_S,
-        help="Release a forced ESS active power when status.json is unreachable this "
-        f"long (default {DEFAULT_WATCHDOG_TIMEOUT_S:g}; 0 = no watchdog)",
+        help="Release a forced ESS active power and write plant.ha_fail_safe_values when "
+        f"status.json is unreachable this long (default {DEFAULT_WATCHDOG_TIMEOUT_S:g}; "
+        "0 = no watchdog)",
     )
     args = parser.parse_args(argv)
     config_dir = args.config_dir

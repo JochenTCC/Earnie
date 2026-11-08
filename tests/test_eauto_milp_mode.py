@@ -1,4 +1,4 @@
-"""Tests für E-Auto MILP Modus A/B (Live) und Modus B (Backtesting)."""
+"""Tests für E-Auto MILP Modus A/B (Live) und stufenlose Planung im Backtesting."""
 from __future__ import annotations
 
 import os
@@ -108,12 +108,12 @@ class TestEautoMilpConfig:
 
 
 class TestEautoMilpModeSelection:
-    def test_logged_day_disables_power_setpoint_in_milp(self):
+    def test_logged_day_uses_power_setpoint_in_milp(self):
         consumer = _eauto_consumer()
         params = _eauto_milp_params()
         assert milp_uses_power_setpoint(
             consumer, _matrix(logged_day=True), 7.0, params
-        ) is False
+        ) is True
         assert milp_uses_power_setpoint(
             consumer, _matrix(logged_day=False), 7.0, params
         ) is True
@@ -139,7 +139,7 @@ class TestEautoMilpModeSelection:
             consumer, _matrix(logged_day=True), 7.0, params
         ) == 3.5
 
-    def test_logged_day_model_has_no_continuous_eauto_power_vars(self):
+    def test_logged_day_model_has_continuous_eauto_power_vars(self):
         params = _eauto_milp_params()
         model = _build_milp_model(
             _matrix(4, logged_day=True),
@@ -152,8 +152,7 @@ class TestEautoMilpModeSelection:
             {"eauto": params},
         )
         assert is_logged_day_matrix(_matrix(logged_day=True))
-        assert "eauto" not in model.consumer_p
-        assert model.consumer_milp_charge_kw["eauto"] == 3.5
+        assert len(model.consumer_p["eauto"]) == 4
         assert len(model.consumer_on["eauto"]) == 4
 
     def test_live_modus_a_model_has_continuous_power_vars(self):

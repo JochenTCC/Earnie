@@ -15,10 +15,12 @@ from simulation.engine import (
 )
 from optimizer.slot_duration import DEFAULT_DT_H
 from simulation.booked_consumption import BOOKED_CONSUMPTION_KEY
+from simulation.capacity_charge import CAPACITY_KEY
 from simulation.reference_costs import LADDER_L2
 from simulation.jahres_verbrauch import jahres_standby_kwh, jahres_verbrauch_kwh
 from ui.consumption_validation_charts import cons_data_monthly_kwh
-from ui.saving_text import soc_correction_text
+from ui.number_format import format_decimal, format_euro
+from ui.saving_text import saving_text, soc_correction_text
 
 _DASH = "—"
 _TIMING_SHIFT_NOTE = "Zeitliche Lastverschiebung (Energie ≈ Spec)"
@@ -123,13 +125,13 @@ def scenario_consumption_subheader(period: dict) -> str:
 def _format_kwh(value: float | None) -> str:
     if value is None:
         return _DASH
-    return f"{value:.1f}"
+    return format_decimal(value, 1)
 
 
 def _format_delta_kwh(value: float | None) -> str:
     if value is None:
         return _DASH
-    return f"{value:+.1f}"
+    return format_decimal(value, 1, signed=True)
 
 
 def _format_plausibility_cell(block: dict | None) -> str:
@@ -419,7 +421,7 @@ def _standard_rules_saving_cell(meta: dict, scenario_id: str, totals: dict) -> s
     block = _soc_correction_block(meta, scenario_id)
     if block:
         saving += float(block["steps"][LADDER_L2]["correction_eur"])
-    return f"{saving:+.2f} €"
+    return saving_text(saving)
 
 
 def _soc_correction_hint(meta: dict, scenario_id: str) -> list[str]:
@@ -472,7 +474,7 @@ def _heat_fuel_cells(meta: dict, scenario_id: str, *, show_fuel: bool) -> dict:
         fuel_kwh = float((block or {}).get("fuel_kwh") or 0.0)
         cells["Brennstoff [kWh]"] = _format_kwh(fuel_kwh) if fuel_kwh else _DASH
         cells["Brennstoffkosten [€]"] = (
-            f"{float(block['fuel_eur']):.2f} €" if fuel_kwh else _DASH
+            format_euro(float(block["fuel_eur"])) if fuel_kwh else _DASH
         )
     cells["CO2 [kg]"] = f"{float(block['co2_kg']):.0f}" if block else _DASH
     return cells
@@ -485,6 +487,51 @@ def _totals_with_fuel(meta: dict, totals: dict) -> dict:
         sid: float(total) + float((fuel.get(sid) or {}).get("fuel_eur") or 0.0)
         for sid, total in totals.items()
     }
+
+
+def build_capacity_rows(meta: dict) -> list[dict]:
+    """One row per result with a capacity charge: highest month peak and the sum over the period."""
+    capacity = meta.get(CAPACITY_KEY) or {}
+    labels = meta.get("labels", {})
+    totals = meta.get("summary", {}).get("total_eur", {})
+    rows: list[dict] = []
+    for scenario_id in _annual_cost_row_order(meta, totals):
+        months = (capacity.get(scenario_id) or {}).get("months") or []
+        if not months:
+            continue
+        highest = max(months, key=lambda month: float(month["peak_kw"]))
+        rows.append(
+            {
+                "Szenario": labels.get(scenario_id, scenario_id),
+                "Höchste Monatsspitze [kW]": format_decimal(float(highest["peak_kw"])),
+                "Monat": highest["month"],
+                "Ø abgerechnet [kW]": format_decimal(
+                    sum(float(month["billed_kw"]) for month in months) / len(months)
+                ),
+                "Leistungspreis [€]": format_euro(
+                    sum(float(month["gross_eur"]) for month in months)
+                ),
+                "Bezugsgrenze [kW]": (
+                    format_decimal(float(highest["import_cap_kw"]))
+                    if highest.get("import_cap_kw") is not None
+                    else "–"
+                ),
+                "Viertelstunden über der Grenze": sum(
+                    int(month.get("slots_over_cap", 0)) for month in months
+                ),
+            }
+        )
+    return rows
+
+
+def capacity_skipped_text(meta: dict) -> str | None:
+    """Entries left out by status, for the notice under the table; ``None`` without any."""
+    skipped: dict[str, str] = {}
+    for block in (meta.get(CAPACITY_KEY) or {}).values():
+        skipped.update(block.get("skipped") or {})
+    if not skipped:
+        return None
+    return ", ".join(f"{cid} (Status {status})" for cid, status in sorted(skipped.items()))
 
 
 def build_annual_cost_rows(meta: dict) -> list[dict]:
@@ -532,7 +579,7 @@ def build_annual_cost_rows(meta: dict) -> list[dict]:
                     "Speicher-Standby [kWh]": standby_cell,
                     "Gesamtverbrauch [kWh]": total_cell,
                     **_heat_fuel_cells(meta, scenario_id, show_fuel=show_fuel),
-                    "Jahres Kosten [€]": f"{total_eur:.2f} €",
+                    "Jahres Kosten [€]": format_euro(total_eur),
                     "Ersparnis vs. Standard-Regeln [€]": _DASH,
                     "Δ vs Referenz [€]": _DASH,
                     "Hinweis": hinweis,
@@ -542,7 +589,7 @@ def build_annual_cost_rows(meta: dict) -> list[dict]:
 
         delta_cell = _DASH
         if live_ref_total is not None:
-            delta_cell = f"{total_eur - live_ref_total:+.2f} €"
+            delta_cell = format_euro(total_eur - live_ref_total, signed=True)
         rows.append(
             {
                 "Szenario": label,
@@ -550,7 +597,7 @@ def build_annual_cost_rows(meta: dict) -> list[dict]:
                 "Speicher-Standby [kWh]": standby_cell,
                 "Gesamtverbrauch [kWh]": total_cell,
                 **_heat_fuel_cells(meta, scenario_id, show_fuel=show_fuel),
-                "Jahres Kosten [€]": f"{total_eur:.2f} €",
+                "Jahres Kosten [€]": format_euro(total_eur),
                 "Ersparnis vs. Standard-Regeln [€]": _standard_rules_saving_cell(
                     meta, scenario_id, totals
                 ),

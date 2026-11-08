@@ -1,7 +1,9 @@
 """Tests for QH power-interval sampler and closed_interval means."""
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+import json
+import logging
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -184,6 +186,162 @@ def test_finalize_overlays_counter_delta_when_anchored(tmp_path: Path):
     # Δimport 0.25 − Δexport 0.05 = 0.20 kWh → 0.8 kW
     assert closed["grid_kw"] == pytest.approx(0.8)
     assert closed["battery_kw"] == pytest.approx(-0.5)
+
+
+def _sample_grid(state: Path, start: datetime, grids, read_energy=None) -> None:
+    for offset, grid in zip(range(30, 30 * (len(grids) + 1), 30), grids):
+        assert sampler.tick(
+            now=start + timedelta(seconds=offset),
+            force=True,
+            state_path=str(state),
+            read_plant=lambda g=grid: _plant(grid=g),
+            read_soc=lambda: 50.0,
+            read_flex_chart=lambda: {},
+            read_energy=read_energy,
+        )
+
+
+def _energy(open_grid: dict, close_grid: dict):
+    calls = {"n": 0}
+
+    def read_energy():
+        calls["n"] += 1
+        return {"grid": open_grid if calls["n"] == 1 else close_grid}
+
+    return read_energy
+
+
+def test_import_mean_is_not_offset_by_export_in_the_same_slot(tmp_path: Path):
+    state = tmp_path / "sampler.json"
+    start = datetime(2026, 11, 7, 18, 0, 0)
+    _sample_grid(state, start, [3.0, -3.0, 3.0])
+    closed = sampler.finalize_closed_interval(start, state_path=str(state))
+    assert closed["grid_kw"] == pytest.approx(1.0)
+    assert closed["grid_import_kw"] == pytest.approx(2.0)
+    assert closed["grid_import_source"] == sampler.GRID_IMPORT_SOURCE_MEAN
+    assert (closed["grid_import_start"], closed["grid_import_end"]) == (
+        "2026-11-07T18:00:30",
+        "2026-11-07T18:01:30",
+    )
+
+
+def test_import_counter_divides_by_the_real_window(tmp_path: Path):
+    state = tmp_path / "sampler.json"
+    start = datetime(2026, 11, 7, 18, 0, 0)
+    read_energy = _energy({"total": 100.0, "total_neg": 5.0}, {"total": 100.29, "total_neg": 5.2})
+    _sample_grid(state, start, [9.0, 9.0, 9.0], read_energy)
+    closed = sampler.finalize_closed_interval(
+        start, state_path=str(state), read_energy=read_energy, now=start + timedelta(minutes=15)
+    )
+    # 0.29 kWh imported over 870 s (first read 30 s into the slot), export counter left out
+    assert closed["grid_import_kw"] == pytest.approx(1.2)
+    assert closed["grid_import_source"] == sampler.GRID_IMPORT_SOURCE_COUNTER
+    assert (closed["grid_import_start"], closed["grid_import_end"]) == (
+        "2026-11-07T18:00:30",
+        "2026-11-07T18:15:00",
+    )
+    # the net counter value keeps its fixed 0.25 h, as before
+    assert closed["grid_kw"] == pytest.approx(0.36)
+
+
+@pytest.mark.parametrize(
+    ("close_total", "closed_after"),
+    [(99.0, timedelta(minutes=15)), (100.29, timedelta(minutes=4))],
+    ids=["counter reset", "window too short"],
+)
+def test_import_stays_on_the_mean_without_a_usable_counter_window(
+    tmp_path: Path, close_total, closed_after
+):
+    state = tmp_path / "sampler.json"
+    start = datetime(2026, 11, 7, 18, 0, 0)
+    read_energy = _energy({"total": 100.0}, {"total": close_total})
+    _sample_grid(state, start, [2.0, 2.0, 2.0], read_energy)
+    closed = sampler.finalize_closed_interval(
+        start, state_path=str(state), read_energy=read_energy, now=start + closed_after
+    )
+    assert closed["grid_import_source"] == sampler.GRID_IMPORT_SOURCE_MEAN
+    assert closed["grid_import_kw"] == pytest.approx(2.0)
+
+
+@pytest.fixture
+def own_runtime(tmp_path: Path, monkeypatch) -> Path:
+    """The raw log goes to the runtime dir; pin it so no other test's files are seen."""
+    runtime = tmp_path / "runtime"
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(runtime))
+    return runtime
+
+
+def _tick_at(state: Path, moment: datetime, grid: float, total: float) -> None:
+    assert sampler.tick(
+        now=moment,
+        force=True,
+        state_path=str(state),
+        read_plant=lambda: _plant(grid=grid),
+        read_soc=lambda: 50.0,
+        read_flex_chart=lambda: {},
+        read_energy=lambda: {"grid": {"total": total, "total_neg": 7.0}},
+    )
+
+
+def test_raw_sample_log_keeps_counters_and_only_the_last_days(tmp_path: Path, monkeypatch, own_runtime):
+    from runtime_store import clock_skew
+
+    monkeypatch.setenv("EARNIE_POWER_SAMPLE_LOG_DAYS", "2")
+    monkeypatch.setattr(
+        clock_skew, "current_estimate", lambda: clock_skew.SkewEstimate(-1.2, 5, ("example.org",))
+    )
+    from runtime_store import ehal_push_inbox
+
+    pushed = datetime(2026, 11, 6, 22, 59, 12, tzinfo=timezone.utc)
+    ehal_push_inbox.record_push("grid.meter.sens_grid_energy_import", "110.0", now=pushed)
+    ehal_push_inbox.record_push("grid.meter.sens_grid_power_active", "2500", now=pushed)
+    state = tmp_path / "sampler.json"
+    first = datetime(2026, 11, 5, 23, 59, 30)
+    _tick_at(state, first, 1.5, 100.0)
+    _tick_at(state, first + timedelta(days=1), 2.5, 110.0)
+    folder = Path(sampler.sample_log_dir())
+    lines = (folder / "2026-11-06.jsonl").read_text(encoding="utf-8").splitlines()
+    assert [json.loads(line) for line in lines] == [{
+        "ts": "2026-11-06T23:59:30",
+        "grid_kw": 2.5,
+        "grid_power_pushed_at": pushed.isoformat(),
+        "grid_import_total_kwh": 110.0,
+        "grid_import_pushed_at": pushed.isoformat(),
+        "grid_export_total_kwh": 7.0,
+        "grid_export_pushed_at": None,
+        "clock_skew_sec": -1.2,
+    }]
+    _tick_at(state, first + timedelta(days=2), 3.5, 120.0)
+    assert sorted(p.name for p in folder.iterdir()) == ["2026-11-06.jsonl", "2026-11-07.jsonl"]
+
+
+def test_in_shadow_mode_the_push_time_is_prods_from_the_feed(monkeypatch):
+    """Shadow reads through the feed: the logged push time must be when Prod got the value."""
+    from runtime_store import ehal_push_inbox
+
+    monkeypatch.setattr(
+        ehal_push_inbox,
+        "_shadow_feed_overlay_if_active",
+        lambda eid: {eid: {"value": 110.0, "parse_ok": True, "last_ts": "2026-11-08T07:00:12+00:00"}},
+    )
+    assert ehal_push_inbox.push_last_ts("grid.meter.sens_grid_energy_import") == "2026-11-08T07:00:12+00:00"
+
+
+def test_raw_sample_log_is_off_by_default(tmp_path: Path, monkeypatch, own_runtime):
+    monkeypatch.delenv("EARNIE_POWER_SAMPLE_LOG_DAYS", raising=False)
+    _tick_at(tmp_path / "sampler.json", datetime(2026, 11, 7, 18, 0, 30), 1.0, 100.0)
+    assert Path(sampler.sample_log_dir()) == own_runtime / sampler.SAMPLE_LOG_DIRNAME
+    assert not (own_runtime / sampler.SAMPLE_LOG_DIRNAME).exists()
+
+
+def test_a_bad_log_setting_is_reported_and_sampling_goes_on(
+    tmp_path: Path, monkeypatch, caplog, own_runtime
+):
+    monkeypatch.setenv("EARNIE_POWER_SAMPLE_LOG_DAYS", "-1")
+    with caplog.at_level(logging.WARNING):
+        _tick_at(tmp_path / "sampler.json", datetime(2026, 11, 7, 18, 0, 30), 1.0, 100.0)
+    assert "raw sample log failed" in caplog.text
+    assert "POWER_SAMPLE_LOG_DAYS" in caplog.text
 
 
 def test_finalize_overlays_flex_counter_when_anchored(tmp_path: Path):

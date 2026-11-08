@@ -79,6 +79,46 @@ def on_cycle(
         return None
 
 
+def planning_shadow_soc(closed_interval: dict[str, Any] | None) -> float | None:
+    """Shadow SoC at the start of the slot this cycle plans (Ledger P11); ``None`` without a chain.
+
+    ``main.py`` computes the plan before ``on_cycle`` books the slot the cycle just
+    closed, so this steps the chain over that slot without saving anything. The plan's
+    baseline then starts where the chain stands once the slot is booked. Never raises:
+    a failure logs a warning and counts as no chain.
+    """
+    try:
+        return _planning_shadow_soc(closed_interval)
+    except Exception as exc:  # noqa: BLE001 — the ledger must never stop a live cycle
+        logger.warning("savings ledger: no shadow SoC for the plan (%s).", exc, exc_info=True)
+        return None
+
+
+def _planning_shadow_soc(closed_interval: dict[str, Any] | None) -> float | None:
+    batteries = config.get_battery_params_list()
+    if not batteries:
+        return None
+    _ensure_loaded()
+    if _state is None:
+        return None
+    if not isinstance(closed_interval, dict) or not closed_interval.get("interval_start"):
+        return _state.shadow_soc
+    timezone_name = config.get_planning_timezone()
+    slot_start = _closed_slot_start(closed_interval, timezone_name)
+    advanced, _row = sl.advance(
+        _state,
+        store.ledger_input_from_pending(slot_start, closed_interval, _state.pending_slot),
+        sl.shadow_battery_params(batteries),
+        store.sunrise_day_bounds(
+            config.get("LATITUDE", cast=float),
+            config.get("LONGITUDE", cast=float),
+            timezone_name,
+        ),
+        app_version=__version__,
+    )
+    return advanced.shadow_soc
+
+
 def _book_error_slot(closed_interval: dict[str, Any] | None) -> None:
     global _state
     if _state is None or not isinstance(closed_interval, dict):

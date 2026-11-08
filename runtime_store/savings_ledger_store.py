@@ -114,6 +114,12 @@ def peek_state(path: str | None = None) -> LoadedState:
         return LoadedState(None, CHAIN_STATE_UNREADABLE)
 
 
+def current_shadow_soc(path: str | None = None) -> float | None:
+    """Where the shadow chain stands now, or ``None`` without a readable chain."""
+    state = peek_state(path).state
+    return state.shadow_soc if state is not None else None
+
+
 def save_state(state: LedgerState, path: str | None = None) -> None:
     """Write the state atomically (temp file + ``os.replace``)."""
     path = path or savings_ledger_state_file()

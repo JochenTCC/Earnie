@@ -26,6 +26,8 @@ from simulation.engine_scenario import scenario_standby_power_kw
 from simulation.backtesting_horizon import BOOK_PERIOD_KEY
 from simulation.period_clip import clip_results_map_to_period
 from simulation.reference_costs import reference_standby_power_kw
+from house_config.import_cap import parse_import_cap
+from simulation.capacity_charge import capacity_by_result, check_capacity_coverage
 from simulation.monthly_fees import fee_breakdowns_by_result_id
 from simulation.se_invoice_markdown import write_se_invoices
 from data.data_loader import resolve_simulation_window
@@ -52,6 +54,7 @@ from simulation.engine import (
     window_slot_datetimes,
 )
 from simulation.reference_costs import LADDER_L2
+from simulation.forecast_mode import PLAN_PRICE, parse_plan_forecast
 from simulation.reference_ladder import (
     LadderReferenceSpec,
     compute_ladder_reference,
@@ -238,6 +241,11 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         description="Backtesting der Energie-Optimierung auf historischen Loxone-Daten.",
     )
     parser.add_argument(
+        "--skip-historical-reference",
+        action="store_true",
+        help="Referenz ohne PV und Batterie nicht rechnen (Studien). Jedes Szenario braucht dann own_reference.",
+    )
+    parser.add_argument(
         "--start-month",
         type=_parse_month,
         metavar="MONAT",
@@ -282,6 +290,16 @@ def _build_arg_parser() -> argparse.ArgumentParser:
             "Preise in der grünen Zone (nur sunrise_window): "
             "'perfect' = historischer Ist-Preis (Standard), "
             "'mirror' = Spiegelung, 'forecast' = OLS-Prognose."
+        ),
+    )
+    parser.add_argument(
+        "--plan-forecast",
+        metavar="EINGABEN",
+        help=(
+            "Forecast-Modus (nur sunrise_window): der MILP plant diese Eingaben auf Prognosen, "
+            "gebucht wird auf Ist-Werten. Kommagetrennt aus price, pv, load; 'price' braucht "
+            "--price-strategy mirror|forecast. Leer = Plan auf Ist-Werten, gleiches Ergebnis wie "
+            "ohne Schalter. Siehe docs/dev/se-forecast-mode.md."
         ),
     )
     parser.add_argument(
@@ -452,6 +470,7 @@ def _run_scenario_worker(
     forecast_model_path: str | None,
     progress_file: str | None = None,
     progress_label: str | None = None,
+    plan_forecast: tuple[str, ...] | None = None,
 ) -> tuple[str, pd.DataFrame, object, list[dict], list[dict]]:
     """Top-Level-Worker für ProcessPoolExecutor (Windows spawn)."""
     from pathlib import Path
@@ -489,6 +508,7 @@ def _run_scenario_worker(
         price_resources=price_resources,
         snapshot_collector=snapshots,
         on_progress=on_progress,
+        plan_forecast=plan_forecast,
     )
     return name, df_result, plausibility, cbc_events, snapshots
 
@@ -508,6 +528,7 @@ def _run_parallel_backtesting(
     progress_file: str | None = None,
     *,
     ladder_specs: list[LadderReferenceSpec],
+    plan_forecast: tuple[str, ...] | None = None,
 ) -> tuple[
     dict[str, pd.DataFrame],
     dict[str, object],
@@ -577,6 +598,7 @@ def _run_parallel_backtesting(
                     forecast_model_path,
                     progress_file,
                     labels.get(name, name),
+                    plan_forecast,
                 )
             ] = ("sim", name, labels.get(name, name))
         for future in as_completed(futures):
@@ -937,6 +959,14 @@ def main(argv: list[str] | None = None):
         raise SystemExit(
             f"--price-strategy {price_strategy} erfordert --horizon-mode {SUNRISE_WINDOW}."
         )
+    plan_forecast = parse_plan_forecast(args.plan_forecast)
+    if plan_forecast is not None:
+        if horizon_mode != SUNRISE_WINDOW:
+            raise SystemExit(f"--plan-forecast erfordert --horizon-mode {SUNRISE_WINDOW}.")
+        if (PLAN_PRICE in plan_forecast) != (price_strategy != PRICE_STRATEGY_PERFECT):
+            raise SystemExit(
+                f"--plan-forecast {PLAN_PRICE} und --price-strategy mirror|forecast gehören zusammen."
+            )
     feature_dataset_path, forecast_model_path = _resolve_price_paths(args)
     feature_dataset_str = str(feature_dataset_path) if feature_dataset_path else None
     forecast_model_str = str(forecast_model_path) if forecast_model_path else None
@@ -971,6 +1001,8 @@ def main(argv: list[str] | None = None):
             f"{start.date()} – {end.date()}"
         )
 
+    if plan_forecast is not None:
+        print(f"Forecast-Modus: Plan auf {', '.join(plan_forecast) or 'Ist-Werten'}, Buchung auf Ist-Werten.")
     if price_strategy != PRICE_STRATEGY_PERFECT:
         print(f"Preisstrategie grüne Zone: {price_strategy}")
         if feature_dataset_path is not None:
@@ -1089,6 +1121,12 @@ def main(argv: list[str] | None = None):
     )
     reference_by_scenario = {sid: reference_by_scenario[sid] for sid in scenarios}
     used_references = set(reference_by_scenario.values())
+    if args.skip_historical_reference and HISTORICAL_REFERENCE_ID in used_references:
+        raise SystemExit(
+            "--skip-historical-reference: Ein Szenario nutzt die Referenz ohne PV und Batterie "
+            "(own_reference fehlt): "
+            + ", ".join(sid for sid, ref in reference_by_scenario.items() if ref == HISTORICAL_REFERENCE_ID)
+        )
     extra_ref_specs = [spec for spec in extra_ref_specs if spec[0] in used_references]
     labels.update(extra_ref_labels)
     ladder_by_scenario, ladder_specs = plan_ladder_reference_tasks(
@@ -1100,13 +1138,26 @@ def main(argv: list[str] | None = None):
         *extra_ref_specs,
         *((spec.ref_id, spec.params, spec.label) for spec in ladder_specs),
     ]
+    # A gap in a grid area's capacity charge fails here, not after the run.
+    for params in (
+        *scenarios.values(),
+        *(params for _ref_id, params, _label in all_ref_specs),
+        reference_params,
+    ):
+        check_capacity_coverage(params, start, end)
     ladder_report: dict[str, dict] = {}
     reference_specs: list[tuple[str, dict | None, str, str]] = [
-        (
-            HISTORICAL_REFERENCE_ID,
-            reference_params,
-            HISTORICAL_REFERENCE_LABEL,
-            "_reference",
+        *(
+            []
+            if args.skip_historical_reference
+            else [
+                (
+                    HISTORICAL_REFERENCE_ID,
+                    reference_params,
+                    HISTORICAL_REFERENCE_LABEL,
+                    "_reference",
+                )
+            ]
         ),
         *[
             (ref_id, params, label, ref_id)
@@ -1156,24 +1207,25 @@ def main(argv: list[str] | None = None):
     sim_results: dict[str, pd.DataFrame] = {}
 
     if args.workers == 1:
-        print(f"Berechne Referenz '{HISTORICAL_REFERENCE_LABEL}'...")
-        ref_progress_path = worker_progress_path(progress_file, "_reference")
-        ref_progress = _make_progress_printer(
-            HISTORICAL_REFERENCE_LABEL,
-            ref_progress_path,
-            phase="reference",
-            result_id=HISTORICAL_REFERENCE_ID,
-        )
-        sim_results[HISTORICAL_REFERENCE_ID] = compute_historical_reference_costs(
-            start,
-            end,
-            prices,
-            ref_settings,
-            cache=cache,
-            scenario_params=reference_params,
-            horizon_mode=horizon_mode,
-            on_progress=ref_progress,
-        )
+        if not args.skip_historical_reference:
+            print(f"Berechne Referenz '{HISTORICAL_REFERENCE_LABEL}'...")
+            ref_progress_path = worker_progress_path(progress_file, "_reference")
+            ref_progress = _make_progress_printer(
+                HISTORICAL_REFERENCE_LABEL,
+                ref_progress_path,
+                phase="reference",
+                result_id=HISTORICAL_REFERENCE_ID,
+            )
+            sim_results[HISTORICAL_REFERENCE_ID] = compute_historical_reference_costs(
+                start,
+                end,
+                prices,
+                ref_settings,
+                cache=cache,
+                scenario_params=reference_params,
+                horizon_mode=horizon_mode,
+                on_progress=ref_progress,
+            )
         extra_refs, _extra_labels, reference_by_scenario = (
             build_per_scenario_reference_costs(
                 start,
@@ -1226,6 +1278,7 @@ def main(argv: list[str] | None = None):
                 horizon_mode=horizon_mode,
                 price_resources=price_resources,
                 snapshot_collector=scenario_snapshots,
+                plan_forecast=plan_forecast,
             )
             sim_results[name] = df_result
             plausibility_by_scenario[name] = plausibility
@@ -1254,6 +1307,7 @@ def main(argv: list[str] | None = None):
                 forecast_model_str,
                 progress_file=progress_file,
                 ladder_specs=ladder_specs,
+                plan_forecast=plan_forecast,
             )
         )
         for name in scenarios:
@@ -1289,7 +1343,7 @@ def main(argv: list[str] | None = None):
         "horizon_mode": horizon_mode,
         "start_month": args.start_month.month if args.start_month is not None else None,
         "end_month": args.end_month.month if args.end_month is not None else None,
-        "backtesting_year": BACKTESTING_YEAR,
+        "backtesting_year": start.year,
         "price_source": price_source,
         "price_strategy": price_strategy,
         "season_mirror_to_last_month": is_season_mirror_enabled(),
@@ -1298,6 +1352,8 @@ def main(argv: list[str] | None = None):
         "ladder_report": ladder_report,
         "live_scenario_id": live_scenario_id,
     }
+    if plan_forecast is not None:
+        period_meta["plan_forecast"] = list(plan_forecast)
     from simulation.engine import collect_imported_pv_scenario_meta
 
     used_pv, missing_pv = collect_imported_pv_scenario_meta(scenarios)
@@ -1355,12 +1411,20 @@ def main(argv: list[str] | None = None):
     )
     from simulation.heat_fuel import heat_fuel_by_result
 
-    heat_fuel = heat_fuel_by_result(
+    params_by_result = {
+        **scenarios,
+        **{ref_id: params for ref_id, params, _label in all_ref_specs},
+        HISTORICAL_REFERENCE_ID: reference_params,
+    }
+    heat_fuel = heat_fuel_by_result(clipped_results, params_by_result)
+    capacity = capacity_by_result(
         clipped_results,
+        params_by_result,
+        # Only the optimized runs plan with the cap, the references carry the same params.
         {
-            **scenarios,
-            **{ref_id: params for ref_id, params, _label in all_ref_specs},
-            HISTORICAL_REFERENCE_ID: reference_params,
+            scenario_id: cap.cap_kw
+            for scenario_id, params in scenarios.items()
+            if (cap := parse_import_cap(params)) is not None
         },
     )
     log_path = save_backtesting_log(
@@ -1379,6 +1443,7 @@ def main(argv: list[str] | None = None):
         prices=prices if sim_cfg.get("export_price_series", False) else None,
         booked_consumption=booked_consumption,
         heat_fuel=heat_fuel,
+        capacity_by_scenario=capacity,
     )
     from runtime_store.usage_ping import note_scenarios_calculated
 
@@ -1396,6 +1461,7 @@ def main(argv: list[str] | None = None):
         period_start=start.date().isoformat(),
         period_end=end.date().isoformat(),
         booked_consumption_by_scenario=booked_consumption,
+        capacity_by_scenario=capacity,
     )
     if progress_file:
         clear_progress_dir(progress_file)

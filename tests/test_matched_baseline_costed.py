@@ -64,6 +64,7 @@ def _run(matrix: list[dict]):
     return sim_costs._run_savings_horizons(
         matrix,
         60.0,
+        60.0,
         None,
         None,
         None,

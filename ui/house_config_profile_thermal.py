@@ -28,6 +28,7 @@ from ui.house_config_profile_thermal_annual import (  # noqa: F401  (re-exported
     _render_thermal_storage_fields,
     _render_wp_annual_metric,
 )
+from ui.number_format import format_cent_kwh, format_euro
 
 
 _PASSTHROUGH_CONSUMER_KEYS = (
@@ -219,7 +220,7 @@ def _render_nne_area_fields(
                 min_value=0.0,
                 step=0.001,
                 help=(
-                    "Konstanter Netznutzungs-Arbeitspreis netto (ohne USt), ohne Zeitregeln. "
+                    "Netznutzungs-Arbeitspreis netto (ohne USt). "
                     "0 = bewusst kein Netzentgelt."
                 ),
                 ratios=WIDE_LABEL_RATIOS,
@@ -230,29 +231,67 @@ def _render_nne_area_fields(
     return area_choice, base_manual
 
 
-def _show_nne_spec_caption(config: dict, catalog: dict) -> None:
-    """Resolved base price and active time rules of the chosen Netzbereich (via Edibert)."""
+def _resolved_grid_fee(config: dict):
+    """Grid fee of the form's ``netznutzung`` through Edibert; shows the error and returns ``None``."""
     from house_config.edibert_tariffs import cached_grid_fees, profile_grid_fee
     from runtime_store.persist_paths import resolve_grid_fees_json_path
 
-    _ = catalog  # the selection list; Edibert resolves from the same files
     try:
-        fee = profile_grid_fee(
+        return profile_grid_fee(
             "Formular", {"netznutzung": config}, cached_grid_fees(resolve_grid_fees_json_path())
         )
     except ValueError as exc:
         st.error(str(exc))
-        return
+        return None
+
+
+def _grid_rules_text(fee) -> str:
     active = ", ".join(rule.id for rule in fee.rules) or "keine"
     skipped = ", ".join(
         f"{item.rule_id} (status={item.detail})" if item.reason == "status"
         else f"{item.rule_id} ({item.reason})"
         for item in fee.skipped
     )
+    return f"aktive Zeitregeln: **{active}**" + (f" · übersprungen: {skipped}" if skipped else "")
+
+
+def _grid_parts_text(fee) -> str:
+    """Per-kWh parts and fixed amounts of a grid fee; empty without any."""
+    parts = []
+    if fee.components:
+        cent = sum(part.value for part in fee.components)
+        parts.append(f"Netzverlust und Abgaben: **{format_cent_kwh(cent, 3)}** netto")
+    if fee.fixed:
+        parts.append(f"feste Beträge: **{format_euro(fee.fixed_eur_year)}/Jahr** netto")
+    return " · ".join(parts)
+
+
+def _show_nne_spec_caption(config: dict) -> None:
+    """Resolved prices of the chosen Netzbereich (via Edibert)."""
+    fee = _resolved_grid_fee(config)
+    if fee is None:
+        return
+    parts = _grid_parts_text(fee)
     st.caption(
-        f"Basis-Arbeitspreis: **{fee.base_cent_kwh:.2f} Cent/kWh** netto · "
-        f"aktive Zeitregeln: **{active}**"
-        + (f" · übersprungen: {skipped}" if skipped else "")
+        f"Basis-Arbeitspreis: **{format_cent_kwh(fee.base_cent_kwh)}** netto · "
+        + _grid_rules_text(fee)
+        + (f" · {parts}" if parts else "")
+    )
+
+
+def _show_own_area_caption(config: dict, catalog: dict, session_scope: str) -> None:
+    """What the stored own area holds besides the work price; saving the form keeps it."""
+    own_id = st.session_state.get(_scoped_key(session_scope, "house_profile_nne_own_id"))
+    if not own_id or own_id not in catalog["areas"]:
+        return
+    fee = _resolved_grid_fee({**config, "area_id": own_id})
+    if fee is None or not (fee.rules or fee.skipped or fee.components or fee.fixed):
+        return
+    parts = _grid_parts_text(fee)
+    st.caption(
+        "Im eigenen Netzbereich gespeichert, bleibt erhalten: "
+        + _grid_rules_text(fee)
+        + (f" · {parts}" if parts else "")
     )
 
 
@@ -278,9 +317,10 @@ def _render_nne_arbeitspreis(*, session_scope: str, land: str, region: str) -> d
         "include_status": ["verordnet", "entwurf"] if include_draft else ["verordnet"],
     }
     if area_choice == OWN_AREA:
+        _show_own_area_caption(config, catalog, session_scope)
         config[OWN_BASE_KEY] = base_manual
     elif area_choice is not None:
-        _show_nne_spec_caption(config, catalog)
+        _show_nne_spec_caption(config)
     else:
         st.warning("Netzbereich wählen — ohne Netzbereich wird das Profil nicht gespeichert.")
     return config

@@ -10,6 +10,7 @@ from ui.pages.scenario_editor_sections import (
     _prepare_scenario_tab,
     _render_scenario_entity_picks,
     _render_scenario_identity_fields,
+    _render_scenario_import_cap,
 )
 from ui.pages.scenario_editor_tariffs import (
     _next_month_in_planning_tz,
@@ -101,4 +102,5 @@ def _render_scenarios_tab() -> None:
     label = _render_scenario_identity_fields(ctx)
     picks = _render_scenario_entity_picks(ctx)
     tariffs = _render_scenario_tariff_block(ctx, picks)
-    _persist_or_delete_scenario(ctx, label, picks, tariffs)
+    import_cap_errors = _render_scenario_import_cap(ctx, picks)
+    _persist_or_delete_scenario(ctx, label, picks, tariffs, import_cap_errors)

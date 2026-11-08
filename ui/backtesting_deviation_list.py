@@ -16,6 +16,7 @@ from simulation.engine import (
     list_simulation_anchors,
     window_anchor_for_date,
 )
+from ui.number_format import format_decimal
 from ui.backtesting_deviation_calendar import (
     build_deviation_calendar_index,
     cases_for_date_and_scenario,
@@ -94,7 +95,7 @@ def _format_deviation_pct(diff_kwh: float, historical_kwh: object | None) -> str
     hist = float(historical_kwh)
     if hist <= 0:
         return None
-    return f"{100.0 * float(diff_kwh) / hist:+.1f}%"
+    return f"{format_decimal(100.0 * float(diff_kwh) / hist, 1, signed=True)}%"
 
 
 def format_deviation_delta_kwh(case: dict) -> str:
@@ -102,12 +103,12 @@ def format_deviation_delta_kwh(case: dict) -> str:
         diff = case.get("diff_kwh")
         if diff is None:
             return _DASH
-        delta = f"{float(diff):+.2f}"
+        delta = format_decimal(float(diff), signed=True)
         pct = _format_deviation_pct(float(diff), case.get("historical_kwh"))
         return f"{delta} ({pct})" if pct else delta
     window_diff = case.get("window_consumption_diff_kwh")
     if window_diff is not None:
-        delta = f"{float(window_diff):+.2f}"
+        delta = format_decimal(float(window_diff), signed=True)
         pct = _format_deviation_pct(float(window_diff), case.get("historical_kwh"))
         return f"{delta} ({pct})" if pct else delta
     return _DASH
@@ -134,15 +135,15 @@ def _render_consumption_caption(case: dict) -> None:
     diff = case.get("diff_kwh")
     if hist is not None and opt is not None and diff is not None:
         st.caption(
-            f"Soll/Ist-Summen (24h): historisch {float(hist):.1f} kWh · "
-            f"optimiert {float(opt):.1f} kWh · Δ {float(diff):+.2f} kWh"
+            f"Soll/Ist-Summen (24h): historisch {format_decimal(float(hist), 1)} kWh · "
+            f"optimiert {format_decimal(float(opt), 1)} kWh · Δ {format_decimal(float(diff), signed=True)} kWh"
         )
 
 
 def _format_consumer_targets(targets: dict | None) -> str | None:
     if not targets:
         return None
-    parts = [f"{key}={float(value):.3f} kWh" for key, value in sorted(targets.items())]
+    parts = [f"{key}={format_decimal(float(value), 3)} kWh" for key, value in sorted(targets.items())]
     return ", ".join(parts)
 
 
@@ -156,13 +157,13 @@ def _render_cbc_facts_caption(case: dict) -> None:
         facts.append(f"Simulationsstunde: {hour_idx}")
     elapsed = case.get("strict_elapsed_sec")
     if elapsed is not None:
-        facts.append(f"Strict-Laufzeit: {float(elapsed):.2f} s")
+        facts.append(f"Strict-Laufzeit: {format_decimal(float(elapsed))} s")
     limit = case.get("strict_limit_sec")
     if limit is not None:
-        facts.append(f"Strict-Limit: {float(limit):.2f} s")
+        facts.append(f"Strict-Limit: {format_decimal(float(limit))} s")
     gap = case.get("gap_rel")
     if gap is not None:
-        facts.append(f"Gap: {float(gap):.4f}")
+        facts.append(f"Gap: {format_decimal(float(gap), 4)}")
     status = case.get("strict_status") or case.get("final_status")
     if status:
         facts.append(f"Status: {status}")

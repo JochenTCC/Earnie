@@ -230,16 +230,13 @@ def resolve_heating_rod_horizon_kwh(
 ) -> float:
     """Upper bound [kWh] for a heating rod: the parent's heat demand over the matrix days.
 
-    The rod has no delivery target; this only lets the MILP plan it (caps per day in
-    ``thermal_flex_context``). Live: 0 until an EHAL binding for the rod exists.
-    SE: the parent comes from the scenario's profile (``planning_scenario_scope``).
+    The rod has no delivery target; this only lets the MILP plan it (the store caps it, in the
+    SE ``optimizer.rod_store``). Live: the store's free heat, 0 while a signal of the rod is
+    missing. SE: the parent comes from the scenario's profile (``planning_scenario_scope``).
     """
     if not optimization_matrix:
         return 0.0
     from optimizer.live_cycle_scope import is_live_thermal_planning
-
-    if is_live_thermal_planning(optimization_matrix):
-        return 0.0
     from optimizer.scenario_planning_scope import planning_runtime_settings
 
     # SE: the scenario's profile (heating-system variant, other house), not the Live one.
@@ -262,6 +259,12 @@ def resolve_heating_rod_horizon_kwh(
             f"Heizstab '{consumer['id']}': thermal_annual '{consumer['parent_id']}' fehlt "
             "im Hausprofil."
         )
+    if is_live_thermal_planning(optimization_matrix):
+        from optimizer.thermal_flex_context import live_rod_heat_cap_kwh, live_rod_ready
+
+        if not live_rod_ready(consumer, parent):
+            return 0.0
+        return live_rod_heat_cap_kwh(parent, profile, optimization_matrix)
     dates = sorted(
         {row.get("date") for row in optimization_matrix if isinstance(row.get("date"), date)}
     )

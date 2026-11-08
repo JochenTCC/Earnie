@@ -9,6 +9,7 @@ import pandas as pd
 import config
 from data import feed_in_prices
 from data.backtesting_prices import BacktestingPriceResources
+from house_config.import_cap import parse_import_cap
 from optimizer.slot_duration import wall_hours_from_slots
 from optimizer import (  # noqa: F401  (simulate_horizon: patch target of the anchor_step facade)
     _calculate_step_cost_parts_from_row,
@@ -84,6 +85,8 @@ from simulation.anchor_step import (
     _hour_cost_without_optimization,
     _simulate_anchor_step,
     _stash_sunrise_full_horizon_flex,
+    import_peaks_after_window,
+    rod_store_levels_after_window,
 )
 from simulation.engine_scenario import (  # noqa: F401  (re-exported)
     _brutto_prices_for_slots,
@@ -243,6 +246,7 @@ class _AnchorRunConfig:
     scenario_id: str | None
     collect_cbc: bool
     snapshot_collector: list[dict] | None
+    forecast_planner: object | None = None
 
 
 class _AnchorStepResult(NamedTuple):
@@ -349,6 +353,8 @@ def _process_anchor_window(
     sim_soc: float,
     hours_done: int,
     plausibility: PlausibilityReport,
+    rod_store_kwh: dict[str, float],
+    import_peak_by_month: dict[str, float],
 ) -> _AnchorStepResult:
     """Simuliert ein Anker-Fenster inkl. Plausibilitätsprüfung und Snapshot-Sammlung."""
     if cfg.collect_cbc:
@@ -372,6 +378,9 @@ def _process_anchor_window(
             collect_cbc=cfg.collect_cbc,
             price_resources=cfg.price_resources,
             collect_full_horizon=collect_snapshots,
+            forecast_planner=cfg.forecast_planner,
+            rod_store_kwh=rod_store_kwh,
+            import_peak_by_month=import_peak_by_month,
         )
     )
     if cfg.collect_cbc:
@@ -453,6 +462,7 @@ def run_simulation(
     horizon_mode: str = DEFAULT_HORIZON_MODE,
     price_resources: BacktestingPriceResources | None = None,
     snapshot_collector: list[dict] | None = None,
+    plan_forecast: tuple[str, ...] | None = None,
 ) -> tuple[pd.DataFrame, PlausibilityReport, list[dict]]:
     """
     Simuliert historische Verbrauchsdaten mit Flex-Optimierung.
@@ -461,6 +471,10 @@ def run_simulation(
       - fixed_24h: [Anker−24h, Anker), SOC frei am Fensterende (E-Auto-Anker)
       - sunrise_window: lückenlose Sonnenaufgang-Kette, je Tag start…end+1 Book
         [SA₁, SA₂) aus MILP SA₀→SA₂; SoC-Kette an den Sonnenaufgängen
+
+    plan_forecast: Forecast-Modus (``docs/dev/se-forecast-mode.md``), die genannten Eingaben
+    plant der MILP auf Prognosen, gebucht wird immer auf Ist-Werten. ``price_resources`` wirken
+    dann nur auf den Plan. ``None`` = Plan und Buchung auf derselben Matrix.
     """
     horizon_mode = parse_horizon_mode(horizon_mode)
     if horizon_mode == SUNRISE_WINDOW:
@@ -479,8 +493,26 @@ def run_simulation(
         )
 
     init = _init_simulation_run(anchors, scenario_params, horizon_mode)
+    forecast_planner = None
+    if plan_forecast is not None:
+        if horizon_mode != SUNRISE_WINDOW:
+            raise ValueError(f"Forecast-Modus erfordert horizon_mode={SUNRISE_WINDOW}.")
+        from simulation.forecast_mode import ForecastPlanner
+
+        forecast_planner = ForecastPlanner(
+            plan_forecast,
+            scenario_params=scenario_params,
+            cache=cache,
+            prices_df=prices_df,
+            feed_in_settings=init.feed_in_settings,
+            price_resources=price_resources,
+        )
+        price_resources = None
     hours_done = 0
     sim_soc = initial_soc
+    rod_store_kwh: dict[str, float] = {}
+    plans_with_import_cap = parse_import_cap(scenario_params) is not None
+    import_peak_by_month: dict[str, float] = {}
 
     all_chart_rows: list[dict] = []
     all_timestamps: list[datetime] = []
@@ -501,11 +533,19 @@ def run_simulation(
         scenario_id=scenario_id,
         collect_cbc=collect_cbc,
         snapshot_collector=snapshot_collector,
+        forecast_planner=forecast_planner,
     )
     try:
         for anchor in anchors:
-            step = _process_anchor_window(cfg, anchor, sim_soc, hours_done, plausibility)
+            step = _process_anchor_window(
+                cfg, anchor, sim_soc, hours_done, plausibility, rod_store_kwh, import_peak_by_month
+            )
             sim_soc = step.sim_soc
+            rod_store_kwh = rod_store_levels_after_window(
+                step.matrix, step.chart_rows, init.flexible_consumers, scenario_params, rod_store_kwh
+            )
+            if plans_with_import_cap:
+                import_peak_by_month = import_peaks_after_window(step.chart_rows, import_peak_by_month)
             all_chart_rows.extend(step.chart_rows)
             all_timestamps.extend(row["slot_datetime"] for row in step.matrix)
 

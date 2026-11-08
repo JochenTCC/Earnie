@@ -29,12 +29,15 @@ WEATHER_AS_OF = "2026-10-22"
 REF_JOBS = 2  # historical + Live reference (see backtesting-max-workers rule)
 
 
-def _env(pack_dir: Path, *, offline_guard: bool) -> dict[str, str]:
+def _env(pack_dir: Path, *, offline_guard: bool, climate_year: int) -> dict[str, str]:
+    """Process environment of one pack. ``climate_year`` pins Earnie's climate reference (thermal model,
+    baseload, modeled profiles) to the price year instead of the last full calendar year."""
     env = dict(os.environ)
     env.update(
         {
             "EARNIE_ENV_PATH": str(pack_dir),
             "EARNIE_OFFLINE": "1",
+            "EARNIE_CLIMATE_REFERENCE_YEAR": str(int(climate_year)),
             "PYTHONUTF8": "1",
             "PYTHONIOENCODING": "utf-8",
         }
@@ -62,11 +65,27 @@ def _install_weather_cache(weather_src: Path) -> int:
     return copied
 
 
+def _harvest_weather_cache(weather_dst: Path, started_at: float) -> int:
+    """Copy weather files Earnie fetched since ``started_at`` (a build or run with network) into ``weather_dst``."""
+    harvested = 0
+    for src in WEATHER_DST.glob("*.json"):
+        if src.stat().st_mtime >= started_at and not (weather_dst / src.name).exists():
+            shutil.copy2(src, weather_dst / src.name)
+            harvested += 1
+    return harvested
+
+
 def _run(args: list[str], env: dict[str, str]) -> None:
     print("+", " ".join(args), flush=True)
     result = subprocess.run([sys.executable, *args], cwd=REPO_ROOT, env=env)
     if result.returncode != 0:
         raise SystemExit(f"Step failed ({result.returncode}): {' '.join(args)}")
+
+
+def generate_cons_data(pack_dir: Path, year: int, env: dict[str, str]) -> None:
+    if not (pack_dir / "runtime" / "cons_data.csv").is_file():
+        _run(["-m", "scripts.generate_cons_data", "--source", "synthetic",
+              "--synthetic-start", f"{year}-01-01", "--synthetic-end", f"{year}-12-31"], env)
 
 
 def _summarize(out_dir: Path) -> dict:
@@ -97,6 +116,7 @@ def _job_count(pack_dir: Path) -> int:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--study-dir", type=Path, default=STUDY_DIR)
+    parser.add_argument("--year", type=int, default=2025, help="Year of the synthetic consumption data.")
     parser.add_argument("--start-month", type=int, default=1)
     parser.add_argument("--end-month", type=int, default=12)
     parser.add_argument("--workers", type=int, default=None,
@@ -116,16 +136,14 @@ def main() -> None:
     cache_dir = (args.cache_dir or study_dir / "cache" / "open_meteo").resolve()
     workers = args.workers or min(os.cpu_count() or 1, _job_count(pack_dir))
 
-    env = _env(pack_dir, offline_guard=not args.allow_network)
+    env = _env(pack_dir, offline_guard=not args.allow_network, climate_year=args.year)
     if args.harvest:
         cache_dir.mkdir(parents=True, exist_ok=True)
     copied = _install_weather_cache(cache_dir)
     print(f"Weather cache: {copied} file(s) installed into {WEATHER_DST}")
     started_at = time.time()
 
-    if not (pack_dir / "runtime" / "cons_data.csv").is_file():
-        _run(["-m", "scripts.generate_cons_data", "--source", "synthetic",
-              "--synthetic-start", "2025-01-01", "--synthetic-end", "2025-12-31"], env)
+    generate_cons_data(pack_dir, args.year, env)
 
     out_dir.mkdir(parents=True, exist_ok=True)
     started = time.time()
@@ -134,12 +152,7 @@ def main() -> None:
           "--workers", str(workers), "--output-dir", str(out_dir)], env)
     summary = _summarize(out_dir)
     if args.harvest:
-        harvested = 0
-        for src in WEATHER_DST.glob("*.json"):
-            if src.stat().st_mtime >= started_at and not (cache_dir / src.name).exists():
-                shutil.copy2(src, cache_dir / src.name)
-                harvested += 1
-        print(f"Harvested {harvested} new weather file(s) into {cache_dir}")
+        print(f"Harvested {_harvest_weather_cache(cache_dir, started_at)} new weather file(s) into {cache_dir}")
     print(f"\nDone in {time.time() - started:.0f} s -> {out_dir}")
     print(json.dumps(summary.get("summary", {}).get("total_eur"), indent=2, ensure_ascii=False, default=str))
 

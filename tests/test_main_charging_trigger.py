@@ -1,6 +1,7 @@
 """Tests for out-of-band vs regular main.py side effects."""
 from __future__ import annotations
 
+from datetime import datetime
 from unittest.mock import MagicMock
 
 import main as main_module
@@ -74,7 +75,14 @@ def test_run_payload_forecast_pv_kw_uses_pre_overlay_matrix(monkeypatch):
         main_module.profile_manager,
         "build_live_planning_matrix",
         lambda _market, _window: [
-            {"expected_p_pv": 2.5, "expected_p_act": 1.0, "price_buy": 10.0, "k_act": 13.44, "hour": 10}
+            {
+                "expected_p_pv": 2.5,
+                "expected_p_act": 1.0,
+                "price_buy": 10.0,
+                "k_act": 13.44,
+                "hour": 10,
+                "slot_datetime": datetime(2026, 6, 15, 10, 0),
+            }
         ],
     )
     monkeypatch.setattr(

@@ -14,12 +14,17 @@ from typing import NamedTuple
 import pandas as pd
 
 from optimizer.charging_schedule import contexts_within_book
+from optimizer.consumer_power import power_limits_kw
+from optimizer.export_power_limit import clip_grid_kw_to_export_cap
 from optimizer.milp_consumer_delivery import consumer_delivery_eligible_indices
+from optimizer.milp_inputs import _resolve_thermal_flex_contexts
+from optimizer.rod_store import ROD_STORE_START_KEY, STORE_BALANCE_CONTEXT_KEY
 from optimizer.scenario_planning_scope import planning_scenario_scope
 from optimizer.sim_baseline import (
     _baseline_battery_params,
     _simulate_single_hour_baseline,
     DEFAULT_RULE_PARAMS,
+    SurplusRod,
     build_rule_based_flex_kw_per_hour,
     build_shaped_flex_kw_per_slot,
 )
@@ -89,6 +94,7 @@ class _WindowResult(NamedTuple):
     no_shape_ids: list[str]
     no_published_block_ids: list[str]
     truncated_lock_slots: int
+    rod_store_kwh: dict[str, float]
 
 
 class LadderReferenceSpec(NamedTuple):
@@ -160,9 +166,30 @@ def _eligible_slots(setup, consumer: dict, book_indices: list[int]) -> list[int]
         contexts.get(cid),
         (setup.filters or {}).get(cid),
     )
-    if is_thermal_flex_consumer(consumer):
+    if is_thermal_flex_consumer(consumer) or is_heating_rod_consumer(consumer):
         return consumer_thermal_eligible_indices(matrix, consumer, eligible)
     return eligible
+
+
+def _surplus_rods(setup, consumers: list[dict], book_indices: list[int]) -> list[SurplusRod]:
+    """L2's heating rods with the MILP's window and store: only beside a fuel source.
+
+    A rod beside an electric heat source stays at 0 kWh (spec § 3.1).
+    """
+    rods = [c for c in consumers if is_heating_rod_consumer(c) and not c["parent_heat_electric"]]
+    if not rods:
+        return []
+    contexts = _resolve_thermal_flex_contexts(setup.matrix, rods, None)
+    return [
+        SurplusRod(
+            cid=str(rod["id"]),
+            nominal_kw=power_limits_kw(rod)[1],
+            eligible=_eligible_slots(setup, rod, book_indices),
+            balance=contexts[str(rod["id"])][STORE_BALANCE_CONTEXT_KEY],
+            level_kwh=contexts[str(rod["id"])][STORE_BALANCE_CONTEXT_KEY].start_kwh,
+        )
+        for rod in rods
+    ]
 
 
 def _book_indices(plan) -> list[int]:
@@ -183,11 +210,13 @@ def _window_rows(
     horizon_mode: str,
     shape_source: _ShapeSource,
     rule_params: dict | None,
+    rod_store_kwh: dict[str, float],
 ) -> _WindowResult:
     from optimizer.simulation import _prepare_horizon_state
     from simulation.anchor_step import _build_anchor_window_plan
 
-    with planning_scenario_scope(scenario_params):
+    surplus_rods: list[SurplusRod] = []
+    with planning_scenario_scope({**scenario_params, ROD_STORE_START_KEY: rod_store_kwh}):
         plan = _build_anchor_window_plan(
             anchor,
             sim_soc,
@@ -235,6 +264,7 @@ def _window_rows(
             no_published_block_ids: list[str] = []
             truncated_lock_slots = 0
         else:
+            surplus_rods = _surplus_rods(setup, consumers, book)
             flex = build_rule_based_flex_kw_per_hour(
                 setup.matrix,
                 setup.horizon_limits,
@@ -251,6 +281,7 @@ def _window_rows(
                 book_indices=book,
                 battery_params=battery,
                 initial_soc=sim_soc,
+                surplus_rods=surplus_rods,
             )
             steuerbefehl = L2_STEUERBEFEHL
             no_published_block_ids = flex.no_published_block_ids
@@ -267,6 +298,8 @@ def _window_rows(
                 steuerbefehl=steuerbefehl,
                 consumers=consumers,
             )
+            if rule_params is not None:
+                curtail_negative_export(row, setup.matrix[t])
             rows.append(row)
     return _WindowResult(
         rows,
@@ -275,6 +308,14 @@ def _window_rows(
         flex.no_shape_ids,
         no_published_block_ids,
         truncated_lock_slots,
+        {rod.cid: rod.level_kwh for rod in surplus_rods},
+    )
+
+
+def curtail_negative_export(chart_row: dict, matrix_row: dict) -> None:
+    """L2 limits export to zero while feeding in costs money; L1 does not (spec § 4.6)."""
+    chart_row["Netzbezug (kW)"] = round(
+        clip_grid_kw_to_export_cap(chart_row["Netzbezug (kW)"], k_push_act=matrix_row["k_push_act"]), 2
     )
 
 
@@ -496,6 +537,7 @@ def _compute_ladder_step(
     truncated_lock_slots = 0
     total_hours = len(anchors) * BACKTESTING_STEP_HOURS
     soc = float(initial_soc)
+    rod_store_kwh: dict[str, float] = {}
     for window_index, anchor in enumerate(anchors, start=1):
         window = _window_rows(
             anchor,
@@ -508,8 +550,10 @@ def _compute_ladder_step(
             horizon_mode=horizon_mode,
             shape_source=shape_source,
             rule_params=rule_params,
+            rod_store_kwh=rod_store_kwh,
         )
         soc = window.end_soc
+        rod_store_kwh = window.rod_store_kwh
         meta = window.meta
         meta["standby_power_kw"] = standby_kw
         meta["reference_no_shape_consumers"] = window.no_shape_ids

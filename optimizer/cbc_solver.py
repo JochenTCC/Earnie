@@ -16,6 +16,8 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_CBC_GAP_REL = 0.10
 DEFAULT_CBC_STRICT_TIME_LIMIT_SEC = 3.0
+# Wall clock. The solve runs in the live cycle, so a stage without a limit could block it for good.
+GAP_STAGE_TIME_LIMIT_SEC = 15.0
 DEFAULT_MILP_SOLVER: Literal["cbc", "highs"] = "highs"
 VALID_MILP_SOLVERS = frozenset({"cbc", "highs"})
 
@@ -256,6 +258,10 @@ def solve_with_strict_fallback(
     Zweistufig: kurzer Strict-Lauf, bei fehlender Optimalität Fallback auf gapRel.
     EARNIE_CBC_STRICT=1: nur Strict ohne Limit (Benchmarks).
     Backend: resolve_milp_solver() → highs (default) or cbc.
+
+    HiGHS reports a time limit with a solution as ``Optimal``, so that plan ends the strict stage
+    (``strict_slow``) and the gap stage only runs when no solution was found in time. If it finds
+    none within ``GAP_STAGE_TIME_LIMIT_SEC`` either, the status is not ``Optimal``.
     """
     backend = resolve_milp_solver()
     label = "HiGHS" if backend == "highs" else "CBC"
@@ -299,7 +305,14 @@ def solve_with_strict_fallback(
                 f"→ Fallback gapRel={gap_rel * 100:.1f}%"
             )
 
-    prob.solve(_build_solver_cmd(backend=backend, msg=msg, gap_rel=gap_rel))
+    prob.solve(
+        _build_solver_cmd(
+            backend=backend,
+            msg=msg,
+            gap_rel=gap_rel,
+            time_limit=GAP_STAGE_TIME_LIMIT_SEC,
+        )
+    )
     final_status = pulp.LpStatus[prob.status]
     return final_status
 

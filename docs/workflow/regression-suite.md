@@ -241,7 +241,7 @@ Order: **R-Rec → R0 → P1 → P2 → L3 → P3.**
 Frozen inputs remove time and price as sources of deviation. What remains is the MILP solver. Findings from `optimizer/cbc_solver.py`:
 
 1. Default solver is **HiGHS** (`threads=1`); CBC is optional. Spec text and fingerprint must name the solver actually used.
-2. `solve_with_strict_fallback` is two-stage: a **strict** attempt with a **3 s wall-clock limit**; if not `Optimal`, a fallback with **`gapRel = 10 %`**. Consequences: which stage produces the plan depends on CPU speed and load (also on the same machine, e.g. parallel workers; dev machine vs. NAS), and stage 2 may return any feasible plan within 10 % of the optimum.
+2. `solve_with_strict_fallback` is two-stage: a **strict** attempt with a **3 s wall-clock limit**; if not `Optimal`, a fallback with **`gapRel = 10 %`** and a **15 s wall-clock limit**. With HiGHS, PuLP reports a time limit with a solution as `Optimal`, so stage 1 can return whatever plan it has after 3 s, and stage 2 only runs when it has none. Consequences: the plan depends on CPU speed and load (also on the same machine, e.g. parallel workers; dev machine vs. NAS), stage 1 may return a plan of unknown distance from the optimum, and stage 2 may return any feasible plan within 10 % of it, or a plan cut off at its own limit.
 3. `optimizer/cbc_events.py` already logs slow strict runs; production logs show how often the fallback occurs.
 4. The existing `tests/test_prod_dump_regression.py::_solve_urgent_dump_milp` calls `PULP_CBC_CMD(msg=False)` directly, not the production path.
 

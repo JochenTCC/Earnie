@@ -4,9 +4,13 @@
 **Fixed 2026-11-02:** D2 (Ledger P1) and D3 (Ledger P2); D1 is replaced by the ledger.
 **Implemented 2026-11-02:** slot engine and day close `runtime_store/savings_ledger.py` (Ledger P3, P4), files `runtime_store/savings_ledger_store.py` (P4), daemon hook `runtime_store/savings_ledger_daemon.py` (P5), backfill CLI `scripts/build_savings_ledger.py` (P6).
 **Decision 2026-11-02 (Ledger P0):** `p_ref`, partial days and powerstations are decided (§ 3, § 4, § 9).
+**Superseded 2026-11-05 (Account view P2):** Chart 2 is an account view now ([`chart2-account-view.md`](chart2-account-view.md)); the "Ersparnis bisher" line and the per-day annotations described below are gone. The ledger supplies the slot series left of *Jetzt*.
+
 **Implemented 2026-11-04 (Ledger P7):** Chart 2 reads "Ersparnis bisher" from the ledger (`ui/chart_ledger_savings.py`) and is shown again; `chart2_enabled()` and `EARNIE_UI_CHART2` are gone. On a running day BL Ziel, Optimiert and "Ersparnis erwartet" cover the rest of the day; an elapsed day shows only its ledger row. The SoC correction is a label, as the change against the previous day (`saving_adjusted − saving`).
 
 **Implemented 2026-11-04 (Account view P1):** slot series of closed SA-days in `savings_ledger_slots.jsonl` (§ 4).
+
+**Implemented 2026-11-07 (Ledger P11):** Chart 1's "SoC BL Ziel" runs on the shadow chain and the plan's baselines start from it (§ 5).
 
 **Implemented 2026-11-04 (Ledger P8):** Monitor tile (`ui/ledger_kpi.py`, § 5), amounts without a sign (`ui/saving_text.py`, § 5), energy-counter slots count (§ 4, § 9 item 6).
 
@@ -163,7 +167,11 @@ The method note (German, user docs) must say in one sentence what "ohne Earnie" 
 
 **Chart 2 labels (Ledger P8).** "Ergebnis" is reserved for an elapsed day with a ledger figure. A running day shows "Bisher" and "Erwartet". A day without actual values is plan only and reads "Plan", as does the Scenario Explorer.
 
-**Amounts without a sign** *(decided 2026-11-04)*. Savings and SoC corrections show the absolute amount and say what it means in words: "gespart" / "mehr ausgegeben", "gutgeschrieben" / "abgezogen" (`ui/saving_text.py`). A result that rounds to 0.00 € counts as saved. Only the cumulated line keeps negative values, because it needs the axis. The rule also covers the account view. The decimal separator is a separate item (`backlog/Backlog.md`).
+**Chart 1 and the plan (Ledger P11).** D1 is gone from Chart 1 as well. `main.py` plans before `on_cycle` books the slot the cycle just closed, so `savings_ledger_daemon.planning_shadow_soc` steps the chain over that slot without saving anything, and all baselines of `calculate_optimization_savings` start there (`baseline_initial_soc`); the optimized plan keeps the live SoC. The "SoC BL Ziel" line is one trace: the open day's `shadow_soc_end` per slot left of *Jetzt*, the plan's baseline right of it. Closed days are not drawn, as paging back already shows no BL line. Without a chain (first start, unreadable state) all runs start at the live SoC, `baseline_start_source` says `live_soc`, and Chart 1 draws no line and shows a hint; Chart 2 keeps its plan figures, which then compare two runs from the same start.
+
+Plan and baseline now start from different SoC, so the plan's cost gap holds the value of that start energy. `soc_correction_increments_euro` applies the formula of § 3 to the plan, with `p_ref` from the plan's own import: its sum is the value of the SoC gap at the end minus its value at the start. The start term is needed: the ledger's open-day correction has already credited that energy, and a plan that just uses it up saves nothing. `savings_matched_euro` and `savings_euro` include the correction; the slot series do not, so Chart 2 keeps the rule that no correction sits in a gap and shows it as the label "SoC am Ende", summed from *Jetzt* to the window end.
+
+**Amounts without a sign** *(decided 2026-11-04)*. Savings and SoC corrections show the absolute amount and say what it means in words: "gespart" / "mehr ausgegeben", "gutgeschrieben" / "abgezogen" (`ui/saving_text.py`). A result that rounds to 0.00 € counts as saved. Only the cumulated line keeps negative values, because it needs the axis. The rule also covers the account view and the Scenario Explorer savings (headline metric, `Ersparnis vs. Standard-Regeln`, `Ersparnis zur Stufe davor`); differences such as `Δ vs Referenz`, the end-SoC term of the ladder table and the device page delta keep their sign. **Decimal separator** *(decided 2026-11-05)*: euro and cent amounts follow the viewer's browser language (`ui/number_format.py` on top of Edibert's `edibert.i18n.numbers`): the supported language (`en` / `de`) the `Accept-Language` header prefers most decides, `.` for `en`, `,` for `de`; `de` when the header is missing or names neither, since the UI is German. Every chart sets Plotly `layout.separators` the same way through `localized_figure`. kWh, kW and % follow as well; numeric `st.dataframe` columns use `localized_number_column` and take the browser's locale.
 
 ## 6. Usage ping and server
 

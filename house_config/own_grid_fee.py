@@ -3,9 +3,14 @@
 The house-profile form offers an own flat Netznutzung work price next to the catalog areas.
 Since data model 5 the profile only references a grid area; the own price lives in
 ``user_grid_fees.json`` (next to ``grid_fees.json``), written through Edibert.
+
+The form edits only the work price. Everything else an existing area holds (time rules, fixed
+amounts such as a migrated grid base fee, components, levies) stays as it is.
 """
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from typing import Any
 
 # Form value of the area select for "Eigener Arbeitspreis" (never persisted).
@@ -48,6 +53,15 @@ def stored_own_grid_fee(netznutzung: dict[str, Any], *, profile_id: str) -> dict
     return out
 
 
+def _stored_user_area(user_path: str, area_id: str) -> dict[str, Any]:
+    """Raw entry of ``area_id`` in ``user_grid_fees.json``; empty when there is none yet."""
+    path = Path(user_path)
+    if not path.is_file():
+        return {}
+    areas = json.loads(path.read_text(encoding="utf-8")).get("areas") or []
+    return next((area for area in areas if area.get("id") == area_id), {})
+
+
 def persist_own_grid_fee(
     netznutzung: dict[str, Any],
     *,
@@ -75,11 +89,10 @@ def persist_own_grid_fee(
     from runtime_store.persist_paths import resolve_grid_fees_json_path, user_grid_fees_path_for
 
     area_id = own_area_id(profile_id)
-    area = flat_user_grid_area(
+    flat = flat_user_grid_area(
         area_id, float(base), label=own_area_label(profile_label), land=land
     )
-    save_user_grid_area(
-        user_grid_fees_path_for(grid_fees_path or resolve_grid_fees_json_path()), area
-    )
+    user_path = user_grid_fees_path_for(grid_fees_path or resolve_grid_fees_json_path())
+    save_user_grid_area(user_path, {**_stored_user_area(user_path, area_id), **flat})
     out["area_id"] = area_id
     return out

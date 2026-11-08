@@ -8,6 +8,7 @@ from house_config.tariffs_store import _normalize_dach_fields, resolve_supplier_
 from optimizer.simulation import calculate_step_cost_parts_from_row
 from simulation.backtesting_log import _build_summary
 from simulation.monthly_fees import (
+    GridFixedPart,
     ScenarioFeeBreakdown,
     fee_breakdown_from_specs,
     monthly_fee_eur_from_params,
@@ -34,18 +35,18 @@ def flat_grid_fee_spec(base_cent_kwh: float) -> InvoiceGridFee:
 
 def test_monthly_fee_same_supplier_uses_max() -> None:
     assert monthly_fee_eur_from_specs(
-        {"supplier_id": "awattar_at", "monthly_fee_eur": 4.79},
-        {"supplier_id": "awattar_at", "monthly_fee_eur": 4.79},
+        {"supplier_id": "awattar_at", "prices_include_vat": True, "monthly_fee_eur": 4.79},
+        {"supplier_id": "awattar_at", "prices_include_vat": True, "monthly_fee_eur": 4.79},
     ) == pytest.approx(4.79)
 
 
 def test_monthly_fee_different_suppliers_sum() -> None:
     assert monthly_fee_eur_from_specs(
-        {"supplier_id": "vkw", "monthly_fee_eur": 3.0},
-        {"supplier_id": "oemag", "monthly_fee_eur": 1.0},
+        {"supplier_id": "vkw", "prices_include_vat": True, "monthly_fee_eur": 3.0},
+        {"supplier_id": "oemag", "prices_include_vat": True, "monthly_fee_eur": 1.0},
     ) == pytest.approx(4.0)
     assert monthly_fee_eur_from_specs(
-        {"supplier_id": "vkw", "monthly_fee_eur": 3.0},
+        {"supplier_id": "vkw", "prices_include_vat": True, "monthly_fee_eur": 3.0},
         None,
     ) == pytest.approx(3.0)
     assert monthly_fee_eur_from_specs(None, None) == 0.0
@@ -54,32 +55,30 @@ def test_monthly_fee_different_suppliers_sum() -> None:
 def test_household_fees_once_from_import() -> None:
     breakdown = fee_breakdown_from_specs(
         {
-            "supplier_id": "vkw",
+            "supplier_id": "vkw", "prices_include_vat": True,
             "monthly_fee_eur": 3.0,
-            "grid_monthly_fee_eur": 10.0,
             "metering_monthly_fee_eur": 2.5,
             "other_monthly_fee_eur": 1.0,
         },
         {
-            "supplier_id": "oemag",
+            "supplier_id": "oemag", "prices_include_vat": True,
             "monthly_fee_eur": 1.0,
-            "grid_monthly_fee_eur": 99.0,
             "metering_monthly_fee_eur": 99.0,
             "other_monthly_fee_eur": 99.0,
         },
     )
     assert breakdown.supplier_monthly_eur == pytest.approx(4.0)
-    assert breakdown.grid_monthly_eur == pytest.approx(10.0)
+    assert breakdown.grid_monthly_eur == 0.0  # a tariff carries no grid fee
     assert breakdown.metering_monthly_eur == pytest.approx(2.5)
     assert breakdown.other_monthly_eur == pytest.approx(1.0)
-    assert breakdown.total_monthly_eur == pytest.approx(17.5)
+    assert breakdown.total_monthly_eur == pytest.approx(7.5)
 
 
 def test_household_fees_fallback_to_export() -> None:
     breakdown = fee_breakdown_from_specs(
-        {"supplier_id": "vkw", "monthly_fee_eur": 3.0},
+        {"supplier_id": "vkw", "prices_include_vat": True, "monthly_fee_eur": 3.0},
         {
-            "supplier_id": "oemag",
+            "supplier_id": "oemag", "prices_include_vat": True,
             "metering_monthly_fee_eur": 4.0,
         },
     )
@@ -95,7 +94,7 @@ def test_monthly_fee_missing_supplier_id_raises() -> None:
 def test_monthly_fee_from_params() -> None:
     params = {
         "_import_tariff_spec": {
-            "supplier_id": "smartenergy",
+            "supplier_id": "smartenergy", "prices_include_vat": True,
             "monthly_fee_eur": 2.99,
         },
         "_export_tariff_spec": {},
@@ -109,18 +108,18 @@ def test_monthly_fees_by_result_id() -> None:
         scenarios={
             "live": {
                 "_import_tariff_spec": {
-                    "supplier_id": "awattar_at",
+                    "supplier_id": "awattar_at", "prices_include_vat": True,
                     "monthly_fee_eur": 4.79,
                 },
                 "_export_tariff_spec": {
-                    "supplier_id": "awattar_at",
+                    "supplier_id": "awattar_at", "prices_include_vat": True,
                     "monthly_fee_eur": 4.79,
                 },
             }
         },
         historical_params={
             "_import_tariff_spec": {
-                "supplier_id": "awattar_at",
+                "supplier_id": "awattar_at", "prices_include_vat": True,
                 "monthly_fee_eur": 4.79,
             },
             "_export_tariff_spec": {},
@@ -131,7 +130,7 @@ def test_monthly_fees_by_result_id() -> None:
                 "live_ref",
                 {
                     "_import_tariff_spec": {
-                        "supplier_id": "vkw",
+                        "supplier_id": "vkw", "prices_include_vat": True,
                         "monthly_fee_eur": 3.0,
                     },
                     "_export_tariff_spec": {},
@@ -143,6 +142,50 @@ def test_monthly_fees_by_result_id() -> None:
     assert fees["historical_reference"] == 4.79
     assert fees["live"] == 4.79
     assert fees["live_ref"] == 3.0
+
+
+def test_net_tariff_fees_get_the_tariffs_vat() -> None:
+    breakdown = fee_breakdown_from_specs(
+        {
+            "supplier_id": "awattar_at",
+            "prices_include_vat": False,
+            "vat_percent": 20.0,
+            "monthly_fee_eur": 4.79,
+            "metering_monthly_fee_eur": 1.0,
+        },
+        # Same supplier, as the catalog has it: the export tariff has 0 % VAT, the higher gross fee counts
+        {
+            "supplier_id": "awattar_at",
+            "prices_include_vat": False,
+            "vat_percent": 0.0,
+            "monthly_fee_eur": 4.79,
+        },
+    )
+    assert breakdown.supplier_monthly_eur == pytest.approx(4.79 * 1.2)
+    assert breakdown.metering_monthly_eur == pytest.approx(1.2)
+
+
+def test_gross_tariff_fee_stays_as_stored() -> None:
+    assert monthly_fee_eur_from_specs(
+        {"supplier_id": "vkw", "prices_include_vat": True, "vat_percent": 20.0, "monthly_fee_eur": 3.0},
+        None,
+    ) == pytest.approx(3.0)
+
+
+@pytest.mark.parametrize(
+    "spec",
+    [
+        {"supplier_id": "vkw", "monthly_fee_eur": 3.0},
+        {"supplier_id": "vkw", "monthly_fee_eur": 3.0, "prices_include_vat": False},
+    ],
+)
+def test_fee_without_vat_facts_raises(spec: dict) -> None:
+    with pytest.raises(ValueError, match="vat_percent fehlt"):
+        monthly_fee_eur_from_specs(spec, None)
+
+
+def test_zero_fee_needs_no_vat_facts() -> None:
+    assert monthly_fee_eur_from_specs({"supplier_id": "vkw", "monthly_fee_eur": 0.0}, None) == 0.0
 
 
 def test_build_summary_adds_full_month_fees() -> None:
@@ -204,7 +247,6 @@ def test_normalize_dach_copies_monthly_fee() -> None:
     _normalize_dach_fields(
         {
             "monthly_fee_eur": 5.99,
-            "grid_monthly_fee_eur": 8.0,
             "metering_monthly_fee_eur": 1.5,
             "other_monthly_fee_eur": 0.5,
             "land": "DE",
@@ -212,7 +254,6 @@ def test_normalize_dach_copies_monthly_fee() -> None:
         spec,
     )
     assert spec["monthly_fee_eur"] == 5.99
-    assert spec["grid_monthly_fee_eur"] == 8.0
     assert spec["metering_monthly_fee_eur"] == 1.5
     assert spec["other_monthly_fee_eur"] == 0.5
 
@@ -235,7 +276,6 @@ def test_tariff_preview_shows_monthly_fee_and_supplier() -> None:
                 "type": "spot_hourly",
                 "settlement_fee_cent_kwh": 1.2,
                 "monthly_fee_eur": 3.0,
-                "grid_monthly_fee_eur": 7.0,
                 "supplier_id": "vkw",
                 "prices_include_vat": False,
             },
@@ -244,7 +284,6 @@ def test_tariff_preview_shows_monthly_fee_and_supplier() -> None:
     )
     assert "Lieferant-Grundpreis (ca.)" in rows
     assert "3" in rows["Lieferant-Grundpreis (ca.)"]
-    assert "Netzentgelt-Grundpreis (ca.)" in rows
     assert rows["Anbieter (supplier_id)"] == "vkw"
 
 
@@ -353,6 +392,7 @@ def test_write_se_invoices_markdown(tmp_path) -> None:
         booked_consumption_by_scenario={
             "live": {"consumption_kwh": 48.0, "standby_kwh": 0.0}
         },
+        capacity_by_scenario={},
     )
     assert len(paths) == 1
     text = (tmp_path / "invoices" / "Live_jahresrechnung.md").read_text(encoding="utf-8")
@@ -486,3 +526,70 @@ def test_invoice_netznutzung_ap_split_from_energiebezug() -> None:
     assert "| Netznutzung Arbeitspreis | 6.00 € |" in body_vat
     assert "| Energiebezug (Lieferant) | 6.00 € (100.0 kWh) |" in body_vat
     assert "| **Gesamt** | **14.00 €** |" in body_vat
+
+    # Grid loss 1 ct net: 1.20 € gross out of the supplier line, same total
+    with_parts = InvoiceGridFee(
+        base_cent_kwh=5.0,
+        rule_labels={},
+        skipped=[],
+        work=lambda _slot: (5.0, None),
+        parts=(("Netzverlustentgelt", 1.0),),
+    )
+    body_parts = render_scenario_invoice_markdown(
+        scenario_id="live",
+        label="Live",
+        df=df,
+        fees=fees,
+        import_spec={
+            "id": "spot",
+            "label": "Spot",
+            "type": "spot_hourly",
+            "prices_include_vat": False,
+            "vat_percent": 20.0,
+        },
+        export_spec=None,
+        booked_consumption={"consumption_kwh": 12.5, "standby_kwh": 0.0},
+        grid_fee=with_parts,
+    )
+    assert "| Energiebezug (Lieferant) | 4.80 € (100.0 kWh) |" in body_parts
+    assert "| Netznutzung Arbeitspreis | 6.00 € |" in body_parts
+    assert "| Netzverlust und Abgaben je kWh | 1.20 € |" in body_parts
+    assert "| Netzverlustentgelt | 100.0 kWh | 1.000 | 1.20 € |" in body_parts
+    assert "| **Gesamt** | **14.00 €** |" in body_parts
+
+
+def test_invoice_shows_fixed_amounts_without_a_work_price() -> None:
+    """A grid area with only fixed amounts still gets its Netznutzung section."""
+    idx = pd.date_range("2025-01-01", periods=2, freq="h")
+    df = pd.DataFrame(
+        {
+            "import_cost_eur": [1.0, 1.0],
+            "export_earn_eur": [0.0, 0.0],
+            "import_kwh": [5.0, 5.0],
+            "export_kwh": [0.0, 0.0],
+            "consumption_kw": [1.0, 1.0],
+            "k_act": [20.0, 20.0],
+            "k_push_act": [0.0, 0.0],
+        },
+        index=idx,
+    )
+    body = render_scenario_invoice_markdown(
+        scenario_id="live",
+        label="Live",
+        df=df,
+        fees=ScenarioFeeBreakdown(grid_monthly_eur=6.0),
+        import_spec={"id": "fix", "label": "Fix", "type": "fixed_cent", "vat_percent": 20.0},
+        export_spec=None,
+        booked_consumption={"consumption_kwh": 2.0, "standby_kwh": 0.0},
+        grid_fee=InvoiceGridFee(
+            base_cent_kwh=0.0,
+            rule_labels={},
+            skipped=[],
+            work=lambda _slot: (0.0, None),
+            fixed=(GridFixedPart("Grundgebühr", 60.0, 6.0),),
+        ),
+    )
+    assert "## Netznutzung" in body
+    assert "| Grundgebühr | 60.00 € | 6.00 € |" in body
+    assert "| Feste Netzbeträge | 6.00 € |" in body
+    assert "| **Gesamt** | **8.00 €** |" in body

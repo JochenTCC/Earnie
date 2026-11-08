@@ -6,7 +6,8 @@ from dataclasses import dataclass
 from datetime import datetime
 
 import pandas as pd
-from simulation.monthly_fees import ScenarioFeeBreakdown
+from simulation.capacity_charge import CapacityResult
+from simulation.monthly_fees import GridFixedPart, grid_fixed_parts
 from simulation.se_invoice_format import (
     _fmt_cent,
     _fmt_eur,
@@ -22,6 +23,8 @@ class InvoiceGridFee:
     rule_labels: dict[str, str]  # rule ID → label, in catalog order
     skipped: list[dict[str, str]]  # {"id", "reason"} of rules not applied
     work: Callable[[datetime], tuple[float, str | None]]  # net cent and rule ID per slot
+    parts: tuple[tuple[str, float], ...] = ()  # label and net cent of the per-kWh components, in k_act too
+    fixed: tuple[GridFixedPart, ...] = ()  # fixed yearly amounts, never in k_act
 
 
 def _skipped_reason(skipped) -> str:
@@ -52,6 +55,8 @@ def _grid_fee_from_params(params: dict | None) -> InvoiceGridFee | None:
         rule_labels={rule.id: rule.label for rule in fee.rules},
         skipped=[{"id": item.rule_id, "reason": _skipped_reason(item)} for item in fee.skipped],
         work=_work,
+        parts=tuple((part.label, float(part.value)) for part in fee.components),
+        fixed=grid_fixed_parts(params),
     )
 
 
@@ -116,6 +121,27 @@ def _netznutzung_components(
     ]
 
 
+def _netz_part_lines(
+    df: pd.DataFrame,
+    *,
+    grid_fee: InvoiceGridFee | None,
+    import_spec: dict | None,
+) -> list[_NetznutzungComponent]:
+    """Netzbezug × brutto je kWh-Bestandteil neben dem Arbeitspreis (Netzverlust, Abgaben)."""
+    if grid_fee is None or df.empty or "import_kwh" not in df.columns:
+        return []
+    import_kwh = float(df["import_kwh"].fillna(0.0).clip(lower=0.0).sum())
+    return [
+        _NetznutzungComponent(
+            label,
+            cent,
+            import_kwh,
+            import_kwh * _netznutzung_ap_gross_cent(cent, import_spec) / 100.0,
+        )
+        for label, cent in grid_fee.parts
+    ]
+
+
 def _netznutzung_section_lines(
     *,
     ap_net_cent: float,
@@ -123,11 +149,14 @@ def _netznutzung_section_lines(
     import_kwh_year: float,
     netznutzung_ap_eur: float,
     components: list[_NetznutzungComponent],
+    parts: list[_NetznutzungComponent],
+    fixed: tuple[GridFixedPart, ...],
     skipped: list[dict],
-    fees: ScenarioFeeBreakdown,
     month_count: int,
+    capacity: CapacityResult | None = None,
 ) -> list[str]:
-    """Separate Netznutzung block (Arbeitspreis breakout + Grundpreis-Stub)."""
+    """Separate Netznutzung block (Arbeitspreis breakout, per-kWh parts, fixed amounts, capacity)."""
+    capacity = capacity or CapacityResult()
     lines = [
         "## Netznutzung",
         "",
@@ -137,7 +166,6 @@ def _netznutzung_section_lines(
         f"| Arbeitspreis in k_act (Basis) | {_fmt_cent(ap_gross_cent)} Cent/kWh |",
         f"| Netzbezug | {_fmt_kwh(import_kwh_year)} |",
         f"| Arbeitspreis (Jahr) | {_fmt_eur(netznutzung_ap_eur)} |",
-        f"| Grundpreis (Katalog-Stub) | {_fmt_eur(fees.grid_monthly_eur * month_count)} |",
         "",
     ]
     if len(components) > 1 or any(c.label != "Basis" for c in components):
@@ -153,6 +181,33 @@ def _netznutzung_section_lines(
                 f"{_fmt_cent(comp.ap_net_cent)} | {_fmt_eur(comp.eur)} |"
             )
         lines.append("")
+    if parts:
+        lines.extend(
+            [
+                "| Netzverlust und Abgaben | Netzbezug | Cent/kWh netto | Betrag |",
+                "| --- | ---: | ---: | ---: |",
+            ]
+        )
+        for part in parts:
+            lines.append(
+                f"| {part.label} | {_fmt_kwh(part.import_kwh)} | "
+                f"{part.ap_net_cent:.3f} | {_fmt_eur(part.eur)} |"
+            )
+        lines.append("")
+    if fixed:
+        lines.extend(
+            [
+                "| Feste Netzbeträge | Netto je Jahr | Betrag |",
+                "| --- | ---: | ---: |",
+            ]
+        )
+        for item in fixed:
+            lines.append(
+                f"| {item.label} | {_fmt_eur(item.net_eur_year)} | "
+                f"{_fmt_eur(item.gross_monthly_eur * month_count)} |"
+            )
+        lines.append("")
+    lines.extend(_capacity_lines(capacity))
     if skipped:
         skipped_text = ", ".join(f"{item['id']} ({item['reason']})" for item in skipped)
         lines.extend([f"Nicht berücksichtigte Regeln: {skipped_text}.", ""])
@@ -161,8 +216,46 @@ def _netznutzung_section_lines(
             "Der Arbeitspreis kommt aus dem Hausprofil (`netznutzung`) und dem "
             "Netzentgelt-Katalog, unabhängig vom Lieferantentarif. In der "
             "Jahressumme ist er aus dem Energiebezug herausgerechnet (kein "
-            "Doppelzählen). Leistungspreis fehlt.",
+            "Doppelzählen). Das gilt auch für Netzverlust und Abgaben je kWh. "
+            "Feste Netzbeträge zählen je Kalendermonat mit einem Zwölftel des "
+            "Jahresbetrags, mit USt laut Bezugstarif. "
+            + (
+                "Der Leistungspreis zählt je Kalendermonat mit der höchsten gebuchten "
+                "Viertelstunde, mit USt laut Bezugstarif."
+                if capacity.months
+                else "Für diesen Zeitraum gilt im Netzbereich kein Leistungspreis."
+            ),
             "",
         ]
     )
+    return lines
+
+
+def _capacity_lines(capacity: CapacityResult) -> list[str]:
+    """Month table of the capacity charge, plus entries left out or not convex."""
+    lines: list[str] = []
+    if capacity.months:
+        lines.extend(
+            [
+                "| Leistungspreis | Höchste Viertelstunde | Abgerechnet | Netto | Betrag |",
+                "| --- | ---: | ---: | ---: | ---: |",
+            ]
+        )
+        for month in capacity.months:
+            lines.append(
+                f"| {month.month} | {month.peak_kw:.2f} kW | {month.billed_kw:.2f} kW | "
+                f"{_fmt_eur(month.net_eur)} | {_fmt_eur(month.gross_eur)} |"
+            )
+        lines.append("")
+    if capacity.skipped:
+        text = ", ".join(f"{cid} (status={status})" for cid, status in capacity.skipped.items())
+        lines.extend([f"Nicht berücksichtigter Leistungspreis: {text}.", ""])
+    if capacity.not_convex:
+        lines.extend(
+            [
+                "Leistungspreis mit fallendem Satz im oberen Band: "
+                f"{', '.join(capacity.not_convex)}.",
+                "",
+            ]
+        )
     return lines

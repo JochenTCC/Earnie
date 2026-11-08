@@ -22,6 +22,7 @@ from runtime_store.migration.types import (
     Question,
 )
 from runtime_store.persist_paths import log_file
+from ui.number_format import format_general
 from ui.truth_banner import OFFICIAL_REPO_URL
 from version import __version__
 
@@ -221,14 +222,14 @@ def _take_suggestion(key: str, value: float) -> None:
 def _render_number_question(question: Question, label: str, key: str) -> float | None:
     """Starts empty; a suggestion (``default``) is only taken on an explicit click."""
     placeholder = (
-        f"Vorschlag: {question.default:g}" if question.default is not None else "Bitte eingeben"
+        f"Vorschlag: {format_general(question.default)}" if question.default is not None else "Bitte eingeben"
     )
     value = st.number_input(
         label, min_value=0.0, value=None, step=0.1, placeholder=placeholder, key=key
     )
     if question.default is not None and value is None:
         st.button(
-            f"Vorschlag übernehmen ({question.default:g})",
+            f"Vorschlag übernehmen ({format_general(question.default)})",
             key=f"{key}__take_default",
             on_click=_take_suggestion,
             args=(key, question.default),

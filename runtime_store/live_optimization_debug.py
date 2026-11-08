@@ -102,6 +102,10 @@ def _savings_summary(savings_info: dict[str, Any]) -> dict[str, Any]:
         "optimized_cost_euro": savings_info.get("optimized_cost_euro"),
         "savings_euro": savings_info.get("savings_euro"),
         "savings_matched_euro": savings_info.get("savings_matched_euro"),
+        "plan_soc_correction_euro": savings_info.get("plan_soc_correction_euro"),
+        "hourly_soc_correction_euro": savings_info.get("hourly_soc_correction_euro"),
+        "baseline_start_source": savings_info.get("baseline_start_source"),
+        "baseline_start_soc_percent": savings_info.get("baseline_start_soc_percent"),
         "baseline_consumption_kwh": savings_info.get("baseline_consumption_kwh"),
         "matched_baseline_consumption_kwh": savings_info.get(
             "matched_baseline_consumption_kwh"

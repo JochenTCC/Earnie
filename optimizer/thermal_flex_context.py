@@ -1,6 +1,7 @@
 """MILP-Zeitfenster und Tagesziele für Haus-Wärme (thermal_annual / Thermals P1a)."""
 from __future__ import annotations
 
+import logging
 from datetime import date, datetime
 from typing import TYPE_CHECKING
 
@@ -8,10 +9,13 @@ import pulp
 
 from house_config.generic_schedule import generic_allowed_slot_hours
 from optimizer.charging_context import matrix_slot_datetime
+from optimizer.rod_store import STORE_BALANCE_CONTEXT_KEY, RodStoreBalance, rod_store_balance
 
 if TYPE_CHECKING:
     from data.modeled_climate import ModeledClimateContext
     from optimizer.milp_horizon import MilpHorizonModel
+
+logger = logging.getLogger(__name__)
 
 THERMAL_MAX_ON_HOURS = 4
 THERMAL_MAX_PULSES_PER_DAY = 4
@@ -193,13 +197,15 @@ def resolve_thermal_flex_contexts(
     house_profile: dict | None,
     *,
     climate: ModeledClimateContext | None = None,
+    rod_store_start_kwh: dict[str, float] | None = None,
 ) -> dict[str, dict]:
     """Tagesziele je Kalendertag für thermal_annual-Flex-Verbraucher.
 
     Slot-aligned to the horizon matrix (same energy basis as
     ``planning_thermal_daily_targets`` / profile_spec), not full-calendar HDD.
     Constraint builder sums only schedule-eligible slots so sunrise book
-    windows match book ``spec_flex_targets_kwh``.
+    windows match book ``spec_flex_targets_kwh``. ``rod_store_start_kwh``: the SE's
+    carried store level per heating rod (``optimizer.rod_store``).
     """
     if not house_profile or not matrix:
         return {}
@@ -220,12 +226,23 @@ def resolve_thermal_flex_contexts(
         live_absent = bool(resolve_absent_status(house_profile)["effective"])
     contexts: dict[str, dict] = {}
     for consumer in consumers:
-        if is_heating_rod_consumer(consumer) and not is_live:
+        if is_heating_rod_consumer(consumer):
             parent = thermal_by_id.get(str(consumer["parent_id"]))
-            if parent is not None and not consumer["parent_heat_electric"]:
+            if parent is None:
+                continue
+            if is_live:
+                contexts[str(consumer["id"])] = _live_rod_context(
+                    matrix, consumer, parent, house_profile
+                )
+            else:
                 contexts[str(consumer["id"])] = {
-                    "daily_heat_cap_kwh": _rod_daily_heat_caps(
-                        matrix, parent, house_profile, climate=climate
+                    STORE_BALANCE_CONTEXT_KEY: rod_store_balance(
+                        matrix,
+                        str(consumer["id"]),
+                        parent,
+                        house_profile,
+                        start_levels_kwh=rod_store_start_kwh,
+                        climate=climate,
                     )
                 }
             continue
@@ -262,19 +279,65 @@ def resolve_thermal_flex_contexts(
     return contexts
 
 
-def _rod_daily_heat_caps(
-    matrix: list,
-    parent: dict,
-    house_profile: dict,
-    *,
-    climate: ModeledClimateContext | None,
-) -> dict[date, float]:
-    """Heat demand [kWh] per matrix day (prorated to the slots present) of a fuel parent."""
-    caps: dict[date, float] = {}
-    for day in sorted({row.get("date") for row in matrix if isinstance(row.get("date"), date)}):
-        heat = thermal_daily_heat_kwh_for_date(parent, house_profile, day, climate=climate)
-        caps[day] = _prorate_thermal_day_target_kwh(heat, len(_indices_for_date(matrix, day)))
-    return caps
+def live_rod_ready(rod: dict, parent: dict) -> bool:
+    """All Live signals of the rod are bound; logs the missing ones once per cycle."""
+    from house_config.heating_rod_bindings import missing_live_signals
+    from optimizer.live_cycle_scope import cycle_memo
+
+    missing = missing_live_signals(rod, parent)
+    if missing:
+
+        def _log_missing() -> bool:
+            logger.info(
+                "Heizstab '%s' wird in Live nicht geplant, es fehlt: %s.",
+                rod["id"],
+                ", ".join(missing),
+            )
+            return True
+
+        cycle_memo(("rod_signals_missing", str(rod["id"])), _log_missing)
+    return not missing
+
+
+def live_rod_heat_cap_kwh(parent: dict, house_profile: dict, matrix: list) -> float:
+    """Heat [kWh] the rod may add in Live: the store's free capacity beyond the floor.
+
+    Same plan and same absent-mode setback as the heat source itself. The store plan counts
+    in input energy of the heat source (power or fuel), so × efficiency is its heat.
+    """
+    from house_config.heat_source import consumer_heat_source, heat_source_efficiency
+    from optimizer.absent_mode import resolve_absent_status, thermal_source_with_live_absent
+    from optimizer.thermal_live_store import live_store_plan_for_matrix
+
+    source = thermal_source_with_live_absent(
+        parent,
+        live_absent_active=bool(resolve_absent_status(house_profile)["effective"]),
+    )
+    plan = live_store_plan_for_matrix(source, house_profile, matrix)
+    if plan is None:
+        raise ValueError(
+            f"Heizstab an '{parent.get('id')}': Live-Speicherplan fehlt, der Heizstab setzt "
+            "einen Wärmespeicher voraus (heat_storage im Heizsystem)."
+        )
+    efficiency = heat_source_efficiency(consumer_heat_source(parent))
+    return round(float(plan.opp_cap_electric_kwh) * efficiency, 3)
+
+
+def _live_rod_context(matrix: list, rod: dict, parent: dict, house_profile: dict) -> dict:
+    """Live: pulse limit for a real switch; a fuel parent caps the rod here (no flex entry).
+
+    Beside an electric parent the store overlay of the parent already caps the rod
+    (``_add_one_thermal_flex_consumer``). Only the first day, like ``live_min_kwh_by_day``.
+    """
+    if not live_rod_ready(rod, parent):
+        return {}
+    ctx: dict = {"live_pulse_limit": True}
+    if not rod["parent_heat_electric"]:
+        first_day = matrix_slot_datetime(matrix, 0).date()
+        ctx["daily_heat_cap_kwh"] = {
+            first_day: live_rod_heat_cap_kwh(parent, house_profile, matrix)
+        }
+    return ctx
 
 
 def _live_house_slot_energy_kwh(
@@ -473,7 +536,20 @@ def add_thermal_flex_constraints(
                 thermal_contexts.get(rod["id"]) or {},
                 covered[str(rod["id"])],
             )
+        balance = (thermal_contexts.get(rod["id"]) or {}).get(STORE_BALANCE_CONTEXT_KEY)
+        if balance is not None:
+            _add_rod_store_balance(
+                model, matrix, schedule_indices, rod, balance, covered[str(rod["id"])]
+            )
         _force_rod_off_outside(model, rod, covered[str(rod["id"])])
+        if (thermal_contexts.get(rod["id"]) or {}).get("live_pulse_limit"):
+            _add_live_rod_pulse_limit(
+                model,
+                matrix,
+                rod,
+                covered[str(rod["id"])],
+                continuing=bool(continue_on.get(rod["id"], False)),
+            )
 
 
 def _rod_energy_expr(model: MilpHorizonModel, rod: dict, indices: list[int]):
@@ -490,7 +566,7 @@ def _add_fuel_parent_rod_caps(
     ctx: dict,
     covered: set[int],
 ) -> None:
-    """Rod beside a fuel source: rod heat (η = 1) per day ≤ the day's heat demand."""
+    """Live, rod beside a fuel source: rod heat (η = 1) of the first day ≤ the store's free heat."""
     caps: dict[date, float] = dict(ctx.get("daily_heat_cap_kwh") or {})
     eligible_set = set(consumer_thermal_eligible_indices(matrix, rod, schedule_indices))
     for day, cap in sorted(caps.items()):
@@ -504,12 +580,64 @@ def _add_fuel_parent_rod_caps(
         covered.update(day_indices)
 
 
+def _add_rod_store_balance(
+    model: MilpHorizonModel,
+    matrix: list,
+    schedule_indices: list[int],
+    rod: dict,
+    balance: RodStoreBalance,
+    covered: set[int],
+) -> None:
+    """SE: the rod's heat (η = 1) in the store stays inside the band on every slot of the book.
+
+    A level variable per slot, no binaries. It may only sit above the real level, which never
+    gains anything, so the constraint is exact. Beside a fuel source this is the rod's only cap;
+    beside an electric source the day's heat of ``_add_one_thermal_flex_consumer`` caps it as well.
+    """
+    if not schedule_indices:
+        return
+    eligible = set(consumer_thermal_eligible_indices(matrix, rod, schedule_indices))
+    if not rod["parent_heat_electric"]:
+        covered.update(slot for slot in eligible if balance.has_demand(slot))
+    level = balance.start_kwh
+    for slot in range(min(schedule_indices), max(schedule_indices) + 1):
+        heat = _rod_energy_expr(model, rod, [slot]) if slot in eligible else 0.0
+        next_level = pulp.LpVariable(
+            f"{rod['id']}_store_{slot}", lowBound=0.0, upBound=balance.capacity_kwh
+        )
+        model.prob += (
+            next_level >= level + heat - balance.drain_kwh[slot],
+            f"{rod['id']}_store_balance_{slot}",
+        )
+        level = next_level
+
+
 def _force_rod_off_outside(model: MilpHorizonModel, rod: dict, covered: set[int]) -> None:
     """No heat demand (or outside the window / book) on a slot → the rod stays off."""
     on_vars = model.consumer_on[rod["id"]]
     for index in range(len(on_vars)):
         if index not in covered:
             model.prob += (on_vars[index] == 0, f"{rod['id']}_rod_off_{index}")
+
+
+def _add_live_rod_pulse_limit(
+    model: MilpHorizonModel,
+    matrix: list,
+    rod: dict,
+    covered: set[int],
+    *,
+    continuing: bool,
+) -> None:
+    """A real rod hangs on a relay: no 15-minute flicker (SE keeps its goldens unchanged)."""
+    for day in sorted({matrix[index].get("date") for index in covered}):
+        add_max_pulses_per_day_constraints(
+            model.prob,
+            model.consumer_on[rod["id"]],
+            [index for index in _indices_for_date(matrix, day) if index in covered],
+            max_pulses=_max_pulses_per_day(rod),
+            prefix=f"{rod['id']}_{day.isoformat()}",
+            continuing=continuing,
+        )
 
 
 def _force_thermal_on_slots(

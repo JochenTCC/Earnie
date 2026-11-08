@@ -514,8 +514,10 @@ def save_live_scenario_id(scenario_id: str) -> None:
 
 def upsert_scenario(scenario: dict) -> None:
     from ui import house_config_io as _io
+    from house_config.import_cap import parse_import_cap
     from house_config.label_uniqueness import assert_unique_label
 
+    parse_import_cap(scenario.get("settings"))
     doc = _io.load_backtesting_scenarios_raw()
     scenarios = list(doc.get("scenarios", []))
     scenario_id = str(scenario.get("id", "")).strip()

@@ -223,7 +223,7 @@ Relevante Parameter:
 - **Wechselrichter:** der zugeordnete Wechselrichter (Hausbatterie) bzw. der integrierte Wechselrichter einer physischen Powerstation.
 - **Verschleißkosten (optional):** Damit bewertet Earnie viele Ladezyklen wirtschaftlich.
 
-Im Live-Betrieb gibt Earnie Ziel-SoC sowie Lade- und Entlade-Sollwerte über das Smarthome-System vor. Die eigentliche Wechselrichter-Logik bleibt in der Hausautomation bzw. im Wechselrichter.
+Im Live-Betrieb gibt Earnie über das Smarthome-System die Sollleistung sowie die Lade- und Entladegrenze vor, bei Loxone und Home Assistant zusätzlich den ESS-Modus. Einen Ziel-SoC sendet Earnie nicht. Die eigentliche Wechselrichter-Logik bleibt in der Hausautomation bzw. im Wechselrichter.
 
 ### Szenarienkonfigurator
 
@@ -253,11 +253,13 @@ Typische Vergleiche:
 
 **Tarife:** Bezugs- und Einspeisetarif kommen aus dem Tarifkatalog oder werden als **Eigener Festpreis** mit eigenem Wert in Cent/kWh eingetragen (der Wert gehört dann zum Szenario, nicht zum Katalog).
 
+**Bezugsgrenze:** Optionale Grenze für den Netzbezug je Viertelstunde, gedacht für den Leistungspreis. Leer bedeutet keine Grenze. Sie wirkt nur in Monaten, in denen der Netzbereich einen Leistungspreis hat, im Szenario-Explorer und im Live-Betrieb. Ist im laufenden Monat schon eine höhere Viertelstunde gemessen, plant Earnie bis zu dieser Höhe, weil sie ohnehin bezahlt wird. Ist der Monat noch ohne Messung, etwa direkt nach der Installation, hält der Plan die Grenze selbst. Kann Earnie nicht planen und schaltet in den Automatikbetrieb, gilt die Grenze nicht; das Protokoll vermerkt das. Eine enge Grenze kann mehr kosten, als sie spart. Das zeigt ein Vergleich von Varianten mit verschiedenen Grenzen im Szenario-Explorer.
+
 - Unter jedem gewählten Tarif steht eine **Vorschau**: Hinweise und Preiskurven, gerechnet mit Land, Region und Netzbereich des Hausprofils dieses Szenarios. Bitte die Werte auf Richtigkeit prüfen – für Vollständigkeit und Aktualität gibt es keine Garantie.
 - Eigene Tarife (**· Benutzertarif** in den Listen) entstehen auf der Seite [Tarife](#tarife-benutzertarife). **Benutzertarife verwalten** öffnet sie mit dem Hausprofil des Szenarios; ist ein Benutzertarif gewählt, öffnet **Benutzertarif bearbeiten** genau diesen. Beide Knöpfe sind gesperrt, solange das Szenario ungespeicherte Änderungen hat.
 - Land- und Tariftyp-Filter schränken nur die Liste ein. Ein gespeicherter Tarif bleibt gewählt, auch wenn er nicht zum Filter passt.
 - Kurz vor Monatsende warnt der Editor, wenn einem Monatstarif (`monthly_table`) der Preis des nächsten Monats fehlt. Bei Katalogtarifen wird er direkt dort eingetragen; bei einem Benutzertarif führt **Im Tarif-Editor öffnen** auf die Seite Tarife.
-- **Monatliche Fixkosten** (Grundpreis des Lieferanten, optional Netz-, Messstellen- und sonstige Kosten) fließen als Näherung in die Gesamt- und Monatskosten des Szenario-Explorers ein, nicht in die Live-Optimierung.
+- **Monatliche Fixkosten** (Grundpreis des Lieferanten, feste Beträge des Netzbereichs, optional Messstellen- und sonstige Kosten) fließen als Näherung in die Gesamt- und Monatskosten des Szenario-Explorers ein, nicht in die Live-Optimierung.
 - Der volumetrische **Netznutzung-Arbeitspreis** wird im Hausprofil (Standort) gepflegt. Er fließt in Live-Betrieb und Szenario-Explorer ein und steht in den Fake-Jahresrechnungen getrennt vom Lieferantenanteil.
 - Nach jedem Lauf des Szenario-Explorers liegen **Fake-Jahresrechnungen** (Markdown) im Log-Ordner unter `invoices/`: Bezug und Einspeisung mit Ø Tarif- und Ø Ist-Preis, die Katalogparameter stehen am Ende.
 
@@ -331,7 +333,7 @@ Die Auswertung umfasst unter anderem:
 
 Die Ergebnisse sind eine **Entscheidungsgrundlage** für Investition und Tarifwahl, keine exakte Prognose der nächsten Stromrechnung. Eine Gewähr, dass sie genau so eintreffen, gibt es nicht.
 
-Der volumetrische **Netznutzung Arbeitspreis** (Hausprofil) fließt in die Kosten ein. Leistungspreis und netzgebietsspezifische Tabellen sind nicht berücksichtigt.
+Der volumetrische **Netznutzung Arbeitspreis** (Hausprofil) fließt in die Kosten ein. Trägt der Netzbereich einen **Leistungspreis**, weist der Szenario-Explorer ihn je Kalendermonat aus. Die Planung kennt den Preis selbst nicht, die SE-Optimierung plant aber unter einer eingetragenen Bezugsgrenze.
 
 <a id="gesamtkosten-jahres-verbrauch-kwh"></a>
 
@@ -465,7 +467,7 @@ Der Monitor unter **Live-Cockpit → Monitor** (Sunset-2-Sunset) zeigt Vergangen
 - **Genauigkeit:** Das Ergebnis hängt vom eingestellten Batterie-Wirkungsgrad ab und ist keine Stromrechnung. Einzelne Tage schwanken, aussagekräftig sind längere Zeiträume.
 - **Unvollständige Tage:** Tage mit weniger als 80 % gebuchten Viertelstunden zählen mit. Der Hilfetext der Kachel nennt ihre Anzahl, Chart 2 markiert sie mit „unvollständig“.
 
-**Ersparnis in Chart 2:** Die Kennzahlen gelten **je Sonnenaufgangs-Tag** (Smartphone: der sichtbare Tag; Desktop: zwei Spalten für SA₀→SA₁ und SA₁→SA₂). Beträge stehen ohne Vorzeichen, die Bedeutung als Wort dabei („gespart“, „mehr ausgegeben“). Am laufenden Tag zeigt Chart 2 **Bisher** (seit Sonnenaufgang) und **Erwartet** (bis zum nächsten Sonnenaufgang), ein abgelaufener Tag das **Ergebnis** und ein Tag, der noch nicht begonnen hat, den **Plan**. Der Energievergleich im Expander bezieht sich dagegen auf den vollen Planungshorizont (jetzt bis übernächster Sonnenaufgang).
+**Ersparnis in Chart 2:** Chart 2 ist eine Kontoansicht: Zwei Linien zeigen den Kontostand seit Fensterstart mit und ohne Earnie (links von Jetzt gebucht aus dem Ersparnis-Buch, rechts der Plan gegen BL Ziel); fällt eine Linie, wird bezahlt. Der grüne oder rote Abstand zwischen den Linien ist die Ersparnis. Mit dem Umschalter **Ist bei Jetzt** treffen sich die Linien bei Jetzt (Abstand am Fensterstart = bisher, am Ende = erwartet), mit **Gemeinsamer Start** beginnen beide bei 0 € (Abstand bei Jetzt = bisher, am Ende = gesamt). Das Panel darunter prüft, ob beide Seiten mit demselben Verbrauch gerechnet wurden. Beträge stehen ohne Vorzeichen, die Bedeutung als Wort dabei („gespart“, „mehr ausgegeben“). Das Dezimalzeichen folgt der Sprache des Browsers: Steht in den Spracheinstellungen Englisch vor Deutsch, zeigt Earnie einen Punkt (`2.18 €`), sonst ein Komma (`2,18 €`). Das gilt auch für kWh, kW und Prozent, für Tabellen und für die Achsen der Charts. Nur Eingabefelder zeigen weiter einen Punkt. Die SoC-Korrektur steht als eigenes Label, abgeschlossene Tage zeigen ihr **Ergebnis** aus dem Buch, ein Fenster ohne Vergangenheit den **Plan**. Details: [Charts](../ui/charts.md#chart-2-kontostand-mit-und-ohne-earnie). Der Energievergleich im Expander bezieht sich dagegen auf den vollen Planungshorizont (jetzt bis übernächster Sonnenaufgang).
 
 #### Chart 1: SoC-Linien (Plausibilität)
 
@@ -482,9 +484,11 @@ Die Seite **Live-Cockpit → Manuelle Geräte** zeigt alle Verbraucher mit der R
 
 ### Analyse Verbrauch & Kosten
 
-Die Seite **Live-Cockpit → Analyse Verbrauch & Kosten** gibt es nur im Live-Betrieb mit bestehender Smarthome-Verbindung (UI-Modus `live_environment`). Sie wertet das Produktiv-Log aus:
+Die Seite **Live-Cockpit → Analyse Verbrauch & Kosten** gibt es nur im Live-Betrieb mit bestehender Smarthome-Verbindung (UI-Modus `live_environment`). Ganz oben steht der **Kontostand mit und ohne Earnie** für den gewählten Zeitraum, aus dem Ersparnis-Buch und in derselben Darstellung wie Chart 2 im Monitor: Zwei Linien zeigen den Kontostand seit Fensterstart, mit dem Umschalter **Ist bei Jetzt** enden beide am Fensterende (der Abstand am Anfang ist die Ersparnis des Zeitraums), mit **Gemeinsamer Start** beginnen beide bei 0 €. Weil bei mehreren Wochen die Gesamtkosten die Skala bestimmen, zeigt ein Panel darunter die **Ersparnis seit Fensterstart** allein: grün gespart, rot mehr ausgegeben. Unvollständige Tage sind markiert; die SoC-Korrekturen der abgeschlossenen Tage stecken in keinem Abstand, eine Zeile unter dem Chart nennt ihre Summe.
 
-- die letzten **7** oder **28 Tage** (verschiebbar),
+Darunter wertet die Seite das Produktiv-Log aus:
+
+- die letzten **7** oder **28 Tage** (verschiebbar; gilt auch für den Kontostand),
 - eine Kennzahl für die letzten **365 Tage** vorhandener Log-Daten,
 - Batterieflüsse,
 - den **Wärmeinhalt** (Simulation und Ist) aus der Live-Historie.

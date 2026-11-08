@@ -196,6 +196,7 @@ def _milp_full_control_setpoint(
     opt_charge: float,
     opt_discharge: float,
     opt_grid_buy: float,
+    opt_grid_sell: float,
     net_pv_surplus: float,
     current_soc: float,
     planned_soc: float,
@@ -235,7 +236,9 @@ def _milp_full_control_setpoint(
             dt_h=dt_h,
         )
         automatik_power = automatik_discharge_kw(net_pv_surplus, max_power)
-        if candidate_power > automatik_power + threshold:
+        # Above the deficit the extra power is export: only when the plan sells. A SoC above plan
+        # (flex delivered less than the plan's on-slots) stays in the battery.
+        if candidate_power > automatik_power + threshold and opt_grid_sell > threshold:
             return MODE_ZWANGS_ENTLADEN, candidate_power, candidate_soc
 
     if (
@@ -297,6 +300,7 @@ def derive_control_from_milp_plan(
             opt_charge=float(ess_plan.get("p_charge") or 0.0),
             opt_discharge=float(ess_plan.get("p_discharge") or 0.0),
             opt_grid_buy=float(milp_plan.get("p_grid_buy") or 0.0),
+            opt_grid_sell=float(milp_plan.get("p_grid_sell") or 0.0),
             net_pv_surplus=net_pv_surplus,
             current_soc=current_soc,
             planned_soc=planned_soc,

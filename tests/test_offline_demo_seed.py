@@ -192,6 +192,19 @@ def test_seed_fills_empty_live_refs(tmp_path, monkeypatch):
     assert offline_demo_seed.live_scenario_refs_incomplete() is False
 
 
+def test_live_scenario_without_a_battery_is_complete(tmp_path, monkeypatch):
+    _prepare_cloud_like(tmp_path, monkeypatch)
+    assert offline_demo_seed.seed_offline_live_scenario() is True
+    path = tmp_path / "earnie_env" / "config" / "backtesting_scenarios.json"
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    doc["scenarios"][0]["settings"]["battery_ids"] = []
+    path.write_text(json.dumps(doc), encoding="utf-8")
+    assert offline_demo_seed.live_scenario_refs_incomplete() is False
+    doc["scenarios"][0]["settings"]["import_tariff_id"] = ""
+    path.write_text(json.dumps(doc), encoding="utf-8")
+    assert offline_demo_seed.live_scenario_refs_incomplete() is True
+
+
 def test_seed_does_not_overwrite_existing_refs(tmp_path, monkeypatch):
     root = _prepare_cloud_like(tmp_path, monkeypatch)
     path = root / "earnie_env" / "config" / "backtesting_scenarios.json"

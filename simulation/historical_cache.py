@@ -62,6 +62,7 @@ class HistoricalDataCache:
         # of `_hour_hold_reindex` and callers may query many windows over the same data.
         self._consumption_df_hourly: pd.DataFrame | None = None
         self._pv_series_hourly: pd.Series | None = None
+        self._baseload_profile_stats: pd.DataFrame | None = None
 
     def _maybe_season_mirror(self, cons_df: pd.DataFrame) -> pd.DataFrame:
         from data.cons_data_season_mirror import (
@@ -163,6 +164,33 @@ class HistoricalDataCache:
             if label in df_window.columns:
                 series[consumer_id] = df_window[label].astype(float).tolist()
         return series
+
+    def get_baseload_profile_deviation_kw(self, slot_datetimes: list[datetime]) -> list[float]:
+        """Profile minus logged baseload per slot; the profile has live's month / weekday / hour key.
+
+        A slot's own day is left out of its mean: with one year of data it would be a quarter
+        of the value. A key that only that day has raises.
+        """
+        self.load()
+        if self._baseload_profile_stats is None:
+            base = self._consumption_df_hourly["BaseLoad"].astype(float)
+            index = pd.DatetimeIndex(base.index)
+            self._baseload_profile_stats = base.groupby(
+                [index.month, index.weekday, index.hour]
+            ).agg(["sum", "count"])
+        stats = self._baseload_profile_stats
+        logged = _hold_from_hourly(self._consumption_df_hourly["BaseLoad"], slot_datetimes)
+        deviation: list[float] = []
+        for slot, actual in zip(slot_datetimes, logged.astype(float).tolist()):
+            key = (slot.month, slot.weekday(), slot.hour)
+            if key not in stats.index or int(stats.loc[key, "count"]) < 2:
+                raise ValueError(
+                    f"Lastprognose: Für {slot:%Y-%m-%d %H:%M} gibt es keinen anderen Tag mit "
+                    "gleichem Monat, Wochentag und Stunde in den Verbrauchsdaten."
+                )
+            total, count = float(stats.loc[key, "sum"]), int(stats.loc[key, "count"])
+            deviation.append((total - actual) / (count - 1) - actual)
+        return deviation
 
     def get_pv_for_slots(
         self,

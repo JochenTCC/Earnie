@@ -100,6 +100,9 @@ class MigrationStep:
     detect_on_start: Callable[[Docs], bool] | None = None
     # Questions that depend on the docs (one per profile / tariff); added to ``questions``.
     questions_for: Callable[[Docs], tuple[Question, ...]] | None = None
+    # Wizard only: a recorder replay and a pack import skip it, so it never changes what an
+    # archived config computes. An imported pack then meets the step in the wizard.
+    attended_only: bool = False
 
 
 def step_questions(step: MigrationStep, docs: Docs) -> tuple[Question, ...]:

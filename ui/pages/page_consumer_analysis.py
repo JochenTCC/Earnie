@@ -5,6 +5,8 @@ from datetime import datetime
 
 import streamlit as st
 
+from ui.number_format import localized_figure
+from ui.chart_account_render import render_period_account_chart
 from ui.chart_context import live_now
 from ui.consumer_cost_analysis_charts import render_window_analysis
 from ui.consumer_cost_analysis_data import CostAnalysisSeries, build_cost_analysis_series
@@ -18,6 +20,7 @@ from ui.consumption_display.period import PeriodKind, TimeWindow, format_window_
 from ui.help_hint import render_page_title_with_help
 
 _HELP = (
+    "Oben der Kontostand mit und ohne Earnie aus dem Ersparnis-Buch. Darunter die "
     "Analyse aus dem Produktiv-Log: Verbrauch je Verbraucher vs. Preis/PV, "
     "Herkunft (PV / Batterie / Netz) und grobe Kosten nur für den Netzanteil. "
     "Charts für die letzten 7 oder 28 Tage (verschiebbar); Kennzahl zusätzlich "
@@ -55,6 +58,14 @@ def _render_cost_section(
     render_window_analysis(series, window=window, now=now)
 
 
+def _render_account_section(window: TimeWindow) -> None:
+    """Mit und ohne Earnie im gewählten Zeitraum (Account view P3)."""
+    try:
+        render_period_account_chart(window.start, window.end)
+    except ValueError as exc:
+        st.error(f"Kontostand kann nicht gezeichnet werden: {exc}")
+
+
 def _render_heat_content_section(window: TimeWindow) -> None:
     st.markdown("#### Wärmeinhalt")
     data = live_heat_content_for_window(window.start, window.end)
@@ -79,7 +90,7 @@ def _render_heat_content_section(window: TimeWindow) -> None:
             f"für {format_window_label(window)}."
         )
         return
-    st.plotly_chart(fig, width="stretch")
+    st.plotly_chart(localized_figure(fig), width="stretch")
     meta = fig.layout.meta or {}
     if not meta.get("has_measured"):
         st.caption(
@@ -118,6 +129,8 @@ def render() -> None:
         st.info("Keine Zeitfenster im Produktiv-Log.")
         return
 
+    _render_account_section(selected)
+    st.divider()
     _render_cost_section(series, selected, now=now)
     st.divider()
     _render_heat_content_section(selected)

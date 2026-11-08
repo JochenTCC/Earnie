@@ -1,6 +1,7 @@
 """Per-anchor backtesting simulation step helpers."""
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -8,14 +9,20 @@ import pandas as pd
 import config
 from data import feed_in_prices
 from data.backtesting_prices import BacktestingPriceResources
+from house_config.import_cap import parse_import_cap
 from optimizer import (
     horizon_end_soc_from_chart_rows,
     horizon_end_soc_percent,
     _delivered_flex_kwh_from_rows,
 )
+from optimizer.import_power_limit import ImportCaps, import_caps_from_params
+from optimizer.milp_inputs import _resolve_thermal_flex_contexts
+from optimizer.rod_store import ROD_STORE_START_KEY, STORE_BALANCE_CONTEXT_KEY, next_level_kwh
 from optimizer.scenario_planning_scope import planning_scenario_scope
+from optimizer.sim_costs import _grid_kw_from_row
 from optimizer.slot_duration import DEFAULT_DT_H, validate_dt_h
 from optimizer.targets import consumer_column_name
+from optimizer.thermal_flex_context import is_heating_rod_consumer
 from simulation.backtesting_horizon import naive_backtesting_slot
 from simulation.historical_cache import HistoricalDataCache
 from simulation.horizon_mode import FIXED_24H, SUNRISE_WINDOW
@@ -221,6 +228,40 @@ def _anchor_step_end_soc(
     )
 
 
+def _window_import_caps(
+    plan: _AnchorWindowPlan,
+    scenario_params: dict,
+    peak_by_month: Mapping[str, float],
+) -> ImportCaps | None:
+    """Limits of the booked slots only.
+
+    The SA₀→SA₁ part was booked by the previous window and is never billed from this plan. A limit
+    there would only make its overshoot variable free for the slots that do count.
+    """
+    if parse_import_cap(scenario_params) is None:
+        return None
+    caps = import_caps_from_params(
+        scenario_params,
+        [naive_backtesting_slot(row["slot_datetime"]) for row in plan.matrix],
+        peak_by_month,
+    )
+    if caps is None or plan.flex_book_hours is None:
+        return caps
+    return caps.only_at(range(plan.flex_book_start, plan.flex_book_start + plan.flex_book_hours))
+
+
+def import_peaks_after_window(
+    book_rows: list[dict],
+    peak_by_month: Mapping[str, float],
+) -> dict[str, float]:
+    """Month peaks after a booked window, like the bill from what was booked; the next window plans with them."""
+    peaks = dict(peak_by_month)
+    for row in book_rows:
+        month = f"{naive_backtesting_slot(row['slot_datetime']):%Y-%m}"
+        peaks[month] = max(peaks.get(month, 0.0), _grid_kw_from_row(row))
+    return peaks
+
+
 def _simulate_plan_horizon(
     plan,
     sim_soc: float,
@@ -229,9 +270,20 @@ def _simulate_plan_horizon(
     hours_done: int,
     collect_cbc: bool,
     scenario_params: dict,
+    forecast_planner=None,
+    import_peak_by_month: Mapping[str, float] | None = None,
 ) -> list[dict]:
+    matrix = plan.matrix
+    extra_kwargs: dict = {}
+    if forecast_planner is not None:
+        # Forecast mode: the MILP sees the plan matrix, the window's own matrix books.
+        matrix = forecast_planner.plan_matrix(plan.matrix, plan.meta["sa1"])
+        extra_kwargs["booking_matrix"] = plan.matrix
+    import_caps = _window_import_caps(plan, scenario_params, import_peak_by_month or {})
+    if import_caps is not None:
+        extra_kwargs["import_caps"] = import_caps
     return _simulate_horizon(
-        plan.matrix,
+        matrix,
         sim_soc,
         battery_params=battery_params,
         verbose=False,
@@ -245,6 +297,7 @@ def _simulate_plan_horizon(
         flex_book_start=plan.flex_book_start,
         soc_hold_index=plan.soc_hold_index,
         soc_hold_percent=plan.soc_hold_percent,
+        **extra_kwargs,
     )
 
 
@@ -257,6 +310,32 @@ def _optional_full_horizon_snapshot(
     if collect_full_horizon and plan.matrix_full is not None:
         return list(chart_rows), plan.matrix_full
     return None, None
+
+
+def rod_store_levels_after_window(
+    book_matrix: list[dict],
+    book_rows: list[dict],
+    consumers: list[dict],
+    scenario_params: dict,
+    levels_kwh: dict[str, float],
+) -> dict[str, float]:
+    """Store level per heating rod after a booked window: the next window starts from it, like the SoC."""
+    rods = [consumer for consumer in consumers if is_heating_rod_consumer(consumer)]
+    if not rods:
+        return {}
+    with planning_scenario_scope({**scenario_params, ROD_STORE_START_KEY: levels_kwh}):
+        contexts = _resolve_thermal_flex_contexts(book_matrix, rods, None)
+    dt_h = validate_dt_h(DEFAULT_DT_H)
+    after: dict[str, float] = {}
+    for rod in rods:
+        balance = contexts[str(rod["id"])][STORE_BALANCE_CONTEXT_KEY]
+        column = consumer_column_name(rod)
+        level = balance.start_kwh
+        for slot, row in enumerate(book_rows):
+            heat_kwh = float(row.get(column, 0.0) or 0.0) * dt_h
+            level = next_level_kwh(level, heat_kwh, balance.drain_kwh[slot], balance.capacity_kwh)
+        after[str(rod["id"])] = level
+    return after
 
 
 def _simulate_anchor_step(
@@ -273,6 +352,9 @@ def _simulate_anchor_step(
     collect_cbc: bool,
     price_resources: BacktestingPriceResources | None = None,
     collect_full_horizon: bool = False,
+    forecast_planner=None,
+    rod_store_kwh: dict[str, float] | None = None,
+    import_peak_by_month: Mapping[str, float] | None = None,
 ) -> tuple[
     list[dict],
     list[dict],
@@ -285,7 +367,7 @@ def _simulate_anchor_step(
     """Ein Backtesting-Schritt für fixed_24h oder sunrise_window (Book [SA₁, SA₂) je ready_by-Tag)."""
     step_start_soc = float(sim_soc)
     # Rod bound and thermal contexts read this scenario's house profile, not the Live one.
-    with planning_scenario_scope(scenario_params):
+    with planning_scenario_scope({**scenario_params, ROD_STORE_START_KEY: rod_store_kwh}):
         plan = _build_anchor_window_plan(
             anchor,
             step_start_soc,
@@ -303,6 +385,8 @@ def _simulate_anchor_step(
             hours_done=hours_done,
             collect_cbc=collect_cbc,
             scenario_params=scenario_params,
+            forecast_planner=forecast_planner,
+            import_peak_by_month=import_peak_by_month,
         )
     flexible_consumers = _flexible_consumers_from_scenario(scenario_params)
     if horizon_mode == SUNRISE_WINDOW:

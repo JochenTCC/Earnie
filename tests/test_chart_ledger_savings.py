@@ -1,19 +1,22 @@
-"""Ledger P7: Chart 2 "Ersparnis bisher" comes from the savings ledger."""
+"""Chart 2's slots left of Jetzt come from the savings ledger (Ledger P7, Account view P2)."""
 from __future__ import annotations
 
 import json
-import math
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-import pandas as pd
 import pytest
 
 from runtime_store import savings_ledger as sl
 from runtime_store import savings_ledger_store as store
 from ui import chart_ledger_savings as cls
-from ui.chart_cumulative_render import render_cumulative_cost_chart
-from ui.chart_decorations import _cost_summary_column_annotations
+from ui.chart_account_view import (
+    SLOT_COUNTED,
+    SLOT_NO_DATA,
+    SLOT_PENDING,
+    SLOT_PLAN,
+    SLOT_SKIPPED,
+)
 
 _TZ = ZoneInfo("Europe/Vienna")
 _QUARTER = timedelta(minutes=15)
@@ -69,47 +72,56 @@ def _build(state, slots, history, rows=()):
     )
 
 
-def test_series_cumulates_without_minus_with_and_stops_at_the_last_booked_slot():
+def test_slots_carry_with_and_without_and_the_open_day_waits_after_the_last_booked_slot():
     slots = [_slot(8) + _QUARTER * index for index in range(6)]
     state = _state(
         _booked(slots[0], with_eur=0.10, without_eur=0.30),
         _booked(slots[1], with_eur=0.20, without_eur=0.10),
-        _booked(slots[2], with_eur=0.05, without_eur=0.05),
+        _booked(slots[2], with_eur=0.05, without_eur=0.05, counted=False),
     )
 
-    series = _build(state, slots, history=5)["cumulative_euro"]
+    ledger = _build(state, slots, history=5)
 
-    assert series[:3] == pytest.approx([0.20, 0.10, 0.10])
-    assert math.isnan(series[3]) and math.isnan(series[4]) and math.isnan(series[5])
+    assert ledger["slot_with_eur"][:2] == pytest.approx([0.10, 0.20])
+    assert ledger["slot_without_eur"][:2] == pytest.approx([0.30, 0.10])
+    assert ledger["slot_states"] == [
+        SLOT_COUNTED, SLOT_COUNTED, SLOT_SKIPPED, SLOT_PENDING, SLOT_PENDING, SLOT_PLAN
+    ]
+    # A skipped slot counts as zero on both sides.
+    assert ledger["slot_with_eur"][2] == 0.0 and ledger["slot_without_eur"][2] == 0.0
 
 
-def test_series_holds_over_a_slot_the_daemon_did_not_book():
+def test_a_gap_before_the_last_booked_slot_has_no_data():
     slots = [_slot(8) + _QUARTER * index for index in range(3)]
     state = _state(
         _booked(slots[0], with_eur=0.0, without_eur=0.2),
         _booked(slots[2], with_eur=0.0, without_eur=0.1),
     )
 
-    series = _build(state, slots, history=3)["cumulative_euro"]
+    states = _build(state, slots, history=3)["slot_states"]
 
-    assert series == pytest.approx([0.2, 0.2, 0.3])
+    assert states == [SLOT_COUNTED, SLOT_NO_DATA, SLOT_COUNTED]
 
 
-def test_series_leaves_slots_of_other_days_empty():
+def test_closed_day_slots_come_from_the_slot_file_records():
     earlier = _DAY_START - timedelta(hours=1)
     booked = _slot(8)
     state = _state(_booked(booked, with_eur=0.0, without_eur=0.2))
+    closed = {"yesterday": [_booked(earlier, with_eur=0.3, without_eur=0.5)]}
 
-    series = _build(state, [earlier, booked], history=2)["cumulative_euro"]
+    ledger = cls.build_ledger_chart_savings(
+        [earlier - _QUARTER, earlier, booked], 3, state, _BATTERY, [],
+        window_start=_DAY_START - timedelta(days=1), window_end=_DAY_END, closed_slots=closed,
+    )
 
-    assert math.isnan(series[0])
-    assert series[1] == pytest.approx(0.2)
+    assert ledger["slot_states"] == [SLOT_NO_DATA, SLOT_COUNTED, SLOT_COUNTED]
+    assert ledger["slot_without_eur"] == pytest.approx([0.0, 0.5, 0.2])
 
 
 def test_soc_correction_is_the_day_rows_change_against_the_previous_day():
     slots = [_slot(8)]
     state = _state(_booked(slots[0], with_eur=0.5, without_eur=0.7), soc_actual_end=30.0, prev=0.25)
-    # (30 − 20) % · 15 kWh · 0.94 at 40 ct = 0.564 €; minus the 0.25 € carried in.
+    # (30 − 20) % · 15 kWh · 0.94 at 40 ct = 0,564 €; minus the 0,25 € carried in.
     ledger = _build(state, slots, history=1)
 
     assert ledger["saving_euro"] == pytest.approx(0.2)
@@ -133,11 +145,12 @@ def test_window_without_any_data_gives_the_hint():
     assert ledger["hint"] == cls.HINT_NO_DATA
 
 
-def test_figures_for_day_tell_open_closed_and_unknown_days_apart():
+def test_closed_days_in_the_window_keep_their_result_and_incomplete_flag():
     yesterday = _DAY_START - timedelta(days=1)
     row = {
         "day_start": yesterday.isoformat(),
         "day_end": _DAY_START.isoformat(),
+        "saving_eur": -0.5,
         "saving_adjusted_eur": -0.4,
         "incomplete": True,
     }
@@ -157,15 +170,14 @@ def test_figures_for_day_tell_open_closed_and_unknown_days_apart():
         window_end=_DAY_END,
     )
 
-    assert [day["day_start"] for day in ledger["closed_days"]] == [yesterday.isoformat()]
-    # Chart anchors are not the ledger's stamps to the second.
-    open_day = cls.ledger_figures_for_day(ledger, _DAY_START + timedelta(seconds=40))
-    assert open_day["saving_euro"] == pytest.approx(0.2)
-    closed = cls.ledger_figures_for_day(ledger, yesterday - timedelta(seconds=40))
-    assert closed["closed_saving_euro"] == pytest.approx(-0.4)
-    assert closed["incomplete"] is True
-    unknown = cls.ledger_figures_for_day(ledger, _DAY_START + timedelta(days=1))
-    assert unknown["saving_euro"] is None and unknown["closed_saving_euro"] is None
+    assert ledger["closed_days"] == [{
+        "day_start": yesterday.isoformat(),
+        "day_end": _DAY_START.isoformat(),
+        "saving_eur": -0.5,
+        "saving_adjusted_eur": -0.4,
+        "incomplete": True,
+    }]
+    assert ledger["saving_euro"] == pytest.approx(0.2)
 
 
 def test_peek_state_leaves_an_unreadable_file_in_place(tmp_path):
@@ -205,92 +217,25 @@ def test_load_without_a_usable_state_gives_a_hint_and_no_values(
 
     assert ledger["hint"] == hint
     assert ledger["saving_euro"] is None
-    assert math.isnan(ledger["cumulative_euro"][0])
+    assert ledger["slot_states"] == [SLOT_NO_DATA]
 
 
-def _render(monkeypatch, ledger):
-    captured: dict = {}
-    captions: list[str] = []
-    monkeypatch.setattr(
-        "ui.chart_cumulative_render.st.plotly_chart",
-        lambda fig, **_k: captured.update(fig=fig),
-    )
-    monkeypatch.setattr("ui.chart_cumulative_render.st.caption", captions.append)
-    monkeypatch.setattr(
-        "ui.chart_cumulative_render.render_title_with_help", lambda *_a, **_k: None
-    )
-    slots = [_slot(8) + _QUARTER * index for index in range(4)]
-    df = pd.DataFrame(
-        {
-            "slot_datetime": slots,
-            "Uhrzeit": [slot.strftime("%d.%m. %H:%M") for slot in slots],
-            "Preis extrapoliert": [False] * 4,
-        }
-    )
-    render_cumulative_cost_chart(
-        df,
-        hourly_matched_baseline_cost_euro=[0.1] * 4,
-        hourly_optimized_cost_euro=[0.08] * 4,
-        hourly_matched_baseline_consumption_kwh=[0.5] * 4,
-        hourly_optimized_consumption_kwh=[0.45] * 4,
-        history_slot_count=2,
-        slot_actual_cost_euro=[0.05] * 2,
-        slot_actual_consumption_kwh=[0.2] * 2,
-        ledger_savings=ledger,
-    )
-    return [trace.name for trace in captured["fig"].data], captions
+def test_a_broken_slot_file_is_a_hint_and_keeps_the_open_day(tmp_path, monkeypatch):
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path))
+    state = _state(_booked(_slot(8), with_eur=0.1, without_eur=0.3))
+    store.save_state(state)
+    yesterday = _DAY_START - timedelta(days=1)
+    store.append_row({
+        "day_start": yesterday.isoformat(), "day_end": _DAY_START.isoformat(),
+        "saving_eur": 0.2, "saving_adjusted_eur": 0.2, "incomplete": False,
+    })
+    monkeypatch.setattr(cls.config, "get_battery_params_list", lambda: [_BATTERY])
+    monkeypatch.setattr(cls.sl, "shadow_battery_params", lambda batteries: batteries[0])
 
-
-def test_chart_draws_the_savings_line_from_the_ledger(monkeypatch):
-    slots = [_slot(8), _slot(8, 15)]
-    state = _state(
-        _booked(slots[0], with_eur=0.0, without_eur=0.2),
-        _booked(slots[1], with_eur=0.0, without_eur=0.1),
+    ledger = cls.load_ledger_chart_savings(
+        [_slot(8)], 1, window_start=yesterday, window_end=_DAY_END
     )
 
-    names, captions = _render(monkeypatch, _build(state, slots + [_slot(8, 30), _slot(8, 45)], 2))
-
-    assert "Ersparnis bisher" in names
-    assert not any("Ersparnis-Buch" in text for text in captions)
-
-
-def test_chart_without_ledger_has_no_zero_line_and_shows_the_hint(monkeypatch):
-    names, captions = _render(monkeypatch, cls._no_ledger(4, cls.HINT_NOT_RUNNING))
-
-    assert "Ist bisher" in " ".join(str(name) for name in names)
-    assert "Ersparnis bisher" not in names
-    assert cls.HINT_NOT_RUNNING in captions
-
-
-def test_soc_correction_has_its_own_row_so_it_stays_out_of_the_second_column():
-    """On one line with "Bisher" it covered the second day column on narrow windows."""
-    lines = _cost_summary_column_annotations(
-        8.0,
-        5.5,
-        show_split_savings=True,
-        achieved_saving_euro=-0.97,
-        achieved_soc_correction_euro=0.78,
-    )
-
-    texts = [line["text"] for line in lines]
-    assert texts == [
-        "BL Ziel: 8.00 €",
-        "Optimiert: 5.50 €",
-        "Bisher: 0.97 € mehr ausgegeben",
-        "SoC: 0.78 € gutgeschrieben",
-        "Erwartet: 2.50 € gespart",
-    ]
-    shifts = [line.get("yshift", 0) for line in lines]
-    assert len(set(shifts)) == len(shifts)
-
-
-def test_no_soc_correction_row_without_a_correction():
-    lines = _cost_summary_column_annotations(
-        8.0,
-        5.5,
-        show_split_savings=True,
-        achieved_saving_euro=-0.97,
-        achieved_soc_correction_euro=None,
-    )
-
-    assert not any("SoC-Korrektur" in line["text"] for line in lines)
+    assert ledger["hint"] == cls.HINT_SLOTS_UNREADABLE
+    assert ledger["slot_states"] == [SLOT_COUNTED]
+    assert [day["day_start"] for day in ledger["closed_days"]] == [yesterday.isoformat()]

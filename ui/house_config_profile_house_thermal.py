@@ -28,6 +28,7 @@ from house_config.house_thermal import (
 )
 from house_config.profile_schema_defaults import profile_default
 from house_config.thermal_labels import building_class_option_label
+from ui.number_format import format_general
 from ui.form_layout import (
     WIDE_LABEL_RATIOS,
     labeled_checkbox,
@@ -187,7 +188,7 @@ def _render_solar_gain_fields(stored: dict, out: dict, *, session_scope: str) ->
             "Vorschlag nach SUSI (Quader, 2 Geschosse, Fensteranteil S 20 %, O/W 10 %, "
             "N 6 %): "
             + ", ".join(
-                f"{_WINDOW_LABELS[d]} {suggestion[d]:g} m²" for d in WINDOW_DIRECTIONS
+                f"{_WINDOW_LABELS[d]} {format_general(suggestion[d])} m²" for d in WINDOW_DIRECTIONS
             )
             + "."
         )

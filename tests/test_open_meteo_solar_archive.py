@@ -416,3 +416,28 @@ def test_fetch_budget_stops_retries_instead_of_sleeping(monkeypatch):
             )
     assert len(calls) == 1
     assert calls[0] <= 1.0
+
+
+def test_last_full_archive_year_follows_the_pinned_climate_year(monkeypatch):
+    natural = archive.last_full_archive_year()
+    monkeypatch.setenv("EARNIE_CLIMATE_REFERENCE_YEAR", str(natural - 1))
+    assert archive.last_full_archive_year() == natural - 1
+    # An explicit reference wins over the pin.
+    assert archive.last_full_archive_year(reference=date(2026, 7, 13)) == 2025
+
+
+def test_pinned_climate_year_after_the_archive_or_invalid_fails_loud(monkeypatch):
+    natural = archive.last_full_archive_year()
+    monkeypatch.setenv("EARNIE_CLIMATE_REFERENCE_YEAR", str(natural + 1))
+    with pytest.raises(ValueError, match="nach dem letzten vollen Archivjahr"):
+        archive.last_full_archive_year()
+    monkeypatch.setenv("EARNIE_CLIMATE_REFERENCE_YEAR", "24")
+    with pytest.raises(ValueError, match="kein Jahr"):
+        archive.last_full_archive_year()
+
+
+def test_ev_reference_year_follows_the_pinned_climate_year(monkeypatch):
+    from house_config.ev_profile import _reference_year_start
+
+    monkeypatch.setenv("EARNIE_CLIMATE_REFERENCE_YEAR", "2024")
+    assert _reference_year_start() == date(2024, 1, 1)

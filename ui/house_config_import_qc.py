@@ -16,6 +16,7 @@ from house_config.consumption_csv import (
     profile_rows_bounds,
     shared_import_span_hours,
 )
+from ui.number_format import format_decimal, localized_figure
 from ui.chart_colors import COLOR_BASELOAD, COLOR_BATTERY, COLOR_GRID, PV_YELLOW_PALETTE
 
 _PV_COLOR = PV_YELLOW_PALETTE[0]
@@ -257,7 +258,7 @@ def _render_span_caption(
     st.caption(
         f"Zeitraum (Schnittmenge der geladenen Serien): "
         f"{bounds[0].strftime('%Y-%m-%d')} – {bounds[1].strftime('%Y-%m-%d')} "
-        f"({span_h} h, ca. {months_approx:.1f} Monate)."
+        f"({span_h} h, ca. {format_decimal(months_approx, 1)} Monate)."
     )
 
 
@@ -309,12 +310,12 @@ def render_import_power_qc(
     bounds, span_h = _import_span(rows)
     _render_span_caption(bounds, span_h)
     st.plotly_chart(
-        import_power_qc_figure(
+        localized_figure(import_power_qc_figure(
             rows["verbrauch"],
             rows["pv"],
             battery_rows=rows["battery"],
             grid_rows=rows["grid"],
-        ),
+        )),
         width="stretch",
         key=f"house_profile_import_qc_{preview_id}",
     )

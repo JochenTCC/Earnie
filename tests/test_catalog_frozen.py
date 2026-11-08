@@ -12,6 +12,9 @@ from pathlib import Path
 
 import pytest
 
+from house_config.edibert_tariffs import load_grid_fees, profile_grid_fee
+from house_config.netznutzung import default_netznutzung_config
+
 SHARE = Path(__file__).resolve().parents[1] / "share" / "config"
 
 FROZEN_IMPORT_IDS = frozenset(
@@ -96,6 +99,26 @@ FROZEN_GRID_RULE_SET_IDS = frozenset(
     }
 )
 
+# BGBl. II Nr. 305/2025, § 6 lit. b, Netzebene 7, cent/kWh
+GRID_LOSS_NE7 = {
+    "AT-BGLD": 0.0,
+    "AT-KTN": 0.368,
+    "AT-KLGF": 0.578,
+    "AT-NOE": 0.384,
+    "AT-OOE": 0.528,
+    "AT-LINZ": 0.487,
+    "AT-SBG": 0.357,
+    "AT-STMK": 0.336,
+    "AT-GRAZ": 0.658,
+    "AT-TIROL": 0.293,
+    "AT-IBK": 0.453,
+    "AT-VBG": 0.393,
+    "AT-WIEN": 0.7,
+    "AT-KLWT": 0.401,
+}
+RENEWABLES_AND_LEVY_CENT_KWH = 0.583 + 0.037 + 0.1  # BGBl. II Nr. 301/2025 § 2 Abs. 2, 3; BGBl. I Nr. 95/2025
+FIXED_EUR_YEAR = 54.0 + 3.796 + 19.02  # BGBl. II Nr. 305/2025, Nr. 301/2025 § 2 Abs. 1, Nr. 416/2024 § 1 Z 5
+
 _HINT = (
     "The public catalog is a frozen seed (Edibert P8): new entries go through Edibert's "
     "catalog channel, not into share/config/."
@@ -113,6 +136,19 @@ def _read(name: str) -> dict:
 def test_tariff_catalog_gets_no_new_tariffs(list_key, frozen):
     ids = {str(tariff["id"]) for tariff in _read("tariffs.json")[list_key]}
     assert not ids - frozen, f"{list_key}: new {sorted(ids - frozen)}. {_HINT}"
+
+
+@pytest.mark.parametrize("area_id", sorted(GRID_LOSS_NE7))
+def test_grid_area_carries_grid_loss_levies_and_fixed_amounts(area_id):
+    catalog = load_grid_fees(str(SHARE / "grid_fees.json"))
+    fee = profile_grid_fee(
+        area_id, {"netznutzung": {**default_netznutzung_config(), "area_id": area_id}}, catalog
+    )
+    by_id = {part.id: part.value for part in fee.components}
+    assert by_id["grid_loss"] == GRID_LOSS_NE7[area_id]
+    assert sum(by_id.values()) == pytest.approx(GRID_LOSS_NE7[area_id] + RENEWABLES_AND_LEVY_CENT_KWH)
+    assert fee.fixed_eur_year == pytest.approx(FIXED_EUR_YEAR)
+    assert catalog.areas[area_id].check is not None
 
 
 def test_grid_fee_catalog_gets_no_new_areas_or_rule_sets():

@@ -44,6 +44,9 @@ from .milp_horizon import (
     _build_milp_model,
     _terminal_soc_energy_kwh,
 )
+from .import_power_limit import ImportCaps
+from .milp_import_cap import add_import_cap_constraints
+from .milp_vendor_mode import add_vendor_mode_export_constraints, plan_vendor_mode_enabled
 from .milp_result import (
     _extract_milp_plan,
     _log_milp_decision,
@@ -98,6 +101,23 @@ def _add_virtual_reserve_refill(
     )
 
 
+def _base_level_start(
+    battery_params: dict | list[dict],
+    current_soc: float,
+    soc_hold_index: int | None,
+    soc_hold_percent: float | None,
+) -> tuple[int, float]:
+    """First slot the SoC base level tracks and the energy before it.
+
+    With a SoC hold the plan starts for real after the hold: the slots before it are not replayed
+    and only lead there.
+    """
+    capacity = float(_primary_battery_params(battery_params).get("battery_capacity_kwh") or 0.0)
+    if soc_hold_index is not None and soc_hold_percent is not None:
+        return soc_hold_index + 1, float(soc_hold_percent) / 100.0 * capacity
+    return 0, float(current_soc) / 100.0 * capacity
+
+
 def _build_milp_model_with_objective(
     matrix: list[dict[str, Any]],
     battery_params: dict | list[dict],
@@ -112,6 +132,8 @@ def _build_milp_model_with_objective(
     current_soc_by_id: dict[str, float] | None = None,
     inverter_params: dict | list[dict] | None = None,
     pv_systems: list[dict] | None = None,
+    soc_hold_index: int | None = None,
+    soc_hold_percent: float | None = None,
 ) -> MilpHorizonModel:
     """Horizontmodell samt Zielfunktion (Energiekosten + Batterie-Verschleiß)."""
     from .export_power_limit import export_caps_for_horizon
@@ -160,6 +182,9 @@ def _build_milp_model_with_objective(
         k_push,
         inputs.ev_milp_by_id,
         wear_cent_per_kwh=wear_cent_per_kwh,
+        base_level_start=_base_level_start(
+            battery_params, current_soc, soc_hold_index, soc_hold_percent
+        ),
     )
     return model
 
@@ -182,6 +207,7 @@ def _add_flex_side_constraints(
         inputs.contexts,
         verbose,
         filter_contexts=inputs.filters,
+        book_indices=inputs.book_indices,
     )
     add_generic_flex_rolling_constraints(
         model,
@@ -299,6 +325,7 @@ def _solve_milp_to_model(
     current_soc_by_id: dict[str, float] | None = None,
     inverter_params: dict | list[dict] | None = None,
     pv_systems: list[dict] | None = None,
+    import_caps: ImportCaps | None = None,
 ) -> tuple[MilpHorizonModel, dict[str, float], dict[str, float], list[int], dict, dict] | None:
     """Baut und löst das MILP; None wenn nicht optimal / leere Matrix."""
     if not matrix:
@@ -329,6 +356,8 @@ def _solve_milp_to_model(
         current_soc_by_id=current_soc_by_id,
         inverter_params=inverter_params,
         pv_systems=pv_systems,
+        soc_hold_index=soc_hold_index,
+        soc_hold_percent=soc_hold_percent,
     )
     _add_flex_side_constraints(
         model, matrix, inputs, verbose, consumer_continue_on, thermal_flex_contexts
@@ -344,6 +373,16 @@ def _solve_milp_to_model(
         sunrise_soc_min_index=sunrise_soc_min_index,
         terminal_soc_percent=terminal_soc_percent,
     )
+    if plan_vendor_mode_enabled():
+        add_vendor_mode_export_constraints(
+            model,
+            matrix,
+            inverter_params if inverter_params is not None else _default_inverter_params(),
+            first_slot=0 if soc_hold_index is None else soc_hold_index + 1,
+        )
+
+    if import_caps is not None:
+        add_import_cap_constraints(model, import_caps)
 
     update_cbc_milp_context_from_row(matrix[0])
     status = solve_with_strict_fallback(model.prob, msg=False, verbose=verbose)
@@ -405,6 +444,14 @@ def _extract_optimizer_controls_from_model(
     )
 
 
+def _warn_import_cap_not_planned(import_caps: ImportCaps | None, reason: str) -> None:
+    """Automatik and the trivial window plan nothing, so an import cap is not held by a plan."""
+    if import_caps is None:
+        return
+    limit = next(value for value in import_caps.limits_kw if value is not None)
+    logger.warning("MILP: Bezugsgrenze (%.2f kW) nicht eingeplant: %s.", limit, reason)
+
+
 def _trivial_optimizer_result(current_soc: float) -> (
     tuple[int, float, float, dict[str, float], dict[str, int], dict[str, float], dict[str, dict]]
 ):
@@ -445,6 +492,7 @@ def milp_optimizer(
     current_soc_by_id: dict[str, float] | None = None,
     inverter_params: dict | list[dict] | None = None,
     pv_systems: list[dict] | None = None,
+    import_caps: ImportCaps | None = None,
 ) -> tuple[int, float, float, dict[str, float], dict[str, int], dict[str, float], dict[str, dict]]:
     """
     Berechnet den optimalen Betriebsmodus und die Ziel-Leistung für den Loxone Miniserver.
@@ -464,6 +512,7 @@ def milp_optimizer(
         spa_remaining_kwh,
     )
     if trivial is not None:
+        _warn_import_cap_not_planned(import_caps, "trivial window, no solve")
         return _trivial_optimizer_result(current_soc)
     fallback_k_push = k_push if k_push is not None else config.get_push_price_cent()
     solved = _solve_milp_to_model(
@@ -490,8 +539,10 @@ def milp_optimizer(
         current_soc_by_id=current_soc_by_id,
         inverter_params=inverter_params,
         pv_systems=pv_systems,
+        import_caps=import_caps,
     )
     if solved is None:
+        _warn_import_cap_not_planned(import_caps, "no optimal solve, Automatik")
         return _AUTOMATIK_FALLBACK
 
     model, preset_by_slot, remaining, schedule_indices, contexts, filters = solved
@@ -548,6 +599,7 @@ def milp_horizon_schedule(
     current_soc_by_id: dict[str, float] | None = None,
     inverter_params: dict | list[dict] | None = None,
     pv_systems: list[dict] | None = None,
+    import_caps: ImportCaps | None = None,
 ) -> list[dict[str, Any]]:
     """
     Ein CBC-Solve über die Matrix; Rückgabe: Stundenplan-Slots für Open-Loop / commit-K.
@@ -594,6 +646,7 @@ def milp_horizon_schedule(
         current_soc_by_id=current_soc_by_id,
         inverter_params=inverter_params,
         pv_systems=pv_systems,
+        import_caps=import_caps,
     )
     if solved is None:
         return [dict(_FALLBACK_SCHEDULE_SLOT)]
