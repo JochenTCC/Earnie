@@ -72,7 +72,10 @@ def test_earnie_points_view_shows_total_and_breakdown(monkeypatch):
     monkeypatch.setattr(
         earnie_points_view,
         "compute_live_points",
-        lambda: {"total": 7, "pv": 2, "storage": 2, "wallbox": 2, "heat": 1, "other": 0},
+        lambda: {
+            "total": 7, "pv": 2, "storage": 2, "wallbox": 2, "heat": 1, "heating_rod": 0,
+            "other": 0,
+        },
     )
     at = AppTest.from_function(_points_view_app).run()
     assert not at.exception

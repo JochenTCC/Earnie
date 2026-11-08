@@ -2,6 +2,16 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Earnie-Points rule version 2 (2026-11-08)
+
+- [x] **Earnie-Points rule version 2** `[feat]` *(business plan v4.4 §5.2, decided 2026-11-07)*: the product counted rule 1 while the business plan and the viability study use rule 2. `house_config/earnie_points.py` now computes `points_v: 2`; every part is rounded half up.
+  - **Rule:** PV 1 point per 7 kWp; storage 1 point per 5 kWh up to 1 kWh per kWp, above 1 per 2.5 kWh; wallbox 2 each, +4 once without storage (< 1 kWh); heat pump 1, a boiler 0; new part `heating_rod`: base points by the heat source minus kWp / 5, at least 0; air conditioning and other flex consumers as in rule 1. Spec: `docs/workflow/earnie-points.md` §2.
+  - **Maintainer's decisions (2026-11-08):** heating rod base gas / oil / district heat 7, pellets / wood 4, electric direct and heat pump 0. A bidirectional wallbox adds its car battery at a quarter of a stationary storage, at least 1 point (in the wallbox part); phases no longer count.
+  - **Live scenario:** `runtime_store/usage_points.py` applies the scenario's `heating_system_ids`, so the heat source of the heating variant the live plant runs counts.
+  - **Docs:** `earnie-points.md`, `usage-ping.md`, public rule table in `docs/einrichtung/betrieb.md`, release-note draft `v2.8.0-earnie-points-v2.draft.md`. No prices or tier limits in this repo.
+  - **Tests:** `tests/test_earnie_points.py`, `tests/test_usage_points.py`, `tests/apptest/test_page_daemon_apptest.py`.
+  - **Open:** the receiver's `points_hist` (earnie-server) does not separate `points_v`, so v1 and v2 totals mix while clients update.
+
 ### Heating rod in the SE: cap by the store (2026-11-07)
 
 - [x] **Heating rod in the SE: cap by the store's free capacity** `[feat]` *(from Live control of the heating rod)*: the SE capped the rod by the day's heat demand per matrix date, so a store took more rod heat than it could hold, and a sunny day could not store heat for the next one. Live is unchanged.

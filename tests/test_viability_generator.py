@@ -370,8 +370,9 @@ def test_fuel_pack_passes_the_loader_with_more_than_two_scenarios(params, tmp_pa
     root = write_pack(house, params, tmp_path / "T")
     report = _load_pack(root / "pack")
     assert report["scenarios"] == ["duo", "duo_pvdyn", "dynamisch"]
-    assert report["points"]["wallbox"] == 4  # three-phase, two wallboxes
-    assert report["points"]["pv"] == 1 + math.ceil((house.pv_kwp - 6) / 4)  # nominal, not effective kWp
+    assert report["points"]["wallbox"] == 4  # two wallboxes, with storage
+    # Rule version 2, nominal (not effective) kWp: 1 point per 7 kWp, rounded half up.
+    assert report["points"]["pv"] == math.floor(house.pv_kwp / 7 + 0.5)
     assert report["consumers"]["wp_heating"] == 0
 
     profile = json.loads((root / "pack/config/house_profiles.json").read_text(encoding="utf-8"))["profiles"][0]

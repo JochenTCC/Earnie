@@ -7,33 +7,56 @@ from __future__ import annotations
 import math
 
 from house_config.earnie_role import EARNIE_ROLE_FLEX, resolve_earnie_role
-from settings.ev_power import ev_nominal_power_conversion
+from house_config.heat_source import consumer_heat_source, heating_rod_part
 
-POINTS_RULE_VERSION = 1
+POINTS_RULE_VERSION = 2
 
-PV_BASE_KWP = 6.0
-PV_STEP_KWP = 4.0
-STORAGE_BASE_KWH = 5.0
-STORAGE_STEP_KWH = 5.0
+PV_KWP_PER_POINT = 7.0
+STORAGE_KINK_KWH_PER_KWP = 1.0
+STORAGE_KWH_PER_POINT_BELOW_KINK = 5.0
+STORAGE_KWH_PER_POINT_ABOVE_KINK = 2.5
+EV_STORAGE_WEIGHT = 0.25
+EV_STORAGE_MIN_POINTS = 1
 
-WALLBOX_POINTS_1_PHASE = 1
-WALLBOX_POINTS_3_PHASE = 2
-WALLBOX_POINTS_BIDIRECTIONAL = 3
-HEAT_POINTS_PER_DEVICE = 1
+WALLBOX_POINTS = 2
+WALLBOX_NO_STORAGE_EXTRA = 4
+WALLBOX_NO_STORAGE_BELOW_KWH = 1.0
+
+HEAT_PUMP_POINTS = 1
+HEATING_ROD_BASE_POINTS: dict[str, int] = {
+    "gas": 7,
+    "oil": 7,
+    "district_heat": 7,
+    "pellets": 4,
+    "wood": 4,
+    "electric_direct": 0,
+    "heat_pump": 0,
+}
+HEATING_ROD_KWP_PER_DEDUCTION = 5.0
+
 OTHER_POINTS_PER_DEVICE = 1
 OTHER_MIN_NOMINAL_POWER_KW = 2.5
 
 _SUM_DECIMALS = 6
 
 
-def _tiered_points(total: float, *, base: float, step: float) -> int:
-    """0 for no capacity, 1 up to ``base``, then +1 per started ``step``."""
-    rounded = round(total, _SUM_DECIMALS)
-    if rounded <= 0.0:
-        return 0
-    if rounded <= base:
-        return 1
-    return 1 + int(math.ceil(round((rounded - base) / step, _SUM_DECIMALS)))
+def _half_up(value: float) -> int:
+    """Round to whole points, 0.5 rounds up (kaufmännisch); float noise ignored."""
+    return int(math.floor(round(value, _SUM_DECIMALS) + 0.5))
+
+
+def _number(item: dict, field: str, *, section: str, name: str) -> float:
+    if field not in item:
+        raise ValueError(f"earnie_points: {section} '{name}': {field} fehlt.")
+    try:
+        value = float(item[field])
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            f"earnie_points: {section} '{name}': {field} ist keine Zahl ({item[field]!r})."
+        ) from exc
+    if value < 0.0 or math.isnan(value):
+        raise ValueError(f"earnie_points: {section} '{name}': {field} muss >= 0 sein.")
+    return value
 
 
 def _sum_field(items: object, field: str, *, section: str) -> float:
@@ -43,44 +66,16 @@ def _sum_field(items: object, field: str, *, section: str) -> float:
     for index, item in enumerate(items):
         if not isinstance(item, dict):
             raise ValueError(f"earnie_points: {section}[{index}] muss ein Objekt sein.")
-        name = str(item.get("id") or index)
-        if field not in item:
-            raise ValueError(f"earnie_points: {section} '{name}': {field} fehlt.")
-        try:
-            value = float(item[field])
-        except (TypeError, ValueError) as exc:
-            raise ValueError(
-                f"earnie_points: {section} '{name}': {field} ist keine Zahl ({item[field]!r})."
-            ) from exc
-        if value < 0.0 or math.isnan(value):
-            raise ValueError(f"earnie_points: {section} '{name}': {field} muss >= 0 sein.")
-        total += value
+        total += _number(item, field, section=section, name=str(item.get("id") or index))
     return total
 
 
-def _pv_points(components: dict) -> int:
-    kwp = _sum_field(components.get("pv_systems", []), "kwp", section="pv_systems")
-    return _tiered_points(kwp, base=PV_BASE_KWP, step=PV_STEP_KWP)
-
-
-def _storage_points(components: dict) -> int:
-    kwh = _sum_field(
-        components.get("batteries", []), "battery_capacity_kwh", section="batteries"
-    )
-    return _tiered_points(kwh, base=STORAGE_BASE_KWH, step=STORAGE_STEP_KWH)
-
-
-def _wallbox_consumer_points(consumer: dict) -> int:
-    if consumer.get("bidirectional") is True:
-        return WALLBOX_POINTS_BIDIRECTIONAL
-    _voltage, phases = ev_nominal_power_conversion(consumer)
-    if phases == 1:
-        return WALLBOX_POINTS_1_PHASE
-    if phases == 3:
-        return WALLBOX_POINTS_3_PHASE
-    raise ValueError(
-        f"earnie_points: Wallbox '{consumer.get('id')}': nominal_power_phases={phases} "
-        "wird nicht bewertet (erlaubt: 1 oder 3)."
+def _storage_points(kwh: float, kwp: float) -> int:
+    """Up to 1 kWh per kWp: 1 point per 5 kWh; above: 1 point per 2.5 kWh."""
+    kink = kwp * STORAGE_KINK_KWH_PER_KWP
+    low, high = min(kwh, kink), max(0.0, kwh - kink)
+    return _half_up(
+        low / STORAGE_KWH_PER_POINT_BELOW_KINK + high / STORAGE_KWH_PER_POINT_ABOVE_KINK
     )
 
 
@@ -98,32 +93,28 @@ def _is_large_flex_consumer(consumer: dict) -> bool:
     return nominal >= OTHER_MIN_NOMINAL_POWER_KW
 
 
-def _consumer_parts(consumer: dict) -> dict[str, int]:
-    """Points of one consumer; at most one non-zero part (no double counting)."""
-    kind = consumer.get("type")
-    if kind == "ev":
-        return {"wallbox": _wallbox_consumer_points(consumer)}
-    if kind == "thermal_annual":
-        return {"heat": HEAT_POINTS_PER_DEVICE}
-    if not _is_controlled(consumer):
-        return {}
-    if _is_large_flex_consumer(consumer):
-        return {"other": OTHER_POINTS_PER_DEVICE}
-    return {}
+def _ev_storage_kwh(consumer: dict) -> float:
+    """Car battery of a bidirectional wallbox, weighted a quarter of a stationary storage."""
+    if consumer.get("bidirectional") is not True:
+        return 0.0
+    name = str(consumer.get("id") or "?")
+    return EV_STORAGE_WEIGHT * _number(
+        consumer, "battery_capacity_kwh", section="Wallbox", name=name
+    )
 
 
-def _consumer_points(profile: dict) -> dict[str, int]:
-    consumers = profile.get("consumers")
-    if not isinstance(consumers, list):
-        raise ValueError("earnie_points: profile.consumers muss eine Liste sein.")
-    parts = {"wallbox": 0, "heat": 0, "other": 0}
-    for consumer in consumers:
-        if not isinstance(consumer, dict):
-            raise ValueError("earnie_points: Verbraucher muss ein Objekt sein.")
-        for part, points in _consumer_parts(consumer).items():
-            parts[part] += points
-    parts["heat"] += _cooling_points(profile)
-    return parts
+def _heating_rod_points(consumer: dict, kwp: float) -> int:
+    """Rod points by the heat source it backs up, minus 1 per 5 kWp of PV, at least 0."""
+    if heating_rod_part(consumer) is None:
+        return 0
+    source_type = consumer_heat_source(consumer)["type"]
+    if source_type not in HEATING_ROD_BASE_POINTS:
+        raise ValueError(
+            f"earnie_points: Heizstab an '{consumer.get('id')}': Wärmequelle "
+            f"'{source_type}' wird nicht bewertet."
+        )
+    base = HEATING_ROD_BASE_POINTS[source_type]
+    return max(0, _half_up(base - kwp / HEATING_ROD_KWP_PER_DEDUCTION))
 
 
 def _cooling_points(profile: dict) -> int:
@@ -135,9 +126,19 @@ def _cooling_points(profile: dict) -> int:
     if carrier is None:
         return 0
     if carrier[COOLING_KEY]["type"] == COOLING_TYPE_SPLIT:
-        return HEAT_POINTS_PER_DEVICE
+        return HEAT_PUMP_POINTS
     heating_counted = any(c is carrier for c in profile.get("consumers") or [])
-    return 0 if heating_counted else HEAT_POINTS_PER_DEVICE
+    return 0 if heating_counted else HEAT_PUMP_POINTS
+
+
+def _consumers(profile: dict) -> list[dict]:
+    consumers = profile.get("consumers")
+    if not isinstance(consumers, list):
+        raise ValueError("earnie_points: profile.consumers muss eine Liste sein.")
+    for consumer in consumers:
+        if not isinstance(consumer, dict):
+            raise ValueError("earnie_points: Verbraucher muss ein Objekt sein.")
+    return consumers
 
 
 def compute_earnie_points(components: dict, profile: dict) -> dict[str, int]:
@@ -145,14 +146,46 @@ def compute_earnie_points(components: dict, profile: dict) -> dict[str, int]:
     and the live house ``profile`` (normalized, with ``consumers``).
 
     Returns the breakdown plus ``total``; only ``total`` is sent in the usage ping.
+    Each consumer contributes to one part only (no double counting). The car battery of a
+    bidirectional wallbox adds to ``wallbox``: the storage points it would add at a quarter of
+    its capacity, at least 1 point per bidirectional wallbox.
     """
     if not isinstance(components, dict):
         raise ValueError("earnie_points: components muss ein Objekt sein.")
     if not isinstance(profile, dict):
         raise ValueError("earnie_points: profile muss ein Objekt sein.")
+    kwp = _sum_field(components.get("pv_systems", []), "kwp", section="pv_systems")
+    stationary_kwh = _sum_field(
+        components.get("batteries", []), "battery_capacity_kwh", section="batteries"
+    )
+    wallboxes = bidirectional = heat = rod = other = 0
+    ev_kwh = 0.0
+    for consumer in _consumers(profile):
+        kind = consumer.get("type")
+        if kind == "ev":
+            wallboxes += 1
+            if consumer.get("bidirectional") is True:
+                bidirectional += 1
+                ev_kwh += _ev_storage_kwh(consumer)
+        elif kind == "thermal_annual":
+            if consumer_heat_source(consumer)["type"] == "heat_pump":
+                heat += HEAT_PUMP_POINTS
+            rod += _heating_rod_points(consumer, kwp)
+        elif _is_controlled(consumer) and _is_large_flex_consumer(consumer):
+            other += OTHER_POINTS_PER_DEVICE
+    wallbox = WALLBOX_POINTS * wallboxes
+    if wallboxes and stationary_kwh < WALLBOX_NO_STORAGE_BELOW_KWH:
+        wallbox += WALLBOX_NO_STORAGE_EXTRA
+    storage = _storage_points(stationary_kwh, kwp)
+    if bidirectional:
+        ev_delta = _storage_points(stationary_kwh + ev_kwh, kwp) - storage
+        wallbox += max(EV_STORAGE_MIN_POINTS * bidirectional, ev_delta)
     parts = {
-        "pv": _pv_points(components),
-        "storage": _storage_points(components),
-        **_consumer_points(profile),
+        "pv": _half_up(kwp / PV_KWP_PER_POINT),
+        "storage": storage,
+        "wallbox": wallbox,
+        "heat": heat + _cooling_points(profile),
+        "heating_rod": rod,
+        "other": other,
     }
     return {"total": sum(parts.values()), **parts}

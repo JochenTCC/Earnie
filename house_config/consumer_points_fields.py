@@ -1,6 +1,7 @@
 """Optional consumer keys that feed the Earnie-Points rule (``docs/workflow/earnie-points.md``).
 
-* ``bidirectional`` (bool) — only ``ev`` consumers: wallbox can discharge (V2G), 3 points.
+* ``bidirectional`` (bool) — only ``ev`` consumers: wallbox can discharge (V2G); the car
+  battery then adds to the wallbox points (rule version 2).
 
 The key is optional: absent means "not set". Invalid values raise. The former
 ``appliance_kind: air_conditioner`` is gone: the air conditioning is the ``cooling`` block of

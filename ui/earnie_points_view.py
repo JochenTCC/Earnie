@@ -14,6 +14,7 @@ PART_LABELS = (
     ("storage", "Speicher"),
     ("wallbox", "Wallboxen"),
     ("heat", "Wärmepumpe / Klimaanlage"),
+    ("heating_rod", "Heizstab"),
     ("other", "Weitere flexible Großverbraucher"),
 )
 
@@ -27,7 +28,7 @@ def render_earnie_points() -> None:
     st.subheader("Earnie-Points dieser Anlage")
     st.caption(
         "Grobe Größenkennzahl des **Live-Szenarios** (PV, Speicher, Wallboxen, "
-        "Wärmepumpen / Klimaanlagen, flexible Großverbraucher). Nur die Gesamtsumme "
+        "Wärmepumpen / Klimaanlagen, Heizstab, flexible Großverbraucher). Nur die Gesamtsumme "
         "kann Teil der Nutzungsstatistik sein. Regel: Betriebs-Doku, Abschnitt "
         "Nutzungsstatistik."
     )

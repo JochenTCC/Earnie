@@ -14,6 +14,13 @@ from typing import Any
 from house_config.components_store import load_components_document
 from house_config.earnie_points import POINTS_RULE_VERSION, compute_earnie_points
 from house_config.entity_resolution import normalize_battery_ids, normalize_pv_system_ids
+from house_config.heating_systems import (
+    SCENARIO_HEATING_SYSTEM_IDS_KEY,
+    apply_scenario_heating_systems,
+    foreign_reference_ids,
+    heating_systems_by_id,
+    normalize_scenario_heating_system_ids,
+)
 from house_config.powerstation import is_powerstation
 from house_config.profiles_store import load_house_profiles_document
 from house_config.scenario_resolution import find_scenario_settings, get_live_scenario_id
@@ -74,7 +81,8 @@ def _live_components(components: dict, settings: dict) -> dict:
     return {"pv_systems": pv_systems, "batteries": house + powerstations}
 
 
-def _live_profile(settings: dict) -> dict:
+def _live_profile(settings: dict, components: dict) -> dict:
+    """House profile of the live scenario, with the heating systems the scenario picks."""
     profile_id = str(settings.get("house_profile_id") or "").strip()
     if not profile_id:
         raise ValueError("Live-Szenario hat kein house_profile_id.")
@@ -82,7 +90,18 @@ def _live_profile(settings: dict) -> dict:
     profile = (doc.get("profiles") or {}).get(profile_id)
     if not isinstance(profile, dict):
         raise ValueError(f"Live-Szenario verweist auf unbekanntes house_profile_id '{profile_id}'.")
-    return profile
+    picks = normalize_scenario_heating_system_ids(
+        settings.get(SCENARIO_HEATING_SYSTEM_IDS_KEY), label="Live-Szenario"
+    )
+    if not picks:
+        return profile
+    return apply_scenario_heating_systems(
+        profile,
+        picks,
+        heating_systems_by_id(components),
+        label=f"Live-Szenario (Hausprofil '{profile_id}')",
+        foreign_references=foreign_reference_ids(doc, profile_id),
+    )
 
 
 def compute_live_points() -> dict[str, int]:
@@ -90,7 +109,9 @@ def compute_live_points() -> dict[str, int]:
     live_id = get_live_scenario_id(read_json_dict(resolve_config_json_path()))
     settings = find_scenario_settings(resolve_backtesting_scenarios_json_path(), live_id)
     components = load_components_document(resolve_components_json_path())
-    return compute_earnie_points(_live_components(components, settings), _live_profile(settings))
+    return compute_earnie_points(
+        _live_components(components, settings), _live_profile(settings, components)
+    )
 
 
 def _apply_points(state: dict[str, Any], breakdown: dict[str, int] | None) -> bool:
