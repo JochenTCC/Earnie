@@ -22,6 +22,7 @@ MIN_IMPORT_WINDOW_SEC = 5 * 60
 GRID_IMPORT_SOURCE_COUNTER = "counter"
 GRID_IMPORT_SOURCE_MEAN = "mean"
 SAMPLE_LOG_DIRNAME = "power_samples"
+FIELD_GRID_POWER = "sens_grid_power_active"
 _SAMPLER_SCHEMA = 1
 
 _PLANT_KEYS = ("pv_kw", "grid_kw", "battery_kw", "house_kw", "baseload_kw", "flex_sum_kw")
@@ -447,16 +448,24 @@ def _log_raw_sample(
 ) -> None:
     """Opt-in raw log for the field test against the meter (max-power tariff P5c).
 
-    One JSON line per sample with the grid power, the grid counters read at the same moment
-    and the clock offset estimate. One file per day; files older than the configured days go.
-    A failure is logged and never stops the sampler.
+    One JSON line per sample with the grid power, the grid counters read at the same moment,
+    when each of these values arrived as a push (``*_pushed_at``) and the clock offset estimate.
+    In Shadow mode the values come through Prod's feed, up to one feed flush late; the push
+    times are Prod's, so the analysis can take that delay out. One file per day; files older
+    than the configured days go. A failure is logged and never stops the sampler.
     """
     try:
         days = sample_log_days()
         if days == 0:
             return
+        from ehal.qualified_ids import qualified_plant_id
+        from integrations.loxone_meter_energy import (
+            CHANNEL_GRID,
+            FIELD_GRID_EXPORT,
+            FIELD_GRID_IMPORT,
+        )
         from runtime_store import clock_skew
-        from integrations.loxone_meter_energy import CHANNEL_GRID
+        from runtime_store.ehal_push_inbox import push_last_ts
 
         reader = read_energy if read_energy is not None else _default_read_energy
         grid = (reader() or {}).get(CHANNEL_GRID) or {}
@@ -464,8 +473,11 @@ def _log_raw_sample(
         line = {
             "ts": _iso(moment),
             "grid_kw": sample["grid_kw"],
+            "grid_power_pushed_at": push_last_ts(qualified_plant_id(FIELD_GRID_POWER)),
             "grid_import_total_kwh": grid.get("total"),
+            "grid_import_pushed_at": push_last_ts(qualified_plant_id(FIELD_GRID_IMPORT)),
             "grid_export_total_kwh": grid.get("total_neg"),
+            "grid_export_pushed_at": push_last_ts(qualified_plant_id(FIELD_GRID_EXPORT)),
             "clock_skew_sec": None if skew is None else skew.offset_sec,
         }
         folder = log_dir or sample_log_dir()

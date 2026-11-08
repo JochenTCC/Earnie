@@ -245,7 +245,7 @@ Eine Einstellung ist nicht nötig; die Datei bleibt lokal. Voraussetzung ist ein
 - **Genauigkeit:** etwa ±0,5–1 s.
 - **Leistungspreis:** Die Monatsspitze misst Earnie in Viertelstunden nach der eigenen Systemuhr. Bei 2 s Abweichung ist der Fehler höchstens 0,02 kW, auch wenn sich der Bezug genau an der Viertelstundengrenze um 10 kW ändert.
 
-**Rohdaten für einen Zählervergleich:** Mit `EARNIE_POWER_SAMPLE_LOG_DAYS=<Tage>` in `.env` schreibt Earnie jede Leistungsprobe (alle 30 s) in `runtime/power_samples/JJJJ-MM-TT.jsonl`: Netzleistung, Bezugs- und Einspeisezähler zum selben Zeitpunkt und die geschätzte Uhrabweichung. Ältere Tage löscht Earnie selbst. Gedacht ist das für einen Vergleich mit dem Viertelstunden-Export aus dem Portal des Netzbetreibers. Leer oder `0` schaltet es aus.
+**Rohdaten für einen Zählervergleich:** Mit `EARNIE_POWER_SAMPLE_LOG_DAYS=<Tage>` in `.env` schreibt Earnie jede Leistungsprobe (alle 30 s) in `runtime/power_samples/JJJJ-MM-TT.jsonl`: Netzleistung, Bezugs- und Einspeisezähler zum selben Zeitpunkt, wann jeder dieser Werte als Push angekommen ist, und die geschätzte Uhrabweichung. Ältere Tage löscht Earnie selbst. Gedacht ist das für einen Vergleich mit dem Viertelstunden-Export aus dem Portal des Netzbetreibers. Leer oder `0` schaltet es aus.
 
 <a id="cycle-recorder-regression-r-rec"></a>
 

@@ -662,6 +662,24 @@ def read_push_counter(
     return value
 
 
+def push_last_ts(ehal_id: str) -> str | None:
+    """When the signal's latest value arrived (``last_ts``), as the counter read sees it.
+
+    In Shadow mode the row comes from the feed, so this is when Prod received the push, not
+    when Shadow read it. ``None`` when the signal has no row.
+    """
+    eid = str(ehal_id or "").strip()
+    feed_overlay = _shadow_feed_overlay_if_active(eid)
+    with _lock:
+        signals = dict(_memory) if _memory else load_inbox()
+        if feed_overlay:
+            signals = {**signals, **feed_overlay}
+        row = signals.get(eid)
+    if row is None or row.get("last_ts") is None:
+        return None
+    return str(row["last_ts"])
+
+
 def _read_push_counter_live(
     eid: str,
     *,

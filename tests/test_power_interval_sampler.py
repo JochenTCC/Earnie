@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -290,6 +290,11 @@ def test_raw_sample_log_keeps_counters_and_only_the_last_days(tmp_path: Path, mo
     monkeypatch.setattr(
         clock_skew, "current_estimate", lambda: clock_skew.SkewEstimate(-1.2, 5, ("example.org",))
     )
+    from runtime_store import ehal_push_inbox
+
+    pushed = datetime(2026, 11, 6, 22, 59, 12, tzinfo=timezone.utc)
+    ehal_push_inbox.record_push("grid.meter.sens_grid_energy_import", "110.0", now=pushed)
+    ehal_push_inbox.record_push("grid.meter.sens_grid_power_active", "2500", now=pushed)
     state = tmp_path / "sampler.json"
     first = datetime(2026, 11, 5, 23, 59, 30)
     _tick_at(state, first, 1.5, 100.0)
@@ -299,12 +304,27 @@ def test_raw_sample_log_keeps_counters_and_only_the_last_days(tmp_path: Path, mo
     assert [json.loads(line) for line in lines] == [{
         "ts": "2026-11-06T23:59:30",
         "grid_kw": 2.5,
+        "grid_power_pushed_at": pushed.isoformat(),
         "grid_import_total_kwh": 110.0,
+        "grid_import_pushed_at": pushed.isoformat(),
         "grid_export_total_kwh": 7.0,
+        "grid_export_pushed_at": None,
         "clock_skew_sec": -1.2,
     }]
     _tick_at(state, first + timedelta(days=2), 3.5, 120.0)
     assert sorted(p.name for p in folder.iterdir()) == ["2026-11-06.jsonl", "2026-11-07.jsonl"]
+
+
+def test_in_shadow_mode_the_push_time_is_prods_from_the_feed(monkeypatch):
+    """Shadow reads through the feed: the logged push time must be when Prod got the value."""
+    from runtime_store import ehal_push_inbox
+
+    monkeypatch.setattr(
+        ehal_push_inbox,
+        "_shadow_feed_overlay_if_active",
+        lambda eid: {eid: {"value": 110.0, "parse_ok": True, "last_ts": "2026-11-08T07:00:12+00:00"}},
+    )
+    assert ehal_push_inbox.push_last_ts("grid.meter.sens_grid_energy_import") == "2026-11-08T07:00:12+00:00"
 
 
 def test_raw_sample_log_is_off_by_default(tmp_path: Path, monkeypatch, own_runtime):
