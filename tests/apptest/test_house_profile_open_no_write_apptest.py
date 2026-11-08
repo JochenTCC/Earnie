@@ -5,6 +5,7 @@ says so; every later open leaves the file byte-identical and shows no „Gespeic
 """
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 
@@ -32,11 +33,57 @@ def test_first_open_normalises_once_and_says_so_then_never_writes_again():
     assert normalised != raw_before, "fixture is raw: the first open brings it to the current format"
     assert _captions(first) == ["Gespeichert – Datei auf das aktuelle Format gebracht"]
 
+    stamp = path.stat().st_mtime_ns
     second = _open()
     assert not second.exception
     assert path.read_bytes() == normalised
     assert _captions(second) == []
-    assert path.stat().st_mtime_ns == path.stat().st_mtime_ns  # no rewrite happened
+    assert path.stat().st_mtime_ns == stamp  # no rewrite happened
+
+
+def test_reference_system_with_heating_rod_is_not_rewritten_on_every_open():
+    """A rod part carries ``internal_gain_factor`` 0 on disk (migration dw5.house_gains).
+
+    The form builds the part without the key; the save normalises it back in. The dry
+    run must compare the normalised catalog, otherwise every open rewrites both files.
+    """
+    components_path = Path(os.environ["EARNIE_COMPONENTS_PATH"])
+    doc = json.loads(components_path.read_text(encoding="utf-8"))
+    system = next(s for s in doc["heating_systems"] if s["id"] == "heating_test_home")
+    system["heat_storage"] = {
+        "volume_liters": 500.0,
+        "heat_loss_kw_per_k": 0.02,
+        "setpoint_c": 45.0,
+        "tolerance_c": 5.0,
+    }
+    system["parts"] = [
+        {
+            "id": "heating_rod",
+            "type": "heating_rod",
+            "nominal_power_kw": 3.0,
+            "internal_gain_factor": 0.0,
+        }
+    ]
+    components_path.write_text(json.dumps(doc, indent=2), encoding="utf-8")
+    house_path = Path(os.environ["EARNIE_HOUSE_PROFILES_PATH"])
+    house = json.loads(house_path.read_text(encoding="utf-8"))
+    # The rod adds consumer energy; keep a Grundlast so the profile can be saved at all.
+    house["profiles"][0]["annual_kwh"] = 10000.0
+    house_path.write_text(json.dumps(house, indent=2), encoding="utf-8")
+
+    first = _open()
+    assert not first.exception
+    assert _captions(first) == ["Gespeichert – Datei auf das aktuelle Format gebracht"]
+    house_stamp = house_path.stat().st_mtime_ns
+    components_stamp = components_path.stat().st_mtime_ns
+    components_after_first = components_path.read_bytes()
+
+    second = _open()
+    assert not second.exception
+    assert _captions(second) == []
+    assert house_path.stat().st_mtime_ns == house_stamp
+    assert components_path.stat().st_mtime_ns == components_stamp
+    assert components_path.read_bytes() == components_after_first
 
 
 def test_edit_after_a_clean_open_is_still_saved():

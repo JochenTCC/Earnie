@@ -177,6 +177,7 @@ def _house_profiles_payload(profile: dict) -> dict:
         assert_reference_systems_unshared,
         heating_systems_by_id,
         merge_inline_reference_systems,
+        normalize_heating_systems,
         reference_ids_by_profile,
     )
     from house_config.label_uniqueness import assert_unique_label, assert_unique_labels_in_list
@@ -225,7 +226,10 @@ def _house_profiles_payload(profile: dict) -> dict:
         "payload": payload,
         "components": components,
         "catalog": catalog,
-        "catalog_changed": catalog != list(components.get(HEATING_SYSTEMS_KEY) or []),
+        # Compared in the normalised form the save writes: the form leaves out keys the
+        # save fills in (e.g. a rod part's internal_gain_factor), which is no change.
+        "catalog_changed": normalize_heating_systems(catalog)
+        != normalize_heating_systems(list(components.get(HEATING_SYSTEMS_KEY) or [])),
         "consumers": consumers,
     }
 
