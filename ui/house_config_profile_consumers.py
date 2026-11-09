@@ -247,6 +247,9 @@ def _render_consumer_identity_fields(
     if c_type == "thermal_annual":
         # Generation field: rendered in the „Heizsystem“ section (same widget key).
         return c_type, c_label, float(consumer.get("nominal_power_kw", 0.0)), force_id
+    if c_type == "ev":
+        # Data model 6: the EV's power follows from its charge currents (EV fields).
+        return c_type, c_label, 0.0, force_id
     nominal = labeled_number_input(
         "Nennleistung (kW)",
         min_value=0.0,
@@ -336,8 +339,9 @@ def _render_consumer_form_body(
     item: dict = {
         "label": c_label,
         "type": c_type,
-        "nominal_power_kw": nominal,
     }
+    if c_type != "ev":
+        item["nominal_power_kw"] = nominal
     # „Haus Wärme“: the absent-mode setback is a house setting („Gebäude / Wärmebedarf“).
     if c_type != "thermal_annual":
         item["absent_mode_enabled"] = labeled_checkbox(
@@ -381,7 +385,21 @@ def _render_consumer_form_body(
             consumer,
             index,
             session_scope=session_scope,
-            nominal_power_kw=float(item["nominal_power_kw"]),
+            nominal_power_kw=_form_power_kw(item),
         )
     )
     return item
+
+
+def _form_power_kw(item: dict) -> float:
+    """kW of the form item; an EV's is its pair maximum (current × voltage × phases)."""
+    if item.get("type") == "ev":
+        from house_config.wallboxes import WALLBOX_VOLTAGE_FORM_KEY
+
+        return (
+            float(item["max_current_a"])
+            * float(item[WALLBOX_VOLTAGE_FORM_KEY])
+            * int(item["phases"])
+            / 1000.0
+        )
+    return float(item["nominal_power_kw"])

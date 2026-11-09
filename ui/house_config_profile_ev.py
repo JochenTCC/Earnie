@@ -23,6 +23,7 @@ from house_config.generic_schedule import (
     reject_legacy_start_flexibility,
 )
 from house_config.id_slug import slug_id
+from house_config.wallboxes import WALLBOX_VOLTAGE_FORM_KEY
 from house_config.profile_schema_defaults import consumer_default, ev_schedule_default
 from house_config.thermal_labels import (
     CONSUMER_TYPE_LABELS,
@@ -71,12 +72,25 @@ _PASSTHROUGH_CONSUMER_KEYS = (
 
 
 
+# Pair defaults of a new EV (1 phase, 6–16 A at 230 V ≈ 1.4–3.7 kW).
+DEFAULT_EV_PHASES = 1
+DEFAULT_EV_MIN_CURRENT_A = 6.0
+DEFAULT_EV_MAX_CURRENT_A = 16.0
+DEFAULT_WALLBOX_VOLTAGE_V = 230.0
+
+
+def _pair_kw(current_a: float, *, voltage_v: float, phases: int) -> float:
+    return float(current_a) * float(voltage_v) * int(phases) / 1000.0
+
+
 def _default_ev_consumer() -> dict:
     return {
         "label": "E-Auto",
         "type": "ev",
-        "nominal_power_kw": 3.5,
-        "min_power_kw": 1.4,
+        "phases": DEFAULT_EV_PHASES,
+        "min_current_a": DEFAULT_EV_MIN_CURRENT_A,
+        "max_current_a": DEFAULT_EV_MAX_CURRENT_A,
+        WALLBOX_VOLTAGE_FORM_KEY: DEFAULT_WALLBOX_VOLTAGE_V,
         "min_on_quarterhours": consumer_default("min_on_quarterhours", consumer_type="ev"),
         "battery_capacity_kwh": 60.0,
         "charging_schedule": {
@@ -93,7 +107,13 @@ def _default_ev_consumer() -> dict:
                 "ready_by_hour": 9,
                 "daily_rest_soc": 30.0,
             },
-            "milp": _suggested_ev_milp(1.4),
+            "milp": _suggested_ev_milp(
+                _pair_kw(
+                    DEFAULT_EV_MIN_CURRENT_A,
+                    voltage_v=DEFAULT_WALLBOX_VOLTAGE_V,
+                    phases=DEFAULT_EV_PHASES,
+                )
+            ),
         },
     }
 
@@ -143,8 +163,10 @@ def _apply_ev_default_widget_keys(
     weekday = sched.get("weekday") or {}
     weekend = sched.get("weekend") or {}
     values = {
-        f"hc_nom_{index}": float(seeded["nominal_power_kw"]),
-        f"hc_ev_min_{index}": float(seeded["min_power_kw"]),
+        f"hc_ev_phases_{index}": int(seeded["phases"]),
+        f"hc_ev_min_a_{index}": float(seeded["min_current_a"]),
+        f"hc_ev_max_a_{index}": float(seeded["max_current_a"]),
+        f"hc_ev_voltage_{index}": float(seeded[WALLBOX_VOLTAGE_FORM_KEY]),
         f"hc_ev_min_qh_{index}": int(seeded["min_on_quarterhours"]),
         f"hc_ev_cap_{index}": float(seeded["battery_capacity_kwh"]),
         f"hc_ev_target_soc_{index}": float(sched.get("target_soc_percent", ev_schedule_default("target_soc_percent"))),
@@ -203,14 +225,69 @@ def _render_day_schedule(
         ),
     }
 
+def _wallbox_voltage(consumer: dict) -> float:
+    """Voltage of the EV's wallbox: form value, else the loaded pair view, else the default."""
+    if consumer.get(WALLBOX_VOLTAGE_FORM_KEY) is not None:
+        return float(consumer[WALLBOX_VOLTAGE_FORM_KEY])
+    wallbox = consumer.get("wallbox")
+    if isinstance(wallbox, dict) and wallbox.get("voltage_v") is not None:
+        return float(wallbox["voltage_v"])
+    return DEFAULT_WALLBOX_VOLTAGE_V
+
+
 def _render_ev_power_fields(consumer: dict, index: int, *, session_scope: str) -> dict:
-    return {
-        "min_power_kw": labeled_number_input(
-            "Mindestleistung (kW)",
+    """Charge limits as current (data model 6), written to the car and its wallbox."""
+    phases = int(
+        labeled_number_input(
+            "Phasen",
+            min_value=1,
+            max_value=3,
+            value=int(consumer.get("phases", DEFAULT_EV_PHASES)),
+            step=1,
+            key=_scoped_key(session_scope, f"hc_ev_phases_{index}"),
+            help="Phasen, mit denen das Auto an dieser Wallbox lädt.",
+        )
+    )
+    min_a = float(
+        labeled_number_input(
+            "Mindest-Ladestrom (A)",
             min_value=0.0,
-            value=float(consumer.get("min_power_kw", 1.4)),
-            key=_scoped_key(session_scope, f"hc_ev_min_{index}"),
-        ),
+            value=float(consumer.get("min_current_a", DEFAULT_EV_MIN_CURRENT_A)),
+            step=1.0,
+            key=_scoped_key(session_scope, f"hc_ev_min_a_{index}"),
+        )
+    )
+    max_a = float(
+        labeled_number_input(
+            "Höchst-Ladestrom (A)",
+            min_value=0.0,
+            value=float(consumer.get("max_current_a", DEFAULT_EV_MAX_CURRENT_A)),
+            step=1.0,
+            key=_scoped_key(session_scope, f"hc_ev_max_a_{index}"),
+        )
+    )
+    voltage = float(
+        labeled_number_input(
+            "Spannung der Wallbox (V)",
+            min_value=100.0,
+            max_value=500.0,
+            value=_wallbox_voltage(consumer),
+            step=1.0,
+            ratios=WIDE_LABEL_RATIOS,
+            key=_scoped_key(session_scope, f"hc_ev_voltage_{index}"),
+            help="Spannung je Phase. Standard: 230 V.",
+        )
+    )
+    st.caption(
+        f"Ladeleistung: {_pair_kw(min_a, voltage_v=voltage, phases=phases):.2f} – "
+        f"{_pair_kw(max_a, voltage_v=voltage, phases=phases):.2f} kW "
+        "(Strom × Spannung × Phasen). Die Grenzen gelten für Auto und Wallbox."
+    )
+    return {
+        "phases": phases,
+        "min_current_a": min_a,
+        "max_current_a": max_a,
+        WALLBOX_VOLTAGE_FORM_KEY: voltage,
         "min_on_quarterhours": labeled_number_input(
             "Mindest-Ladedauer (Viertelstunden)",
             min_value=1,
@@ -224,32 +301,6 @@ def _render_ev_power_fields(consumer: dict, index: int, *, session_scope: str) -
             value=float(consumer.get("battery_capacity_kwh", 60.0)),
             step=1.0,
             key=_scoped_key(session_scope, f"hc_ev_cap_{index}"),
-        ),
-    }
-
-def _render_ev_amp_conversion_fields(
-    sched: dict, index: int, *, session_scope: str
-) -> dict:
-    """Nennspannung / Phasen — only used when the Lademerker delivers Ampere."""
-    return {
-        "nominal_power_voltage_v": labeled_number_input(
-            "Nennspannung (V) für A→kW",
-            min_value=100.0,
-            max_value=500.0,
-            value=float(sched.get("nominal_power_voltage_v", ev_schedule_default("nominal_power_voltage_v"))),
-            step=1.0,
-            ratios=WIDE_LABEL_RATIOS,
-            key=_scoped_key(session_scope, f"hc_ev_voltage_{index}"),
-            help="Nur relevant, wenn der Lademerker Ampere liefert. Standard: 230 V.",
-        ),
-        "nominal_power_phases": labeled_number_input(
-            "Phasen für A→kW",
-            min_value=1,
-            max_value=3,
-            value=int(sched.get("nominal_power_phases", ev_schedule_default("nominal_power_phases"))),
-            step=1,
-            key=_scoped_key(session_scope, f"hc_ev_phases_{index}"),
-            help="Standard: 1 Phase.",
         ),
     }
 
@@ -281,9 +332,6 @@ def _render_ev_charging_schedule(
                 "Unabhängig vom Haus-Abwesenheitsmodus."
             ),
         ),
-        **_render_ev_amp_conversion_fields(
-            sched, index, session_scope=session_scope
-        ),
         "weekday": _render_day_schedule(
             "Werktag",
             sched.get("weekday") or {},
@@ -306,7 +354,11 @@ def _render_ev_fields(consumer: dict, index: int, *, session_scope: str) -> dict
     )
     item["charging_schedule"]["milp"] = _render_ev_milp_fields(
         sched.get("milp") or {},
-        float(item["min_power_kw"]),
+        _pair_kw(
+            item["min_current_a"],
+            voltage_v=item[WALLBOX_VOLTAGE_FORM_KEY],
+            phases=item["phases"],
+        ),
         index,
         session_scope=session_scope,
     )

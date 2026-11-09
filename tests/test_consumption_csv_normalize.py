@@ -230,6 +230,11 @@ def test_serialize_consumer_keeps_use_profile_csv_false() -> None:
             "ev",
             {
                 "min_power_kw": 1.0,
+                # Normalized EV: stored current fields next to the pair view (data model 6).
+                "phases": 1,
+                "min_current_a": 1.0 * 1000.0 / 230.0,
+                "max_current_a": 1.0 * 1000.0 / 230.0,
+                "wallbox_assignment": {"mode": "fixed", "wallbox_id": "c_ev"},
                 "min_on_quarterhours": 4,
                 "battery_capacity_kwh": 40.0,
                 "charging_schedule": {

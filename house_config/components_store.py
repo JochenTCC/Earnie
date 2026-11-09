@@ -5,6 +5,7 @@ import json
 import os
 
 from house_config.entity_resolution import normalize_battery, normalize_pv_system
+from house_config.wallboxes import WALLBOXES_KEY, normalize_wallboxes, serialize_wallbox
 from house_config.heating_systems import (
     HEATING_SYSTEMS_KEY,
     normalize_heating_systems,
@@ -84,6 +85,7 @@ def normalize_components_document(doc: dict) -> dict:
         "batteries": batteries,
         "pv_systems": pv_systems,
         HEATING_SYSTEMS_KEY: normalize_heating_systems(doc.get(HEATING_SYSTEMS_KEY)),
+        WALLBOXES_KEY: normalize_wallboxes(doc.get(WALLBOXES_KEY)),
     }
 
 
@@ -145,11 +147,15 @@ def load_components_document(path: str) -> dict:
     heating_systems = doc.get(HEATING_SYSTEMS_KEY, [])
     if not isinstance(heating_systems, list):
         raise ValueError("heating_systems muss ein Array sein.")
+    wallboxes = doc.get(WALLBOXES_KEY, [])
+    if not isinstance(wallboxes, list):
+        raise ValueError("wallboxes muss ein Array sein.")
     out = {
         "inverters": inverters,
         "batteries": batteries,
         "pv_systems": pv_systems,
         HEATING_SYSTEMS_KEY: heating_systems,
+        WALLBOXES_KEY: wallboxes,
     }
     if shadow:
         try:
@@ -292,6 +298,7 @@ def save_components_document(path: str, doc: dict) -> None:
         pass
 
     _reject_dropping_heating_systems(path, doc)
+    _reject_dropping_wallboxes(path, doc)
     normalized = normalize_components_document(doc)
     serializable = {
         "inverters": [_serialize_inverter(item) for item in normalized["inverters"]],
@@ -302,6 +309,10 @@ def save_components_document(path: str, doc: dict) -> None:
         serializable[HEATING_SYSTEMS_KEY] = [
             serialize_heating_system(item) for item in normalized[HEATING_SYSTEMS_KEY]
         ]
+    if normalized[WALLBOXES_KEY]:
+        serializable[WALLBOXES_KEY] = [
+            serialize_wallbox(item) for item in normalized[WALLBOXES_KEY]
+        ]
     stamp_data_model(serializable)
     target = os.path.abspath(path)
     os.makedirs(os.path.dirname(target) or ".", exist_ok=True)
@@ -311,6 +322,17 @@ def save_components_document(path: str, doc: dict) -> None:
         handle.write("\n")
     os.replace(tmp, target)
     clear_components_doc_cache()
+
+
+def _reject_dropping_wallboxes(path: str, doc: dict) -> None:
+    """A writer that never loaded the wallboxes must not wipe them (no silent data loss)."""
+    if WALLBOXES_KEY in doc or not os.path.isfile(path):
+        return
+    if _read_json(path).get(WALLBOXES_KEY):
+        raise ValueError(
+            "components.json: Speichern ohne wallboxes würde die Wallboxen löschen — "
+            "Dokument über load_components_document laden und ändern."
+        )
 
 
 def _reject_dropping_heating_systems(path: str, doc: dict) -> None:

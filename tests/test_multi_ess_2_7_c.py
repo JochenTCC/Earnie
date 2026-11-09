@@ -23,8 +23,8 @@ from runtime_store.migrate_v4 import (
 )
 
 
-def test_current_data_model_is_5():
-    assert CURRENT_DATA_MODEL == 5
+def test_current_data_model_is_6():
+    assert CURRENT_DATA_MODEL == 6
 
 
 def test_normalize_battery_ids_rejects_singular():

@@ -51,7 +51,7 @@
             "ehal_bindings": {}
         }
     ],
-    "earnie_data_model": 5,
+    "earnie_data_model": 6,
     "heating_systems": [
         {
             "id": "heating_test_home",

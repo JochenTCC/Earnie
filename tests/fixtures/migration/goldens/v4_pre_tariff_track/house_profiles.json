@@ -34,10 +34,8 @@
                     "id": "e_auto",
                     "label": "smart",
                     "type": "ev",
-                    "nominal_power_kw": 3.5,
                     "use_profile_csv": false,
                     "absent_mode_enabled": true,
-                    "min_power_kw": 1.4,
                     "min_on_quarterhours": 1,
                     "battery_capacity_kwh": 16.0,
                     "charging_schedule": {
@@ -54,8 +52,6 @@
                             "ready_by_hour": 12,
                             "daily_rest_soc": 80.0
                         },
-                        "nominal_power_voltage_v": 220.0,
-                        "nominal_power_phases": 1,
                         "milp": {
                             "live_modus_a_min_remaining_kwh": 2.8,
                             "tie_break_on_epsilon": 0.001,
@@ -63,19 +59,20 @@
                         }
                     },
                     "ehal_bindings": {
-                        "sens_evcs_active_power": "",
-                        "set_evcs_max_current": "",
-                        "set_evcs_mode": "",
-                        "sens_evcs_connected": "",
                         "sens_evcs_soc_act": "",
-                        "get_evcs_nominal_current": "",
                         "sens_evcs_bat_capacity": "",
                         "get_evcs_ready_by_time": "",
                         "get_evcs_limit_soc": "",
-                        "get_evcs_soc_min_immediate": "",
-                        "evcs.e_auto.set_evcs_max_current": ""
+                        "get_evcs_soc_min_immediate": ""
                     },
-                    "internal_gain_factor": 0.0
+                    "internal_gain_factor": 0.0,
+                    "phases": 1,
+                    "min_current_a": 6.363636363636363,
+                    "max_current_a": 15.909090909090908,
+                    "wallbox_assignment": {
+                        "mode": "fixed",
+                        "wallbox_id": "e_auto"
+                    }
                 },
                 {
                     "id": "pool_swimspa",
@@ -360,10 +357,8 @@
                     "id": "e_auto",
                     "label": "smart",
                     "type": "ev",
-                    "nominal_power_kw": 3.5,
                     "use_profile_csv": false,
                     "absent_mode_enabled": true,
-                    "min_power_kw": 1.4,
                     "min_on_quarterhours": 1,
                     "battery_capacity_kwh": 16.0,
                     "charging_schedule": {
@@ -380,8 +375,6 @@
                             "ready_by_hour": 12,
                             "daily_rest_soc": 80.0
                         },
-                        "nominal_power_voltage_v": 220.0,
-                        "nominal_power_phases": 1,
                         "milp": {
                             "live_modus_a_min_remaining_kwh": 2.8,
                             "tie_break_on_epsilon": 0.001,
@@ -389,19 +382,20 @@
                         }
                     },
                     "ehal_bindings": {
-                        "sens_evcs_active_power": "",
-                        "set_evcs_max_current": "",
-                        "set_evcs_mode": "",
-                        "sens_evcs_connected": "",
                         "sens_evcs_soc_act": "",
-                        "get_evcs_nominal_current": "",
                         "sens_evcs_bat_capacity": "",
                         "get_evcs_ready_by_time": "",
                         "get_evcs_limit_soc": "",
-                        "get_evcs_soc_min_immediate": "",
-                        "evcs.e_auto.set_evcs_max_current": ""
+                        "get_evcs_soc_min_immediate": ""
                     },
-                    "internal_gain_factor": 0.0
+                    "internal_gain_factor": 0.0,
+                    "phases": 1,
+                    "min_current_a": 6.363636363636363,
+                    "max_current_a": 15.909090909090908,
+                    "wallbox_assignment": {
+                        "mode": "fixed",
+                        "wallbox_id": "e_auto"
+                    }
                 },
                 {
                     "id": "pool_swimspa",
@@ -686,10 +680,8 @@
                     "id": "e_auto",
                     "label": "smart",
                     "type": "ev",
-                    "nominal_power_kw": 3.5,
                     "use_profile_csv": false,
                     "absent_mode_enabled": true,
-                    "min_power_kw": 1.4,
                     "min_on_quarterhours": 1,
                     "battery_capacity_kwh": 16.0,
                     "charging_schedule": {
@@ -706,8 +698,6 @@
                             "ready_by_hour": 12,
                             "daily_rest_soc": 80.0
                         },
-                        "nominal_power_voltage_v": 220.0,
-                        "nominal_power_phases": 1,
                         "milp": {
                             "live_modus_a_min_remaining_kwh": 2.8,
                             "tie_break_on_epsilon": 0.001,
@@ -715,19 +705,20 @@
                         }
                     },
                     "ehal_bindings": {
-                        "sens_evcs_active_power": "",
-                        "set_evcs_max_current": "",
-                        "set_evcs_mode": "",
-                        "sens_evcs_connected": "",
                         "sens_evcs_soc_act": "",
-                        "get_evcs_nominal_current": "",
                         "sens_evcs_bat_capacity": "",
                         "get_evcs_ready_by_time": "",
                         "get_evcs_limit_soc": "",
-                        "get_evcs_soc_min_immediate": "",
-                        "evcs.e_auto.set_evcs_max_current": ""
+                        "get_evcs_soc_min_immediate": ""
                     },
-                    "internal_gain_factor": 0.0
+                    "internal_gain_factor": 0.0,
+                    "phases": 1,
+                    "min_current_a": 6.363636363636363,
+                    "max_current_a": 15.909090909090908,
+                    "wallbox_assignment": {
+                        "mode": "fixed",
+                        "wallbox_id": "e_auto"
+                    }
                 },
                 {
                     "id": "pool_swimspa",
@@ -993,5 +984,5 @@
             "single_tariff": true
         }
     },
-    "earnie_data_model": 5
+    "earnie_data_model": 6
 }

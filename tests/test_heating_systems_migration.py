@@ -137,8 +137,14 @@ def test_dogfooding_fixture_migrates_and_loads(tmp_path):
         if "heating_power_kw" not in entry:
             assert entry["heat_source"]["type"] == "gas"
             entry["heating_power_kw"] = 9.0
-    for name in {*result.changed_files, *hoisted.changed_files, *powered.changed_files}:
-        (config_dir / name).write_text(json.dumps(powered.docs[name]), encoding="utf-8")
+    # The loader reads data model 6: the EV of the fixture needs its wallbox (dm6.wallboxes).
+    from runtime_store.migration.steps.wallboxes import apply as apply_wallboxes
+
+    walled = apply_wallboxes(powered.docs, {})
+    assert not walled.blockers
+    changed = {*result.changed_files, *hoisted.changed_files, *powered.changed_files}
+    for name in {*changed, *walled.changed_files}:
+        (config_dir / name).write_text(json.dumps(walled.docs[name]), encoding="utf-8")
     catalog = {e["id"]: e for e in result.docs["components.json"]["heating_systems"]}
     assert set(catalog) == {"heating_profile_a", "heating_profile_b", "heating_profile_b_2",
                             "heating_profile_c"}

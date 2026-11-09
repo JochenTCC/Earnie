@@ -306,9 +306,16 @@ def _stub_consumer(*, consumer_id: str, label: str, hk_type: str, bindings: dict
         consumer["earnie_role"] = "known"
         consumer["use_profile_csv"] = False
     elif hk_type == "ev":
-        consumer["nominal_power_kw"] = 3.5
+        from house_config.wallboxes import WALLBOX_VOLTAGE_FORM_KEY
+
+        # Data model 6: charge limits as current; the save creates the EV's own wallbox
+        # (its charger bindings move there, house_config.wallboxes.route_evs_to_wallboxes).
+        consumer.pop("nominal_power_kw")
+        consumer["phases"] = 1
+        consumer["min_current_a"] = 6.0
+        consumer["max_current_a"] = 16.0
+        consumer[WALLBOX_VOLTAGE_FORM_KEY] = 230.0
         consumer["battery_capacity_kwh"] = 50.0
-        consumer["min_power_kw"] = 1.4
         consumer["min_on_quarterhours"] = 4
         consumer["charging_schedule"] = dict(_DEFAULT_EV_SCHEDULE)
     elif hk_type == "thermal_annual":

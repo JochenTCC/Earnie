@@ -44,10 +44,11 @@ from runtime_store.migration.steps.tariff_format import STEP as TARIFF_FORMAT
 from runtime_store.migration.steps.topology import STEP as TOPOLOGY
 from runtime_store.migration.steps.v3_to_v4 import STEP as V3_TO_V4
 from runtime_store.migration.steps.vat_deductible import STEP as VAT_DEDUCTIBLE
+from runtime_store.migration.steps.wallboxes import STEP as WALLBOXES
 from runtime_store.migration.types import MigrationStep
 
 # Inventory order (Earnie-env-home chronology + code dependencies). Data model 5 comes after
-# every dm4 step; the tariff-track step consumes the dm5 grid-area hand-over; the correction of
+# every dm4 step, data model 6 after every dm5 step; the tariff-track step consumes the dm5 grid-area hand-over; the correction of
 # the site's grid catalog needs its format and runs last.
 STEPS: tuple[MigrationStep, ...] = (
     EHAL,
@@ -79,6 +80,7 @@ STEPS: tuple[MigrationStep, ...] = (
     VAT_DEDUCTIBLE,
     HOUSE_GAINS,
     HOUSE_COOLING,
+    WALLBOXES,
     TARIFF_FORMAT,
     GRID_AREA_LEVIES,
 )

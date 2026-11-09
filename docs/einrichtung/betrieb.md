@@ -54,6 +54,20 @@ Im selben Lauf ersetzt **`dm5.heat_source`** das Feld `heat_pump_type` der Haus-
 
 Ohne diese Migration lädt Earnie Hausprofile mit `base_cent_kwh`, ohne `area_id`, mit `heat_pump_type` oder mit der Wärmeerzeugung direkt an der Haus-Wärme (ohne `heating_system_id`) und Tarifdateien ohne `tariff_format` nicht; die Meldung verweist auf den Assistenten.
 
+### Datenmodell 6: Wallboxen
+
+Beim Wechsel auf Datenmodell 6 läuft der Schritt **`dm6.wallboxes`**. Die Wallbox ist jetzt ein eigener Anlagenteil in `components.json` (`wallboxes[]`), wie Batterien und Wechselrichter. Das E-Auto bleibt ein Verbraucher im Hausprofil. Die Ladegrenzen stehen nicht mehr als Leistung (kW) am E-Auto, sondern als **Ladestrom (A)** an Auto und Wallbox:
+
+- **Je E-Auto eine Wallbox** mit derselben Kennung, damit die EHAL-IDs `evcs.<Kennung>.*` gleich bleiben. Die Lade-Bindings des E-Autos (`sens_evcs_active_power`, `sens_evcs_connected`, `get_evcs_nominal_current`, `set_evcs_max_current`, `set_evcs_mode`) ziehen zur Wallbox um, die Auto-Bindings (SoC, Ladeziel, Fertig-um) bleiben am E-Auto.
+- **Strom statt Leistung:** `nominal_power_kw` und `min_power_kw` werden mit der bisherigen Spannung und Phasenzahl in `max_current_a` und `min_current_a` umgerechnet (ohne Angabe 230 V und 1 Phase, wie bisher). Die Werte stehen an Auto **und** Wallbox, Spannung und Phasen an der Wallbox, die Phasen zusätzlich am Auto. Die Felder `nominal_power_voltage_v` und `nominal_power_phases` in `charging_schedule` entfallen.
+- **Feste Zuordnung:** Jedes E-Auto bekommt `wallbox_assignment` mit `mode: fixed` und seiner Wallbox.
+
+Earnie rechnet mit dem Paar aus Auto und Wallbox: größerer Mindeststrom, kleinerer Höchststrom, kleinere Phasenzahl, Leistung = Strom × Spannung der Wallbox × Phasen. Für ein migriertes Paar ergibt das genau die bisherige Leistung, die Ergebnisse bleiben gleich.
+
+Steht dasselbe E-Auto (gleiche Kennung) in mehreren Hausprofilen, legt der Schritt eine gemeinsame Wallbox an, solange Leistung, Spannung, Phasen und Lade-Bindings übereinstimmen. Unterscheiden sie sich, stoppt die Migration mit Hinweis auf das Hausprofil: Ein E-Auto gehört zu genau einem Hausprofil. Vor der Migration die Werte angleichen oder das E-Auto in einem Profil umbenennen.
+
+Ohne diese Migration lädt Earnie Hausprofile mit `nominal_power_kw` oder `min_power_kw` am E-Auto nicht; die Meldung verweist auf den Assistenten. Details: [E-Auto und Wallbox](../konfiguration/flexible-verbraucher.md#e-auto-und-wallbox-ladestrom).
+
 ### Loxone: alte Merkernamen behalten oder leeren
 
 Beim Wechsel von Datenmodell 3 (offizielle 2.6) auf 4 fragt der Assistent bei Loxone-Installationen, ob die alten **Merkernamen** in den Bindungen erhalten bleiben sollen. Earnie braucht sie nicht mehr: Lesen läuft per Push mit der EHAL-ID, Schreiben über `status.json` mit der EHAL-ID.

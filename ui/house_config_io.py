@@ -69,7 +69,25 @@ def save_house_profiles(doc: dict) -> None:
     payload = merge_inline_heating_systems(
         house_doc_for_save(doc), read_existing=resolve_house_profiles_json_path()
     )
+    payload = route_ev_wallboxes_for_save(payload)
     save_house_profiles_document(resolve_house_profiles_json_path(), payload)
+
+
+def route_ev_wallboxes_for_save(doc: dict) -> dict:
+    """EVs as editors hand them back → file shape; their wallbox side saved to components.json."""
+    from house_config.components_store import load_components_document
+    from house_config.wallboxes import (
+        WALLBOXES_KEY,
+        normalize_wallboxes,
+        route_evs_to_wallboxes,
+    )
+
+    components = load_components_document(resolve_components_json_path())
+    before = list(components.get(WALLBOXES_KEY) or [])
+    profiles, wallboxes = route_evs_to_wallboxes(list(doc.get("profiles") or []), before)
+    if normalize_wallboxes(wallboxes) != normalize_wallboxes(before):
+        _save_components_document({**components, WALLBOXES_KEY: wallboxes})
+    return {**doc, "profiles": profiles}
 
 
 def merge_inline_heating_systems(doc: dict, *, read_existing: str) -> dict:
@@ -205,10 +223,20 @@ def _house_profiles_payload(profile: dict) -> dict:
     )
     from house_config.baseload import ensure_baseload_not_over_allocated
     from house_config.profiles_store import normalize_house_profiles_document
+    from house_config.wallboxes import (
+        WALLBOXES_KEY,
+        normalize_wallboxes,
+        route_evs_to_wallboxes,
+        wallboxes_by_id,
+    )
 
+    # The EV form edits its fixed wallbox inline (components.json wallboxes[]).
+    stored_wallboxes = list(components.get(WALLBOXES_KEY) or [])
+    (profile,), wallboxes = route_evs_to_wallboxes([profile], stored_wallboxes)
     normalized = normalize_house_profiles_document(
         {"profiles": [profile]},
         heating_systems=heating_systems_by_id({HEATING_SYSTEMS_KEY: catalog}),
+        wallboxes=wallboxes_by_id({WALLBOXES_KEY: wallboxes}),
     )
     ensure_baseload_not_over_allocated(normalized["profiles"][profile_id])
     profiles = [p for p in profiles if p.get("id") != profile["id"]]
@@ -230,6 +258,9 @@ def _house_profiles_payload(profile: dict) -> dict:
         # save fills in (e.g. a rod part's internal_gain_factor), which is no change.
         "catalog_changed": normalize_heating_systems(catalog)
         != normalize_heating_systems(list(components.get(HEATING_SYSTEMS_KEY) or [])),
+        "wallboxes": wallboxes,
+        "wallboxes_changed": normalize_wallboxes(wallboxes)
+        != normalize_wallboxes(stored_wallboxes),
         "consumers": consumers,
     }
 
@@ -244,7 +275,11 @@ def house_profile_write_pending(profile: dict) -> bool:
     from house_config.profiles_store import serialize_house_profiles_document
 
     built = _house_profiles_payload(profile)
-    if built["catalog_changed"] or not os.path.isfile(built["path"]):
+    if (
+        built["catalog_changed"]
+        or built["wallboxes_changed"]
+        or not os.path.isfile(built["path"])
+    ):
         return True
     would_write = serialize_house_profiles_document(built["path"], built["payload"])
     return would_write != read_json_document(built["path"])
@@ -252,10 +287,17 @@ def house_profile_write_pending(profile: dict) -> bool:
 
 def upsert_house_profile(profile: dict) -> None:
     from house_config.heating_systems import HEATING_SYSTEMS_KEY
+    from house_config.wallboxes import WALLBOXES_KEY
 
     built = _house_profiles_payload(profile)
-    if built["catalog_changed"]:
-        _save_components_document({**built["components"], HEATING_SYSTEMS_KEY: built["catalog"]})
+    if built["catalog_changed"] or built["wallboxes_changed"]:
+        _save_components_document(
+            {
+                **built["components"],
+                HEATING_SYSTEMS_KEY: built["catalog"],
+                WALLBOXES_KEY: built["wallboxes"],
+            }
+        )
     save_house_profiles_document(built["path"], built["payload"])
     from ui.house_config_entities_io import sync_powerstation_attached_from_consumers
 

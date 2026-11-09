@@ -3,10 +3,10 @@ from __future__ import annotations
 
 from typing import Any
 
-CURRENT_DATA_MODEL = 5
-COMPATIBLE_DATA_MODELS: frozenset[int] = frozenset({5})
-# 3 and 4 load only through the migration registry (wizard / scripts.migrate_config)
-MIGRATABLE_DATA_MODELS: frozenset[int] = frozenset({3, 4})
+CURRENT_DATA_MODEL = 6
+COMPATIBLE_DATA_MODELS: frozenset[int] = frozenset({6})
+# 3 to 5 load only through the migration registry (wizard / scripts.migrate_config)
+MIGRATABLE_DATA_MODELS: frozenset[int] = frozenset({3, 4, 5})
 
 DATA_MODEL_KEY = "earnie_data_model"
 

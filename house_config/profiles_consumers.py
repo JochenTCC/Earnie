@@ -253,25 +253,25 @@ def _normalize_earnie_role(
     )
 
 
-def _normalize_ev_consumer(raw: dict, spec: dict, *, profile_id: str, index: int) -> None:
+def _normalize_ev_consumer(
+    raw: dict,
+    spec: dict,
+    *,
+    profile_id: str,
+    index: int,
+) -> None:
+    """EV with current limits; the pair view is added by ``_normalize_consumer`` (M1)."""
+    from house_config.wallboxes import normalize_ev_current_fields, reject_legacy_ev_fields
+
+    label = f"profiles '{profile_id}' consumers[{index}] '{spec['id']}'"
+    reject_legacy_ev_fields(raw, label=label)
     battery_capacity = float(raw.get("battery_capacity_kwh", 0.0) or 0.0)
     if battery_capacity <= 0:
         raise ValueError(
             f"profiles '{profile_id}' consumers[{index}]: "
             "battery_capacity_kwh muss > 0 sein."
         )
-    spec["min_power_kw"] = float(raw.get("min_power_kw", 0.0) or 0.0)
-    if spec["min_power_kw"] < 0.0:
-        raise ValueError(
-            f"profiles '{profile_id}' consumers[{index}] '{spec['id']}': "
-            "min_power_kw muss >= 0 sein."
-        )
-    if spec["min_power_kw"] > spec["nominal_power_kw"] + 1e-9:
-        raise ValueError(
-            f"profiles '{profile_id}' consumers[{index}] '{spec['id']}': "
-            f"min_power_kw ({spec['min_power_kw']}) darf nicht größer als "
-            f"nominal_power_kw ({spec['nominal_power_kw']}) sein."
-        )
+    spec.update(normalize_ev_current_fields(raw, label=label))
     spec["min_on_quarterhours"] = max(1, int(raw.get("min_on_quarterhours", 1) or 1))
     spec["battery_capacity_kwh"] = battery_capacity
     spec["charging_schedule"] = normalize_ev_charging_schedule(raw.get("charging_schedule"))
@@ -323,8 +323,13 @@ def _normalize_consumer(
     heating_systems: dict | None = None,
     house_thermal: dict | None = None,
     persons: int = 0,
+    wallboxes: dict | None = None,
 ) -> dict:
-    """One consumer; ``house_thermal`` / ``persons`` feed a ``thermal_annual`` consumer."""
+    """One consumer; ``house_thermal`` / ``persons`` feed a ``thermal_annual`` consumer.
+
+    ``wallboxes`` is the ``components.json`` catalog (id → wallbox); an EV resolves its
+    fixed wallbox there (fail loud when missing).
+    """
     if not isinstance(raw, dict):
         raise ValueError(f"profiles '{profile_id}' consumers[{index}] muss ein Objekt sein.")
     consumer_id = str(raw.get("id", "")).strip()
@@ -373,7 +378,9 @@ def _normalize_consumer(
                 index=index,
             )
     elif consumer_type == "ev":
-        _normalize_ev_consumer(raw, spec, profile_id=profile_id, index=index)
+        _normalize_ev_consumer(
+            raw, spec, profile_id=profile_id, index=index
+        )
     if consumer_type == "thermal_annual":
         _normalize_thermal_annual_consumer(
             raw,
@@ -392,6 +399,15 @@ def _normalize_consumer(
     normalize_points_fields(raw, spec, profile_id=profile_id, index=index)
     _copy_ehal_entity_fields(raw, spec)
     _copy_rod_bindings(raw, spec, profile_id=profile_id)
+    if consumer_type == "ev":
+        from house_config.wallboxes import resolve_ev_pair
+
+        # After the bindings: the pair view merges the wallbox's charger bindings in.
+        resolve_ev_pair(
+            spec,
+            wallboxes,
+            label=f"profiles '{profile_id}' consumers[{index}] '{consumer_id}'",
+        )
     return spec
 
 
@@ -444,7 +460,6 @@ def _serialize_generic_fields(consumer: dict, out: dict) -> None:
 
 
 def _serialize_ev_fields(consumer: dict, out: dict) -> None:
-    out["min_power_kw"] = consumer.get("min_power_kw", 0.0)
     out["min_on_quarterhours"] = consumer.get("min_on_quarterhours", 1)
     out["battery_capacity_kwh"] = consumer["battery_capacity_kwh"]
     out["charging_schedule"] = consumer["charging_schedule"]
@@ -527,4 +542,8 @@ def _serialize_consumer(consumer: dict) -> dict:
         _serialize_thermal_rc_fields(consumer, out)
     serialize_points_fields(consumer, out)
     _attach_ehal_entity_fields(out, consumer)
+    if consumer["type"] == "ev":
+        from house_config.wallboxes import split_ev_view
+
+        split_ev_view(consumer, out)
     return out

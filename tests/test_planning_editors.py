@@ -869,10 +869,12 @@ def test_seed_ev_defaults_on_type_switch_overwrites_generic_power():
     assert seeded["label"] == "Garage"
     assert seeded["id"] == "e_auto"
     assert seeded["type"] == "ev"
-    assert seeded["nominal_power_kw"] == defaults["nominal_power_kw"]
-    assert seeded["min_power_kw"] == defaults["min_power_kw"]
-    assert session["home__hc_g0_nom_1"] == defaults["nominal_power_kw"]
-    assert session["home__hc_g0_ev_min_1"] == defaults["min_power_kw"]
+    assert "nominal_power_kw" not in seeded
+    assert seeded["max_current_a"] == defaults["max_current_a"]
+    assert seeded["min_current_a"] == defaults["min_current_a"]
+    assert session["home__hc_g0_ev_max_a_1"] == defaults["max_current_a"]
+    assert session["home__hc_g0_ev_min_a_1"] == defaults["min_current_a"]
+    assert session["home__hc_g0_ev_phases_1"] == defaults["phases"]
     assert session["home__hc_g0_ev_min_qh_1"] == defaults["min_on_quarterhours"]
 
 
@@ -1755,6 +1757,8 @@ def test_upsert_thermal_profile_roundtrip(tmp_path, monkeypatch):
 
 def test_upsert_two_consumers_roundtrip(tmp_path, monkeypatch):
     config_dir = _bind_paths(tmp_path, monkeypatch)
+    # The EV's new wallbox is saved to components.json; no config.json to reload here.
+    monkeypatch.setattr(config, "reinit_config", lambda: None)
     path = config_dir / "house_profiles.json"
     upsert_house_profile(
         {
@@ -1776,8 +1780,11 @@ def test_upsert_two_consumers_roundtrip(tmp_path, monkeypatch):
                     "id": "ev",
                     "label": "E-Auto",
                     "type": "ev",
-                    "nominal_power_kw": 3.5,
-                    "min_power_kw": 1.4,
+                    # Form shape (data model 6): pair limits as current + wallbox voltage.
+                    "phases": 1,
+                    "min_current_a": 6.0,
+                    "max_current_a": 16.0,
+                    "wallbox_voltage_v": 230.0,
                     "min_on_quarterhours": 4,
                     "battery_capacity_kwh": 60.0,
                     "charging_schedule": {
@@ -1803,6 +1810,14 @@ def test_upsert_two_consumers_roundtrip(tmp_path, monkeypatch):
     consumers = doc["profiles"]["home"]["consumers"]
     assert len(consumers) == 2
     assert {consumer["id"] for consumer in consumers} == {"pool", "ev"}
+    ev = next(c for c in consumers if c["id"] == "ev")
+    assert ev["wallbox_assignment"] == {"mode": "fixed", "wallbox_id": "ev"}
+    assert ev["nominal_power_kw"] == pytest.approx(3.68)
+    assert ev["min_power_kw"] == pytest.approx(1.38)
+    components = json.loads((config_dir / "components.json").read_text(encoding="utf-8"))
+    (wallbox,) = components["wallboxes"]
+    assert wallbox["id"] == "ev" and wallbox["voltage_v"] == 230.0
+    assert wallbox["ehal_bindings"] == {"evcs.ev.set_evcs_max_current": ""}
 
 
 def test_schedule_defaults_preserves_zero_start_shift_h():

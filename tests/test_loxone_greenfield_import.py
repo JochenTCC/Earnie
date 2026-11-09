@@ -321,8 +321,11 @@ def test_run_import_creates_typed_and_efm_consumers():
     assert by_id["e_auto"]["id_locked"] is False
     assert by_id["kochen"]["id_locked"] is False
     assert by_id["e_auto"]["battery_capacity_kwh"] == 50.0
-    assert by_id["e_auto"]["nominal_power_kw"] == 3.5
-    assert by_id["e_auto"]["min_power_kw"] == 1.4
+    # Data model 6: limits as current; the save gives the car its own wallbox (230 V).
+    assert by_id["e_auto"]["phases"] == 1
+    assert by_id["e_auto"]["min_current_a"] == 6.0
+    assert by_id["e_auto"]["max_current_a"] == 16.0
+    assert by_id["e_auto"]["wallbox_voltage_v"] == 230.0
     assert by_id["e_auto"]["min_on_quarterhours"] == 4
     assert "pool_swimspa" in by_id or "pool_swim_spa" in by_id or any(
         c["type"] == "thermal_rc" for c in consumers

@@ -12,7 +12,7 @@ Persisted config pack JSON must not be reshaped silently. Spec: [`docs/workflow/
 
 | Track | Key | Files | Owner |
 |---|---|---|---|
-| Earnie data model | `earnie_data_model` (int, 5) | `config`, `components`, `house_profiles`, `backtesting_scenarios`, `deviation_rules` | Earnie registry |
+| Earnie data model | `earnie_data_model` (int, 6) | `config`, `components`, `house_profiles`, `backtesting_scenarios`, `deviation_rules` | Earnie registry |
 | Tariff format | `tariff_format` (int, 1, since 2.8) | `tariffs`, `user_tariffs`, `grid_fees`, `user_grid_fees` (`TARIFF_TRACK_FILES`) | Edibert (`edibert.api.migrate`); Earnie wraps it in `tf1.tariff_format` |
 
 Tariff-track files never carry `earnie_data_model`. Untagged ones are migrated by `tf1.tariff_format` (registered last); loaders require `tariff_format` (`ensure_tariff_format`).

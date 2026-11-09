@@ -147,6 +147,12 @@ def test_fixture_migrates_and_loads_with_the_same_building_values(tmp_path):
     # The gas variant has nominal_power_kw 0: no heating power to derive, the user enters it.
     for entry in components["heating_systems"]:
         entry.setdefault("heating_power_kw", 9.0)
+    # The loader reads data model 6: the EV of the fixture needs its wallbox (dm6.wallboxes).
+    from runtime_store.migration.steps.wallboxes import apply as apply_wallboxes
+
+    dm6 = apply_wallboxes({HOUSE: result.docs[HOUSE], "components.json": components}, {}).docs
+    components = dm6["components.json"]
+    (config_dir / HOUSE).write_text(json.dumps(dm6[HOUSE]), encoding="utf-8")
     (config_dir / "components.json").write_text(json.dumps(components), encoding="utf-8")
     clear_components_doc_cache()
     clear_house_profiles_doc_cache()

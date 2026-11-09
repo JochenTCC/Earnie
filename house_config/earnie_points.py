@@ -158,12 +158,14 @@ def compute_earnie_points(components: dict, profile: dict) -> dict[str, int]:
     stationary_kwh = _sum_field(
         components.get("batteries", []), "battery_capacity_kwh", section="batteries"
     )
-    wallboxes = bidirectional = heat = rod = other = 0
+    bidirectional = heat = rod = other = 0
+    wallbox_ids: set[str] = set()
     ev_kwh = 0.0
     for consumer in _consumers(profile):
         kind = consumer.get("type")
         if kind == "ev":
-            wallboxes += 1
+            # A wallbox counts once, however many cars it serves (data model 6).
+            wallbox_ids.add(str(consumer["wallbox_assignment"]["wallbox_id"]))
             if consumer.get("bidirectional") is True:
                 bidirectional += 1
                 ev_kwh += _ev_storage_kwh(consumer)
@@ -173,6 +175,7 @@ def compute_earnie_points(components: dict, profile: dict) -> dict[str, int]:
             rod += _heating_rod_points(consumer, kwp)
         elif _is_controlled(consumer) and _is_large_flex_consumer(consumer):
             other += OTHER_POINTS_PER_DEVICE
+    wallboxes = len(wallbox_ids)
     wallbox = WALLBOX_POINTS * wallboxes
     if wallboxes and stationary_kwh < WALLBOX_NO_STORAGE_BELOW_KWH:
         wallbox += WALLBOX_NO_STORAGE_EXTRA

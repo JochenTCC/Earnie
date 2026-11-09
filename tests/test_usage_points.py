@@ -11,6 +11,10 @@ import pytest
 from house_config.components_store import clear_components_doc_cache
 from runtime_store import usage_ping as up
 from runtime_store import usage_points as pts
+from tests.fixtures.ev_wallbox import ev_fields, wallbox_entry
+
+# 16 A × 230 V × 3 phases ≈ 11 kW
+_WALLBOX = wallbox_entry("wallbox", max_current_a=16.0, phases=3)
 
 
 def _write(path: Path, doc: dict) -> None:
@@ -38,6 +42,7 @@ def _components() -> dict:
             {"id": "pv_main", "label": "Dach", "kwp": 8.0, "tilt": 30, "azimuth": 0, **wr},
             {"id": "pv_alt", "label": "Alternative", "kwp": 20.0, "tilt": 30, "azimuth": 0, **wr},
         ],
+        "wallboxes": [_WALLBOX],
         "batteries": [
             {
                 "id": "bat_main",
@@ -57,7 +62,7 @@ def _components() -> dict:
     }
 
 
-def _profiles(phases: int = 3, bidirectional: bool = False) -> dict:
+def _profiles(bidirectional: bool = False) -> dict:
     return {
         "profiles": [
             {
@@ -72,11 +77,10 @@ def _profiles(phases: int = 3, bidirectional: bool = False) -> dict:
                         "id": "wallbox",
                         "label": "Wallbox",
                         "type": "ev",
-                        "nominal_power_kw": 11.0,
+                        **ev_fields("wallbox", max_current_a=16.0),
                         "battery_capacity_kwh": 60.0,
                         "bidirectional": bidirectional,
                         "charging_schedule": {
-                            "nominal_power_phases": phases,
                             "weekday": {
                                 "car_available_from_hour": 18,
                                 "ready_by_hour": 7,

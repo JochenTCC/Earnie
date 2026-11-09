@@ -79,10 +79,36 @@ def activate_pv_system_required(pv: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+def _is_dm6_ev(consumer: dict[str, Any]) -> bool:
+    """An EV's charger keys (and their activation) live on its wallbox since data model 6.
+
+    ``dm6.wallboxes`` activates them there for packs it migrates.
+    """
+    return str(consumer.get("type") or "").strip() == "ev"
+
+
+def wallbox_required_keys(wallbox_id: str) -> tuple[str, ...]:
+    """Required charger keys of a wallbox (``evcs.<Kennung>.set_evcs_max_current``)."""
+    return required_binding_keys(
+        component_kind="consumer", entity_id=wallbox_id, consumer_type="ev"
+    )
+
+
+def activate_wallbox_required(wallbox: dict[str, Any]) -> dict[str, Any]:
+    out = dict(wallbox) if isinstance(wallbox, dict) else {}
+    wid = str(out.get("id") or "").strip()
+    if not wid:
+        return out
+    out["ehal_bindings"] = activate_required_keys(
+        out.get("ehal_bindings"), wallbox_required_keys(wid)
+    )
+    return out
+
+
 def activate_consumer_required(consumer: dict[str, Any]) -> dict[str, Any]:
     out = dict(consumer) if isinstance(consumer, dict) else {}
     cid = str(out.get("id") or "").strip()
-    if not cid:
+    if not cid or _is_dm6_ev(out):
         return out
     ctype = str(out.get("type") or "").strip()
     keys = required_binding_keys(
@@ -131,6 +157,11 @@ def activate_required_in_components(components: dict[str, Any]) -> dict[str, Any
         activate_pv_system_required(p) if isinstance(p, dict) else p
         for p in pv_systems
     ]
+    if out.get("wallboxes"):
+        out["wallboxes"] = [
+            activate_wallbox_required(w) if isinstance(w, dict) else w
+            for w in list(out.get("wallboxes") or [])
+        ]
     return out
 
 
@@ -193,7 +224,7 @@ def pack_missing_required(
                     continue
                 cid = str(consumer.get("id") or "").strip()
                 ctype = str(consumer.get("type") or "").strip()
-                if not cid:
+                if not cid or _is_dm6_ev(consumer):
                     continue
                 keys = required_binding_keys(
                     component_kind="consumer",
@@ -203,6 +234,12 @@ def pack_missing_required(
                 if keys and missing_required_keys(consumer.get("ehal_bindings"), keys):
                     return True
     if isinstance(components, dict):
+        for wallbox in components.get("wallboxes") or []:
+            wid = str(wallbox.get("id") or "").strip() if isinstance(wallbox, dict) else ""
+            if wid and missing_required_keys(
+                wallbox.get("ehal_bindings"), wallbox_required_keys(wid)
+            ):
+                return True
         pv_systems = list(components.get("pv_systems") or [])
         grid_tied = grid_tied_house_battery_ids(
             components.get("batteries"), components.get("inverters")

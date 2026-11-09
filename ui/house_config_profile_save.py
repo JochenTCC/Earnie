@@ -158,6 +158,13 @@ def _resolve_consumer_ids(consumers: list[dict], edited: list[dict]) -> list[dic
                 )
         item["id"] = consumer_id
         item["label"] = label or consumer_id
+        if str(item.get("type") or "") == "ev":
+            # The EV keeps its wallbox; a new EV gets its own (house_config.wallboxes).
+            from house_config.wallboxes import WALLBOX_ASSIGNMENT_KEY
+
+            assignment = original.get(WALLBOX_ASSIGNMENT_KEY) if isinstance(original, dict) else None
+            if assignment:
+                item[WALLBOX_ASSIGNMENT_KEY] = dict(assignment)
         # Avoid dirty-writing id_locked onto legacy rows (missing flag ⇒ locked)
         # so Hausprofil auto_persist does not rewrite every open.
         if not id_locked:

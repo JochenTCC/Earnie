@@ -372,6 +372,25 @@ Ein weiteres Szenario kann für die Haus-Wärme ein anderes Heizsystem aus dem K
 - **Live-Szenario:** Das Live-Szenario rechnet immer mit dem Referenzsystem. Statt der Auswahl zeigt der Szenarienkonfigurator dort die Zeile „Heizsystem: … (Referenzsystem, Änderung im Hauskonfigurator)“. Eine Auswahl `heating_system_ids` im Live-Szenario lehnt Earnie ab.
 - **Andere Häuser:** Eine Wärmepumpen-Variante ist auf die Heizlast eines Hauses ausgelegt. Earnie erlaubt sie trotzdem für ein anderes Haus und prüft die Auslegung derzeit nicht.
 
+## E-Auto und Wallbox: Ladestrom
+
+Seit Datenmodell 6 sind E-Auto und Wallbox getrennt. Die Wallbox steht in `components.json` unter `wallboxes[]`, das E-Auto ist ein Verbraucher im Hausprofil und verweist mit `wallbox_assignment` auf seine Wallbox. Die Ladegrenzen sind **Ströme**, keine Leistungen: Eine Leistung hängt vom Paar ab (Spannung, Phasen), ein Strom ist eine Eigenschaft des Geräts.
+
+| Feld | Ort | Bedeutung |
+| ---- | --- | --------- |
+| `voltage_v` | Wallbox | Spannung je Phase (meist 230 V) |
+| `phases` | Wallbox und E-Auto | Phasen, mit denen das Gerät lädt (1–3) |
+| `min_current_a` | Wallbox und E-Auto | Kleinster Ladestrom (A) |
+| `max_current_a` | Wallbox und E-Auto | Größter Ladestrom (A) |
+| `ehal_bindings` | Wallbox | Lade-Felder: `sens_evcs_active_power`, `sens_evcs_connected`, `get_evcs_nominal_current`, `set_evcs_max_current` (Pflicht), `set_evcs_mode` |
+| `wallbox_assignment` | E-Auto | `{"mode": "fixed", "wallbox_id": "<Kennung>"}`: feste Wallbox |
+
+Für ein Paar aus Auto und Wallbox gilt der **größere** Mindeststrom, der **kleinere** Höchststrom und die **kleinere** Phasenzahl. Daraus rechnet Earnie die Ladeleistung: Strom × Spannung der Wallbox × Phasen. Ein einphasiges Auto an einer dreiphasigen Wallbox lädt also einphasig. Liegt der Mindeststrom des Paars über seinem Höchststrom, haben Auto und Wallbox keinen gemeinsamen Ladestrom: Earnie lehnt das Hausprofil beim Laden mit einer Meldung ab und begrenzt nichts stillschweigend.
+
+Im Hauskonfigurator stehen beim E-Auto **Phasen**, **Mindest-Ladestrom (A)**, **Höchst-Ladestrom (A)** und **Spannung der Wallbox (V)**; darunter zeigt Earnie die Ladeleistung in kW. Beim Speichern gelten diese Grenzen für Auto **und** Wallbox, wie die Migration sie angelegt hat. Ein neues E-Auto bekommt beim Speichern eine eigene Wallbox mit seiner Kennung. Die Lade-Bindings der Wallbox pflegt die Seite EHAL-Com wie bisher beim E-Auto.
+
+In dieser Version hat jedes E-Auto eine feste Wallbox. Mehrere Autos, die sich Wallboxen teilen (`mode: dynamic`), folgen in einer späteren Version.
+
 ## E-Auto: `charging_schedule`
 
 Die folgenden Felder gelten, wenn der Block gesetzt ist und `enabled: true` enthält.
@@ -397,7 +416,7 @@ Ladeziel in kWh (vereinfacht; die Akkukapazität stammt aus Live-EHAL, wenn gebu
 
 `(target_soc_percent − Rest-SOC) / 100 × Akkukapazität_Live / charging_efficiency`
 
-`nominal_power_kw_name` (Legacy unter `charging_schedule.loxone`) überschreibt zur Laufzeit die konfigurierte `nominal_power_kw`, wenn der Live-Wert lesbar ist.
+`nominal_power_kw_name` (Legacy unter `charging_schedule.loxone`) überschreibt zur Laufzeit die Höchstleistung des Paars, wenn der Live-Wert lesbar ist.
 
 ### SOC-Ziele im Live-Betrieb (EHAL)
 
@@ -411,7 +430,7 @@ Der Block `charging_schedule.milp` am EV-Verbraucher ist **Pflicht**, sobald Ear
 
 | Feld (UI) | Schlüssel | Bedeutung | Vorschlag |
 | --- | --- | --- | --- |
-| Kontinuierlich laden ab Restmenge (kWh) | `live_modus_a_min_remaining_kwh` | Liegt die noch zu ladende Energie darüber, gibt Earnie eine stetige Ladeleistung vor; darunter schaltet es in ganzen Viertelstunden. Muss > 0 sein. | 2 × Mindestleistung (ohne Mindestleistung 2 × 1,4 kW) |
+| Kontinuierlich laden ab Restmenge (kWh) | `live_modus_a_min_remaining_kwh` | Liegt die noch zu ladende Energie darüber, gibt Earnie eine stetige Ladeleistung vor; darunter schaltet es in ganzen Viertelstunden. Muss > 0 sein. | 2 × Mindestleistung des Paars (Mindeststrom × Spannung × Phasen) |
 | Tie-Break Einschalten (ε₁) | `tie_break_on_epsilon` | Kleine Strafe je Lade-Viertelstunde; weit unter dem kleinsten Bezugspreis. | 0,001 |
 | Tie-Break Zeitpunkt (ε₂) | `tie_break_time_epsilon` | Kleine Strafe für spätes Laden; bei gleichen Kosten lädt Earnie früher. | 0,0001 |
 

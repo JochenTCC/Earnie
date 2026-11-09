@@ -15,7 +15,7 @@
     },
     "earnie_data_model": {
       "type": "integer",
-      "const": 5,
+      "const": 6,
       "description": "Earnie data-model version for config pack import/export."
     }
   },
@@ -332,19 +332,6 @@
           "type": "boolean",
           "description": "true = bei Abwesenheit Ladebedarf prognostizieren (Loxone- und Config-Pfad). ReadyAt: Live-FertigUm wenn parsebar, sonst Config ready_by_hour."
         },
-        "nominal_power_voltage_v": {
-          "default": 230.0,
-          "type": "number",
-          "exclusiveMinimum": 0,
-          "description": "Nennspannung für A→kW-Umrechnung (Default 230 V)."
-        },
-        "nominal_power_phases": {
-          "default": 1,
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 3,
-          "description": "Phasenzahl für A→kW-Umrechnung (Default 1)."
-        },
         "weekday": {
           "$ref": "#/definitions/day_schedule"
         },
@@ -621,7 +608,35 @@
         },
         "min_power_kw": {
           "type": "number",
-          "minimum": 0
+          "minimum": 0,
+          "description": "Nicht für type ev (Datenmodell 6: Ladegrenzen als Strom, min_current_a)."
+        },
+        "phases": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3,
+          "description": "Nur ev: Phasen, mit denen das Auto lädt."
+        },
+        "min_current_a": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Nur ev: kleinster Ladestrom des Autos (A). Für ein Paar gilt der größere Mindeststrom von Auto und Wallbox."
+        },
+        "max_current_a": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Nur ev: größter Ladestrom des Autos (A). Für ein Paar gilt der kleinere Höchststrom; Leistung = Strom × Spannung der Wallbox × kleinere Phasenzahl."
+        },
+        "wallbox_assignment": {
+          "type": "object",
+          "description": "Nur ev: Zuordnung zur Wallbox (components.json wallboxes[]). mode fixed = feste Wallbox (wallbox_id).",
+          "required": ["mode"],
+          "additionalProperties": false,
+          "properties": {
+            "mode": { "enum": ["fixed", "dynamic"] },
+            "wallbox_id": { "type": "string" },
+            "wallbox_ids": { "type": "array", "items": { "type": "string" } }
+          }
         },
         "min_on_quarterhours": {
           "default": 1,

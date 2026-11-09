@@ -97,6 +97,7 @@ def _normalize_profile_consumers(
     heating_systems: dict | None,
     house_thermal: dict | None,
     persons: int,
+    wallboxes: dict | None,
 ) -> list[dict]:
     consumers: list[dict] = []
     seen: set[str] = set()
@@ -109,6 +110,7 @@ def _normalize_profile_consumers(
             heating_systems=heating_systems,
             house_thermal=house_thermal,
             persons=persons,
+            wallboxes=wallboxes,
         )
         if consumer["type"] == "thermal_annual":
             thermal_consumer_indices.append(c_index)
@@ -210,7 +212,13 @@ def _profile_geo_and_csv_fields(raw: dict) -> dict:
     }
 
 
-def _normalize_profile(raw: dict, index: int, *, heating_systems: dict | None) -> dict:
+def _normalize_profile(
+    raw: dict,
+    index: int,
+    *,
+    heating_systems: dict | None,
+    wallboxes: dict | None = None,
+) -> dict:
     if not isinstance(raw, dict):
         raise ValueError(f"profiles[{index}] muss ein Objekt sein.")
     profile_id = str(raw.get("id", "")).strip()
@@ -264,6 +272,7 @@ def _normalize_profile(raw: dict, index: int, *, heating_systems: dict | None) -
         heating_systems=heating_systems,
         house_thermal=house_thermal,
         persons=persons,
+        wallboxes=wallboxes,
     )
     # Switch off: the heating consumer is kept for the file but not planned.
     consumers = [
@@ -438,12 +447,16 @@ def _normalize_grid_meter(raw: object) -> dict | None:
 
 
 def normalize_house_profiles_document(
-    doc: dict, *, heating_systems: dict | None = None
+    doc: dict,
+    *,
+    heating_systems: dict | None = None,
+    wallboxes: dict | None = None,
 ) -> dict:
     """Normalize a house document; ``heating_systems`` is the catalog (id → entry).
 
     Required as soon as a profile has a ``thermal_annual`` consumer (its
-    ``heating_system_id`` is resolved there, fail loud otherwise).
+    ``heating_system_id`` is resolved there, fail loud otherwise). ``wallboxes``
+    (id → wallbox, ``components.json``) likewise as soon as a profile has an EV.
     """
     if not isinstance(doc, dict):
         raise ValueError("house_profiles.json muss ein Objekt sein.")
@@ -452,7 +465,9 @@ def normalize_house_profiles_document(
         raise ValueError("profiles muss ein Array sein.")
     profiles: dict[str, dict] = {}
     for index, item in enumerate(raw_profiles):
-        spec = _normalize_profile(item, index, heating_systems=heating_systems)
+        spec = _normalize_profile(
+            item, index, heating_systems=heating_systems, wallboxes=wallboxes
+        )
         if spec["id"] in profiles:
             raise ValueError(f"profiles: doppelte id '{spec['id']}'.")
         profiles[spec["id"]] = spec
@@ -503,6 +518,30 @@ def _heating_catalog_for(path: str, raw: dict) -> dict | None:
     return load_heating_systems_for_house(path)
 
 
+def _wallbox_catalog_for(path: str, raw: dict) -> dict | None:
+    """Wallboxes next to the house file, read only when an EV consumer needs them."""
+    from house_config.wallboxes import load_wallboxes_for_house
+
+    if not _has_consumer_type(raw, "ev"):
+        return None
+    return load_wallboxes_for_house(path)
+
+
+def _has_consumer_type(raw: dict, consumer_type: str) -> bool:
+    profiles = raw.get("profiles") if isinstance(raw, dict) else None
+    items = list(profiles.values()) if isinstance(profiles, dict) else profiles or []
+    return any(
+        isinstance(consumer, dict)
+        and str(consumer.get("type") or "").strip().lower() == consumer_type
+        for profile in items
+        if isinstance(profile, dict)
+        for consumer in [
+            *(profile.get("consumers") or []),
+            *(profile.get(INACTIVE_CONSUMERS_KEY) or []),
+        ]
+    )
+
+
 def _has_thermal_annual(raw: dict) -> bool:
     profiles = raw.get("profiles") if isinstance(raw, dict) else None
     items = list(profiles.values()) if isinstance(profiles, dict) else profiles or []
@@ -533,7 +572,9 @@ def load_house_profiles_document(path: str) -> dict:
         return cached[1]
     raw = _read_json(path)
     doc = normalize_house_profiles_document(
-        raw, heating_systems=_heating_catalog_for(path, raw)
+        raw,
+        heating_systems=_heating_catalog_for(path, raw),
+        wallboxes=_wallbox_catalog_for(path, raw),
     )
     if shadow:
         from runtime_store.shadow.hooks import apply_overlay_to_house
@@ -611,7 +652,9 @@ def serialize_house_profiles_document(path: str, doc: dict) -> dict:
     from runtime_store.data_model import stamp_data_model
 
     normalized = normalize_house_profiles_document(
-        doc, heating_systems=_heating_catalog_for(path, doc)
+        doc,
+        heating_systems=_heating_catalog_for(path, doc),
+        wallboxes=_wallbox_catalog_for(path, doc),
     )
     from house_config.heating_systems import assert_reference_systems_unshared
 

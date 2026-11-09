@@ -1,6 +1,6 @@
 {
     "$schema": "./components.schema.json",
-    "earnie_data_model": 5,
+    "earnie_data_model": 6,
     "inverters": [
         {
             "id": "wr_main",
@@ -94,6 +94,22 @@
             },
             "heating_power_kw": 15.05,
             "min_on_quarterhours": 4
+        }
+    ],
+    "wallboxes": [
+        {
+            "id": "ev",
+            "label": "Wallbox E-Auto",
+            "voltage_v": 230.0,
+            "phases": 1,
+            "min_current_a": 6.086956521739131,
+            "max_current_a": 15.217391304347826,
+            "ehal_bindings": {
+                "sens_evcs_active_power": "",
+                "set_evcs_max_current": "",
+                "set_evcs_mode": "",
+                "evcs.ev.set_evcs_max_current": ""
+            }
         }
     ]
 }

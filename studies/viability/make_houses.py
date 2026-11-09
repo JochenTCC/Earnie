@@ -38,6 +38,8 @@ HOUSE_ID = "house"
 HEATING_CONSUMER_ID = "wp_heating"
 HEATING_SYSTEM_ID = f"heating_{HOUSE_ID}"
 BASELOAD_TOLERANCE_KWH = 5.0
+# The study's wallbox kW are converted to current with this voltage (data model 6).
+WALLBOX_VOLTAGE_V = 230.0
 BASELOAD_ITERATIONS = 5
 
 
@@ -125,6 +127,38 @@ def _heating_consumer(house: DerivedHouse, template: dict, params: dict) -> dict
     return consumer
 
 
+def _ev_currents(params: dict) -> dict:
+    """The study's wallbox kW as currents (data model 6), the same on car and wallbox."""
+    assumptions = params["annahmen"]
+    phases = int(assumptions["wallbox_phasen"])
+    per_amp_kw = WALLBOX_VOLTAGE_V * phases / 1000.0
+    return {
+        "phases": phases,
+        "min_current_a": assumptions["wallbox_min_kw"] / per_amp_kw,
+        "max_current_a": assumptions["wallbox_kw"] / per_amp_kw,
+    }
+
+
+def _wallboxes(house: DerivedHouse, params: dict, template: dict) -> list[dict]:
+    """One wallbox per car (``ev<n>``), same Kennung as the car."""
+    out = []
+    for index, _pattern in enumerate(house.ev_patterns, start=1):
+        wallbox_id = f"ev{index}"
+        wallbox = copy.deepcopy(template)
+        wallbox.update(
+            id=wallbox_id,
+            label=f"Wallbox {index}",
+            voltage_v=WALLBOX_VOLTAGE_V,
+            **_ev_currents(params),
+        )
+        wallbox["ehal_bindings"] = {
+            k.replace(".ev.", f".{wallbox_id}.") if ".ev." in k else k: v
+            for k, v in wallbox["ehal_bindings"].items()
+        }
+        out.append(wallbox)
+    return out
+
+
 def _ev(index: int, pattern: str, template: dict, params: dict) -> dict:
     assumptions = params["annahmen"]
     windows = params["eauto_muster"][pattern]
@@ -136,13 +170,12 @@ def _ev(index: int, pattern: str, template: dict, params: dict) -> dict:
     ev.update(
         id=ev_id,
         label=f"E-Auto {index} ({pattern})",
-        nominal_power_kw=assumptions["wallbox_kw"],
-        min_power_kw=assumptions["wallbox_min_kw"],
         battery_capacity_kwh=assumptions["ev_akku_kwh"],
+        **_ev_currents(params),
+        wallbox_assignment={"mode": "fixed", "wallbox_id": ev_id},
     )
     schedule = ev["charging_schedule"]
     schedule["target_soc_percent"] = target
-    schedule["nominal_power_phases"] = assumptions["wallbox_phasen"]
     for day, key in (("weekday", "werktag"), ("weekend", "wochenende")):
         schedule[day] = {
             "car_available_from_hour": windows[key][0],
@@ -231,7 +264,12 @@ def _components(house: DerivedHouse, params: dict, *, performance_ratio: float) 
             pv_azimuth=azimuth,
         )
         pv_systems.append(system)
-    doc.update(batteries=batteries, pv_systems=pv_systems, heating_systems=[heating_system(house, params)])
+    doc.update(
+        batteries=batteries,
+        pv_systems=pv_systems,
+        heating_systems=[heating_system(house, params)],
+        wallboxes=_wallboxes(house, params, doc["wallboxes"][0]),
+    )
     return doc, [b["id"] for b in batteries], [p["id"] for p in pv_systems]
 
 

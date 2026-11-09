@@ -48,7 +48,7 @@
             "ehal_bindings": {}
         }
     ],
-    "earnie_data_model": 5,
+    "earnie_data_model": 6,
     "inverters": [
         {
             "id": "wr_main",
@@ -78,6 +78,24 @@
                 "heat_loss_kw_per_k": 0.01,
                 "setpoint_c": 47.0,
                 "tolerance_c": 5.0
+            }
+        }
+    ],
+    "wallboxes": [
+        {
+            "id": "e_auto",
+            "label": "Wallbox smart",
+            "voltage_v": 220.0,
+            "phases": 1,
+            "min_current_a": 6.363636363636363,
+            "max_current_a": 15.909090909090908,
+            "ehal_bindings": {
+                "sens_evcs_active_power": "alias_5",
+                "set_evcs_max_current": "alias_6",
+                "set_evcs_mode": "alias_7",
+                "sens_evcs_connected": "alias_8",
+                "get_evcs_nominal_current": "alias_10",
+                "evcs.e_auto.set_evcs_max_current": ""
             }
         }
     ]

@@ -1,7 +1,11 @@
 """Tests für Hauskonfigurator-Entitäten, Tarife und Szenario-Auflösung (Version 1.24)."""
 from __future__ import annotations
 
-from tests.fixtures.heating_catalog import normalize_inline_house, save_inline_house
+from tests.fixtures.heating_catalog import (
+    normalize_inline_house,
+    save_inline_house,
+    write_inline_house,
+)
 import json
 import re
 from datetime import date, datetime
@@ -230,13 +234,30 @@ def _ev_profile_doc(**ev_overrides):
     }
 
 
-def test_ev_min_power_must_not_exceed_nominal():
+def test_ev_min_current_must_not_exceed_max_current():
     from house_config.profiles_store import normalize_house_profiles_document
+    from tests.fixtures.ev_wallbox import ev_fields, wallbox_catalog, wallbox_entry
 
-    with pytest.raises(ValueError, match="min_power_kw .* darf nicht größer"):
-        normalize_inline_house(
-            _ev_profile_doc(nominal_power_kw=1.0, min_power_kw=1.4)
+    doc = _ev_profile_doc(**ev_fields("e_auto", min_current_a=10.0, max_current_a=8.0))
+    for key in ("nominal_power_kw", "min_power_kw"):
+        doc["profiles"][0]["consumers"][0].pop(key)
+    with pytest.raises(ValueError, match="min_current_a .* darf nicht größer"):
+        normalize_house_profiles_document(
+            doc, wallboxes=wallbox_catalog(wallbox_entry("e_auto"))
         )
+
+
+def test_ev_and_wallbox_without_common_current_fail_loud():
+    """D2: a pair whose minimum exceeds its maximum is an error, never clamped."""
+    from house_config.profiles_store import normalize_house_profiles_document
+    from tests.fixtures.ev_wallbox import ev_fields, wallbox_catalog, wallbox_entry
+
+    doc = _ev_profile_doc(**ev_fields("e_auto", min_current_a=6.0, max_current_a=16.0))
+    for key in ("nominal_power_kw", "min_power_kw"):
+        doc["profiles"][0]["consumers"][0].pop(key)
+    box = wallbox_entry("e_auto", min_current_a=20.0, max_current_a=32.0)
+    with pytest.raises(ValueError, match="keinen gemeinsamen Ladestrom"):
+        normalize_house_profiles_document(doc, wallboxes=wallbox_catalog(box))
 
 
 def test_ev_min_on_quarterhours_defaults_to_one_and_is_never_zero():
@@ -687,8 +708,9 @@ def test_ev_consumer_normalization(tmp_path):
     import json
 
     path = tmp_path / "house_profiles.json"
-    path.write_text(
-        json.dumps(
+    write_inline_house(
+        path,
+        (
             {
                 "profiles": [
                     {
@@ -710,7 +732,6 @@ def test_ev_consumer_normalization(tmp_path):
                 ]
             }
         ),
-        encoding="utf-8",
     )
     doc = load_house_profiles_document(str(path))
     ev = doc["profiles"]["home"]["consumers"][0]
@@ -910,8 +931,9 @@ def test_build_hourly_kw_profile_with_ev_consumer(tmp_path):
 
     path = tmp_path / "house_profiles.json"
     ev = _sample_ev_consumer()
-    path.write_text(
-        json.dumps(
+    write_inline_house(
+        path,
+        (
             {
                 "profiles": [
                     {
@@ -933,7 +955,6 @@ def test_build_hourly_kw_profile_with_ev_consumer(tmp_path):
                 ]
             }
         ),
-        encoding="utf-8",
     )
     doc = load_house_profiles_document(str(path))
     profile = doc["profiles"]["home"]
@@ -1526,8 +1547,9 @@ def test_scenario_resolution_includes_ev_planning_flex(tmp_path):
     from house_config.scenario_resolution import resolve_scenario_settings
 
     path = tmp_path / "house_profiles.json"
-    path.write_text(
-        json.dumps(
+    write_inline_house(
+        path,
+        (
             {
                 "profiles": [
                     {
@@ -1561,7 +1583,6 @@ def test_scenario_resolution_includes_ev_planning_flex(tmp_path):
                 ]
             }
         ),
-        encoding="utf-8",
     )
     resolved = resolve_scenario_settings(
         {"house_profile_id": "home_ev"},

@@ -18,6 +18,7 @@ from streamlit.testing.v1 import AppTest
 
 from house_config.profiles_store import clear_house_profiles_doc_cache
 from tests.apptest.fields import CONSUMER_FIELDS, Field
+from tests.fixtures.ev_wallbox import ev_fields, merge_wallboxes, wallbox_entry
 
 _SCRIPT = Path(__file__).parent / "scripts" / "run_page_house_config.py"
 _TIMEOUT_S = 30.0
@@ -32,7 +33,7 @@ _EXTRA_CONSUMERS = [
     },
     {
         "id": "ev1", "label": "Auto", "type": "ev",
-        "battery_capacity_kwh": 50.0, "nominal_power_kw": 11.0,
+        "battery_capacity_kwh": 50.0, **ev_fields("ev1", phases=3, max_current_a=16.0),
         "charging_schedule": {
             "weekday": {"car_available_from_hour": 15, "ready_by_hour": 7, "daily_rest_soc": 20.0},
         },
@@ -55,6 +56,12 @@ def _profile_with_all_consumer_types(_isolated_backtesting_config):
     doc["profiles"][0]["consumers"] += _EXTRA_CONSUMERS
     with open(path, "w", encoding="utf-8") as handle:
         json.dump(doc, handle, ensure_ascii=False)
+    components_path = os.environ["EARNIE_COMPONENTS_PATH"]
+    with open(components_path, encoding="utf-8") as handle:
+        components = json.load(handle)
+    components = merge_wallboxes(components, [wallbox_entry("ev1", max_current_a=16.0)])
+    with open(components_path, "w", encoding="utf-8") as handle:
+        json.dump(components, handle, ensure_ascii=False)
     clear_house_profiles_doc_cache()
 
 
@@ -78,6 +85,13 @@ def _stored(spec: Field):
         doc = json.load(handle)
     profile = next(p for p in doc["profiles"] if p["id"] == _PROFILE_ID)
     consumer = next(c for c in profile["consumers"] if c["id"] == spec.entity)
+    if spec.profile_key.startswith("wallbox."):
+        # The EV's pair voltage is written to its wallbox (components.json wallboxes[]).
+        with open(os.environ["EARNIE_COMPONENTS_PATH"], encoding="utf-8") as handle:
+            wallboxes = json.load(handle)["wallboxes"]
+        wallbox_id = consumer["wallbox_assignment"]["wallbox_id"]
+        wallbox = next(w for w in wallboxes if w["id"] == wallbox_id)
+        return _dig(wallbox, spec.profile_key.split(".", 1)[1])
     if spec.profile_key.split(".")[0] in SYSTEM_FIELDS and "heating_system_id" in consumer:
         # Heat generation is written into the reference entry of the heating-system catalog.
         with open(os.environ["EARNIE_COMPONENTS_PATH"], encoding="utf-8") as handle:
@@ -143,7 +157,7 @@ def _consumer_field(entity: str, suffix: str) -> Field:
     "entity,suffix,value",
     [
         pytest.param("pool", "nom_3", 0.0, id="pool-nominal-power-zero"),
-        pytest.param("ev1", "ev_min_2", 50.0, id="ev-min-power-above-nominal"),
+        pytest.param("ev1", "ev_min_a_2", 50.0, id="ev-min-current-above-max"),
     ],
 )
 def test_t3_rejected_value_shows_error_and_keeps_file(entity: str, suffix: str, value: float) -> None:
@@ -171,7 +185,12 @@ def test_ev_without_milp_block_shows_and_saves_the_suggested_values() -> None:
     from optimizer.eauto_milp import suggested_min_remaining_kwh
 
     at = _new_session()
-    min_power = float(at.number_input(key=_KEY_PREFIX + "ev_min_2").value)
+    min_power = (
+        float(at.number_input(key=_KEY_PREFIX + "ev_min_a_2").value)
+        * float(at.number_input(key=_KEY_PREFIX + "ev_voltage_2").value)
+        * int(at.number_input(key=_KEY_PREFIX + "ev_phases_2").value)
+        / 1000.0
+    )
     suggested = suggested_min_remaining_kwh(min_power)
     assert at.number_input(key=_KEY_PREFIX + "ev_milp_rem_2").value == pytest.approx(suggested)
     assert at.number_input(key=_KEY_PREFIX + "ev_milp_eps_on_2").value == pytest.approx(

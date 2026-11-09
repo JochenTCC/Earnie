@@ -1,6 +1,6 @@
 # Multiple EVs and wallboxes, HouseSim wallbox write-back: design and implementation plan
 
-**Status:** design draft (2026-11-09); W1 built, the rest not. Decisions D1–D10 accepted by the maintainer on 2026-11-09 (D2 in its revised form: limits as current on both devices). D11 follows from D1–D3. Branch `feat/multi-ev-wallbox` (first named `docs/multi-ev-wallbox-design`), based on `main` at `fda24a4e`.
+**Status:** W1–W3 built and merged (2026-11-09); M1a built, M1b open. Decisions D1–D10 accepted by the maintainer on 2026-11-09 (D2 in its revised form: limits as current on both devices). D11 follows from D1–D3. Branch `feat/multi-ev-wallbox` (first named `docs/multi-ev-wallbox-design`), based on `main` at `fda24a4e`.
 **Backlog items:** **Enable multiple EV / Wallboxes** and **HouseSim wallbox write-back** (both Version 2.+1). The write-back is the test bench for the assignment, so this plan covers both. Target release: not decided.
 
 ## Goal
@@ -49,7 +49,7 @@ All accepted on 2026-11-09 (maintainer). D2 was revised in the review: the first
 
 Questions for the maintainer:
 
-- **Q1 (answered 2026-11-09):** An EV belongs to exactly one house profile. `dm6.wallboxes` raises with a clear message when the same EV Kennung appears in several profiles; it never merges them.
+- **Q1 (answered 2026-11-09):** An EV belongs to exactly one house profile. Profiles made by copying carry the same EV Kennung with identical data (seen in the migration fixtures): `dm6.wallboxes` gives those one shared wallbox when the charger data (current range, voltage, phases, charger bindings) are equal, and blocks with a German message when they differ. It never merges different data.
 - **Q2 (answered 2026-11-09):** Wallboxes deliver no vehicle ID for now; the design does not rely on one. AC home charging runs on IEC 61851, which has no vehicle ID; ISO 15118 (EVCCID) is rare on AC and hardly exposed by home wallboxes. RFID is not accepted as evidence. Sites without a vehicle ID source (Loxone included) assign by D4 (b)–(d).
 - **Q3:** Release: both items are under Version 2.+1. Whether W1–W3 or M1–M2 move into a release is not decided here.
 
@@ -87,6 +87,18 @@ Each phase is one chat session and ends with green tests and a commit. **W** = H
 - **Done:** the existing single-EV path is tested against simulated physics. This closes **HouseSim wallbox write-back**.
 
 ### M1: Schema and migration (no behaviour change)
+
+**M1a built 2026-11-09** (approach agreed with the maintainer: a pair resolver in the loader instead of rewriting the runtime readers now):
+
+- Data model 6; `house_config/wallboxes.py` (wallbox normalize / serialize, EV current fields, `pair_limits`, `resolve_ev_pair`, `route_evs_to_wallboxes`); `components.json` keeps `wallboxes[]` through load / save; the house loader reads the wallboxes next to the house file like the heating catalog.
+- **Pair view:** the loader fills `nominal_power_kw` / `min_power_kw` (rounded to 9 digits against float noise), `charging_schedule.nominal_power_voltage_v` / `_phases` and the wallbox's charger bindings (`evcs.<Wallbox>.*` rewritten to `evcs.<EV>.*`) into the normalized EV. All runtime readers stay unchanged until M2. Only the new shape is stored; a pre-dm6 EV fails loud with the migration hint.
+- **Saves:** `route_evs_to_wallboxes` (Hauskonfigurator and every `save_house_profiles` editor: EHAL-Com, signal list, greenfield import) writes the wallbox side of an EV to `components.json` (form pair limits, charger bindings edited on the view) and drops the view keys. The serializer refuses a charger binding on the EV that differs from its wallbox.
+- **Step `dm6.wallboxes`:** as below; also activates `evcs.<Kennung>.set_evcs_max_current` on the wallbox (the required key moved from the EV, `required_signal_activation`) and stamps every Earnie-track file to 6. `dm5.netznutzung_split` now detects models 3 / 4 only (it stamped every older pack before).
+- Form: one set of limits (phases, min / max current, wallbox voltage) written to car **and** wallbox, kW shown. Earnie Points count distinct wallboxes. Greenfield EV stub in currents. Viability study generator writes wallboxes.
+- Repo packs migrated: `share/config` templates, `studies/poc_cloud`, `tests/fixtures/backtesting`, migration goldens. Untracked local packs (`studies/viability/packs_*`, `greenfield/config`, `ha_lab/testbed/config`, the site config) migrate through the wizard / `scripts.migrate_config`.
+- Tests: full suite green, golden-master regression 12/12 unchanged (incl. the private replay cases, migrated in memory).
+
+**M1b (open):** wallbox list on the Komponenten page (label, voltage, phases, currents, bindings) and separate car limits in the EV form (D2 in full: car and wallbox may differ); readable example values in `share/config` (the migrated example keeps 15.217… A for 3.5 kW); HA greenfield / binding pages that create EVs, if any remain.
 
 - `components.wallboxes[]` in schema, loaders and the Komponenten page; EV consumer fields as in D2; `ev.wallbox_assignment` (D3).
 - Step `dm6.wallboxes`: one wallbox per EV consumer (Kennung = the consumer's Kennung, so `evcs.<Kennung>.*` IDs stay the same), charger bindings moved, the old `min_power_kw` / `nominal_power_kw` converted into current with the consumer's voltage and phases and written to **both** wallbox and EV (they described the pair, so the pair keeps exactly its old limits), `fixed` assignment. The same EV Kennung in several house profiles raises (Q1). Release notes helper picks it up.

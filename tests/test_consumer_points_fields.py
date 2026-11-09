@@ -3,7 +3,16 @@ from __future__ import annotations
 
 import pytest
 
-from house_config.profiles_store import _normalize_consumer, _serialize_consumer
+from house_config.profiles_store import _normalize_consumer as _normalize_raw
+from house_config.profiles_store import _serialize_consumer
+from tests.fixtures.ev_wallbox import ev_fields, wallbox_catalog, wallbox_entry
+
+# 16 A × 230 V × 3 phases ≈ 11 kW
+_WALLBOXES = wallbox_catalog(wallbox_entry("wallbox", max_current_a=16.0))
+
+
+def _normalize_consumer(raw: dict, index: int, profile_id: str) -> dict:
+    return _normalize_raw(raw, index, profile_id, wallboxes=_WALLBOXES)
 
 
 def _ev(**extra) -> dict:
@@ -11,7 +20,7 @@ def _ev(**extra) -> dict:
         "id": "wallbox",
         "label": "Wallbox",
         "type": "ev",
-        "nominal_power_kw": 11.0,
+        **ev_fields("wallbox"),
         "battery_capacity_kwh": 60.0,
         "charging_schedule": {
             "weekday": {

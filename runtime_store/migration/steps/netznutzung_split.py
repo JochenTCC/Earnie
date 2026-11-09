@@ -15,7 +15,6 @@ from typing import Any, Iterator
 from house_config.edibert_tariffs import flat_user_grid_area, user_grid_area_id
 from runtime_store.data_model import (
     CURRENT_DATA_MODEL,
-    MIGRATABLE_DATA_MODELS,
     read_data_model,
     stamp_data_model,
 )
@@ -139,9 +138,14 @@ def questions_for(docs: Docs) -> tuple[Question, ...]:
     return tuple(questions)
 
 
+# The models this step lifts to data model 5 (and further: it stamps the current model; the
+# steps of later models run after it and keep that stamp).
+_BEFORE_DM5: frozenset[int] = frozenset({3, 4})
+
+
 def detect(docs: Docs) -> bool:
     for name in EARNIE_TRACK_FILES:
-        if read_data_model(docs.get(name)) in MIGRATABLE_DATA_MODELS:
+        if read_data_model(docs.get(name)) in _BEFORE_DM5:
             return True
     house = docs.get(HOUSE_FILE)
     if not isinstance(house, dict):

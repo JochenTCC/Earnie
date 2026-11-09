@@ -52,7 +52,7 @@
             "cooling_enabled": false
         }
     ],
-    "earnie_data_model": 5,
+    "earnie_data_model": 6,
     "plant": {
         "grid_meter": {
             "at_house_connection": true,

@@ -95,10 +95,13 @@ def inline_heating_catalog(doc: dict) -> tuple[dict, dict[str, dict]]:
 
 
 def normalize_inline_house(doc: dict) -> dict:
+    """Old inline heating and EV shape → loader; catalogs passed like the file loader does."""
     from house_config.profiles_store import normalize_house_profiles_document
+    from tests.fixtures.ev_wallbox import inline_wallbox_catalog
 
     out, catalog = inline_heating_catalog(doc)
-    return normalize_house_profiles_document(out, heating_systems=catalog)
+    out, wallboxes = inline_wallbox_catalog(out)
+    return normalize_house_profiles_document(out, heating_systems=catalog, wallboxes=wallboxes)
 
 
 def write_inline_pack(config_dir, doc: dict, *, components: dict | None = None) -> None:
@@ -108,21 +111,30 @@ def write_inline_pack(config_dir, doc: dict, *, components: dict | None = None) 
 
     root = Path(config_dir)
     root.mkdir(parents=True, exist_ok=True)
+    from tests.fixtures.ev_wallbox import merge_wallboxes, split_inline_wallboxes
+
     out, entries = split_inline_heating(doc)
+    out, wallboxes = split_inline_wallboxes(out)
     comp = copy.deepcopy(components) if components is not None else {}
     comp.setdefault("heating_systems", []).extend(entries)
+    comp = merge_wallboxes(comp, wallboxes)
     (root / "house_profiles.json").write_text(json.dumps(out), encoding="utf-8")
     (root / "components.json").write_text(json.dumps(comp), encoding="utf-8")
 
 
-def _merge_into_sibling_components(house_path, entries: list[dict[str, Any]]) -> None:
+def _merge_into_sibling_components(
+    house_path, entries: list[dict[str, Any]], wallboxes: list[dict[str, Any]] | None = None
+) -> None:
     import json
     from pathlib import Path
+
+    from tests.fixtures.ev_wallbox import merge_wallboxes
 
     comp_path = Path(house_path).with_name("components.json")
     comp = json.loads(comp_path.read_text(encoding="utf-8")) if comp_path.is_file() else {}
     catalog = [e for e in comp.get("heating_systems") or [] if e["id"] not in {x["id"] for x in entries}]
     comp["heating_systems"] = catalog + entries
+    comp = merge_wallboxes(comp, wallboxes or [])
     comp_path.write_text(json.dumps(comp), encoding="utf-8")
 
 
@@ -131,15 +143,21 @@ def write_inline_house(path, doc: dict) -> None:
     import json
     from pathlib import Path
 
+    from tests.fixtures.ev_wallbox import split_inline_wallboxes
+
     out, entries = split_inline_heating(doc)
+    out, wallboxes = split_inline_wallboxes(out)
     Path(path).write_text(json.dumps(out), encoding="utf-8")
-    _merge_into_sibling_components(path, entries)
+    _merge_into_sibling_components(path, entries, wallboxes)
 
 
 def save_inline_house(path, doc: dict) -> None:
     """``save_house_profiles_document`` for a document with inline heat generation."""
     from house_config.profiles_store import save_house_profiles_document
 
+    from tests.fixtures.ev_wallbox import split_inline_wallboxes
+
     out, entries = split_inline_heating(doc)
-    _merge_into_sibling_components(path, entries)
+    out, wallboxes = split_inline_wallboxes(out)
+    _merge_into_sibling_components(path, entries, wallboxes)
     save_house_profiles_document(str(path), out)

@@ -45,7 +45,7 @@ def _json(path: Path) -> dict:
 def test_tracks_match_edibert() -> None:
     assert CURRENT_TARIFF_FORMAT == EDIBERT_TARIFF_FORMAT
     assert TARIFF_TRACK_FILES == frozenset(EDIBERT_TARIFF_TRACK_FILES)
-    assert CURRENT_DATA_MODEL == 5
+    assert CURRENT_DATA_MODEL == 6
 
 
 def test_plan_lists_both_steps_and_all_questions(tmp_path: Path) -> None:
@@ -61,6 +61,7 @@ def test_plan_lists_both_steps_and_all_questions(tmp_path: Path) -> None:
         "dm5.vat_deductible",
         "dm5.house_gains",
         "dm5.house_cooling",
+        "dm6.wallboxes",
         "tf1.tariff_format",
         "tf1.grid_area_levies",
     )
@@ -90,11 +91,12 @@ def test_one_run_one_backup_matches_golden_and_is_idempotent(tmp_path: Path) -> 
         "dm5.vat_deductible",
         "dm5.house_gains",
         "dm5.house_cooling",
+        "dm6.wallboxes",
         "tf1.tariff_format",
         "tf1.grid_area_levies",
     )
     backups = list((config_dir / "backups").iterdir())
-    assert len(backups) == 1 and backups[0].name.startswith("pre-migration-dm4-dm5-")
+    assert len(backups) == 1 and backups[0].name.startswith("pre-migration-dm4-dm6-")
     golden = FIXTURES / "goldens" / NAME
     for path in sorted(golden.glob("*.json")):
         assert _json(config_dir / path.name) == _json(path), path.name
@@ -109,7 +111,7 @@ def test_migrated_files_carry_the_right_tracks(tmp_path: Path) -> None:
         doc = _json(config_dir / name)
         assert doc["tariff_format"] == 1 and "earnie_data_model" not in doc, name
     house = _json(config_dir / "house_profiles.json")
-    assert house["earnie_data_model"] == 5
+    assert house["earnie_data_model"] == 6
     netz = {p["id"]: p["netznutzung"] for p in house["profiles"]}
     assert netz["profile_a"]["area_id"] == "user_profile_a"
     assert netz["profile_b"]["area_id"] == "AT-VBG"

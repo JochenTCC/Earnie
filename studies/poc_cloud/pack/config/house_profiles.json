@@ -1,6 +1,6 @@
 {
   "$schema": "./house_profiles.schema.json",
-  "earnie_data_model": 5,
+  "earnie_data_model": 6,
   "profiles": [
     {
       "id": "example_efh",
@@ -36,9 +36,7 @@
           "id": "ev",
           "label": "E-Auto",
           "type": "ev",
-          "nominal_power_kw": 3.5,
           "absent_mode_enabled": true,
-          "min_power_kw": 1.4,
           "min_on_quarterhours": 4,
           "battery_capacity_kwh": 60.0,
           "charging_schedule": {
@@ -62,13 +60,16 @@
             }
           },
           "ehal_bindings": {
-            "sens_evcs_active_power": "",
-            "set_evcs_max_current": "",
-            "set_evcs_mode": "",
-            "evcs.ev.set_evcs_max_current": "",
             "ev.ev.sens_power_act": ""
           },
-          "internal_gain_factor": 0.0
+          "internal_gain_factor": 0.0,
+          "phases": 1,
+          "min_current_a": 6.086956521739131,
+          "max_current_a": 15.217391304347826,
+          "wallbox_assignment": {
+            "mode": "fixed",
+            "wallbox_id": "ev"
+          }
         },
         {
           "id": "waschmaschine",

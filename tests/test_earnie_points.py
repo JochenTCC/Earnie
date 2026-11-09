@@ -20,6 +20,7 @@ def _ev(cid="ev", **extra) -> dict:
         "nominal_power_kw": 11.0,
         "battery_capacity_kwh": 60.0,
         "charging_schedule": {"nominal_power_phases": 3},
+        "wallbox_assignment": {"mode": "fixed", "wallbox_id": cid},
         **extra,
     }
 
@@ -131,7 +132,7 @@ def test_bidirectional_gives_at_least_one_point():
     # Stationary 2 kWh → 0.4 → 0; with the car 2 + 1/4 = 2.25 kWh → 0.45 → 0: delta 0, minimum 1.
     small = _ev(bidirectional=True, battery_capacity_kwh=1.0)
     assert _points(plant, [small])["wallbox"] == 2 + 1
-    two = [small, {**small, "id": "ev2"}]
+    two = [small, _ev("ev2", bidirectional=True, battery_capacity_kwh=1.0)]
     assert _points(plant, two)["wallbox"] == 4 + 2
 
 
@@ -255,3 +256,14 @@ def test_invalid_components_raise(components, message):
 def test_invalid_profile_raises():
     with pytest.raises(ValueError, match="profile.consumers muss eine Liste sein"):
         compute_earnie_points(_components(), {})
+
+
+def test_two_cars_at_one_wallbox_count_one_wallbox():
+    """Data model 6: the points count wallboxes, not cars."""
+    shared = {"wallbox_assignment": {"mode": "fixed", "wallbox_id": "box"}}
+    one = compute_earnie_points(_components(kwh=(10.0,)), {"consumers": [_ev("a", **shared)]})
+    two = compute_earnie_points(
+        _components(kwh=(10.0,)),
+        {"consumers": [_ev("a", **shared), _ev("b", **shared)]},
+    )
+    assert two["wallbox"] == one["wallbox"]

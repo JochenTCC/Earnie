@@ -23,7 +23,13 @@ ESS_NAMES = {
     "set_ess_mode": "Earnie_Steuerbefehl",
     "set_ess_target_soc": "Earnie_Ziel_SOC",
 }
-BATTERY = {"max_charge_power_kw": 5.0, "max_discharge_power_kw": 5.0}
+BATTERY = {
+    "max_charge_power_kw": 5.0,
+    "max_discharge_power_kw": 5.0,
+    "battery_capacity_kwh": 15.0,
+    "min_soc": 5.0,
+    "max_soc": 100.0,
+}
 
 
 def _bindings(names: dict[str, str]):
@@ -33,7 +39,9 @@ def _bindings(names: dict[str, str]):
     )
 
 
-def _snapshot(names: dict[str, str], *, mode: int, target_soc: float) -> dict[str, float]:
+def _snapshot(
+    names: dict[str, str], *, mode: int, target_soc: float, target_power_kw: float = 0.0
+) -> dict[str, float]:
     with (
         _bindings(names),
         patch.object(lw.config, "get_battery_params", return_value=BATTERY),
@@ -45,7 +53,7 @@ def _snapshot(names: dict[str, str], *, mode: int, target_soc: float) -> dict[st
     ):
         return lw.build_sent_loxone_snapshot(
             mode=mode,
-            target_power_kw=0.0,
+            target_power_kw=target_power_kw,
             target_soc=target_soc,
             consumer_powers={},
             charging_contexts={},
@@ -95,12 +103,83 @@ def test_live_write_publishes_the_target_soc() -> None:
 
 @pytest.mark.parametrize(("raw", "sent"), [(99.0, 99.0), (101.2, 100.0), (-3.0, 0.0), (47.06, 47.1)])
 def test_target_soc_percent_is_clamped_and_rounded(raw: float, sent: float) -> None:
-    assert lw.ess_target_soc_percent(raw) == sent
+    assert (
+        lw.ess_target_soc_percent(raw, mode=0, target_power_kw=0.0, battery_params=BATTERY)
+        == sent
+    )
 
 
 def test_target_soc_nan_fails_loud() -> None:
     with pytest.raises(ValueError):
-        lw.ess_target_soc_percent(float("nan"))
+        lw.ess_target_soc_percent(
+            float("nan"), mode=0, target_power_kw=0.0, battery_params=BATTERY
+        )
+
+
+# Huawei reports whole-percent SoC: forced modes get a buffer beyond the slot-end SoC,
+# 1 % reporting step + 25 % of the slot's SoC change at the target power.
+# 5 kW on 15 kWh for 15 min = 8.33 % slot change -> buffer 3.08 %.
+
+
+def test_forced_discharge_target_soc_gets_power_dependent_buffer() -> None:
+    sent = lw.ess_target_soc_percent(
+        60.5, mode=3, target_power_kw=5.0, battery_params=BATTERY
+    )
+    assert sent == pytest.approx(57.4)
+
+
+def test_buffer_grows_with_target_power() -> None:
+    low = lw.ess_target_soc_buffer_percent(3, 1.0, 15.0, dt_h=0.25)
+    high = lw.ess_target_soc_buffer_percent(3, 5.0, 15.0, dt_h=0.25)
+    assert low == pytest.approx(1.0 + 0.25 * 1.0 * 0.25 / 15.0 * 100.0)
+    assert high == pytest.approx(1.0 + 0.25 * 5.0 * 0.25 / 15.0 * 100.0)
+    assert high > low > 1.0
+
+
+def test_forced_charge_target_soc_buffer_goes_up_and_stops_at_max_soc() -> None:
+    assert lw.ess_target_soc_percent(
+        80.0, mode=1, target_power_kw=5.0, battery_params=BATTERY
+    ) == pytest.approx(83.1)
+    assert (
+        lw.ess_target_soc_percent(99.0, mode=1, target_power_kw=5.0, battery_params=BATTERY)
+        == 100.0
+    )
+
+
+def test_discharge_buffer_stops_at_min_soc_and_never_raises_the_plan() -> None:
+    assert (
+        lw.ess_target_soc_percent(6.0, mode=3, target_power_kw=5.0, battery_params=BATTERY)
+        == 5.0
+    )
+    assert (
+        lw.ess_target_soc_percent(4.0, mode=3, target_power_kw=5.0, battery_params=BATTERY)
+        == 4.0
+    )
+
+
+@pytest.mark.parametrize("mode", [0, 2])
+def test_automatik_and_hold_get_no_buffer(mode: int) -> None:
+    assert (
+        lw.ess_target_soc_percent(63.4, mode=mode, target_power_kw=5.0, battery_params=BATTERY)
+        == 63.4
+    )
+
+
+def test_buffer_without_capacity_fails_loud() -> None:
+    with pytest.raises(ValueError):
+        lw.ess_target_soc_buffer_percent(3, 5.0, 0.0, dt_h=0.25)
+
+
+def test_snapshot_sends_the_buffered_discharge_target() -> None:
+    snap = _snapshot(ESS_NAMES, mode=3, target_soc=60.5, target_power_kw=5.0)
+    assert snap["Earnie_Ziel_SOC"] == pytest.approx(57.4)
+
+
+def test_ha_publishes_the_buffered_discharge_target(ha) -> None:
+    ha(target_activated=True)
+    error, _rows = ehal_live.write_ess_setpoints_from_control(3, 5.0, target_soc=60.5)
+    assert error is None
+    assert load_published()["ess.house.set_ess_target_soc"] == pytest.approx(57.4)
 
 
 @pytest.fixture
