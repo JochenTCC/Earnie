@@ -128,6 +128,14 @@ class HaWriteMixin:
         self._write_optional_setpoint(
             doc,
             outcome,
+            "set_ess_target_soc",
+            supported=any(
+                ess_field_kind(key) == "set_ess_target_soc" for key in self.cfg.entities
+            ),
+        )
+        self._write_optional_setpoint(
+            doc,
+            outcome,
             "set_grid_export_power_limit",
             supported="set_grid_export_power_limit" in self.cfg.entities,
         )

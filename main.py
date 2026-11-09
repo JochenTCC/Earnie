@@ -762,6 +762,7 @@ def _main_cycle(
                 export_cap_kw=export_cap,
                 telemetry=telemetry_for_export,
                 automatik_discharge_cap_kw=automatik_discharge_cap,
+                target_soc=target_soc,
             )
             logger.info("Sende EHAL EVCS-Maxstrom an %s...", backend)
             err_evcs, evcs_records = ehal_live.write_evcs_max_current_from_consumers(

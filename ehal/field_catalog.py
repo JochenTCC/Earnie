@@ -66,6 +66,7 @@ SETPOINT_FIELDS: tuple[str, ...] = (
     "set_ess_discharge_power_limit",
     "set_ess_mode",
     "set_ess_source_select",
+    "set_ess_target_soc",
     "set_evcs_max_current",
     "set_evcs_mode",
     "set_grid_export_power_limit",

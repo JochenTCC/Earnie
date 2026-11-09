@@ -99,6 +99,19 @@ def map_ess_setpoints(
     return None, max_charge, max_discharge, 0
 
 
+def ess_target_soc_percent(target_soc: float) -> float:
+    """Target SoC for ``set_ess_target_soc`` in % (0-100, one decimal).
+
+    The optimizer's value per mode: hold (Entladesperre) = current SoC, forced
+    charge/discharge = planned SoC at slot end, Automatik = 99. Only written when
+    the battery maps ``set_ess_target_soc``.
+    """
+    value = float(target_soc)
+    if value != value:  # NaN
+        raise ValueError("set_ess_target_soc: target SoC is NaN")
+    return round(min(100.0, max(0.0, value)), 1)
+
+
 def flex_consumer_enable_value(
     consumer: dict,
     consumer_powers: dict[str, float],
@@ -424,8 +437,6 @@ def build_sent_loxone_snapshot(
     )
     contexts = charging_contexts or {}
     snapshot: dict[str, float] = {}
-    # target_soc_name removed (2.4.j): ESS via active_power + limits + set_ess_mode.
-    _ = target_soc
 
     from house_config.ess_bindings import resolve_primary_ess_binding
     from integrations.ehal_debug_mapping import has_mappable_live_batteries
@@ -436,6 +447,7 @@ def build_sent_loxone_snapshot(
         ("set_ess_charge_power_limit", charge_kw),
         ("set_ess_discharge_power_limit", discharge_kw),
         ("set_ess_mode", float(control_cmd)),
+        ("set_ess_target_soc", ess_target_soc_percent(target_soc)),
     ):
         wired = resolve_primary_ess_binding(kind)
         if not wired:
@@ -522,16 +534,16 @@ def send_huawei_modbus_states(
     )
     if control == BATTERY_CONTROL_LIMITS_ONLY:
         active_kw = None
-    # target_soc no longer written (2.4.j); kept in signature for call-site compat.
-    _ = target_soc
+    target_soc_pct = ess_target_soc_percent(target_soc)
 
     logger.info(
         "Sending ESS C1 Mapping -> Soll: %s kW, Ladegrenze: %s kW, "
-        "Entladegrenze: %s kW, set_ess_mode/Cmd: %s",
+        "Entladegrenze: %s kW, set_ess_mode/Cmd: %s, Ziel-SoC: %s %%",
         active_kw,
         charge_kw,
         discharge_kw,
         control_cmd,
+        target_soc_pct,
     )
 
     records = _publish_ess_c1_setpoints(
@@ -540,6 +552,7 @@ def send_huawei_modbus_states(
             ("set_ess_charge_power_limit", charge_kw),
             ("set_ess_discharge_power_limit", discharge_kw),
             ("set_ess_mode", float(control_cmd)),
+            ("set_ess_target_soc", target_soc_pct),
         )
     )
     if export_cap_kw is not _OMIT_EXPORT_CAP:

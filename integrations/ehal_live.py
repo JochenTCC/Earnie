@@ -435,10 +435,13 @@ def write_ess_setpoints_from_control(
     export_cap_kw: float | None | object = _OMIT_EXPORT_CAP,
     telemetry: dict[str, Any] | None = None,
     automatik_discharge_cap_kw: float | None = None,
+    target_soc: float | None = None,
 ) -> tuple[EhalWriteError | None, list[dict[str, Any]]]:
     """Map optimizer mode/power to EHAL Design C1 ESS setpoints.
 
     ``automatik_discharge_cap_kw`` caps the discharge limit in Automatik (virtual reserve floor).
+    ``target_soc`` (optimizer target SoC in %) adds ``set_ess_target_soc``; the adapter
+    writes it only where the battery activates that field.
 
     When ``export_cap_kw`` is passed (including ``None`` = unconstrained), also write
     ``set_grid_export_power_limit`` (W magnitude; plant export maximum = PV kWp + force
@@ -487,6 +490,12 @@ def write_ess_setpoints_from_control(
         (active_kw, charge_kw, discharge_kw, control_cmd),
         export_cap_kw,
     )
+    if target_soc is not None:
+        from integrations.loxone_writes import ess_target_soc_percent
+
+        target_soc_pct = ess_target_soc_percent(target_soc)
+        setpoint["set_ess_target_soc"] = target_soc_pct
+        record_fields["set_ess_target_soc"] = target_soc_pct
     error = adapter.write_setpoints(setpoint)
     if error is not None:
         persist_write_error(error)

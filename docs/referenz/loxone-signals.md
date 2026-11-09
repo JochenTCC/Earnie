@@ -289,6 +289,7 @@ Default-Namen. Netz-/PV-/Batterie-**Leistung** bevorzugt über die EFM-Zählerbe
 | `set_ess_charge_power_limit`      | Schreiben | `Earnie_LadeLeistungs-Limit`                     | Max. Ladeleistung (echtes Limit)                                                            |
 | `set_ess_discharge_power_limit`   | Schreiben | `Earnie_EntladeLeistungs-Limit`                  | Max. Entladeleistung (echtes Limit)                                                         |
 | `set_ess_mode`                    | Schreiben | `Earnie_Steuerbefehl`                            | Sticky: immer schreiben; `0` = Automatik; nur Batterie; OpenEMS ignoriert                   |
+| `set_ess_target_soc`              | Schreiben | `Earnie_Ziel_SOC`                                | Optional, % (0–100): Entladesperre = Ist-SoC, Zwangsladen/-entladen = geplanter SoC am Slot-Ende, Automatik = 99; nur wenn gemappt |
 | `ess.<id>.set_ess_source_select`  | Schreiben | Pattern-B-Merker (z. B. alt `Earnie_Speicher_Quellenwahl`) | nur physisches `standby_backup`; `0` = Netzdurchleitung, `1` = reiner Batterie-Inselbetrieb (Fähigkeit `supports_ess_source_select`); nicht auf Anlagenebene |
 | `set_grid_export_power_limit`     | Schreiben | `Earnie_EinspeiseLeistungs-Limit`                | Max. Export kW (Betrag ≥ 0); `0` = kein Export; unbeschränkt = PV-kWp + max. Batterie-Entladung kW |
 | *(Watchdog)*                       | Lesen     | `Earnie_Heartbeat`                               | Entity-bezogen; kein EHAL-Feld                                                              |

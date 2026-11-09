@@ -223,7 +223,7 @@ Relevante Parameter:
 - **Wechselrichter:** der zugeordnete Wechselrichter (Hausbatterie) bzw. der integrierte Wechselrichter einer physischen Powerstation.
 - **Verschleißkosten (optional):** Damit bewertet Earnie viele Ladezyklen wirtschaftlich.
 
-Im Live-Betrieb gibt Earnie über das Smarthome-System die Sollleistung sowie die Lade- und Entladegrenze vor, bei Loxone und Home Assistant zusätzlich den ESS-Modus. Einen Ziel-SoC sendet Earnie nicht. Die eigentliche Wechselrichter-Logik bleibt in der Hausautomation bzw. im Wechselrichter.
+Im Live-Betrieb gibt Earnie über das Smarthome-System die Sollleistung sowie die Lade- und Entladegrenze vor, bei Loxone und Home Assistant zusätzlich den ESS-Modus. Ist bei der Batterie das Signal „Ziel-SoC“ (`set_ess_target_soc`) zugeordnet, sendet Earnie auch den Ziel-SoC: Beim Halten (Entladesperre) ist das der aktuelle Ladestand, beim Zwangsladen oder -entladen der geplante Ladestand am Ende der Viertelstunde. Die eigentliche Wechselrichter-Logik bleibt in der Hausautomation bzw. im Wechselrichter.
 
 ### Szenarienkonfigurator
 

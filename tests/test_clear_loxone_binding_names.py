@@ -366,13 +366,14 @@ def test_ess_c1_publishes_entity_scoped_when_batteries_present() -> None:
     ):
         records = lw.send_huawei_modbus_states(0, 0.0, 0.0)
 
-    assert len(records) == 4
+    assert len(records) == 5
     qids = [c.args[0] for c in pub.call_args_list]
     assert qids == [
         "ess.15_kwh_speicher.set_ess_active_power",
         "ess.15_kwh_speicher.set_ess_charge_power_limit",
         "ess.15_kwh_speicher.set_ess_discharge_power_limit",
         "ess.15_kwh_speicher.set_ess_mode",
+        "ess.15_kwh_speicher.set_ess_target_soc",
     ]
     assert [c.kwargs.get("io_name") for c in pub.call_args_list] == qids
 

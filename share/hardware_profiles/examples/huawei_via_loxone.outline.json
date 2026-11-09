@@ -3,7 +3,7 @@
   "model": "Luna / inverter via Loxone markers (outline)",
   "protocol": "proprietary",
   "status": "outline",
-  "notes": "Design C1: Live writes set_ess_active_power + true charge/discharge limits + set_ess_mode hint (control_cmd). Ziel-SOC removed in 2.4.j. Register addresses illustrative for future Path D.",
+  "notes": "Design C1: Live writes set_ess_active_power + true charge/discharge limits + set_ess_mode hint (control_cmd) + optional set_ess_target_soc (Ziel-SOC; removed in 2.4.j, back as optional setpoint 2026-11-09). Register addresses illustrative for future Path D.",
   "registers": [
     {
       "address": 47000,

@@ -15,6 +15,7 @@ ESS_FIELD_KINDS: frozenset[str] = frozenset(
         "set_ess_discharge_power_limit",
         "set_ess_mode",
         "set_ess_source_select",
+        "set_ess_target_soc",
         "get_ess_soc_min",
         "get_ess_soc_max",
         "get_ess_max_charge_power",

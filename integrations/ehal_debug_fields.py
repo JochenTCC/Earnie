@@ -71,6 +71,7 @@ BATTERY_ESS_LIVE_WRITE_KINDS: tuple[str, ...] = (
     "set_ess_charge_power_limit",
     "set_ess_discharge_power_limit",
     "set_ess_mode",
+    "set_ess_target_soc",
 )
 
 BATTERY_SOURCE_SELECT_KIND = "set_ess_source_select"
@@ -93,6 +94,7 @@ PLANT_LIVE_WRITE_FIELDS: tuple[str, ...] = (
     "set_ess_charge_power_limit",
     "set_ess_discharge_power_limit",
     "set_ess_mode",
+    "set_ess_target_soc",
     "set_grid_export_power_limit",
 )
 EV_LIVE_READ_FIELDS: tuple[str, ...] = (

@@ -41,6 +41,12 @@
       "enum": [0, 1],
       "description": "Route locally-attached consumers: 0 = grid pass-through (charge allowed), 1 = battery-only island (no AC charge). Live wire is entity-scoped ess.{id}.set_ess_source_select on physical standby_backup (2.7.h); omit for house ESS / plant."
     },
+    "set_ess_target_soc": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Optional target SoC in % for hubs that stop a forced charge/discharge there (e.g. Huawei via Loxone). Hold (Entladesperre) = current SoC. OpenEMS ignores."
+    },
     "set_evcs_max_current": {
       "type": "number",
       "minimum": 0,
@@ -68,6 +74,7 @@
     {"required": ["set_ess_discharge_power_limit"]},
     {"required": ["set_ess_mode"]},
     {"required": ["set_ess_source_select"]},
+    {"required": ["set_ess_target_soc"]},
     {"required": ["set_evcs_max_current"]},
     {"required": ["set_evcs_mode"]},
     {"required": ["set_grid_export_power_limit"]},

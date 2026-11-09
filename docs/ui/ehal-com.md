@@ -64,6 +64,7 @@ Overview of the **canonical EHAL wire fields** (the per-role matrix is in §C be
 | Setpoints (limits)      | `inv.{id}.set_inv_ac_power_limit`  | no*      | **W**; max AC output of this inverter (magnitude ≥ 0); Live curtailment when plant `p_pv_curtail` > 0, else sticky rating |
 | Setpoints (limits)      | `set_evcs_max_current`             | no*      | **A**; non-negative amount (EV charging target/max current)                                                    |
 | Setpoints (mode)        | `set_ess_mode`                     | no*      | Sticky backend: always write; **0 = automatic**; battery only (export caps via `set_grid_export_power_limit`); OpenEMS ignores it |
+| Setpoints (target)      | `set_ess_target_soc`               | no       | **%** (0–100); optional; hold (Entladesperre) = current SoC, forced charge/discharge = planned SoC at slot end, automatic = 99; OpenEMS ignores it |
 | Setpoints (source)      | `ess.<id>.set_ess_source_select`   | no*      | **0** = grid pass-through, **1** = battery island; entity-scoped on physical `standby_backup` only; omit for house ESS / plant |
 | Setpoints (extended)    | `set_evcs_mode`                    | no*      | Enum: `off` \| `pv` \| `now`; on Home Assistant a number (`off`=0 / `pv`=1 / `now`=2), published next to `set_evcs_max_current`; with „Sofort laden“ only the mode `now` is published (no current) |
 | Capability flags        | `supports_ess_write`               | yes      | boolean; ESS setpoints may be written                                                                          |

@@ -61,6 +61,7 @@ class EhalSetpoint(TypedDict):
     set_ess_discharge_power_limit: NotRequired[float]
     set_ess_mode: NotRequired[str | float]
     set_ess_source_select: NotRequired[float]
+    set_ess_target_soc: NotRequired[float]
     set_evcs_max_current: NotRequired[float]
     set_evcs_mode: NotRequired[str]
     set_grid_export_power_limit: NotRequired[float]

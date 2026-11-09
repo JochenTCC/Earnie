@@ -32,6 +32,7 @@ EHAL_TO_BLOCKS: dict[str, str] = {
     "set_ess_discharge_power_limit": "target_discharge_power_name",
     "set_ess_mode": "control_cmd_name",
     "set_ess_source_select": "ess_source_select_name",
+    "set_ess_target_soc": "ess_target_soc_name",
     "get_grid_export_power_limit": "grid_export_limit_in_name",
     "set_grid_export_power_limit": "grid_export_limit_out_name",
     "get_ess_soc_min": "ess_soc_min_name",
@@ -78,6 +79,7 @@ _HINTS: dict[str, tuple[str, ...]] = {
     "set_ess_charge_power_limit": ("ladegrenze", "charge limit", "max lade"),
     "set_ess_discharge_power_limit": ("entladegrenze", "discharge limit", "max entlade"),
     "set_ess_mode": ("steuerbefehl", "control_cmd", "huawei", "modbus cmd", "ess mode"),
+    "set_ess_target_soc": ("ziel soc", "ziel-soc", "zielsoc", "soll soc", "target soc"),
     # set_ess_source_select: manual only (standby_backup) — see MANUAL_ONLY_FIELDS
     "get_grid_export_power_limit": (
         "einspeisegrenze",

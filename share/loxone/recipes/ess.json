@@ -76,6 +76,12 @@
       "notes": "Mode hint for Huawei/Loxone; OpenEMS ignores."
     },
     {
+      "ehal_field": "set_ess_target_soc",
+      "loxone_blocks_key": "plant.ehal_bindings.set_ess_target_soc",
+      "suggested_name": "Earnie_Ziel_SOC",
+      "notes": "Optional target SoC (%) for the Huawei forced charge/discharge; hold = current SoC."
+    },
+    {
       "ehal_field": "set_ess_source_select",
       "loxone_blocks_key": "plant.ehal_bindings.set_ess_source_select",
       "suggested_name": "Earnie_Speicher_Quellenwahl",
