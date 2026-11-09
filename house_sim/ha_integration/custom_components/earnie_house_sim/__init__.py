@@ -68,11 +68,30 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return unload_ok
 
 
-def _coordinator(hass: HomeAssistant) -> HouseSimCoordinator:
-    entries = hass.data.get(DOMAIN) or {}
+def _coordinator(hass: HomeAssistant, call: ServiceCall) -> HouseSimCoordinator:
+    """The simulator a service call targets.
+
+    With one config entry that entry; with several the call must name the
+    archetype (``archetype`` field), so a call never lands on a guessed house.
+    """
+    entries: dict[str, HouseSimCoordinator] = hass.data.get(DOMAIN) or {}
     if not entries:
         raise vol.Invalid("earnie_house_sim is not configured")
-    return next(iter(entries.values()))
+    wanted = call.data.get("archetype")
+    if wanted is None:
+        if len(entries) > 1:
+            names = sorted(c.package.name for c in entries.values())
+            raise vol.Invalid(f"Several simulators run ({names}); name one with 'archetype'")
+        return next(iter(entries.values()))
+    matches = [c for c in entries.values() if c.package.name == str(wanted)]
+    if len(matches) != 1:
+        raise vol.Invalid(f"No single simulator with archetype {wanted!r}")
+    return matches[0]
+
+
+def _with_archetype(fields: dict) -> vol.Schema:
+    """Service schema plus the optional ``archetype`` selector."""
+    return vol.Schema({**fields, vol.Optional("archetype"): cv.string})
 
 
 def _register_services(hass: HomeAssistant) -> None:
@@ -80,14 +99,14 @@ def _register_services(hass: HomeAssistant) -> None:
         return
 
     async def cloud_pass(call: ServiceCall) -> None:
-        coord = _coordinator(hass)
+        coord = _coordinator(hass, call)
         minutes = float(call.data.get("minutes", 15))
         scale = float(call.data.get("scale", 0.2))
         coord.overlay.apply_cloud_pass(minutes=minutes, scale=scale)
         await coord.async_request_refresh()
 
     async def car_arrives(call: ServiceCall) -> None:
-        coord = _coordinator(hass)
+        coord = _coordinator(hass, call)
         wallbox = call.data.get("wallbox")
         ev = call.data.get("ev")
         if coord.has_wallbox_model:
@@ -107,7 +126,7 @@ def _register_services(hass: HomeAssistant) -> None:
         await coord.async_request_refresh()
 
     async def car_leaves(call: ServiceCall) -> None:
-        coord = _coordinator(hass)
+        coord = _coordinator(hass, call)
         wallbox = call.data.get("wallbox")
         if coord.has_wallbox_model:
             if wallbox not in {w.id for w in parse_wallboxes(coord.package.house_params)}:
@@ -120,21 +139,21 @@ def _register_services(hass: HomeAssistant) -> None:
         await coord.async_request_refresh()
 
     async def load_spike(call: ServiceCall) -> None:
-        coord = _coordinator(hass)
+        coord = _coordinator(hass, call)
         minutes = float(call.data.get("minutes", 15))
         extra_kw = float(call.data.get("extra_kw", 3.0))
         coord.overlay.apply_load_spike(minutes=minutes, extra_kw=extra_kw)
         await coord.async_request_refresh()
 
     async def set_soc(call: ServiceCall) -> None:
-        coord = _coordinator(hass)
+        coord = _coordinator(hass, call)
         soc = max(0.0, min(100.0, float(call.data["soc_pct"])))
         coord.physics = replace(coord.physics, soc_pct=soc)
         await coord.async_persist()
         await coord.async_request_refresh()
 
     async def set_unavailable(call: ServiceCall) -> None:
-        coord = _coordinator(hass)
+        coord = _coordinator(hass, call)
         entity_id = str(call.data["entity_id"])
         minutes = float(call.data.get("minutes", 5))
         until = dt_util.utcnow().timestamp() + minutes * 60.0
@@ -142,15 +161,15 @@ def _register_services(hass: HomeAssistant) -> None:
         await coord.async_request_refresh()
 
     async def reject_writes(call: ServiceCall) -> None:
-        coord = _coordinator(hass)
+        coord = _coordinator(hass, call)
         coord.reject_writes = bool(call.data.get("enabled", True))
 
     async def setpoint_lag(call: ServiceCall) -> None:
-        coord = _coordinator(hass)
+        coord = _coordinator(hass, call)
         coord.setpoint_lag_s = max(0.0, float(call.data.get("seconds", 0)))
 
     async def unit_flip(call: ServiceCall) -> None:
-        coord = _coordinator(hass)
+        coord = _coordinator(hass, call)
         coord.unit_flip = bool(call.data.get("enabled", True))
         await coord.async_request_refresh()
 
@@ -158,7 +177,7 @@ def _register_services(hass: HomeAssistant) -> None:
         DOMAIN,
         "cloud_pass",
         cloud_pass,
-        schema=vol.Schema(
+        schema=_with_archetype(
             {
                 vol.Optional("minutes", default=15): vol.Coerce(float),
                 vol.Optional("scale", default=0.2): vol.Coerce(float),
@@ -169,7 +188,7 @@ def _register_services(hass: HomeAssistant) -> None:
         DOMAIN,
         "car_arrives",
         car_arrives,
-        schema=vol.Schema(
+        schema=_with_archetype(
             {
                 vol.Optional("power_w", default=7000): vol.Coerce(float),
                 vol.Optional("wallbox"): cv.string,
@@ -182,13 +201,13 @@ def _register_services(hass: HomeAssistant) -> None:
         DOMAIN,
         "car_leaves",
         car_leaves,
-        schema=vol.Schema({vol.Optional("wallbox"): cv.string}),
+        schema=_with_archetype({vol.Optional("wallbox"): cv.string}),
     )
     hass.services.async_register(
         DOMAIN,
         "load_spike",
         load_spike,
-        schema=vol.Schema(
+        schema=_with_archetype(
             {
                 vol.Optional("minutes", default=15): vol.Coerce(float),
                 vol.Optional("extra_kw", default=3.0): vol.Coerce(float),
@@ -199,13 +218,13 @@ def _register_services(hass: HomeAssistant) -> None:
         DOMAIN,
         "set_soc",
         set_soc,
-        schema=vol.Schema({vol.Required("soc_pct"): vol.Coerce(float)}),
+        schema=_with_archetype({vol.Required("soc_pct"): vol.Coerce(float)}),
     )
     hass.services.async_register(
         DOMAIN,
         "set_unavailable",
         set_unavailable,
-        schema=vol.Schema(
+        schema=_with_archetype(
             {
                 vol.Required("entity_id"): cv.string,
                 vol.Optional("minutes", default=5): vol.Coerce(float),
@@ -216,17 +235,17 @@ def _register_services(hass: HomeAssistant) -> None:
         DOMAIN,
         "reject_writes",
         reject_writes,
-        schema=vol.Schema({vol.Optional("enabled", default=True): cv.boolean}),
+        schema=_with_archetype({vol.Optional("enabled", default=True): cv.boolean}),
     )
     hass.services.async_register(
         DOMAIN,
         "setpoint_lag",
         setpoint_lag,
-        schema=vol.Schema({vol.Optional("seconds", default=0): vol.Coerce(float)}),
+        schema=_with_archetype({vol.Optional("seconds", default=0): vol.Coerce(float)}),
     )
     hass.services.async_register(
         DOMAIN,
         "unit_flip",
         unit_flip,
-        schema=vol.Schema({vol.Optional("enabled", default=True): cv.boolean}),
+        schema=_with_archetype({vol.Optional("enabled", default=True): cv.boolean}),
     )

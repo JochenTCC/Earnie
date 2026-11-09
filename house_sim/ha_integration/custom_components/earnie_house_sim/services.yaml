@@ -26,6 +26,11 @@ car_arrives:
     charges by the wallbox setpoints). Archetypes without a wallbox model take
     a fixed charge power instead.
   fields:
+    archetype:
+      name: Archetype
+      description: Required when several simulators run (every service takes it).
+      selector:
+        text:
     wallbox:
       name: Wallbox
       description: Wallbox id from house_params.wallboxes (wallbox model only).
@@ -59,6 +64,11 @@ car_leaves:
   description: >-
     Unplug the EV at a wallbox (wallbox model), or clear the fixed charge power.
   fields:
+    archetype:
+      name: Archetype
+      description: Required when several simulators run.
+      selector:
+        text:
     wallbox:
       name: Wallbox
       description: Wallbox id (wallbox model only).

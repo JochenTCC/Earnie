@@ -176,7 +176,7 @@ A custom integration cannot register `input_number`. Fixture rows `input_number.
 
 ### Services
 
-Domain `earnie_house_sim`: scenarios `cloud_pass`, `car_arrives`, `car_leaves`, `load_spike`, `set_soc`; faults `set_unavailable`, `reject_writes`, `setpoint_lag`, `unit_flip` (PV only: a kW entity is shown ×1000, a W entity ÷1000, unit attribute unchanged). All four shipped fixtures model their wallbox (below), so `car_arrives` takes `wallbox` and `ev` (optional `soc_pct`) and `car_leaves` takes `wallbox`; `power_w` applies only to an archetype without a wallbox model (e.g. generated ones). Plug states are `binary_sensor` entities (platform added for this).
+Domain `earnie_house_sim`: scenarios `cloud_pass`, `car_arrives`, `car_leaves`, `load_spike`, `set_soc`; faults `set_unavailable`, `reject_writes`, `setpoint_lag`, `unit_flip` (PV only: a kW entity is shown ×1000, a W entity ÷1000, unit attribute unchanged). All four shipped fixtures model their wallbox (below), so `car_arrives` takes `wallbox` and `ev` (optional `soc_pct`) and `car_leaves` takes `wallbox`; `power_w` applies only to an archetype without a wallbox model (e.g. generated ones). Plug states are `binary_sensor` entities (platform added for this). Every service takes an optional `archetype`; with several simulator entries it is required, so a call never lands on a guessed house. Checked on the HA `2025.7.0` testbed on 2026-11-09 (plan W3).
 
 ### Wallbox model (core, W1–W2; plan [`multi-ev-wallbox-plan.md`](multi-ev-wallbox-plan.md))
 
