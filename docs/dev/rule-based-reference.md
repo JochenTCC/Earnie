@@ -148,7 +148,7 @@ The MILP sees the values that get booked:
 | Load | Baseload and flex targets of the window, i.e. the actual need; the book's values overlay the MILP matrix. `Verbrauch-Prognose (kW)` is this value. | `simulation/matrix_builder.py:478`, `:598-599`, `simulation/engine_scenario.py:177` |
 | Prices | Default `perfect`: actual prices over SA₀→SA₂, no publication cutoff. The UI always runs this. | `data/backtesting_prices.py:341-357`, `scripts/run_backtesting.py:219` |
 
-Limits on that foresight: one plan per day with no re-plan as in live, and no view past SA₂ (`simulation/backtesting_horizon.py:158`).
+Limits on that foresight: one plan per day with no re-plan as in live. Since 2026-11-09 the plan looks 8 h past SA₂ by default (`EARNIE_SE_LOOKAHEAD_H`, `optimizer/milp_horizon_extras.py::lookahead_hours`); the book still ends at SA₂.
 
 `--price-strategy mirror|forecast` does not fix this:
 
