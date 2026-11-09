@@ -1,6 +1,6 @@
 # Multiple EVs and wallboxes, HouseSim wallbox write-back: design and implementation plan
 
-**Status:** design draft (2026-11-09), nothing implemented. All decisions below are **proposals** until the maintainer accepts them. Branch `docs/multi-ev-wallbox-design`, based on `main` at `fda24a4e`.
+**Status:** design draft (2026-11-09); W1 built, the rest not. All decisions below are **proposals** until the maintainer accepts them. Branch `feat/multi-ev-wallbox` (first named `docs/multi-ev-wallbox-design`), based on `main` at `fda24a4e`.
 **Backlog items:** **Enable multiple EV / Wallboxes** and **HouseSim wallbox write-back** (both Version 2.+1). The write-back is the test bench for the assignment, so this plan covers both. Target release: not decided.
 
 ## Goal
@@ -56,6 +56,8 @@ Open questions for the maintainer:
 Each phase is one chat session and ends with green tests and a commit. **W** = HouseSim wallbox write-back, **M** = multiple EVs and wallboxes. W1–W3 and M1–M2 do not depend on each other; M3 needs W3 as its test bench.
 
 ### W1: HouseSim core — wallbox and EV physics
+
+**Built 2026-11-09** (D10 taken as accepted for this phase): `house_sim/core/evcs.py`, wired into `step_physics` / `run_ticks`, S4 copy synced, tests `tests/test_house_sim_core_evcs.py`. Archetypes without `house_params.wallboxes` keep the fixed power override, so no shipped fixture changes until W2. Not built: the vendor entities that feed `WallboxSetpoints` (W2), persistence of the EV state in the S4 coordinator (W2).
 
 - `house_params.wallboxes[]` (Kennung, voltage, phases, min / max current, `read_only`) and `house_params.evs[]` (Kennung, capacity, start SoC, acceptance kW, phases, optional vehicle ID).
 - `WallboxSetpoints` per wallbox: `max_current_a`, `enabled` (from the vendor's enable or mode field). Read like `EssSetpoints` today.

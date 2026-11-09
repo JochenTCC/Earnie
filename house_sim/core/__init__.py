@@ -9,6 +9,7 @@ from .archetype import (
     physics_entity_values,
     project_physics_to_store,
 )
+from .evcs import EvcsState, WallboxSetpoints
 from .physics import (
     EssSetpoints,
     PhysicsState,
@@ -25,6 +26,7 @@ __all__ = [
     "FIXTURES_DIR",
     "ArchetypePackage",
     "EssSetpoints",
+    "EvcsState",
     "PhysicsState",
     "ScenarioOverlay",
     "compute_heat_loss_kw",
@@ -37,4 +39,5 @@ __all__ = [
     "run_ticks",
     "simulate_next_temp_c",
     "step_physics",
+    "WallboxSetpoints",
 ]

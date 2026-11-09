@@ -175,7 +175,11 @@ A custom integration cannot register `input_number`. Fixture rows `input_number.
 
 ### Services
 
-Domain `earnie_house_sim`: scenarios `cloud_pass`, `car_arrives`, `car_leaves`, `load_spike`, `set_soc`; faults `set_unavailable`, `reject_writes`, `setpoint_lag`, `unit_flip` (PV only: a kW entity is shown ×1000, a W entity ÷1000, unit attribute unchanged). Wallbox power is a scenario override only (no EV SoC model in this pass).
+Domain `earnie_house_sim`: scenarios `cloud_pass`, `car_arrives`, `car_leaves`, `load_spike`, `set_soc`; faults `set_unavailable`, `reject_writes`, `setpoint_lag`, `unit_flip` (PV only: a kW entity is shown ×1000, a W entity ÷1000, unit attribute unchanged). Wallbox power is a scenario override only in the shipped fixtures; the core wallbox model below is not wired to the services and fixtures yet (W2 of [`multi-ev-wallbox-plan.md`](multi-ev-wallbox-plan.md)).
+
+### Wallbox model (core, W1)
+
+`house_sim/core/evcs.py`. An archetype opts in with `house_params.wallboxes[]` (`id`, `voltage_v`, `phases`, `min_current_a`, `max_current_a`, optional `read_only`, `initial_ev_id`) and `house_params.evs[]` (`id`, `capacity_kwh`, `initial_soc_pct`, `max_charge_power_kw`, `phases`, optional `vehicle_id`). Per tick each wallbox charges its plugged-in EV with `I × U × min(phases of box and car)`, where `I` is the setpoint capped at the box's maximum and 0 below its minimum or when disabled; the car's acceptance and the energy left to 100 % cap the power. A `read_only` box charges at what the car accepts. The EV's SoC counts the AC energy (no charge losses). `step_physics(..., wallbox_setpoints={id: WallboxSetpoints(max_current_a, enabled)})` drives it; `ScenarioOverlay.car_arrives(wallbox=…, ev=…, soc_pct=…)` and `car_leaves(wallbox=…)` plug and unplug. `evcs_power_w` is the sum over wallboxes; `as_dict()` adds `evcs` (connections, EV SoC, power per wallbox). Mixing models fails loud: a fixed `car_arrives(power_w)` or `initial_evcs_power_w` on an archetype with wallboxes raises, and so does a wallbox event on one without.
 
 ### Persistence
 

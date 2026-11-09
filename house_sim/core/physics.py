@@ -1,8 +1,8 @@
 """Closed-loop house physics: SoC, PV, grid, energy counters, optional thermal."""
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
-from typing import Any, Callable
+from dataclasses import dataclass, field, replace
+from typing import Any, Callable, Mapping
 
 from .archetype import (
     ArchetypePackage,
@@ -11,6 +11,17 @@ from .archetype import (
     entity_unit,
     native_to_base,
     project_physics_to_store,
+)
+from .evcs import (
+    EvcsEvent,
+    EvcsState,
+    WallboxSetpoints,
+    apply_events,
+    has_wallbox_model,
+    initial_evcs_state,
+    parse_evs,
+    parse_wallboxes,
+    step_evcs,
 )
 from .thermal import simulate_next_temp_c
 
@@ -66,6 +77,7 @@ class ScenarioOverlay:
     load_spike_remaining_h: float = 0.0
     load_spike_extra_kw: float = 0.0
     evcs_power_override_w: float | None = None
+    evcs_events: list[EvcsEvent] = field(default_factory=list)
 
     def decay(self, dt_h: float) -> None:
         self.cloud_pass_remaining_h = max(0.0, self.cloud_pass_remaining_h - dt_h)
@@ -79,11 +91,34 @@ class ScenarioOverlay:
         self.load_spike_remaining_h = max(0.0, float(minutes) / 60.0)
         self.load_spike_extra_kw = float(extra_kw)
 
-    def car_arrives(self, power_w: float = 7000.0) -> None:
-        self.evcs_power_override_w = float(power_w)
+    def car_arrives(
+        self,
+        power_w: float = 7000.0,
+        *,
+        wallbox: str | None = None,
+        ev: str | None = None,
+        soc_pct: float | None = None,
+    ) -> None:
+        """Plug a car in.
 
-    def car_leaves(self) -> None:
-        self.evcs_power_override_w = 0.0
+        With ``wallbox`` and ``ev`` (archetype with ``house_params.wallboxes``) the
+        EV is plugged into that wallbox at the next tick and charges by setpoint.
+        Without them (archetype without a wallbox model) the wallbox draws the
+        fixed ``power_w``.
+        """
+        if wallbox is None and ev is None:
+            self.evcs_power_override_w = float(power_w)
+            return
+        if not wallbox or not ev:
+            raise ValueError("car_arrives needs both wallbox and ev")
+        self.evcs_events.append(EvcsEvent(wallbox_id=wallbox, ev_id=ev, soc_pct=soc_pct))
+
+    def car_leaves(self, *, wallbox: str | None = None) -> None:
+        """Unplug the car at ``wallbox``; without it, end the fixed power override."""
+        if wallbox is None:
+            self.evcs_power_override_w = 0.0
+            return
+        self.evcs_events.append(EvcsEvent(wallbox_id=wallbox, ev_id=None))
 
 
 @dataclass(frozen=True)
@@ -102,6 +137,8 @@ class PhysicsState:
     ambient_c: float | None
     ess_charge_energy_kwh: float = 0.0
     ess_discharge_energy_kwh: float = 0.0
+    # Wallbox model (``house_params.wallboxes``); empty for archetypes without it.
+    evcs: EvcsState = field(default_factory=EvcsState)
 
     def as_dict(self) -> dict[str, Any]:
         out: dict[str, Any] = {
@@ -122,6 +159,8 @@ class PhysicsState:
             out["temp_c"] = self.temp_c
         if self.ambient_c is not None:
             out["ambient_c"] = self.ambient_c
+        if self.evcs.wallbox_power_w or self.evcs.ev_soc_pct:
+            out["evcs"] = self.evcs.as_dict()
         return out
 
 
@@ -148,6 +187,14 @@ def _fixture_state_kwh(package: ArchetypePackage, entity_id: str, default: float
 def initial_physics(package: ArchetypePackage) -> PhysicsState:
     params = package.house_params
     thermal = params.get("thermal") if isinstance(params.get("thermal"), dict) else None
+    evcs = EvcsState()
+    if has_wallbox_model(params):
+        if float(params.get("initial_evcs_power_w", 0.0)) != 0.0:
+            raise ValueError(
+                "initial_evcs_power_w does not apply with house_params.wallboxes; "
+                "plug an EV in with initial_ev_id instead"
+            )
+        evcs = initial_evcs_state(parse_wallboxes(params), parse_evs(params))
     return PhysicsState(
         tick=0,
         soc_pct=float(params.get("initial_soc_pct", 50.0)),
@@ -171,7 +218,44 @@ def initial_physics(package: ArchetypePackage) -> PhysicsState:
         ess_discharge_energy_kwh=_fixture_state_kwh(
             package, battery_energy_entity_id(package, "discharge"), 0.0
         ),
+        evcs=evcs,
     )
+
+
+def _step_wallboxes(
+    state: PhysicsState,
+    *,
+    package: ArchetypePackage,
+    overlay: ScenarioOverlay | None,
+    wallbox_setpoints: Mapping[str, WallboxSetpoints] | None,
+    dt_h: float,
+) -> tuple[float, EvcsState]:
+    """Wallbox power (W) for this tick and the new wallbox / EV state."""
+    params = package.house_params
+    if not has_wallbox_model(params):
+        if overlay is not None and overlay.evcs_events:
+            raise ValueError(
+                "car_arrives / car_leaves with a wallbox need house_params.wallboxes"
+            )
+        if overlay is not None and overlay.evcs_power_override_w is not None:
+            return float(overlay.evcs_power_override_w), state.evcs
+        return float(state.evcs_power_w), state.evcs
+
+    if overlay is not None and overlay.evcs_power_override_w is not None:
+        raise ValueError(
+            "This archetype models its wallboxes (house_params.wallboxes): "
+            "use car_arrives(wallbox=..., ev=...) instead of a fixed power"
+        )
+    wallboxes = parse_wallboxes(params)
+    evs = parse_evs(params)
+    evcs = state.evcs
+    if overlay is not None and overlay.evcs_events:
+        evcs = apply_events(evcs, overlay.evcs_events, wallboxes=wallboxes, evs=evs)
+        overlay.evcs_events.clear()
+    evcs = step_evcs(
+        evcs, wallboxes=wallboxes, evs=evs, setpoints=wallbox_setpoints, dt_h=dt_h
+    )
+    return evcs.total_power_w, evcs
 
 
 def resolve_ess_power_w(setpoints: EssSetpoints) -> float:
@@ -234,8 +318,13 @@ def step_physics(
     dt_h: float,
     overlay: ScenarioOverlay | None = None,
     pv_kw_override: float | None = None,
+    wallbox_setpoints: Mapping[str, WallboxSetpoints] | None = None,
 ) -> PhysicsState:
-    """Advance house physics by Δt hours using explicit setpoints."""
+    """Advance house physics by Δt hours using explicit setpoints.
+
+    ``wallbox_setpoints`` (by wallbox id) drive the wallbox model of archetypes
+    with ``house_params.wallboxes``; plug events in ``overlay`` apply first.
+    """
     if dt_h <= 0:
         raise ValueError("dt_h must be > 0")
     capacity_kwh = float(package.house_params.get("battery_capacity_kwh", 0.0))
@@ -255,10 +344,13 @@ def step_physics(
     if overlay is not None and overlay.load_spike_remaining_h > 0:
         load_kw = load_kw + float(overlay.load_spike_extra_kw)
 
-    if overlay is not None and overlay.evcs_power_override_w is not None:
-        evcs_power_w = float(overlay.evcs_power_override_w)
-    else:
-        evcs_power_w = float(state.evcs_power_w)
+    evcs_power_w, evcs = _step_wallboxes(
+        state,
+        package=package,
+        overlay=overlay,
+        wallbox_setpoints=wallbox_setpoints,
+        dt_h=dt_h,
+    )
     load_kw = load_kw + evcs_power_w / 1000.0
 
     if setpoints.self_consumption:
@@ -321,6 +413,7 @@ def step_physics(
         ambient_c=ambient_c,
         ess_charge_energy_kwh=state.ess_charge_energy_kwh + charge_delta,
         ess_discharge_energy_kwh=state.ess_discharge_energy_kwh + discharge_delta,
+        evcs=evcs,
     )
 
 
@@ -334,24 +427,31 @@ def run_ticks(
     setpoints: EssSetpoints | None = None,
     overlay: ScenarioOverlay | None = None,
     read_setpoints=None,
+    wallbox_setpoints: Mapping[str, WallboxSetpoints] | None = None,
+    read_wallbox_setpoints=None,
 ) -> PhysicsState:
     """Run n closed-loop ticks; project physics onto the store after each step.
 
     ``read_setpoints`` if provided is ``callable(store, package) -> EssSetpoints``
     and is called before each tick (mock adapter). Otherwise ``setpoints`` is reused.
+    ``read_wallbox_setpoints`` / ``wallbox_setpoints`` work the same way for wallboxes.
     """
     state = physics or initial_physics(package)
     project_physics_to_store(store, package=package, physics=state.as_dict())
     current = setpoints or EssSetpoints()
+    current_wallbox = wallbox_setpoints
     for _ in range(int(n_ticks)):
         if read_setpoints is not None:
             current = read_setpoints(store, package)
+        if read_wallbox_setpoints is not None:
+            current_wallbox = read_wallbox_setpoints(store, package)
         state = step_physics(
             state,
             package=package,
             setpoints=current,
             dt_h=dt_h,
             overlay=overlay,
+            wallbox_setpoints=current_wallbox,
         )
         project_physics_to_store(store, package=package, physics=state.as_dict())
     return state
