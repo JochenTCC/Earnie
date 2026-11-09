@@ -149,3 +149,15 @@ def test_ha_skips_the_target_soc_when_not_activated(ha) -> None:
     error, _rows = ehal_live.write_ess_setpoints_from_control(2, 0.0, target_soc=71.0)
     assert error is None
     assert "ess.house.set_ess_target_soc" not in load_published()
+
+
+def test_startup_safe_push_sends_the_automatik_target_soc(monkeypatch) -> None:
+    """The safe push at daemon start must not send target SoC 0 (seen on dev.12)."""
+    calls: list[tuple] = []
+    monkeypatch.setattr(
+        ehal_live, "write_huawei_modbus_states", lambda *a, **kw: calls.append(a) or []
+    )
+    monkeypatch.setattr(ehal_live, "write_flexible_consumer_states", lambda *a, **kw: [])
+    monkeypatch.setattr(ehal_live, "write_inv_ac_limits_from_plan", lambda **kw: (None, []))
+    ehal_live._push_safe_setpoints_loxone()
+    assert calls == [(0, 0.0, 99.0)]

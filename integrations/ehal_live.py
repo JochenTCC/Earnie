@@ -593,7 +593,9 @@ def _push_safe_setpoints_loxone() -> None:
         "Startup: sende sichere Loxone-Sollwerte "
         "(ESS Automatik, Freigabe/Sollwerte aus)..."
     )
-    huawei = write_huawei_modbus_states(0, 0.0, 0.0)
+    # Automatik target SoC is 99 like the optimizer's Automatik; 0 would ask the
+    # inverter to discharge to empty where it honours set_ess_target_soc.
+    huawei = write_huawei_modbus_states(0, 0.0, 99.0)
     flex = write_flexible_consumer_states({}, None, None)
     _inv_err, inv_rows = write_inv_ac_limits_from_plan(plant_curtail_kw=0.0)
     failed = [

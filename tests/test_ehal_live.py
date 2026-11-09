@@ -211,7 +211,7 @@ def test_push_safe_setpoints_on_startup_loxone(config_mock, huawei_mock, flex_mo
     flex_mock.return_value = []
     _clear_safe_setpoints_skip_env()
     ehal_live.push_safe_setpoints_on_startup()
-    huawei_mock.assert_called_once_with(0, 0.0, 0.0)
+    huawei_mock.assert_called_once_with(0, 0.0, 99.0)
     flex_mock.assert_called_once_with({}, None, None)
 
 
