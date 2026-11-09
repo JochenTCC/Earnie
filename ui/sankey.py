@@ -51,9 +51,10 @@ def _grid_color(grid_kw: float) -> str:
 
 
 def _battery_color(battery_kw: float) -> str:
-    if battery_kw < 0:
-        return SANKEY_BATTERY_DISCHARGE_COLOR
+    """Node colour; ``battery_kw`` uses the Live sign (``+`` = discharge)."""
     if battery_kw > 0:
+        return SANKEY_BATTERY_DISCHARGE_COLOR
+    if battery_kw < 0:
         return SANKEY_BATTERY_CHARGE_COLOR
     return SANKEY_BATTERY_IDLE_COLOR
 
