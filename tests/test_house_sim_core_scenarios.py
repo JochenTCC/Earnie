@@ -46,7 +46,10 @@ def test_cloud_pass_scales_pv():
 
 
 def test_car_arrives_raises_load_and_evcs():
-    package = load_archetype("evcc_en")
+    """Archetype without a wallbox model: the fixed power override."""
+    base = load_archetype("evcc_en")
+    params = {k: v for k, v in base.house_params.items() if k not in ("wallboxes", "evs")}
+    package = replace(base, house_params=params)
     state = initial_physics(package)
     overlay = ScenarioOverlay()
     overlay.car_arrives(7000.0)
@@ -60,6 +63,25 @@ def test_car_arrives_raises_load_and_evcs():
     assert nxt.evcs_power_w == pytest.approx(7000.0)
     # base load 1.5 + 7 kW EVCS, pv tick1 1.2 → grid_kw = 8.5 - 1.2 = 7.3
     assert nxt.grid_power_w == pytest.approx(7300.0)
+
+
+def test_car_arrives_at_wallbox_charges_by_setpoint():
+    """evcc_en models its loadpoint: 16 A × 230 V × 3 phases (car limit 16 A)."""
+    from house_sim.core.evcs import WallboxSetpoints
+
+    package = load_archetype("evcc_en")
+    overlay = ScenarioOverlay()
+    overlay.car_arrives(wallbox="lp1", ev="car_a")
+    nxt = step_physics(
+        initial_physics(package),
+        package=package,
+        setpoints=EssSetpoints(),
+        dt_h=0.25,
+        overlay=overlay,
+        wallbox_setpoints={"lp1": WallboxSetpoints(32.0)},
+    )
+    assert nxt.evcs_power_w == pytest.approx(16.0 * 230.0 * 3)
+    assert nxt.grid_power_w == pytest.approx((1.5 + 11.04 - 1.2) * 1000.0)
 
 
 def test_set_soc_via_replace_and_step():

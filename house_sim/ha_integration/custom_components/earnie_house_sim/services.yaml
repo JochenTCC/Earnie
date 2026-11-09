@@ -21,10 +21,32 @@ cloud_pass:
 
 car_arrives:
   name: Car arrives
-  description: Set wallbox charge power (scenario override, no EV SoC model).
+  description: >-
+    Plug an EV into a wallbox (archetypes with house_params.wallboxes; it then
+    charges by the wallbox setpoints). Archetypes without a wallbox model take
+    a fixed charge power instead.
   fields:
+    wallbox:
+      name: Wallbox
+      description: Wallbox id from house_params.wallboxes (wallbox model only).
+      selector:
+        text:
+    ev:
+      name: EV
+      description: EV id from house_params.evs (wallbox model only).
+      selector:
+        text:
+    soc_pct:
+      name: EV SoC on arrival
+      description: Optional; keeps the EV's last SoC when empty.
+      selector:
+        number:
+          min: 0
+          max: 100
+          unit_of_measurement: "%"
     power_w:
       name: Charge power
+      description: Fixed power for archetypes without a wallbox model.
       default: 7000
       selector:
         number:
@@ -34,7 +56,14 @@ car_arrives:
 
 car_leaves:
   name: Car leaves
-  description: Clear wallbox charge power override.
+  description: >-
+    Unplug the EV at a wallbox (wallbox model), or clear the fixed charge power.
+  fields:
+    wallbox:
+      name: Wallbox
+      description: Wallbox id (wallbox model only).
+      selector:
+        text:
 
 load_spike:
   name: Load spike

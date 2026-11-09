@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from house_sim.core.archetype import ArchetypePackage
+from house_sim.core.evcs import WallboxSetpoints
 from house_sim.core.physics import (
     EssSetpoints,
     PhysicsState,
@@ -11,6 +12,7 @@ from house_sim.core.physics import (
     resolve_ess_power_w,
     run_ticks as _core_run_ticks,
     step_physics as _core_step_physics,
+    wallbox_setpoints_from_lookup,
 )
 from house_sim.state_store import StateStore
 
@@ -23,7 +25,15 @@ __all__ = [
     "run_ticks",
     "step_physics",
     "setpoints_from_store",
+    "wallbox_setpoints_from_store",
 ]
+
+
+def wallbox_setpoints_from_store(
+    store: StateStore, package: ArchetypePackage
+) -> dict[str, WallboxSetpoints]:
+    """Wallbox setpoints from the mapped vendor entities in the mock store."""
+    return wallbox_setpoints_from_lookup(package, store.numeric_state, store.text_state)
 
 
 def setpoints_from_store(store: StateStore, package: ArchetypePackage) -> EssSetpoints:
@@ -58,6 +68,7 @@ def step_physics(
         dt_h=dt_h,
         overlay=overlay,
         pv_kw_override=pv_kw_override,
+        wallbox_setpoints=wallbox_setpoints_from_store(store, package),
     )
 
 
@@ -78,4 +89,5 @@ def run_ticks(
         physics=physics,
         overlay=overlay,
         read_setpoints=setpoints_from_store,
+        read_wallbox_setpoints=wallbox_setpoints_from_store,
     )

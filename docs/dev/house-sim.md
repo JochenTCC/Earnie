@@ -175,11 +175,22 @@ A custom integration cannot register `input_number`. Fixture rows `input_number.
 
 ### Services
 
-Domain `earnie_house_sim`: scenarios `cloud_pass`, `car_arrives`, `car_leaves`, `load_spike`, `set_soc`; faults `set_unavailable`, `reject_writes`, `setpoint_lag`, `unit_flip` (PV only: a kW entity is shown ×1000, a W entity ÷1000, unit attribute unchanged). Wallbox power is a scenario override only in the shipped fixtures; the core wallbox model below is not wired to the services and fixtures yet (W2 of [`multi-ev-wallbox-plan.md`](multi-ev-wallbox-plan.md)).
+Domain `earnie_house_sim`: scenarios `cloud_pass`, `car_arrives`, `car_leaves`, `load_spike`, `set_soc`; faults `set_unavailable`, `reject_writes`, `setpoint_lag`, `unit_flip` (PV only: a kW entity is shown ×1000, a W entity ÷1000, unit attribute unchanged). All four shipped fixtures model their wallbox (below), so `car_arrives` takes `wallbox` and `ev` (optional `soc_pct`) and `car_leaves` takes `wallbox`; `power_w` applies only to an archetype without a wallbox model (e.g. generated ones). Plug states are `binary_sensor` entities (platform added for this).
 
-### Wallbox model (core, W1)
+### Wallbox model (core, W1–W2; plan [`multi-ev-wallbox-plan.md`](multi-ev-wallbox-plan.md))
 
 `house_sim/core/evcs.py`. An archetype opts in with `house_params.wallboxes[]` (`id`, `voltage_v`, `phases`, `min_current_a`, `max_current_a`, optional `read_only`, `initial_ev_id`) and `house_params.evs[]` (`id`, `capacity_kwh`, `initial_soc_pct`, `min_current_a`, `max_current_a`, `phases`, optional `vehicle_id`). Limits are currents on both devices: a pair charges between the larger minimum and the smaller maximum current, on the smaller phase count; a pair without a common current raises. Per tick each wallbox charges its plugged-in EV with `I × U × phases`, where `I` is the setpoint capped at the pair's maximum and 0 below its minimum or when disabled; the energy left to 100 % caps the power. A `read_only` box charges at the pair's maximum. The EV's SoC counts the AC energy (no charge losses). `step_physics(..., wallbox_setpoints={id: WallboxSetpoints(max_current_a, enabled)})` drives it; `ScenarioOverlay.car_arrives(wallbox=…, ev=…, soc_pct=…)` and `car_leaves(wallbox=…)` plug and unplug. `evcs_power_w` is the sum over wallboxes; `as_dict()` adds `evcs` (connections, EV SoC, power per wallbox). Mixing models fails loud: a fixed `car_arrives(power_w)` or `initial_evcs_power_w` on an archetype with wallboxes raises, and so does a wallbox event on one without.
+
+**Vendor entities (W2).** Each wallbox may carry `entities`: `max_current` (setpoint in A), `enable` (`{entity_id, off_states}`: charges unless the entity is in an off state), `power`, `energy` (counter), `plugged` (`on` / `off`), `status` (`{entity_id, states}` mapping `none` / `connected` / `charging` / `complete` to vendor states) and `vehicle` (the plugged EV's `vehicle_id`, else `""`); each EV may carry `soc`, `plugged`, `power`. Setpoints are read from the store (S1–S3, `wallbox_setpoints_from_store`) or the coordinator (S4), telemetry is projected in each entity's unit. With a wallbox model the flat `sens_evcs_active_power` projection is skipped; the wallbox's own `power` entity carries the value. A writable wallbox whose current entity has no value gets no setpoints, and charging there raises.
+
+| Fixture | Wallbox | Setpoints | Telemetry | Car |
+|---|---|---|---|---|
+| `evcc_en` | `lp1`, 6–32 A, 3 ph | `number.evcc_loadpoint_1_max_current`, `switch.evcc_loadpoint_1_enable` (off: `off`) | power, plug `binary_sensor`, vehicle name | `car_a` 60 kWh, 6–16 A, 3 ph, `Car A`, SoC sensor |
+| `fronius_de` | `wattpilot`, 6–16 A, 3 ph | `number.goe_…_amp`, `select.goe_…_frc` (off: `1`) | power, go-e `car` status 1–4 | `car_a` 77 kWh, 6–16 A, 3 ph |
+| `huawei_en` | `goe`, 6–32 A, 3 ph | as above | as above | `car_a` 40 kWh, 6–32 A, **1 ph** |
+| `sma_keba` | `keba`, 6–16 A, 3 ph, `read_only` | none | power (kW), energy counter | `car_a` 58 kWh, 6–16 A, 3 ph |
+
+The mock store still rejects `switch` services (negative write-domain case); tests set the evcc enable state directly.
 
 ### Persistence
 
@@ -206,4 +217,4 @@ house_sim/fixtures/<name>/
   meta.json               # S2+: provenance (sources, verified, unverified)
 ```
 
-`evcc_en` includes `switch.evcc_loadpoint_1_enable` (not mapped — negative case) and no heat-pump entity. Optional `devices` list is used by S4 for HA device registry; the mock loader ignores it for HTTP shape.
+`evcc_en` includes `switch.evcc_loadpoint_1_enable` (not in the EHAL map — negative write-domain case; the wallbox model reads it as the loadpoint's enable) and no heat-pump entity. Optional `devices` list is used by S4 for HA device registry; the mock loader ignores it for HTTP shape.

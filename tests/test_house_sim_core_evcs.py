@@ -30,8 +30,15 @@ CAR_3P = EvParams(
 )
 
 
-def _package(**params) -> ArchetypePackage:
+def _no_model_package() -> ArchetypePackage:
+    """evcc_en without its wallbox model (the legacy fixed-power path)."""
     base = load_archetype("evcc_en")
+    params = {k: v for k, v in base.house_params.items() if k not in ("wallboxes", "evs")}
+    return replace(base, house_params=params)
+
+
+def _package(**params) -> ArchetypePackage:
+    base = _no_model_package()
     house_params = dict(base.house_params)
     house_params.pop("initial_evcs_power_w", None)
     house_params.update(params)
@@ -279,7 +286,7 @@ def test_fixed_power_override_is_rejected_with_wallbox_model():
 
 
 def test_wallbox_event_without_wallbox_model_raises():
-    package = load_archetype("evcc_en")
+    package = _no_model_package()
     overlay = ScenarioOverlay()
     overlay.car_arrives(wallbox="lp1", ev="car_a")
     with pytest.raises(ValueError, match="house_params.wallboxes"):
@@ -308,6 +315,6 @@ def test_initial_ev_charges_from_first_tick_and_as_dict_carries_state():
 
 
 def test_archetype_without_wallbox_model_keeps_state_without_evcs_key():
-    package = load_archetype("evcc_en")
+    package = _no_model_package()
     state = initial_physics(package)
     assert "evcs" not in state.as_dict()

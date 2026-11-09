@@ -23,6 +23,7 @@ from .evcs import (
     parse_wallboxes,
     step_evcs,
 )
+from .evcs import wallbox_setpoints_from_lookup as _wallbox_setpoints_from_lookup
 from .thermal import simulate_next_temp_c
 
 
@@ -66,6 +67,24 @@ def ess_setpoints_from_lookup(
         discharge_limit_w=_watts("set_ess_discharge_power_limit"),
         self_consumption=self_consumption,
     )
+
+
+def wallbox_setpoints_from_lookup(
+    package: ArchetypePackage,
+    numeric: Callable[[str], float | None],
+    text: Callable[[str], str | None],
+) -> dict[str, WallboxSetpoints]:
+    """Wallbox setpoints from mapped vendor entities (``house_params.wallboxes``).
+
+    ``numeric(entity_id)`` returns the raw number, ``text(entity_id)`` the raw
+    state string. The current entity must be in A (or carry no unit).
+    """
+    wallboxes = parse_wallboxes(package.house_params)
+    for wallbox in wallboxes:
+        entity_id = wallbox.entities.max_current
+        if entity_id and entity_unit(package, entity_id) not in ("", "a"):
+            raise ValueError(f"Wallbox {wallbox.id!r}: {entity_id} must be in A")
+    return _wallbox_setpoints_from_lookup(wallboxes, numeric=numeric, text=text)
 
 
 @dataclass
@@ -194,7 +213,15 @@ def initial_physics(package: ArchetypePackage) -> PhysicsState:
                 "initial_evcs_power_w does not apply with house_params.wallboxes; "
                 "plug an EV in with initial_ev_id instead"
             )
-        evcs = initial_evcs_state(parse_wallboxes(params), parse_evs(params))
+        wallboxes = parse_wallboxes(params)
+        evcs = initial_evcs_state(
+            wallboxes,
+            parse_evs(params),
+            initial_energy_kwh={
+                w.id: _fixture_state_kwh(package, w.entities.energy or "", 0.0)
+                for w in wallboxes
+            },
+        )
     return PhysicsState(
         tick=0,
         soc_pct=float(params.get("initial_soc_pct", 50.0)),
@@ -250,8 +277,10 @@ def _step_wallboxes(
     evs = parse_evs(params)
     evcs = state.evcs
     if overlay is not None and overlay.evcs_events:
-        evcs = apply_events(evcs, overlay.evcs_events, wallboxes=wallboxes, evs=evs)
+        # Take the events first: a bad event must not repeat on every tick.
+        events = list(overlay.evcs_events)
         overlay.evcs_events.clear()
+        evcs = apply_events(evcs, events, wallboxes=wallboxes, evs=evs)
     evcs = step_evcs(
         evcs, wallboxes=wallboxes, evs=evs, setpoints=wallbox_setpoints, dt_h=dt_h
     )

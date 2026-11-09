@@ -21,12 +21,62 @@ Parameters come from ``house_params``::
 setpoints (e.g. KEBA without write access): it charges at the pair's maximum.
 ``initial_ev_id`` and ``vehicle_id`` are optional.
 
+Optional ``entities`` connect the model to vendor entities (W2)::
+
+    wallbox "entities": {
+      "max_current": "number.evcc_loadpoint_1_max_current",      # setpoint, A
+      "enable": {"entity_id": "switch.evcc_loadpoint_1_enable",  # charges unless
+                 "off_states": ["off"]},                         # in an off state
+      "power": "sensor.evcc_loadpoint_1_charge_power",
+      "energy": "sensor.keba_p30_total_energy",                  # counter
+      "plugged": "binary_sensor.evcc_loadpoint_1_connected",     # on / off
+      "status": {"entity_id": "sensor.goe_x_car",                # vendor states
+                 "states": {"none": "1", "charging": "2",
+                            "connected": "3", "complete": "4"}},
+      "vehicle": "sensor.evcc_loadpoint_1_vehicle_name"}         # vehicle_id or ""
+    EV "entities": {"soc": ..., "plugged": ..., "power": ...}
+
 No Earnie imports: this module is copied into the S4 HA integration.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
+
+
+# Car status of a wallbox, mapped onto vendor states by ``entities.status``.
+STATUS_NONE = "none"  # no car plugged in
+STATUS_CONNECTED = "connected"  # car plugged in, not charging, not full
+STATUS_CHARGING = "charging"
+STATUS_COMPLETE = "complete"  # car plugged in and full
+STATUS_KEYS = (STATUS_NONE, STATUS_CONNECTED, STATUS_CHARGING, STATUS_COMPLETE)
+
+PLUGGED_ON = "on"
+PLUGGED_OFF = "off"
+
+
+@dataclass(frozen=True)
+class WallboxEntities:
+    """Vendor entities of one wallbox (all optional; see module docstring)."""
+
+    max_current: str | None = None
+    enable: str | None = None
+    enable_off_states: tuple[str, ...] = ()
+    power: str | None = None
+    energy: str | None = None
+    plugged: str | None = None
+    status: str | None = None
+    status_states: Mapping[str, str] = field(default_factory=dict)
+    vehicle: str | None = None
+
+
+@dataclass(frozen=True)
+class EvEntities:
+    """Vehicle-side entities of one EV (all optional)."""
+
+    soc: str | None = None
+    plugged: str | None = None
+    power: str | None = None
 
 
 @dataclass(frozen=True)
@@ -38,6 +88,7 @@ class WallboxParams:
     max_current_a: float
     read_only: bool = False
     initial_ev_id: str | None = None
+    entities: WallboxEntities = field(default_factory=WallboxEntities)
 
 
 @dataclass(frozen=True)
@@ -49,6 +100,7 @@ class EvParams:
     max_current_a: float
     phases: int
     vehicle_id: str | None = None
+    entities: EvEntities = field(default_factory=EvEntities)
 
 
 @dataclass(frozen=True)
@@ -70,6 +122,7 @@ class EvcsState:
     ev_at_wallbox: Mapping[str, str] = field(default_factory=dict)
     ev_soc_pct: Mapping[str, float] = field(default_factory=dict)
     wallbox_power_w: Mapping[str, float] = field(default_factory=dict)
+    wallbox_energy_kwh: Mapping[str, float] = field(default_factory=dict)
 
     @property
     def total_power_w(self) -> float:
@@ -86,6 +139,7 @@ class EvcsState:
             "ev_at_wallbox": dict(self.ev_at_wallbox),
             "ev_soc_pct": dict(self.ev_soc_pct),
             "wallbox_power_w": dict(self.wallbox_power_w),
+            "wallbox_energy_kwh": dict(self.wallbox_energy_kwh),
         }
 
 
@@ -143,6 +197,10 @@ def parse_wallboxes(house_params: Mapping[str, Any]) -> tuple[WallboxParams, ...
             raise ValueError(f"{where}: voltage_v must be > 0")
         min_a, max_a = _current_range(raw, where)
         initial = raw.get("initial_ev_id")
+        read_only = bool(raw.get("read_only", False))
+        entities = _parse_wallbox_entities(raw.get("entities"), f"{where}.entities")
+        if read_only and (entities.max_current or entities.enable):
+            raise ValueError(f"{where}: a read_only wallbox takes no setpoint entities")
         out.append(
             WallboxParams(
                 id=wid,
@@ -150,8 +208,9 @@ def parse_wallboxes(house_params: Mapping[str, Any]) -> tuple[WallboxParams, ...
                 phases=_phases(_require(raw, "phases", where), where),
                 min_current_a=min_a,
                 max_current_a=max_a,
-                read_only=bool(raw.get("read_only", False)),
+                read_only=read_only,
                 initial_ev_id=str(initial).strip() if initial else None,
+                entities=entities,
             )
         )
     _check_unique([w.id for w in out], "wallbox")
@@ -186,10 +245,86 @@ def parse_evs(house_params: Mapping[str, Any]) -> tuple[EvParams, ...]:
                 max_current_a=max_a,
                 phases=_phases(_require(raw, "phases", where), where),
                 vehicle_id=str(vehicle).strip() if vehicle else None,
+                entities=_parse_ev_entities(raw.get("entities"), f"{where}.entities"),
             )
         )
     _check_unique([e.id for e in out], "EV")
     return tuple(out)
+
+
+def _entity_id(value: Any, where: str) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    if "." not in text:
+        raise ValueError(f"{where}: {value!r} is no entity id")
+    return text
+
+
+def _parse_wallbox_entities(raw: Any, where: str) -> WallboxEntities:
+    """``entities`` of a wallbox.
+
+    ``enable`` is ``{"entity_id": ..., "off_states": [...]}``: the wallbox charges
+    unless the entity is in one of the off states (evcc switch: ``["off"]``;
+    go-e ``frc``: ``["1"]``). ``status`` is ``{"entity_id": ..., "states":
+    {"none": ..., "connected": ..., "charging": ..., "complete": ...}}``.
+    """
+    if raw is None:
+        return WallboxEntities()
+    if not isinstance(raw, dict):
+        raise ValueError(f"{where} must be an object")
+    known = {"max_current", "enable", "power", "energy", "plugged", "status", "vehicle"}
+    unknown = set(raw) - known
+    if unknown:
+        raise ValueError(f"{where}: unknown keys {sorted(unknown)}")
+    enable_id: str | None = None
+    off_states: tuple[str, ...] = ()
+    if raw.get("enable") is not None:
+        enable = raw["enable"]
+        if not isinstance(enable, dict):
+            raise ValueError(f"{where}.enable must be {{entity_id, off_states}}")
+        enable_id = _entity_id(_require(enable, "entity_id", f"{where}.enable"), where)
+        states = _require(enable, "off_states", f"{where}.enable")
+        if not isinstance(states, list) or not states:
+            raise ValueError(f"{where}.enable.off_states must be a non-empty list")
+        off_states = tuple(str(s) for s in states)
+    status_id: str | None = None
+    status_states: dict[str, str] = {}
+    if raw.get("status") is not None:
+        status = raw["status"]
+        if not isinstance(status, dict):
+            raise ValueError(f"{where}.status must be {{entity_id, states}}")
+        status_id = _entity_id(_require(status, "entity_id", f"{where}.status"), where)
+        states = _require(status, "states", f"{where}.status")
+        if not isinstance(states, dict) or set(states) != set(STATUS_KEYS):
+            raise ValueError(f"{where}.status.states needs exactly {list(STATUS_KEYS)}")
+        status_states = {key: str(value) for key, value in states.items()}
+    return WallboxEntities(
+        max_current=_entity_id(raw.get("max_current"), where),
+        enable=enable_id,
+        enable_off_states=off_states,
+        power=_entity_id(raw.get("power"), where),
+        energy=_entity_id(raw.get("energy"), where),
+        plugged=_entity_id(raw.get("plugged"), where),
+        status=status_id,
+        status_states=status_states,
+        vehicle=_entity_id(raw.get("vehicle"), where),
+    )
+
+
+def _parse_ev_entities(raw: Any, where: str) -> EvEntities:
+    if raw is None:
+        return EvEntities()
+    if not isinstance(raw, dict):
+        raise ValueError(f"{where} must be an object")
+    unknown = set(raw) - {"soc", "plugged", "power"}
+    if unknown:
+        raise ValueError(f"{where}: unknown keys {sorted(unknown)}")
+    return EvEntities(
+        soc=_entity_id(raw.get("soc"), where),
+        plugged=_entity_id(raw.get("plugged"), where),
+        power=_entity_id(raw.get("power"), where),
+    )
 
 
 def _check_unique(ids: list[str], what: str) -> None:
@@ -205,7 +340,10 @@ def has_wallbox_model(house_params: Mapping[str, Any]) -> bool:
 
 
 def initial_evcs_state(
-    wallboxes: tuple[WallboxParams, ...], evs: tuple[EvParams, ...]
+    wallboxes: tuple[WallboxParams, ...],
+    evs: tuple[EvParams, ...],
+    *,
+    initial_energy_kwh: Mapping[str, float] | None = None,
 ) -> EvcsState:
     if wallboxes and not evs:
         raise ValueError("house_params.wallboxes needs house_params.evs")
@@ -225,7 +363,120 @@ def initial_evcs_state(
         ev_at_wallbox=connected,
         ev_soc_pct={ev.id: ev.initial_soc_pct for ev in evs},
         wallbox_power_w={w.id: 0.0 for w in wallboxes},
+        wallbox_energy_kwh={
+            w.id: float((initial_energy_kwh or {}).get(w.id, 0.0)) for w in wallboxes
+        },
     )
+
+
+def evcs_state_from_dict(
+    raw: Mapping[str, Any],
+    *,
+    wallboxes: tuple[WallboxParams, ...],
+    evs: tuple[EvParams, ...],
+) -> EvcsState:
+    """Restore a saved :meth:`EvcsState.as_dict`; ids must match the archetype."""
+    wallbox_ids = {w.id for w in wallboxes}
+    ev_ids = {e.id for e in evs}
+    connected = {str(k): str(v) for k, v in dict(raw.get("ev_at_wallbox") or {}).items()}
+    soc = {str(k): float(v) for k, v in dict(raw.get("ev_soc_pct") or {}).items()}
+    energy = {str(k): float(v) for k, v in dict(raw.get("wallbox_energy_kwh") or {}).items()}
+    if not set(connected) <= wallbox_ids or not set(connected.values()) <= ev_ids:
+        raise ValueError("Saved wallbox connections do not match the archetype")
+    if set(soc) != ev_ids or not set(energy) <= wallbox_ids:
+        raise ValueError("Saved EV / wallbox state does not match the archetype")
+    if len(set(connected.values())) != len(connected):
+        raise ValueError("Saved state has one EV plugged into two wallboxes")
+    return EvcsState(
+        ev_at_wallbox=connected,
+        ev_soc_pct=soc,
+        wallbox_power_w={w.id: 0.0 for w in wallboxes},
+        wallbox_energy_kwh={w.id: energy.get(w.id, 0.0) for w in wallboxes},
+    )
+
+
+def wallbox_setpoints_from_lookup(
+    wallboxes: tuple[WallboxParams, ...],
+    *,
+    numeric: Callable[[str], float | None],
+    text: Callable[[str], str | None],
+) -> dict[str, WallboxSetpoints]:
+    """Setpoints from the vendor entities: current in A, enable by off states.
+
+    A writable wallbox without a ``max_current`` entity, or whose entity has no
+    value, gets no setpoints; charging a car there then raises in the step.
+    """
+    out: dict[str, WallboxSetpoints] = {}
+    for wallbox in wallboxes:
+        ents = wallbox.entities
+        if wallbox.read_only or not ents.max_current:
+            continue
+        current = numeric(ents.max_current)
+        if current is None:
+            continue
+        enabled = True
+        if ents.enable:
+            state = text(ents.enable)
+            if state is None:
+                raise ValueError(
+                    f"Wallbox {wallbox.id!r}: enable entity {ents.enable} has no state"
+                )
+            enabled = str(state) not in ents.enable_off_states
+        out[wallbox.id] = WallboxSetpoints(max_current_a=float(current), enabled=enabled)
+    return out
+
+
+def wallbox_status(state: EvcsState, wallbox_id: str, evs: tuple[EvParams, ...]) -> str:
+    ev_id = state.ev_at_wallbox.get(wallbox_id)
+    if ev_id is None:
+        return STATUS_NONE
+    if float(state.wallbox_power_w.get(wallbox_id, 0.0)) > 0.0:
+        return STATUS_CHARGING
+    if float(state.ev_soc_pct.get(ev_id, 0.0)) >= 100.0:
+        return STATUS_COMPLETE
+    return STATUS_CONNECTED
+
+
+def evcs_telemetry(
+    state: EvcsState,
+    *,
+    wallboxes: tuple[WallboxParams, ...],
+    evs: tuple[EvParams, ...],
+) -> list[tuple[str, str, float | str]]:
+    """``(entity_id, quantity, value)`` for every mapped wallbox / EV entity.
+
+    ``quantity`` is ``power`` (W), ``energy`` (kWh), ``percent`` or ``text``
+    (written as is: plug ``on`` / ``off``, vendor status, vehicle name or ``""``).
+    """
+    evs_by_id = {ev.id: ev for ev in evs}
+    out: list[tuple[str, str, float | str]] = []
+    for wallbox in wallboxes:
+        ents = wallbox.entities
+        ev_id = state.ev_at_wallbox.get(wallbox.id)
+        power_w = float(state.wallbox_power_w.get(wallbox.id, 0.0))
+        if ents.power:
+            out.append((ents.power, "power", power_w))
+        if ents.energy:
+            out.append((ents.energy, "energy", float(state.wallbox_energy_kwh.get(wallbox.id, 0.0))))
+        if ents.plugged:
+            out.append((ents.plugged, "text", PLUGGED_ON if ev_id else PLUGGED_OFF))
+        if ents.status:
+            status = wallbox_status(state, wallbox.id, evs)
+            out.append((ents.status, "text", ents.status_states[status]))
+        if ents.vehicle:
+            vehicle = evs_by_id[ev_id].vehicle_id if ev_id else None
+            out.append((ents.vehicle, "text", vehicle or ""))
+    for ev in evs:
+        ents = ev.entities
+        wallbox_id = state.wallbox_of_ev(ev.id)
+        if ents.soc:
+            out.append((ents.soc, "percent", float(state.ev_soc_pct.get(ev.id, ev.initial_soc_pct))))
+        if ents.plugged:
+            out.append((ents.plugged, "text", PLUGGED_ON if wallbox_id else PLUGGED_OFF))
+        if ents.power:
+            power = state.wallbox_power_w.get(wallbox_id, 0.0) if wallbox_id else 0.0
+            out.append((ents.power, "power", float(power)))
+    return out
 
 
 def apply_events(
@@ -337,4 +588,10 @@ def step_evcs(
         )
         powers[wallbox.id] = power_w
         soc[ev_id] = min(100.0, soc[ev_id] + power_w / 1000.0 * dt_h / ev.capacity_kwh * 100.0)
-    return replace(state, ev_soc_pct=soc, wallbox_power_w=powers)
+    energy = {
+        w.id: float(state.wallbox_energy_kwh.get(w.id, 0.0)) + powers[w.id] / 1000.0 * dt_h
+        for w in wallboxes
+    }
+    return replace(
+        state, ev_soc_pct=soc, wallbox_power_w=powers, wallbox_energy_kwh=energy
+    )

@@ -45,7 +45,10 @@
       "entity_ids": [
         "sensor.evcc_loadpoint_1_charge_power",
         "number.evcc_loadpoint_1_max_current",
-        "switch.evcc_loadpoint_1_enable"
+        "switch.evcc_loadpoint_1_enable",
+        "binary_sensor.evcc_loadpoint_1_connected",
+        "sensor.evcc_loadpoint_1_vehicle_name",
+        "sensor.evcc_car_a_soc"
       ]
     },
     {
@@ -228,6 +231,31 @@
         "device_class": "temperature",
         "unit_of_measurement": "°C",
         "friendly_name": "House Sim Buffer Temp",
+        "state_class": "measurement"
+      }
+    },
+    {
+      "entity_id": "binary_sensor.evcc_loadpoint_1_connected",
+      "state": "off",
+      "attributes": {
+        "device_class": "plug",
+        "friendly_name": "evcc Loadpoint 1 Connected"
+      }
+    },
+    {
+      "entity_id": "sensor.evcc_loadpoint_1_vehicle_name",
+      "state": "",
+      "attributes": {
+        "friendly_name": "evcc Loadpoint 1 Vehicle"
+      }
+    },
+    {
+      "entity_id": "sensor.evcc_car_a_soc",
+      "state": "45.0",
+      "attributes": {
+        "device_class": "battery",
+        "unit_of_measurement": "%",
+        "friendly_name": "evcc Car A SoC",
         "state_class": "measurement"
       }
     }

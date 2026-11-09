@@ -13,11 +13,18 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.util import dt as dt_util
 
 from ._core.archetype import load_archetype_from_roots
+from ._core.evcs import parse_evs, parse_wallboxes
 from .const import CONF_ARCHETYPE, DOMAIN, EXTERNAL_ARCHETYPES_PARTS
 from .coordinator import FIXTURES_DIR, HouseSimCoordinator
 from .entity_map import ha_entity_id
 
-PLATFORMS = [Platform.SENSOR, Platform.NUMBER, Platform.SELECT, Platform.SWITCH]
+PLATFORMS = [
+    Platform.SENSOR,
+    Platform.BINARY_SENSOR,
+    Platform.NUMBER,
+    Platform.SELECT,
+    Platform.SWITCH,
+]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -81,13 +88,35 @@ def _register_services(hass: HomeAssistant) -> None:
 
     async def car_arrives(call: ServiceCall) -> None:
         coord = _coordinator(hass)
-        power_w = float(call.data.get("power_w", 7000))
-        coord.overlay.car_arrives(power_w)
+        wallbox = call.data.get("wallbox")
+        ev = call.data.get("ev")
+        if coord.has_wallbox_model:
+            params = coord.package.house_params
+            if wallbox not in {w.id for w in parse_wallboxes(params)}:
+                raise vol.Invalid(f"car_arrives: unknown or missing wallbox {wallbox!r}")
+            if ev not in {e.id for e in parse_evs(params)}:
+                raise vol.Invalid(f"car_arrives: unknown or missing ev {ev!r}")
+            soc = call.data.get("soc_pct")
+            coord.overlay.car_arrives(
+                wallbox=str(wallbox), ev=str(ev), soc_pct=None if soc is None else float(soc)
+            )
+        else:
+            if wallbox or ev:
+                raise vol.Invalid("car_arrives: this archetype has no wallbox model; use power_w")
+            coord.overlay.car_arrives(float(call.data.get("power_w", 7000)))
         await coord.async_request_refresh()
 
-    async def car_leaves(_call: ServiceCall) -> None:
+    async def car_leaves(call: ServiceCall) -> None:
         coord = _coordinator(hass)
-        coord.overlay.car_leaves()
+        wallbox = call.data.get("wallbox")
+        if coord.has_wallbox_model:
+            if wallbox not in {w.id for w in parse_wallboxes(coord.package.house_params)}:
+                raise vol.Invalid(f"car_leaves: unknown or missing wallbox {wallbox!r}")
+            coord.overlay.car_leaves(wallbox=str(wallbox))
+        else:
+            if wallbox:
+                raise vol.Invalid("car_leaves: this archetype has no wallbox model")
+            coord.overlay.car_leaves()
         await coord.async_request_refresh()
 
     async def load_spike(call: ServiceCall) -> None:
@@ -140,9 +169,21 @@ def _register_services(hass: HomeAssistant) -> None:
         DOMAIN,
         "car_arrives",
         car_arrives,
-        schema=vol.Schema({vol.Optional("power_w", default=7000): vol.Coerce(float)}),
+        schema=vol.Schema(
+            {
+                vol.Optional("power_w", default=7000): vol.Coerce(float),
+                vol.Optional("wallbox"): cv.string,
+                vol.Optional("ev"): cv.string,
+                vol.Optional("soc_pct"): vol.All(vol.Coerce(float), vol.Range(min=0, max=100)),
+            }
+        ),
     )
-    hass.services.async_register(DOMAIN, "car_leaves", car_leaves, schema=vol.Schema({}))
+    hass.services.async_register(
+        DOMAIN,
+        "car_leaves",
+        car_leaves,
+        schema=vol.Schema({vol.Optional("wallbox"): cv.string}),
+    )
     hass.services.async_register(
         DOMAIN,
         "load_spike",

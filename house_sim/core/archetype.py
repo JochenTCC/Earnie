@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
+from .evcs import EvcsState, evcs_telemetry, has_wallbox_model, parse_evs, parse_wallboxes
+
 FIXTURES_DIR = Path(__file__).resolve().parent.parent / "fixtures"
 
 
@@ -247,17 +249,44 @@ def _entity_id_for_kind(entities: dict[str, str], kind: str) -> str:
     return ""
 
 
+def _evcs_entity_values(
+    package: ArchetypePackage, physics: dict[str, Any]
+) -> dict[str, tuple[float | str, str]]:
+    """Wallbox / EV entities of an archetype with ``house_params.wallboxes``."""
+    raw = physics.get("evcs")
+    if not isinstance(raw, dict):
+        return {}
+    state = EvcsState(**raw)
+    params = package.house_params
+    out: dict[str, tuple[float | str, str]] = {}
+    for entity_id, quantity, value in evcs_telemetry(
+        state, wallboxes=parse_wallboxes(params), evs=parse_evs(params)
+    ):
+        if quantity == "text":
+            out[entity_id] = (str(value), "")
+            continue
+        unit = entity_unit(package, entity_id)
+        out[entity_id] = (base_to_native(float(value), quantity=quantity, unit=unit), unit)
+    return out
+
+
 def physics_entity_values(
     package: ArchetypePackage, physics: dict[str, Any]
-) -> dict[str, tuple[float, str]]:
+) -> dict[str, tuple[float | str, str]]:
     """Physics → ``{entity_id: (value in entity unit and vendor sign, unit)}``.
 
     Honors each entity's ``unit_of_measurement`` (W/kW, Wh/kWh) and the Golden
-    Map ``sign`` (``negate`` = vendor sign is inverse to EHAL).
+    Map ``sign`` (``negate`` = vendor sign is inverse to EHAL). With a wallbox
+    model, wallbox and EV entities come from ``house_params`` instead of the
+    flat ``sens_evcs_active_power`` mapping; text states (plug, status, vehicle)
+    carry the unit ``""``.
     """
-    out: dict[str, tuple[float, str]] = {}
+    out: dict[str, tuple[float | str, str]] = {}
     entities = package.ehal_entities
+    wallbox_model = has_wallbox_model(package.house_params)
     for field_name, (phys_key, quantity, to_base) in TELEMETRY_PROJECTION.items():
+        if wallbox_model and field_name == "sens_evcs_active_power":
+            continue
         entity_id = _entity_id_for_kind(entities, field_name)
         if not entity_id or phys_key not in physics:
             continue
@@ -289,10 +318,13 @@ def physics_entity_values(
                 base_to_native(derived[key], quantity=DERIVED_QUANTITY[key], unit=unit),
                 unit,
             )
+    out.update(_evcs_entity_values(package, physics))
     return out
 
 
-def _format_native(value: float, unit: str) -> str:
+def _format_native(value: float | str, unit: str) -> str:
+    if isinstance(value, str):
+        return value
     return f"{float(value):{_FORMAT.get(unit, '.2f')}}"
 
 

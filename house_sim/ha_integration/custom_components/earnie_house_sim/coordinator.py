@@ -34,6 +34,13 @@ from ._core.archetype import (
     flip_power_reading,
     physics_entity_values,
 )
+from ._core.evcs import (
+    WallboxSetpoints,
+    evcs_state_from_dict,
+    has_wallbox_model,
+    parse_evs,
+    parse_wallboxes,
+)
 from ._core.physics import (
     EssSetpoints,
     PhysicsState,
@@ -41,6 +48,7 @@ from ._core.physics import (
     ess_setpoints_from_lookup,
     initial_physics,
     step_physics,
+    wallbox_setpoints_from_lookup,
 )
 from ._core.weather_pv import pv_kw_from_weather
 
@@ -133,6 +141,27 @@ class HouseSimCoordinator(DataUpdateCoordinator[PhysicsState]):
             ),
             evcs_power_w=float(raw.get("evcs_power_w", self.physics.evcs_power_w)),
         )
+        saved_evcs = raw.get("evcs")
+        if self.has_wallbox_model and isinstance(saved_evcs, dict):
+            params = self.package.house_params
+            try:
+                evcs = evcs_state_from_dict(
+                    saved_evcs,
+                    wallboxes=parse_wallboxes(params),
+                    evs=parse_evs(params),
+                )
+            except ValueError as exc:
+                raise HomeAssistantError(
+                    f"earnie_house_sim: saved wallbox state does not fit the archetype "
+                    f"({exc}); remove and re-add the integration"
+                ) from exc
+            self.physics = replace(
+                self.physics, evcs=evcs, evcs_power_w=evcs.total_power_w
+            )
+        for key, value in dict(raw.get("switch_states") or {}).items():
+            self.switch_states[str(key)] = bool(value)
+        for key, value in dict(raw.get("select_states") or {}).items():
+            self.select_states[str(key)] = str(value)
         saved_setpoints = raw.get("setpoints")
         if isinstance(saved_setpoints, dict):
             for key, value in saved_setpoints.items():
@@ -144,24 +173,48 @@ class HouseSimCoordinator(DataUpdateCoordinator[PhysicsState]):
         self._last_tick_monotonic = None
 
     async def async_persist(self) -> None:
-        await self._store.async_save(
-            {
-                "soc_pct": self.physics.soc_pct,
-                "pv_energy_kwh": self.physics.pv_energy_kwh,
-                "grid_import_energy_kwh": self.physics.grid_import_energy_kwh,
-                "grid_export_energy_kwh": self.physics.grid_export_energy_kwh,
-                "ess_charge_energy_kwh": self.physics.ess_charge_energy_kwh,
-                "ess_discharge_energy_kwh": self.physics.ess_discharge_energy_kwh,
-                "temp_c": self.physics.temp_c,
-                "evcs_power_w": self.physics.evcs_power_w,
-                "setpoints": dict(self.setpoints),
-            }
-        )
+        doc: dict[str, Any] = {
+            "soc_pct": self.physics.soc_pct,
+            "pv_energy_kwh": self.physics.pv_energy_kwh,
+            "grid_import_energy_kwh": self.physics.grid_import_energy_kwh,
+            "grid_export_energy_kwh": self.physics.grid_export_energy_kwh,
+            "ess_charge_energy_kwh": self.physics.ess_charge_energy_kwh,
+            "ess_discharge_energy_kwh": self.physics.ess_discharge_energy_kwh,
+            "temp_c": self.physics.temp_c,
+            "evcs_power_w": self.physics.evcs_power_w,
+            "setpoints": dict(self.setpoints),
+            "switch_states": dict(self.switch_states),
+            "select_states": dict(self.select_states),
+        }
+        if self.has_wallbox_model:
+            doc["evcs"] = self.physics.evcs.as_dict()
+        await self._store.async_save(doc)
+
+    @property
+    def has_wallbox_model(self) -> bool:
+        return has_wallbox_model(self.package.house_params)
 
     def _ess_setpoints(self) -> EssSetpoints:
         return ess_setpoints_from_lookup(
             self.package,
             lambda fixture_id: self.setpoints.get(ha_entity_id(fixture_id)),
+        )
+
+    def _text_state(self, fixture_id: str) -> str | None:
+        ha_id = ha_entity_id(fixture_id)
+        if ha_id in self.switch_states:
+            return "on" if self.switch_states[ha_id] else "off"
+        if ha_id in self.select_states:
+            return self.select_states[ha_id]
+        return None
+
+    def _wallbox_setpoints(self) -> dict[str, WallboxSetpoints] | None:
+        if not self.has_wallbox_model:
+            return None
+        return wallbox_setpoints_from_lookup(
+            self.package,
+            lambda fixture_id: self.setpoints.get(ha_entity_id(fixture_id)),
+            self._text_state,
         )
 
     def _apply_pending_setpoints(self, now_mono: float) -> None:
@@ -267,14 +320,18 @@ class HouseSimCoordinator(DataUpdateCoordinator[PhysicsState]):
         except Exception as exc:  # noqa: BLE001
             raise UpdateFailed(str(exc)) from exc
 
-        self.physics = step_physics(
-            self.physics,
-            package=self.package,
-            setpoints=self._ess_setpoints(),
-            dt_h=dt_h,
-            overlay=self.overlay,
-            pv_kw_override=pv_override,
-        )
+        try:
+            self.physics = step_physics(
+                self.physics,
+                package=self.package,
+                setpoints=self._ess_setpoints(),
+                dt_h=dt_h,
+                overlay=self.overlay,
+                pv_kw_override=pv_override,
+                wallbox_setpoints=self._wallbox_setpoints(),
+            )
+        except ValueError as exc:
+            raise UpdateFailed(str(exc)) from exc
         self._last_tick_monotonic = now_mono
         await self.async_persist()
         return self.physics
