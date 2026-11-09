@@ -15,7 +15,7 @@ from runtime_store.env_vars import is_truthy, read_env
 logger = logging.getLogger(__name__)
 
 DEFAULT_CBC_GAP_REL = 0.10
-DEFAULT_CBC_STRICT_TIME_LIMIT_SEC = 3.0
+DEFAULT_CBC_STRICT_TIME_LIMIT_SEC = 5.0
 # Wall clock. The solve runs in the live cycle, so a stage without a limit could block it for good.
 GAP_STAGE_TIME_LIMIT_SEC = 15.0
 DEFAULT_MILP_SOLVER: Literal["cbc", "highs"] = "highs"
@@ -78,6 +78,10 @@ def stopped_at_limit(prob: pulp.LpProblem) -> bool:
     it apart (``LpSolutionIntegerFeasible`` instead of ``LpSolutionOptimal``).
     """
     return prob.status == pulp.LpStatusOptimal and prob.sol_status == pulp.LpSolutionIntegerFeasible
+
+
+# Strict-stage status of a solve stopped at its time limit (PuLP calls it ``Optimal``).
+STRICT_STATUS_TIME_LIMIT = "TimeLimit"
 
 
 def _objective_value(prob: pulp.LpProblem) -> float | None:
@@ -296,9 +300,12 @@ def solve_with_strict_fallback(
     EARNIE_CBC_STRICT=1: nur Strict ohne Limit (Benchmarks).
     Backend: resolve_milp_solver() → highs (default) or cbc.
 
-    HiGHS reports a time limit with a solution as ``Optimal``, so that plan ends the strict stage
-    (``strict_slow``) and the gap stage only runs when no solution was found in time. If it finds
-    none within ``GAP_STAGE_TIME_LIMIT_SEC`` either, the status is not ``Optimal``.
+    A strict stage stopped at its time limit counts as not optimal, although PuLP reports it as
+    ``Optimal`` (``stopped_at_limit``): its plan depends on CPU speed. The gap stage then solves
+    again with ``gapRel`` (``strict_fallback``, ``strict_status`` ``TimeLimit``) and its plan is
+    used; it ends on the gap, so the plan is reproducible unless the gap stage itself reaches
+    ``GAP_STAGE_TIME_LIMIT_SEC`` (``gap_time_limit_hit`` in the solve log). Without any solution
+    within that limit the status is not ``Optimal``.
     """
     backend = resolve_milp_solver()
     label = "HiGHS" if backend == "highs" else "CBC"
@@ -331,8 +338,8 @@ def solve_with_strict_fallback(
             )
         )
         elapsed = time.perf_counter() - t0
-        status = pulp.LpStatus[prob.status]
         limit_hit = stopped_at_limit(prob)
+        status = STRICT_STATUS_TIME_LIMIT if limit_hit else pulp.LpStatus[prob.status]
         record.update(
             strict_limit_sec=strict_limit,
             strict_elapsed_sec=round(elapsed, 3),

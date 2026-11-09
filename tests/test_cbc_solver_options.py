@@ -36,7 +36,7 @@ def test_default_gap_rel_is_ten_percent():
     assert resolve_cbc_strict_time_limit_sec() == DEFAULT_CBC_STRICT_TIME_LIMIT_SEC
     assert cbc_solver_settings_resolved() == {
         "gapRel": 0.10,
-        "strict_time_limit_sec": 3.0,
+        "strict_time_limit_sec": 5.0,
     }
 
 

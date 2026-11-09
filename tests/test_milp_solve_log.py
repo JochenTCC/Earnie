@@ -70,18 +70,36 @@ def test_optimal_strict_solve_is_logged(solver_stages):
     assert solve_hit_time_limit(record) is False
 
 
-def test_strict_stop_at_time_limit_is_visible(solver_stages):
-    queue, _ = solver_stages
-    queue.append(_FakeSolver(*AT_LIMIT))
+def test_strict_stop_at_time_limit_falls_back_to_the_gap_stage(solver_stages):
+    """A strict plan cut off at the limit depends on CPU speed: the gap stage replaces it."""
+    queue, stages = solver_stages
+    queue.extend([_FakeSolver(*AT_LIMIT, x=3.0), _FakeSolver(*OPTIMAL, x=1.0)])
     cbc_events.begin_cbc_event_collection()
     cs.begin_solve_log()
-    cs.solve_with_strict_fallback(_problem())
+    prob = _problem()
+    assert cs.solve_with_strict_fallback(prob) == "Optimal"
 
+    assert stages == [True, False]
+    assert pulp.value(prob.objective) == pytest.approx(2.0)
     (record,) = cs.take_solve_log()
     assert record["strict_time_limit_hit"] is True
-    assert solve_hit_time_limit(record) is True
+    assert record["strict_status"] == cs.STRICT_STATUS_TIME_LIMIT
+    assert record["stage"] == "gap"
+    assert solve_hit_time_limit(record) is False
     (event,) = cbc_events.take_cbc_events()
+    assert event["event"] == "strict_fallback"
     assert event["time_limit_hit"] is True
+
+
+def test_gap_stage_stopped_at_its_limit_is_visible(solver_stages):
+    queue, _ = solver_stages
+    queue.extend([_FakeSolver(*AT_LIMIT), _FakeSolver(*AT_LIMIT)])
+    cs.begin_solve_log()
+    assert cs.solve_with_strict_fallback(_problem()) == "Optimal"
+
+    (record,) = cs.take_solve_log()
+    assert record["gap_time_limit_hit"] is True
+    assert solve_hit_time_limit(record) is True
 
 
 def test_gap_stage_runs_without_strict_solution(solver_stages):
