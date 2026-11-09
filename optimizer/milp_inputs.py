@@ -19,6 +19,7 @@ from .eauto_milp import (
 from .filter_context import resolve_filter_contexts
 from .milp_consumers import filter_feasible_consumers
 from .milp_horizon import EMPTY_MILP_PLAN
+from .hp_store import HP_STORE_START_KEY
 from .rod_store import ROD_STORE_START_KEY
 from .scenario_planning_scope import planning_runtime_settings
 from .slot_duration import validate_dt_h
@@ -150,6 +151,7 @@ def _resolve_thermal_flex_contexts(
         profile,
         climate=climate,
         rod_store_start_kwh=settings.get(ROD_STORE_START_KEY),
+        hp_store_start_kwh=settings.get(HP_STORE_START_KEY),
     )
 
 

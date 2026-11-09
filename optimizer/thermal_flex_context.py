@@ -9,6 +9,7 @@ import pulp
 
 from house_config.generic_schedule import generic_allowed_slot_hours
 from optimizer.charging_context import matrix_slot_datetime
+from optimizer.hp_store import HP_STORE_CONTEXT_KEY, HpStoreBalance, hp_store_balance
 from optimizer.rod_store import STORE_BALANCE_CONTEXT_KEY, RodStoreBalance, rod_store_balance
 
 if TYPE_CHECKING:
@@ -198,6 +199,7 @@ def resolve_thermal_flex_contexts(
     *,
     climate: ModeledClimateContext | None = None,
     rod_store_start_kwh: dict[str, float] | None = None,
+    hp_store_start_kwh: dict[str, float] | None = None,
 ) -> dict[str, dict]:
     """Tagesziele je Kalendertag für thermal_annual-Flex-Verbraucher.
 
@@ -205,7 +207,8 @@ def resolve_thermal_flex_contexts(
     ``planning_thermal_daily_targets`` / profile_spec), not full-calendar HDD.
     Constraint builder sums only schedule-eligible slots so sunrise book
     windows match book ``spec_flex_targets_kwh``. ``rod_store_start_kwh``: the SE's
-    carried store level per heating rod (``optimizer.rod_store``).
+    carried store level per heating rod (``optimizer.rod_store``), ``hp_store_start_kwh`` the same
+    per heat pump (``optimizer.hp_store``).
     """
     if not house_profile or not matrix:
         return {}
@@ -276,7 +279,27 @@ def resolve_thermal_flex_contexts(
             "slot_energy_kwh": slot_energy,
             "targets_slot_aligned": True,
         }
+        if not is_live and _heat_source_is_electric(source):
+            contexts[cid][HP_STORE_CONTEXT_KEY] = hp_store_balance(
+                cid,
+                source,
+                slot_energy,
+                _heat_source_efficiency(source),
+                start_levels_kwh=hp_store_start_kwh,
+            )
     return contexts
+
+
+def _heat_source_is_electric(source: dict) -> bool:
+    from house_config.heat_source import consumer_heat_source, heat_source_is_electric
+
+    return heat_source_is_electric(consumer_heat_source(source))
+
+
+def _heat_source_efficiency(source: dict) -> float:
+    from house_config.heat_source import consumer_heat_source, heat_source_efficiency
+
+    return heat_source_efficiency(consumer_heat_source(source))
 
 
 def live_rod_ready(rod: dict, parent: dict) -> bool:
@@ -516,16 +539,22 @@ def add_thermal_flex_constraints(
         if not is_thermal_flex_consumer(consumer):
             continue
         parent_rods = [rod for rod in rods if rod["parent_id"] == consumer["id"]]
-        _add_one_thermal_flex_consumer(
+        ctx = thermal_contexts.get(consumer["id"]) or {}
+        effective_by_day = _add_one_thermal_flex_consumer(
             model,
             matrix,
             schedule_indices,
             consumer,
-            thermal_contexts.get(consumer["id"]) or {},
+            ctx,
             continuing=bool(continue_on.get(consumer["id"], False)),
             rods=parent_rods,
             rod_covered=covered,
         )
+        hp_balance = ctx.get(HP_STORE_CONTEXT_KEY)
+        if hp_balance is not None:
+            _add_hp_store_balance(
+                model, matrix, schedule_indices, consumer, hp_balance, parent_rods, effective_by_day
+            )
     for rod in rods:
         if not rod["parent_heat_electric"]:
             _add_fuel_parent_rod_caps(
@@ -612,6 +641,95 @@ def _add_rod_store_balance(
         level = next_level
 
 
+HP_STORE_SLACK_PENALTY_CENT_PER_KWH = 200.0
+"""Heat [kWh] outside the heat pump's band costs this much, so a band that cannot hold (a short
+``thermal_flex_window``, pulse limits) never makes the plan infeasible. Same value as the import
+cap's slack; far above any price, so the plan only leaves the band when nothing else works."""
+
+
+def _add_hp_store_balance(
+    model: MilpHorizonModel,
+    matrix: list,
+    schedule_indices: list[int],
+    consumer: dict,
+    balance: HpStoreBalance,
+    rods: list[dict],
+    effective_by_day: dict[date, float],
+) -> None:
+    """SE: the heat pump's heat (plus its rods' heat, η = 1) stays inside the band on every slot.
+
+    The year model's heat of a day leaves the level spread like the model's own slots, scaled to
+    the energy the day must deliver (``effective_by_day``), so a day that delivers its target ends
+    where it started. Heat outside ``[0, capacity]`` goes into slack with a high price
+    (``HP_STORE_SLACK_PENALTY_CENT_PER_KWH``); ``model.hp_store_slack`` keeps it for the report.
+    """
+    from optimizer.milp_consumers import _delivery_energy_expr
+
+    if not schedule_indices:
+        return
+    cid = str(consumer["id"])
+    first, last = min(schedule_indices), max(schedule_indices)
+    book = range(first, last + 1)
+    drain = _hp_drain_scaled_to_days(matrix, book, balance, effective_by_day)
+    eligible = set(consumer_thermal_eligible_indices(matrix, consumer, schedule_indices))
+    rod_eligible = {
+        str(rod["id"]): set(consumer_thermal_eligible_indices(matrix, rod, schedule_indices))
+        for rod in rods
+    }
+    slacks: list = []
+    penalty = pulp.LpAffineExpression()
+    level = balance.start_kwh
+    for slot in book:
+        heat = (
+            _delivery_energy_expr(model, consumer, [slot]) * balance.efficiency
+            if slot in eligible
+            else 0.0
+        )
+        for rod in rods:
+            if slot in rod_eligible[str(rod["id"])]:
+                heat = heat + _rod_energy_expr(model, rod, [slot])
+        next_level = pulp.LpVariable(f"{cid}_hp_store_{slot}")
+        model.prob += (
+            next_level == level + heat - drain[slot],
+            f"{cid}_hp_store_balance_{slot}",
+        )
+        below = pulp.LpVariable(f"{cid}_hp_store_below_{slot}", lowBound=0.0)
+        above = pulp.LpVariable(f"{cid}_hp_store_above_{slot}", lowBound=0.0)
+        model.prob += next_level >= -below, f"{cid}_hp_store_floor_{slot}"
+        model.prob += next_level <= balance.capacity_kwh + above, f"{cid}_hp_store_cap_{slot}"
+        penalty += HP_STORE_SLACK_PENALTY_CENT_PER_KWH * (below + above)
+        slacks.append((below, above))
+        level = next_level
+    model.prob.objective += penalty
+    if model.hp_store_slack is None:
+        model.hp_store_slack = {}
+    model.hp_store_slack[cid] = slacks
+
+
+def _hp_drain_scaled_to_days(
+    matrix: list,
+    book: range,
+    balance: HpStoreBalance,
+    effective_by_day: dict[date, float],
+) -> dict[int, float]:
+    """Year-model heat per book slot, each day scaled to the heat it must deliver (0 without a target)."""
+    slots_by_day: dict[date, list[int]] = {}
+    for slot in book:
+        slots_by_day.setdefault(matrix[slot]["date"], []).append(slot)
+    drain: dict[int, float] = {}
+    for day, slots in slots_by_day.items():
+        model_heat = sum(balance.drain_kwh[slot] for slot in slots)
+        want_heat = float(effective_by_day.get(day, 0.0)) * balance.efficiency
+        factor = want_heat / model_heat if model_heat > 1e-9 else 0.0
+        for slot in slots:
+            drain[slot] = balance.drain_kwh[slot] * factor
+        if model_heat <= 1e-9 and want_heat > 1e-9:
+            # Heat to deliver but no modeled heat in the book's part of the day: spread it evenly.
+            for slot in slots:
+                drain[slot] = want_heat / len(slots)
+    return drain
+
+
 def _force_rod_off_outside(model: MilpHorizonModel, rod: dict, covered: set[int]) -> None:
     """No heat demand (or outside the window / book) on a slot → the rod stays off."""
     on_vars = model.consumer_on[rod["id"]]
@@ -693,7 +811,8 @@ def _add_one_thermal_flex_consumer(
     continuing: bool,
     rods: list[dict] | None = None,
     rod_covered: dict[str, set[int]] | None = None,
-) -> None:
+) -> dict[date, float]:
+    """Constraints of one thermal_annual consumer; returns the energy [kWh] it must deliver per day."""
     from optimizer.consumer_power import power_limits_kw
     from optimizer.milp_consumers import _delivery_energy_expr, _max_deliverable_kwh
 
@@ -707,8 +826,9 @@ def _add_one_thermal_flex_consumer(
     # Live store overlay: day targets are informational (plan energy), so an
     # empty plan day must not skip the structural pulse limits below.
     live_overlay = ctx.get("live_store_start_c") is not None
+    effective_by_day: dict[date, float] = {}
     if not daily_targets and not live_day_min and not forced_indices and not live_overlay:
-        return
+        return effective_by_day
     on_vars = model.consumer_on[cid]
     max_hours = _max_on_hours(consumer)
     max_pulses = _max_pulses_per_day(consumer)
@@ -745,6 +865,7 @@ def _add_one_thermal_flex_consumer(
         effective = min(want, max_deliverable, op_max_kwh)
         if effective <= 1e-9:
             continue
+        effective_by_day[day] = effective
         if not forced_indices:
             add_max_pulses_per_day_constraints(
                 model.prob,
@@ -776,3 +897,4 @@ def _add_one_thermal_flex_consumer(
             delivered >= effective,
             f"{cid}_thermal_day_{day.isoformat()}",
         )
+    return effective_by_day

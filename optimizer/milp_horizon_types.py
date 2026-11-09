@@ -28,6 +28,7 @@ class MilpHorizonModel:
     battery_params_by_id: dict[str, dict] | None = None
     p_pv_curtail: list | None = None
     import_cap_slack: list | None = None  # per slot; None without a limit there
+    hp_store_slack: dict[str, list] | None = None  # SE heat pump band: (below, above) per book slot
 
 
 @dataclass

@@ -15,6 +15,7 @@ from optimizer import (
     horizon_end_soc_percent,
     _delivered_flex_kwh_from_rows,
 )
+from optimizer.hp_store import HP_STORE_CONTEXT_KEY, HP_STORE_START_KEY, next_hp_level_kwh
 from optimizer.import_power_limit import ImportCaps, import_caps_from_params
 from optimizer.milp_inputs import _resolve_thermal_flex_contexts
 from optimizer.rod_store import ROD_STORE_START_KEY, STORE_BALANCE_CONTEXT_KEY, next_level_kwh
@@ -22,7 +23,7 @@ from optimizer.scenario_planning_scope import planning_scenario_scope
 from optimizer.sim_costs import _grid_kw_from_row
 from optimizer.slot_duration import DEFAULT_DT_H, validate_dt_h
 from optimizer.targets import consumer_column_name
-from optimizer.thermal_flex_context import is_heating_rod_consumer
+from optimizer.thermal_flex_context import is_heating_rod_consumer, is_thermal_flex_consumer
 from simulation.backtesting_horizon import naive_backtesting_slot
 from simulation.historical_cache import HistoricalDataCache
 from simulation.horizon_mode import FIXED_24H, SUNRISE_WINDOW
@@ -338,6 +339,42 @@ def rod_store_levels_after_window(
     return after
 
 
+def hp_store_levels_after_window(
+    book_matrix: list[dict],
+    book_rows: list[dict],
+    consumers: list[dict],
+    scenario_params: dict,
+    levels_kwh: dict[str, float],
+) -> dict[str, float]:
+    """Band level per heat pump after a booked window (``optimizer.hp_store``), like the SoC.
+
+    The booked heat (pump × JAZ plus its rods) fills the level, the year model's heat empties it.
+    """
+    pumps = [consumer for consumer in consumers if is_thermal_flex_consumer(consumer)]
+    if not pumps:
+        return {}
+    rods = [consumer for consumer in consumers if is_heating_rod_consumer(consumer)]
+    with planning_scenario_scope({**scenario_params, HP_STORE_START_KEY: levels_kwh}):
+        contexts = _resolve_thermal_flex_contexts(book_matrix, pumps, None)
+    dt_h = validate_dt_h(DEFAULT_DT_H)
+    after: dict[str, float] = {}
+    for pump in pumps:
+        balance = (contexts.get(str(pump["id"])) or {}).get(HP_STORE_CONTEXT_KEY)
+        if balance is None:
+            continue
+        columns = [consumer_column_name(pump)]
+        rod_columns = [
+            consumer_column_name(rod) for rod in rods if str(rod.get("parent_id")) == str(pump["id"])
+        ]
+        level = balance.start_kwh
+        for slot, row in enumerate(book_rows):
+            heat_kwh = sum(float(row.get(column, 0.0) or 0.0) for column in columns) * dt_h * balance.efficiency
+            heat_kwh += sum(float(row.get(column, 0.0) or 0.0) for column in rod_columns) * dt_h
+            level = next_hp_level_kwh(level, heat_kwh, balance.drain_kwh[slot], balance.capacity_kwh)
+        after[str(pump["id"])] = level
+    return after
+
+
 def _simulate_anchor_step(
     anchor: datetime,
     sim_soc: float,
@@ -355,6 +392,7 @@ def _simulate_anchor_step(
     forecast_planner=None,
     rod_store_kwh: dict[str, float] | None = None,
     import_peak_by_month: Mapping[str, float] | None = None,
+    hp_store_kwh: dict[str, float] | None = None,
 ) -> tuple[
     list[dict],
     list[dict],
@@ -367,7 +405,9 @@ def _simulate_anchor_step(
     """Ein Backtesting-Schritt für fixed_24h oder sunrise_window (Book [SA₁, SA₂) je ready_by-Tag)."""
     step_start_soc = float(sim_soc)
     # Rod bound and thermal contexts read this scenario's house profile, not the Live one.
-    with planning_scenario_scope({**scenario_params, ROD_STORE_START_KEY: rod_store_kwh}):
+    with planning_scenario_scope(
+        {**scenario_params, ROD_STORE_START_KEY: rod_store_kwh, HP_STORE_START_KEY: hp_store_kwh}
+    ):
         plan = _build_anchor_window_plan(
             anchor,
             step_start_soc,
