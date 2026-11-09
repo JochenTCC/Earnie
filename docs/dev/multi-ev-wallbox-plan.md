@@ -78,6 +78,8 @@ Each phase is one chat session and ends with green tests and a commit. **W** = H
 
 ### W3: Earnie against HouseSim — one EV end to end
 
+**Built 2026-11-09, except the S4 bench run:** `house_sim/vendor_bridge.py` plays the HA carrier automations between the contract entities and a vendor archetype (setpoints contract → vendor, telemetry vendor → contract, plug `on`/`off` → `1`/`0`). `tests/test_house_sim_ev_end_to_end.py`: Earnie publishes `evcs.car_a.set_evcs_max_current` (kW → A with the consumer's voltage and phases), the push harness applies it, `evcc_en` charges the car, charge power, grid power, plug and car SoC come back through Earnie's push inbox, and Earnie's own read path (`fetch_loxone_actual_soc_percent`, `read_generic_value` on the plug marker) sees them; 0 A stops the car, unplugging is seen. **Not covered:** the setpoint is published with `ehal_write.write_field`, not by the planner through `write_evcs_max_current_from_consumers` (that needs the full live config); the S4 integration in a running HA (needs the maintainer's testbed).
+
 - Contract test: Earnie plans one EV, writes `set_evcs_max_current`, HouseSim charges, the grid power and the EV SoC follow, the planner's next context sees the new SoC.
 - `docs/dev/house-sim.md`: wallbox and EV parameters, services, what each fixture can do.
 - **Done:** the existing single-EV path is tested against simulated physics. This closes **HouseSim wallbox write-back**.

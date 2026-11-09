@@ -39,6 +39,7 @@ house_sim/
   mock_rest.py          # S1 HTTP mock (pull bench)
   contract.py           # P5d: entities from activated keys
   push_harness.py       # P5d: push client + status.json apply
+  vendor_bridge.py      # W3: contract ↔ vendor archetype (role of the HA carrier automations)
   stepper.py            # S1 adapter: StateStore → core setpoints
   ha_integration/
     custom_components/earnie_house_sim/
