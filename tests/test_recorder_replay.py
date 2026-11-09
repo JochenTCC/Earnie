@@ -178,6 +178,35 @@ def _replay_reading_outdoor_forecast(monkeypatch, start_state: dict):
     return read, fetch
 
 
+def test_replay_runs_inside_the_live_cycle_scope(tmp_path, monkeypatch):
+    """A rejected live snapshot leaves row 0 ``forecast``; Live still plans thermals as Live.
+
+    Replay outside the scope took such a cycle for an SE matrix and planned the heat pump
+    with HDD day targets (cycle 2026-11-01 16:44: 23.6 kWh remaining instead of 0).
+    """
+    from optimizer.live_cycle_scope import in_live_cycle, is_live_thermal_planning
+    from runtime_store import recorder_replay
+
+    _cfg_with_battery(tmp_path, monkeypatch)
+    seen: list[tuple[bool, bool]] = []
+
+    def _prepare(entry, cfg):
+        seen.append((in_live_cycle(), is_live_thermal_planning([{"consumption_mode": "forecast"}])))
+        raise _StopAfterPrepare
+
+    monkeypatch.setattr(recorder_replay, "_prepare_replay_inputs", _prepare)
+    entry = {
+        "timestamp": "2026-11-01T16:44:53",
+        "planning_window": {"start": "2026-11-01T16:45:00+01:00"},
+        "start_state": {},
+    }
+    with patch("data.outdoor_forecast.get_hourly_outdoor_forecast_c", return_value=[3.0]):
+        with pytest.raises(_StopAfterPrepare):
+            recorder_replay._solve_prepared_entry(entry, solver_mode="strict", verbose=False)
+    assert seen == [(True, True)]
+    assert not in_live_cycle()
+
+
 def test_replay_fails_loud_when_recorded_forecast_is_empty(tmp_path, monkeypatch):
     _cfg_with_battery(tmp_path, monkeypatch)
     with pytest.raises(ValueError, match="outdoor_forecast"):

@@ -256,6 +256,7 @@ def _solve_prepared_entry(
     from contextlib import ExitStack
 
     from data.outdoor_forecast import replay_outdoor_forecast
+    from optimizer.live_cycle_scope import live_cycle_scope
     from runtime_store.planning_clock import planning_freeze
     from runtime_store.push_read_replay import replay_push_reads
 
@@ -270,6 +271,10 @@ def _solve_prepared_entry(
     moment = _recorded_planning_moment(entry)
     _rebind_consumer_state_path()
     with ExitStack() as stack:
+        # Same cycle semantics as main: Live thermal planning also when the live snapshot was
+        # rejected and row 0 stayed ``forecast`` (``is_live_thermal_planning``). Without the
+        # scope such a cycle planned the heat pump with SE day targets (cycle 2026-11-01 16:44).
+        stack.enter_context(live_cycle_scope())
         stack.enter_context(planning_freeze(moment))
         if has_outdoor_forecast:
             stack.enter_context(replay_outdoor_forecast(recorded_forecast))
