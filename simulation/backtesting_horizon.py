@@ -14,7 +14,6 @@ Defaults when not set explicitly
 """
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -26,10 +25,10 @@ from data.planning_window import (
     official_sun_times,
     sunrise_anchor_slot_index,
 )
+from optimizer.milp_horizon_extras import LOOKAHEAD_ENV, lookahead_hours  # noqa: F401 (re-exported)
 from simulation.horizon_mode import BACKTESTING_STEP_HOURS
 
 
-LOOKAHEAD_ENV = "EARNIE_SE_LOOKAHEAD_H"
 BOOK_PERIOD_KEY = "_book_period"
 """Scenario-param key ``(start, end_exclusive)`` (naive datetimes): book only slots inside.
 
@@ -123,17 +122,6 @@ def hourly_slots_half_open(start: datetime, end: datetime) -> tuple[datetime, ..
 def _sunrise_on(day: date, latitude: float, longitude: float, timezone_name: str) -> datetime:
     sunrise, _sunset = official_sun_times(day, latitude, longitude, timezone_name)
     return sunrise
-
-
-def lookahead_hours() -> float:
-    """Prototype of "MILP look-ahead past SA₂": plan past the book, off unless the variable is set."""
-    raw = os.environ.get(LOOKAHEAD_ENV, "").strip()
-    if not raw:
-        return 0.0
-    hours = float(raw)
-    if hours < 0.0:
-        raise ValueError(f"{LOOKAHEAD_ENV} muss >= 0 sein, gefunden {raw!r}.")
-    return hours
 
 
 def resolve_ready_by_sunrise_step(

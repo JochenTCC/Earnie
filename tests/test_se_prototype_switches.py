@@ -45,7 +45,7 @@ os.environ.setdefault("EARNIE_OFFLINE", "1")
 _START = pd.Timestamp(SOC_CHAIN_START_DAY)
 _END = pd.Timestamp(SOC_CHAIN_END_DAY)
 _ENERGY_COLUMNS = ["consumption_kw", "baseload_kw", "swimspa_kw", "eauto_kw", "pv_kw"]
-_OFF = (None, None)
+_OFF = ("0", None)
 _LOOKAHEAD = ("8", None)
 _BOTH = ("8", "1")
 
@@ -315,8 +315,8 @@ def test_cheapest_slot_past_sa2_sets_the_value(monkeypatch) -> None:
 
 
 def test_level_without_a_look_ahead_stops(monkeypatch) -> None:
-    _set_switches(monkeypatch, None, "1")
-    with pytest.raises(KeyError, match=LOOKAHEAD_ENV):
+    _set_switches(monkeypatch, "0", "1")
+    with pytest.raises(ValueError, match=LOOKAHEAD_ENV):
         _solve_milp_to_model(
             _matrix(), 50.0, _battery(), 10.0, False, [], {}, None, None, None, None, None, None,
             None, None, inverter_params=[], pv_systems=[],
@@ -335,10 +335,15 @@ def test_level_with_a_look_ahead_past_the_horizon_stops(monkeypatch) -> None:
 # --- Window: the look-ahead only adds slots past the book
 
 
-@pytest.mark.parametrize("raw,expected", [("", 0.0), ("0", 0.0), ("8", 8.0), ("2.5", 2.5)])
+@pytest.mark.parametrize("raw,expected", [("", 8.0), ("0", 0.0), ("8", 8.0), ("2.5", 2.5)])
 def test_lookahead_hours(monkeypatch, raw, expected) -> None:
     monkeypatch.setenv(LOOKAHEAD_ENV, raw)
     assert lookahead_hours() == expected
+
+
+def test_lookahead_is_on_by_default(monkeypatch) -> None:
+    monkeypatch.delenv(LOOKAHEAD_ENV, raising=False)
+    assert lookahead_hours() == 8.0
 
 
 def test_negative_lookahead_is_rejected(monkeypatch) -> None:
@@ -350,7 +355,7 @@ def test_negative_lookahead_is_rejected(monkeypatch) -> None:
 def test_lookahead_changes_the_plan_window_and_nothing_of_the_book(monkeypatch) -> None:
     ready_by = datetime(2026, 1, 15, 7, 0)
     resolve = lambda: resolve_ready_by_sunrise_step(ready_by, 47.2, 9.6, "Europe/Vienna")  # noqa: E731
-    monkeypatch.delenv(LOOKAHEAD_ENV, raising=False)
+    monkeypatch.setenv(LOOKAHEAD_ENV, "0")
     off = resolve()
 
     monkeypatch.setenv(LOOKAHEAD_ENV, "8")
@@ -468,7 +473,7 @@ def test_book_matrix_and_its_targets_do_not_see_the_look_ahead(sim, monkeypatch)
     cache = load_fixture_cache()
     prices = build_synthetic_prices_df(_START, _END)
     anchor = list_sunrise_step_anchors(_START, _END, cache, scenario)[0]
-    _set_switches(monkeypatch, None, None)
+    _set_switches(monkeypatch, "0", None)
     book_off, meta_off, sa1_off, full_off = build_sunrise_window_matrix(anchor, cache, prices, scenario)
 
     _set_switches(monkeypatch, "8", None)

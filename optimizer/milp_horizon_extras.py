@@ -9,12 +9,25 @@ from .milp_horizon_types import MilpHorizonModel
 from .slot_duration import validate_dt_h
 
 LOOKAHEAD_ENV = "EARNIE_SE_LOOKAHEAD_H"
+DEFAULT_LOOKAHEAD_H = 8.0
+"""SE: hours the plan looks past SA₂ (decided 2026-11-09). The study sets the variable, 0 turns it off."""
 BASE_LEVEL_ENV = "EARNIE_BASE_LEVEL"
 # First-prototype assumptions, to be replaced by the empirical rule of the backlog item.
 BASE_LEVEL_DAY_PER_LOOKAHEAD = 1.5
 BASE_LEVEL_RESERVE_SHARE = 0.1
 BASE_LEVEL_MAX_SHARE = 0.5
 BASE_LEVEL_VALUE_SHARE = 0.9
+
+
+def lookahead_hours() -> float:
+    """SE look-ahead past SA₂: ``DEFAULT_LOOKAHEAD_H`` unless ``EARNIE_SE_LOOKAHEAD_H`` is set."""
+    raw = os.environ.get(LOOKAHEAD_ENV, "").strip()
+    if not raw:
+        return DEFAULT_LOOKAHEAD_H
+    hours = float(raw)
+    if hours < 0.0:
+        raise ValueError(f"{LOOKAHEAD_ENV} muss >= 0 sein, gefunden {raw!r}.")
+    return hours
 
 
 def _add_terminal_soc_constraint(model: MilpHorizonModel, e_terminal: float) -> None:
@@ -250,7 +263,7 @@ def _base_level_credit(
         )
     if start is None:
         raise ValueError(f"{BASE_LEVEL_ENV} braucht den Start-SoC des Plans (base_level_start).")
-    lookahead_h = float(os.environ[LOOKAHEAD_ENV])
+    lookahead_h = lookahead_hours()
     lookahead_slots = round(lookahead_h / float(model.dt_h))
     if not 1 <= lookahead_slots < model.horizon:
         raise ValueError(
