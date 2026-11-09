@@ -610,7 +610,7 @@ def _main_cycle(
         active_reserves = load_active_reserves()
         cycle_recorder.record_active_reserves(recorder_token, active_reserves)
         battery_params = apply_reserves_to_battery_params(
-            battery_params, active_reserves
+            battery_params, active_reserves, current_soc=float(current_soc)
         )
         battery_params = ehal_live.filter_planning_batteries_with_soc(
             battery_params, current_soc_by_id
@@ -697,6 +697,17 @@ def _main_cycle(
             dt_h=DEFAULT_DT_H,
             reserves=active_reserves,
         )
+        from optimizer.powerstation_reserve import reserve_floor_discharge_cap_kw
+
+        # Automatik must not drain the virtual reserve within the slot (refill ping-pong).
+        automatik_discharge_cap = reserve_floor_discharge_cap_kw(
+            battery_params, float(current_soc), dt_h=DEFAULT_DT_H
+        )
+        if automatik_discharge_cap is not None and mode == 0:
+            logger.info(
+                "Automatik discharge limit capped at %.2f kW (virtual reserve floor)",
+                automatik_discharge_cap,
+            )
         reserve_charges = physical_charge_setpoints_kw(active_reserves)
         standby_sources, standby_charges = live_source_and_charge(standby_plans, slot=0)
         # Hard clamp to effective pack max (HK ∩ live) — never write above resolve.
@@ -750,6 +761,7 @@ def _main_cycle(
                 target_power,
                 export_cap_kw=export_cap,
                 telemetry=telemetry_for_export,
+                automatik_discharge_cap_kw=automatik_discharge_cap,
             )
             logger.info("Sende EHAL EVCS-Maxstrom an %s...", backend)
             err_evcs, evcs_records = ehal_live.write_evcs_max_current_from_consumers(
@@ -780,7 +792,11 @@ def _main_cycle(
         else:
             logger.info("📤 Sende gemappte Huawei-Modbus-Werte an Loxone...")
             huawei_writes = ehal_live.write_huawei_modbus_states(
-                mode, target_power, target_soc, export_cap_kw=export_cap
+                mode,
+                target_power,
+                target_soc,
+                export_cap_kw=export_cap,
+                automatik_discharge_cap_kw=automatik_discharge_cap,
             )
             logger.info("📤 Sende flexible Verbraucher-Sollwerte an Loxone...")
             flex_writes = ehal_live.write_flexible_consumer_states(
@@ -830,6 +846,7 @@ def _main_cycle(
             charging_contexts,
             consumer_pv_follow,
             export_cap_kw=export_cap,
+            automatik_discharge_cap_kw=automatik_discharge_cap,
         )
         loxone_sent.update(
             planned_powerstation_loxone_sent(phys_charge, standby_sources)

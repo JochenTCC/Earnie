@@ -367,16 +367,19 @@ def test_recorded_reserves_shape_battery_params(monkeypatch):
 
     seen = {}
 
-    def _apply(params, reserves=None):
+    def _apply(params, reserves=None, *, current_soc=None):
         seen["reserves"] = reserves
+        seen["current_soc"] = current_soc
         return {**params, "_virtual_reserve_asap_kwh": 0.38}
 
     monkeypatch.setattr(powerstation_live, "apply_reserves_to_battery_params", _apply)
     reserves = [{"powerstation_id": "virtual_gs", "asap_charge_kwh": 0.38}]
     out = rr._battery_params_with_recorded_reserves(
-        {"capacity_kwh": 15.0}, {"active_reserves": reserves}
+        {"capacity_kwh": 15.0}, {"active_reserves": reserves}, 12.0
     )
     assert seen["reserves"] == reserves
+    # Live relaxes the reserve floor by the SoC reading; replay must pass the same SoC.
+    assert seen["current_soc"] == 12.0
     assert out["_virtual_reserve_asap_kwh"] == 0.38
 
 
@@ -384,14 +387,14 @@ def test_cycles_without_recorded_reserves_keep_config_params():
     from runtime_store import recorder_replay as rr
 
     params = {"capacity_kwh": 15.0}
-    assert rr._battery_params_with_recorded_reserves(params, {}) is params
+    assert rr._battery_params_with_recorded_reserves(params, {}, 50.0) is params
 
 
 def test_recorded_reserves_must_be_a_list():
     from runtime_store import recorder_replay as rr
 
     with pytest.raises(TypeError, match="active_reserves"):
-        rr._battery_params_with_recorded_reserves({}, {"active_reserves": {}})
+        rr._battery_params_with_recorded_reserves({}, {"active_reserves": {}}, 50.0)
 
 
 def test_early_start_cycle_replays_at_its_tick_not_the_recording_time():

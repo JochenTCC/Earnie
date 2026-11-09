@@ -360,18 +360,27 @@ def _control_ess_setpoints(
     target_power_kw: float,
     max_charge_kw: float,
     max_discharge_kw: float,
+    automatik_discharge_cap_kw: float | None = None,
 ) -> tuple[float | None, float, float, int]:
     """``map_ess_setpoints`` honouring limits-only battery control (no active power)."""
     from house_config.battery_control import BATTERY_CONTROL_LIMITS_ONLY
 
     active_kw, charge_kw, discharge_kw, control_cmd = map_ess_setpoints(
-        mode, target_power_kw, max_charge_kw, max_discharge_kw
+        mode,
+        target_power_kw,
+        max_charge_kw,
+        max_discharge_kw,
+        automatik_discharge_cap_kw=automatik_discharge_cap_kw,
     )
     if control == BATTERY_CONTROL_LIMITS_ONLY:
         active_kw = None
         if mode in (1, 3):
             active_kw, charge_kw, discharge_kw, control_cmd = map_ess_setpoints(
-                0, 0.0, max_charge_kw, max_discharge_kw
+                0,
+                0.0,
+                max_charge_kw,
+                max_discharge_kw,
+                automatik_discharge_cap_kw=automatik_discharge_cap_kw,
             )
     return active_kw, charge_kw, discharge_kw, control_cmd
 
@@ -425,8 +434,11 @@ def write_ess_setpoints_from_control(
     max_discharge_power_kw: float | None = None,
     export_cap_kw: float | None | object = _OMIT_EXPORT_CAP,
     telemetry: dict[str, Any] | None = None,
+    automatik_discharge_cap_kw: float | None = None,
 ) -> tuple[EhalWriteError | None, list[dict[str, Any]]]:
     """Map optimizer mode/power to EHAL Design C1 ESS setpoints.
+
+    ``automatik_discharge_cap_kw`` caps the discharge limit in Automatik (virtual reserve floor).
 
     When ``export_cap_kw`` is passed (including ``None`` = unconstrained), also write
     ``set_grid_export_power_limit`` (W magnitude; plant export maximum = PV kWp + force
@@ -461,6 +473,7 @@ def write_ess_setpoints_from_control(
         target_power_kw,
         float(max_charge_power_kw),
         float(max_discharge_power_kw),
+        automatik_discharge_cap_kw,
     )
     if active_kw is None and is_ha_backend() and control == BATTERY_CONTROL_FULL:
         # The HA ``number`` is sticky: omitting the active power would leave the last force

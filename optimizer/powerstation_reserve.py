@@ -240,14 +240,99 @@ def apply_virtual_reserve_floor(
 def prepare_battery_params_for_reserves(
     battery_params: dict | list[dict],
     reserves: list[dict[str, Any]],
+    *,
+    current_soc: float | None = None,
 ) -> dict | list[dict]:
-    """Apply virtual floor + refill-deadline metadata for the live/MILP call."""
-    return apply_virtual_reserve_floor(
+    """Apply virtual floor + refill-deadline metadata for the live/MILP call.
+
+    With ``current_soc`` the floor also honours the SoC reading resolution
+    (``relax_reserve_floor_for_soc_reading``).
+    """
+    out = apply_virtual_reserve_floor(
         battery_params,
         protected_kwh=virtual_protected_kwh(reserves),
         asap_charge_kwh=virtual_asap_charge_kwh(reserves),
         refill_deadline_utc=virtual_refill_deadline_iso(reserves),
     )
+    if current_soc is None:
+        return out
+    return relax_reserve_floor_for_soc_reading(out, current_soc)
+
+
+# The plant reports the SoC in whole percent; a floor such as 12.3 % reads as
+# "below" at 12 % although the gap (0.3 % of the capacity) is reading noise.
+SOC_READING_RESOLUTION_PCT = 1.0
+
+_FLOOR_SOC_KEY = "_virtual_reserve_floor_soc"
+_BASE_MIN_SOC_KEY = "_virtual_reserve_base_min_soc"
+_FLOOR_RELAXED_KEY = "_virtual_reserve_floor_relaxed_to"
+
+
+def _min_soc_key(bat: dict) -> str:
+    return "min_soc" if ("min_soc" in bat or "max_soc" in bat) else "battery_min_soc"
+
+
+def _primary(battery_params: dict | list[dict]) -> dict | None:
+    if isinstance(battery_params, list):
+        return battery_params[0] if battery_params else None
+    return battery_params
+
+
+def relax_reserve_floor_for_soc_reading(
+    battery_params: dict | list[dict],
+    current_soc: float,
+) -> dict | list[dict]:
+    """Lower the virtual-reserve floor to ``current_soc`` when it is within one reading step.
+
+    Without this, a reading of 12 % under a 12.3 % floor makes the MILP restore the floor in
+    slot 0 with a low-power forced charge every cycle (reserve-refill ping-pong). Only the
+    virtual part of the floor is relaxed, never below the configured ``min_soc``; a SoC more
+    than one step below the floor still has to be refilled.
+    """
+    out = [dict(b) for b in battery_params] if isinstance(battery_params, list) else dict(battery_params)
+    bat = _primary(out)
+    if bat is None or _FLOOR_SOC_KEY not in bat:
+        return out
+    floor = float(bat[_FLOOR_SOC_KEY])
+    base = float(bat[_BASE_MIN_SOC_KEY])
+    soc = float(current_soc)
+    if not (floor - SOC_READING_RESOLUTION_PCT - 1e-9 <= soc < floor) or soc < base:
+        return out
+    bat[_min_soc_key(bat)] = soc
+    bat[_FLOOR_RELAXED_KEY] = soc
+    logger.info(
+        "Virtual reserve floor %.2f %% relaxed to SoC reading %.1f %% (within %.0f %% resolution)",
+        floor,
+        soc,
+        SOC_READING_RESOLUTION_PCT,
+    )
+    return out
+
+
+def reserve_floor_discharge_cap_kw(
+    battery_params: dict | list[dict],
+    current_soc: float,
+    *,
+    dt_h: float,
+) -> float | None:
+    """Highest Automatik discharge power that keeps the virtual reserve for one slot.
+
+    In Automatik the plant follows its own rule down to its own minimum SoC, so a large flex
+    load can drain the virtual reserve within one slot, and the next cycle refills it from the
+    grid. Capping the written discharge limit at the energy above the floor (AC side, through
+    the path efficiency) prevents that. ``None`` without a virtual reserve floor.
+    """
+    bat = _primary(battery_params)
+    if bat is None or _FLOOR_SOC_KEY not in bat:
+        return None
+    if dt_h <= 0.0:
+        raise ValueError(f"reserve_floor_discharge_cap_kw: dt_h must be > 0, got {dt_h}")
+    if "efficiency" not in bat:
+        raise ValueError("reserve_floor_discharge_cap_kw: battery params without efficiency")
+    capacity = float(bat["battery_capacity_kwh"])
+    floor = float(bat[_min_soc_key(bat)])
+    above_kwh = max(0.0, float(current_soc) - floor) / 100.0 * capacity
+    return above_kwh * float(bat["efficiency"]) / float(dt_h)
 
 
 def _raise_min_soc(bat: dict, protected_kwh: float) -> None:
@@ -259,10 +344,10 @@ def _raise_min_soc(bat: dict, protected_kwh: float) -> None:
     base_energy = (min_soc / 100.0) * capacity
     new_energy = base_energy + float(protected_kwh)
     new_soc = min(max_soc - 0.01, (new_energy / capacity) * 100.0)
-    if "min_soc" in bat or "max_soc" in bat:
-        bat["min_soc"] = max(min_soc, new_soc)
-    else:
-        bat["battery_min_soc"] = max(min_soc, new_soc)
+    floor = max(min_soc, new_soc)
+    bat[_min_soc_key(bat)] = floor
+    bat[_FLOOR_SOC_KEY] = floor
+    bat[_BASE_MIN_SOC_KEY] = min_soc
 
 
 def physical_reserves(reserves: list[dict[str, Any]]) -> list[dict[str, Any]]:

@@ -71,9 +71,13 @@ def load_active_reserves() -> list[dict[str, Any]]:
 def apply_reserves_to_battery_params(
     battery_params: dict | list[dict],
     reserves: list[dict[str, Any]] | None = None,
+    *,
+    current_soc: float | None = None,
 ) -> dict | list[dict]:
     active = reserves if reserves is not None else load_active_reserves()
-    return prepare_battery_params_for_reserves(battery_params, active)
+    return prepare_battery_params_for_reserves(
+        battery_params, active, current_soc=current_soc
+    )
 
 
 def _consumers_by_id() -> dict[str, dict]:
