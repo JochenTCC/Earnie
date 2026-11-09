@@ -25,6 +25,7 @@ def runtime_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.delenv("EARNIE_USAGE_PING", raising=False)
     monkeypatch.delenv("EARNIE_INSTALL_CONTEXT", raising=False)
     monkeypatch.delenv("EARNIE_SHADOW", raising=False)
+    monkeypatch.delenv("EARNIE_CLOUD_DEMO", raising=False)
     # set_consent → refresh_points would otherwise spawn a real POST to SERVER_BASE
     # (now a live HTTPS host) and race with tests that call maybe_send_ping next.
     monkeypatch.setattr(up, "spawn_maybe_send_ping", lambda: False)
@@ -75,6 +76,20 @@ def test_kill_switch_blocks_send(runtime_dir: Path, monkeypatch: pytest.MonkeyPa
     fake = _FakeTransport()
     assert up.maybe_send_ping(_now(), transport=fake, endpoint_url="http://x/ping") is False
     assert fake.calls == []
+
+
+def test_cloud_demo_blocks_send_even_with_consent_and_force(
+    runtime_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    up.set_consent("on", now=_now())
+    monkeypatch.setenv("EARNIE_CLOUD_DEMO", "1")
+    fake = _FakeTransport()
+    assert up.maybe_send_ping(_now(), transport=fake, endpoint_url="http://x/ping") is False
+    assert up.maybe_send_ping(
+        _now(), transport=fake, endpoint_url="http://x/ping", force=True
+    ) is False
+    assert fake.calls == []
+    assert "last_attempt_at" not in up.load_state()
 
 
 def test_consent_off_blocks_send(runtime_dir: Path) -> None:

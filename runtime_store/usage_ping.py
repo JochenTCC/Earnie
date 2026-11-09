@@ -1,7 +1,10 @@
 """Opt-in anonymous usage ping client (UsagePing P1–P3).
 
 State lives in ``runtime/usage_ping.json``. Nothing is sent unless consent is
-``on`` and ``EARNIE_USAGE_PING`` is not ``off``. See ``docs/workflow/usage-ping.md``.
+``on`` and ``EARNIE_USAGE_PING`` is not ``off``, and never in the Streamlit
+Community Cloud demo (``EARNIE_CLOUD_DEMO=1``: each browser session has its own
+empty ``runtime/``, so an install ID would count every visit as a new install).
+See ``docs/workflow/usage-ping.md``.
 """
 from __future__ import annotations
 
@@ -14,6 +17,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Literal
 
+from runtime_store.cloud_demo import is_cloud_demo
 from runtime_store.env_vars import is_explicit_offline, read_env
 from runtime_store.install_context import detect_install_context
 from runtime_store.persist_paths import usage_ping_state_file
@@ -290,7 +294,10 @@ def maybe_send_ping(
 
     ``force=True`` skips the once-per-day and 1 h retry gates (consent + kill-switch
     still apply). Intended for debug / lab; production callers leave it false.
+    Never sends in the cloud demo (``EARNIE_CLOUD_DEMO=1``), not even with ``force``.
     """
+    if is_cloud_demo():
+        return False
     stamp = _utc_now(now)
     state = load_state()
     if not _should_attempt(state, stamp) and not force:

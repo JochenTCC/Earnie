@@ -13,6 +13,7 @@ from runtime_store import usage_ping as up
 def runtime_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path / "runtime"))
     monkeypatch.delenv("EARNIE_USAGE_PING", raising=False)
+    monkeypatch.delenv("EARNIE_CLOUD_DEMO", raising=False)
     # set_consent("on") → refresh_points may spawn a real ping; not under test here.
     monkeypatch.setattr(up, "spawn_maybe_send_ping", lambda: False)
     return tmp_path / "runtime"
@@ -131,3 +132,60 @@ def test_dialog_intro_advertising_copy() -> None:
     from ui import usage_ping_consent as consent
 
     assert "Um die Qualität von Earnie permanent zu verbessern" in consent._DIALOG_INTRO
+
+
+def test_cloud_demo_explorer_shows_no_dialog_and_records_nothing(
+    runtime_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from ui import usage_ping_consent as consent
+
+    monkeypatch.setenv("EARNIE_CLOUD_DEMO", "1")
+    session: dict[str, Any] = {}
+    monkeypatch.setattr(consent.st, "session_state", session)
+    opened: list[int] = []
+    monkeypatch.setattr(consent, "_consent_dialog", lambda: opened.append(1))
+
+    consent.maybe_prompt_consent_on_explorer()
+    assert opened == []
+    assert up.load_state()["consent"] == "unset"
+    assert up.load_state().get("stage") != "explorer"
+    assert session == {}
+
+
+def test_cloud_demo_editor_fallback_shows_no_dialog(
+    runtime_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from ui import usage_ping_consent as consent
+
+    monkeypatch.setenv("EARNIE_CLOUD_DEMO", "1")
+    monkeypatch.setattr(
+        "ui.mode_selector.get_enabled_ui_mode_keys",
+        lambda: ["sunset2sunset", "live_environment"],
+    )
+    opened: list[int] = []
+    monkeypatch.setattr(consent, "_consent_dialog", lambda: opened.append(1))
+    monkeypatch.setattr(consent.st, "session_state", {})
+
+    consent.maybe_prompt_consent_on_editor()
+    assert opened == []
+    assert up.load_state().get("stage") != "explorer"
+
+
+def test_cloud_demo_settings_show_note_without_toggle(
+    runtime_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from ui import usage_ping_consent as consent
+
+    monkeypatch.setenv("EARNIE_CLOUD_DEMO", "1")
+    captions: list[str] = []
+    monkeypatch.setattr(consent.st, "subheader", lambda *_a, **_k: None)
+    monkeypatch.setattr(consent.st, "caption", lambda text, **_k: captions.append(text))
+
+    def _no_toggle(*_a: Any, **_k: Any) -> bool:
+        raise AssertionError("toggle must not render in the cloud demo")
+
+    monkeypatch.setattr(consent.st, "toggle", _no_toggle)
+    monkeypatch.setattr(consent.st, "expander", _no_toggle)
+
+    consent.render_usage_ping_settings()
+    assert captions == ["In der Online-Demo sendet Earnie keine Nutzungsstatistik."]

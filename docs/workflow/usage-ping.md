@@ -12,6 +12,7 @@ Non-goals: usage analytics, feature tracking, error reporting, any per-user prof
 
 - **Opt-in, tri-state:** `unset` (never asked) / `on` / `off`. Only `on` sends. `unset` and `off` send nothing. Missing state file = `unset`.
 - **Hard kill-switch:** env `EARNIE_USAGE_PING=off` overrides config (for packagers / paranoid users).
+- **No install ping in the cloud demo:** with `EARNIE_CLOUD_DEMO=1` every browser session has its own empty `runtime/`, so an install ID would count each visit as a new install. `maybe_send_ping` is a no-op there (also with `force`), the consent dialog (explorer and editor fallback) does not open, and the settings show a note instead of the toggle.
 - **Data minimisation:** payload is a fixed whitelist (§4); no free-form fields, no config content, no prices, no locations, no device names.
 - **Fire-and-forget:** ping runs off the optimisation path, short timeout, one attempt per day plus retries after failure; failure is logged at WARNING and never affects the cycle.
 - **Transparency:** the UI shows the exact JSON that would be sent ("Show what is sent").
