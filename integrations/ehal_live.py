@@ -493,7 +493,18 @@ def write_ess_setpoints_from_control(
     if target_soc is not None:
         from integrations.loxone_writes import ess_target_soc_percent
 
-        target_soc_pct = ess_target_soc_percent(target_soc)
+        from house_config.battery_control import BATTERY_CONTROL_LIMITS_ONLY
+
+        # limits_only drops forced modes (``_control_ess_setpoints``): no buffer then.
+        target_mode = (
+            0 if control == BATTERY_CONTROL_LIMITS_ONLY and mode in (1, 3) else mode
+        )
+        target_soc_pct = ess_target_soc_percent(
+            target_soc,
+            mode=target_mode,
+            target_power_kw=target_power_kw,
+            battery_params=battery_params,
+        )
         setpoint["set_ess_target_soc"] = target_soc_pct
         record_fields["set_ess_target_soc"] = target_soc_pct
     error = adapter.write_setpoints(setpoint)

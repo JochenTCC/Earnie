@@ -651,7 +651,7 @@ class TestBuildSentSnapshot:
             "house_config.ess_bindings.resolve_primary_ess_binding",
             side_effect=lambda kind, **kw: ess_names.get(kind, ""),
         ), patch.object(
-            lc.config, "get_battery_params", return_value={"max_power_kw": 5.0}
+            lc.config, "get_battery_params", return_value={"max_power_kw": 5.0, "battery_capacity_kwh": 15.0, "min_soc": 5.0, "max_soc": 100.0}
         ), patch.object(
             lc.config, "get_flexible_consumers", return_value=consumers
         ), patch(
@@ -995,7 +995,7 @@ class TestSendHuaweiAndConsumers:
             "house_config.ess_bindings.resolve_primary_ess_binding",
             side_effect=lambda kind, **kw: ess_names.get(kind, ""),
         ), patch.object(
-            lc.config, "get_battery_params", return_value={"max_power_kw": 5.0}
+            lc.config, "get_battery_params", return_value={"max_power_kw": 5.0, "battery_capacity_kwh": 15.0, "min_soc": 5.0, "max_soc": 100.0}
         ), patch(
             "integrations.ehal_debug_mapping.build_loxone_setpoint_io_index",
             return_value=io_index,
@@ -1032,7 +1032,7 @@ class TestSendHuaweiAndConsumers:
             "house_config.ess_bindings.resolve_primary_ess_binding",
             side_effect=lambda kind, **kw: ess_names.get(kind, ""),
         ), patch.object(
-            lc.config, "get_battery_params", return_value={"max_power_kw": 5.0}
+            lc.config, "get_battery_params", return_value={"max_power_kw": 5.0, "battery_capacity_kwh": 15.0, "min_soc": 5.0, "max_soc": 100.0}
         ), patch(
             "integrations.ehal_debug_mapping.build_loxone_setpoint_io_index",
             return_value=io_index,

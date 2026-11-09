@@ -298,7 +298,7 @@ Default names. Grid/PV/battery **power** preferably via the EFM meter designatio
 | `get_ess_soc_min`                 | Read      | `Earnie_Batterie_SOC_Min` (optional)             | Discharge cut-off SoC %; MILP when `limits_from_live`                               |
 | `get_ess_soc_max`                 | Read      | `Earnie_Batterie_SOC_Max` (optional)             | Charge cut-off SoC %                                                                |
 | `get_ess_max_charge_power`        | Read      | `Earnie_Batterie_Max_Ladeleistung` (optional)    | Device max charge (Loxone kW → EHAL W)                                              |
-| `get_ess_max_discharge_power`     | Read      | `Earnie_Batterie_Max_Entladeleistung` (optional) | Device max discharge (Loxone kW → EHAL W)                                           |
+| `get_ess_max_discharge_power`     | Read      | `Earnie_Batterie_Max_Entladeleistung` (optional) | Device max discharge (Loxone kW → EHAL W). Static device values only (Huawei 37046/37048), **never** feed back `Earnie_EntladeLeistungs-Limit`: a read-back 0 locks the battery |
 | `sens_power_consumers`            | Read      | (optional)                                        | House load; otherwise derived                                                               |
 | `sens_temperature_outside`        | Read      | `Earnie_Aussentemperatur`                        | Outside temperature °C (house-wide; heat pump/pool)                                        |
 | `sens_absent_mode`                | Read      | `Earnie_Abwesend`                                | House absent / holiday mode 0/1 (OR with HK `absent_mode`)                                 |

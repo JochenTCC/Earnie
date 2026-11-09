@@ -99,16 +99,74 @@ def map_ess_setpoints(
     return None, max_charge, max_discharge, 0
 
 
-def ess_target_soc_percent(target_soc: float) -> float:
+# Inverters such as the Huawei LUNA report SoC in whole percent and end a forced
+# charge/discharge when that reported value reaches the target. A target with decimals
+# can stop the slot up to one step early, so forced modes get a buffer beyond the plan's
+# slot-end SoC: one reporting step plus a share of the SoC change the slot plans at the
+# target power (faster slots overshoot the reporting step more before the stop). The
+# active power setpoint still bounds the energy of the slot; the next cycle re-plans.
+TARGET_SOC_REPORT_STEP_PCT = 1.0
+TARGET_SOC_POWER_SHARE = 0.25
+
+
+def ess_target_soc_buffer_percent(
+    mode: int,
+    target_power_kw: float,
+    battery_capacity_kwh: float,
+    *,
+    dt_h: float,
+) -> float:
+    """SoC buffer (%) beyond the planned slot-end SoC for forced charge/discharge.
+
+    0 for Automatik and hold (Entladesperre): hold sends the current SoC as target
+    and must not charge or discharge past it.
+    """
+    if mode not in (1, 3):  # MODE_ZWANGS_LADEN, MODE_ZWANGS_ENTLADEN
+        return 0.0
+    power = abs(float(target_power_kw))
+    if power <= 0.0:
+        return 0.0
+    capacity = float(battery_capacity_kwh)
+    if capacity <= 0.0:
+        raise ValueError(
+            f"set_ess_target_soc: battery capacity {capacity} kWh, buffer needs a capacity > 0"
+        )
+    slot_soc_change_pct = power * float(dt_h) / capacity * 100.0
+    return TARGET_SOC_REPORT_STEP_PCT + TARGET_SOC_POWER_SHARE * slot_soc_change_pct
+
+
+def ess_target_soc_percent(
+    target_soc: float,
+    *,
+    mode: int,
+    target_power_kw: float,
+    battery_params: dict,
+) -> float:
     """Target SoC for ``set_ess_target_soc`` in % (0-100, one decimal).
 
     The optimizer's value per mode: hold (Entladesperre) = current SoC, forced
-    charge/discharge = planned SoC at slot end, Automatik = 99. Only written when
-    the battery maps ``set_ess_target_soc``.
+    charge/discharge = planned SoC at slot end, Automatik = 99. Forced modes move it
+    by ``ess_target_soc_buffer_percent`` (down for discharge, up for charge), never
+    past the battery's ``min_soc`` / ``max_soc``. Only written when the battery maps
+    ``set_ess_target_soc``.
     """
+    from optimizer.slot_duration import DEFAULT_DT_H
+
     value = float(target_soc)
     if value != value:  # NaN
         raise ValueError("set_ess_target_soc: target SoC is NaN")
+    if mode in (1, 3) and abs(float(target_power_kw)) > 0.0:
+        buffer = ess_target_soc_buffer_percent(
+            mode,
+            target_power_kw,
+            float(battery_params["battery_capacity_kwh"]),
+            dt_h=DEFAULT_DT_H,
+        )
+        # The clamp only limits the buffer; it never moves the plan's own value back.
+        if mode == 3:
+            value = min(value, max(float(battery_params["min_soc"]), value - buffer))
+        else:
+            value = max(value, min(float(battery_params["max_soc"]), value + buffer))
     return round(min(100.0, max(0.0, value)), 1)
 
 
@@ -427,7 +485,8 @@ def build_sent_loxone_snapshot(
     automatik_discharge_cap_kw: float | None = None,
 ) -> dict[str, float]:
     """Alle an Loxone gesendeten Steuerwerte: Merkername → Zahl."""
-    max_charge, max_discharge = _battery_max_powers_kw(config.get_battery_params())
+    battery_params = config.get_battery_params()
+    max_charge, max_discharge = _battery_max_powers_kw(battery_params)
     active_kw, charge_kw, discharge_kw, control_cmd = map_ess_setpoints(
         mode,
         target_power_kw,
@@ -447,7 +506,15 @@ def build_sent_loxone_snapshot(
         ("set_ess_charge_power_limit", charge_kw),
         ("set_ess_discharge_power_limit", discharge_kw),
         ("set_ess_mode", float(control_cmd)),
-        ("set_ess_target_soc", ess_target_soc_percent(target_soc)),
+        (
+            "set_ess_target_soc",
+            ess_target_soc_percent(
+                target_soc,
+                mode=mode,
+                target_power_kw=target_power_kw,
+                battery_params=battery_params,
+            ),
+        ),
     ):
         wired = resolve_primary_ess_binding(kind)
         if not wired:
@@ -534,7 +601,12 @@ def send_huawei_modbus_states(
     )
     if control == BATTERY_CONTROL_LIMITS_ONLY:
         active_kw = None
-    target_soc_pct = ess_target_soc_percent(target_soc)
+    target_soc_pct = ess_target_soc_percent(
+        target_soc,
+        mode=mode,
+        target_power_kw=target_power_kw,
+        battery_params=battery_params,
+    )
 
     logger.info(
         "Sending ESS C1 Mapping -> Soll: %s kW, Ladegrenze: %s kW, "

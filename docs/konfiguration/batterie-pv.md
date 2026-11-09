@@ -30,7 +30,7 @@ Im **Szenario-Explorer** (Verbrauchsdaten / cons_data) gilt für die PV-Linien:
 | `battery_max_charge_power_kw` | kW | `components.json` → `batteries[]` | Max. Ladeleistung (ersetzt das gemeinsame `battery_max_power_kw`) |
 | `battery_max_discharge_power_kw` | kW | `components.json` → `batteries[]` | Max. Entladeleistung |
 | `battery_max_power_kw` | kW | `components.json` → `batteries[]` | **Veraltet (deprecated):** früher eine Grenze für beide Richtungen; wird beim Laden der Konfiguration in Lade- und Entladegrenze übertragen |
-| `limits_from_live` | bool | `components.json` → `batteries[]` | Bei `true` kommen SOC-Min/Max und max. Lade-/Entladeleistung live aus `get_ess_*` (Fallback: Hauskonfigurator-Werte) |
+| `limits_from_live` | bool | `components.json` → `batteries[]` | Bei `true` kommen SOC-Min/Max und max. Lade-/Entladeleistung live aus `get_ess_*` (Fallback: Hauskonfigurator-Werte). Diese Lesewerte müssen statische Gerätegrenzen sein, nie ein Wert, den Earnie selbst schreibt (Details: [EHAL-Referenz](../referenz/ehal.md#get_ess_-limits-device-capability-only-never-an-earnie-setpoint)) |
 | `efficiency` | 0–1 | `components.json` → `inverters[]` | Einweg-Wirkungsgrad DC↔AC (**η_inv**), Pflicht. Wirkt auf PV DC→AC und als Teil des Speicherpfads. Migration bestehender Konfigurationen: `python -m scripts.migrate_conversion_efficiency_once --config-dir <config>` |
 | `battery_efficiency` | 0–1 | `components.json` → `batteries[]` | Einweg-Wirkungsgrad der Zellchemie (**η_batt**). Optimierung und Simulation nutzen **η_path = η_inv · η_batt** (Roundtrip ≈ η_path²). Früher stand hier ein zusammengefasster Pfad-Faktor; die Migration rechnet η_inv heraus. |
 | `battery_min_soc` | % | `components.json` → `batteries[]` | Untere SOC-Grenze (Schutz) |

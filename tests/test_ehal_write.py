@@ -81,7 +81,7 @@ def test_send_huawei_publishes_only(publish_dir: Path) -> None:
     }
     with (
         patch.object(
-            lc.config, "get_battery_params", return_value={"max_power_kw": 5.0}
+            lc.config, "get_battery_params", return_value={"max_power_kw": 5.0, "battery_capacity_kwh": 15.0, "min_soc": 5.0, "max_soc": 100.0}
         ),
         patch(
             "house_config.ess_bindings.resolve_primary_ess_binding",
@@ -132,7 +132,7 @@ def test_send_huawei_publishes_export_limit_qualified(publish_dir: Path, monkeyp
     )
     with (
         patch.object(
-            lc.config, "get_battery_params", return_value={"max_power_kw": 5.0}
+            lc.config, "get_battery_params", return_value={"max_power_kw": 5.0, "battery_capacity_kwh": 15.0, "min_soc": 5.0, "max_soc": 100.0}
         ),
         patch(
             "house_config.ess_bindings.resolve_primary_ess_binding",
