@@ -1,6 +1,6 @@
 {
   "engine": {
-    "earnie_version": "2.8.0-dev.8",
+    "earnie_version": "2.8.0-dev.13",
     "solver": "highs",
     "solver_mode": "strict",
     "highspy": "1.15.1",
@@ -14,23 +14,23 @@
   "metrics": {
     "status_optimal": 1,
     "n_slots": 96,
-    "cost_euro": 6.292883691358776,
-    "objective_raw": 629.2883691358776,
-    "mode": 2,
-    "target_power_kw": 0.0,
-    "battery_plan_kw": 0.0,
+    "cost_euro": 6.767575253981508,
+    "objective_raw": 676.7575253981507,
+    "mode": 1,
+    "target_power_kw": 4.979,
+    "battery_plan_kw": 4.979,
     "consumer_energy_kw_slot0_e_auto": 0.0,
     "consumer_energy_kw_slot0_pool_swimspa": 2.8,
     "consumer_energy_kw_slot0_waermepumpe": 1.9,
     "consumer_energy_kw_slot0_waschmaschine": 0.0
   },
   "plan": {
-    "plan_hash": "c3f4b35c1ef466d3",
+    "plan_hash": "dac67b3a0b86d5bb",
     "diff_slots": null
   },
   "baseline": {
-    "git_sha": "4866576230d2c6f0063cf8c6f63bbfd7ffff194a",
-    "recorded_at": "2026-11-06T06:46:02Z",
+    "git_sha": "5119255362d3b9bdf80190ed53f157a4b02edfed",
+    "recorded_at": "2026-11-09T16:11:11Z",
     "source": "update-golden"
   },
   "inputs": {
