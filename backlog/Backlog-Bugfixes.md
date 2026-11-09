@@ -64,7 +64,6 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## Minor changes (no bugs but still not worth to put it in backlog.md - do not remove this chapter - even if empty)
 
-- [ ] Add possibility to abort running SE simulation
 
 
 ## Document Review Findings (Do not remove this chapter — even if empty)

@@ -6,14 +6,17 @@ import subprocess
 import sys
 import threading
 import time
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, TextIO
 
 from runtime_store.persist_paths import resolve_backtesting_log_dir
 from simulation.backtesting_progress import (
+    clear_cancel_request,
     clear_progress_dir,
     read_progress_file,
     read_progress_snapshot,
+    request_cancel,
 )
 from simulation.horizon_mode import DEFAULT_HORIZON_MODE
 
@@ -202,7 +205,22 @@ def build_backtesting_command(
     return cmd
 
 
-def run_backtesting_subprocess(
+@dataclass
+class BacktestingRun:
+    """A started SE subprocess. The UI keeps it in the session, so a rerun or a page change
+    does not lose the run: the page attaches to it again and can still cancel it."""
+
+    proc: subprocess.Popen
+    output_chunks: list[str]
+    reader: threading.Thread
+    progress_file: str | None
+    cancel_requested: bool = field(default=False)
+
+    def running(self) -> bool:
+        return self.proc.poll() is None
+
+
+def start_backtesting_subprocess(
     *,
     output_dir: str | None = None,
     start_month: int | None = None,
@@ -210,15 +228,14 @@ def run_backtesting_subprocess(
     progress_file: str | None = None,
     horizon_mode: str = DEFAULT_HORIZON_MODE,
     workers: int = 1,
-    on_progress: Callable[[dict[str, dict]], None] | None = None,
-) -> tuple[int, str]:
-    """Startet Backtesting offline; gibt (exit_code, kombiniertes stdout/stderr) zurück."""
+) -> BacktestingRun:
+    """Start the SE subprocess and return at once. Raises ``FileNotFoundError`` without the script."""
     log_dir = default_backtesting_output_dir() if output_dir is None else output_dir
     script_path = backtesting_script_path()
     if not script_path.is_file():
-        message = f"Backtesting-Skript fehlt: {script_path}"
-        return 1, message
-
+        raise FileNotFoundError(f"Backtesting-Skript fehlt: {script_path}")
+    # A marker left by an earlier cancel must not stop the new run.
+    clear_cancel_request(progress_file)
     cmd = build_backtesting_command(
         output_dir=log_dir,
         start_month=start_month,
@@ -244,14 +261,65 @@ def run_backtesting_subprocess(
         daemon=True,
     )
     stdout_reader.start()
-    while proc.poll() is None:
-        if progress_file and on_progress is not None:
-            on_progress(read_progress_snapshot(progress_file))
+    return BacktestingRun(
+        proc=proc,
+        output_chunks=stdout_chunks,
+        reader=stdout_reader,
+        progress_file=progress_file,
+    )
+
+
+def cancel_backtesting_run(run: BacktestingRun) -> None:
+    """Ask the run to stop; its workers end at their next simulated hour (exit ``EXIT_CANCELLED``)."""
+    if run.progress_file is None:
+        raise ValueError("SE cancel needs the run's progress file")
+    request_cancel(run.progress_file)
+    run.cancel_requested = True
+
+
+def finish_backtesting_run(run: BacktestingRun) -> tuple[int, str]:
+    """Wait for the subprocess, return (exit_code, combined stdout/stderr), clear progress files."""
+    run.proc.wait()
+    run.reader.join(timeout=5.0)
+    output = "".join(run.output_chunks)
+    exit_code = _normalize_exit_code(run.proc.returncode or 0, output)
+    if run.progress_file:
+        clear_progress_dir(run.progress_file)
+    return exit_code, output
+
+
+def poll_backtesting_progress(
+    run: BacktestingRun,
+    on_progress: Callable[[dict[str, dict]], None] | None = None,
+) -> None:
+    """Report progress until the subprocess ends."""
+    while run.running():
+        if run.progress_file and on_progress is not None:
+            on_progress(read_progress_snapshot(run.progress_file))
         time.sleep(_PROGRESS_POLL_SEC)
 
-    stdout_reader.join(timeout=5.0)
-    output = "".join(stdout_chunks)
-    exit_code = _normalize_exit_code(proc.returncode or 0, output)
-    if progress_file:
-        clear_progress_dir(progress_file)
-    return exit_code, output
+
+def run_backtesting_subprocess(
+    *,
+    output_dir: str | None = None,
+    start_month: int | None = None,
+    end_month: int | None = None,
+    progress_file: str | None = None,
+    horizon_mode: str = DEFAULT_HORIZON_MODE,
+    workers: int = 1,
+    on_progress: Callable[[dict[str, dict]], None] | None = None,
+) -> tuple[int, str]:
+    """Startet Backtesting offline und wartet; gibt (exit_code, kombiniertes stdout/stderr) zurück."""
+    try:
+        run = start_backtesting_subprocess(
+            output_dir=output_dir,
+            start_month=start_month,
+            end_month=end_month,
+            progress_file=progress_file,
+            horizon_mode=horizon_mode,
+            workers=workers,
+        )
+    except FileNotFoundError as exc:
+        return 1, str(exc)
+    poll_backtesting_progress(run, on_progress)
+    return finish_backtesting_run(run)

@@ -2,6 +2,13 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Szenario-Explorer: cancel a running run (2026-11-09)
+
+- [x] **Add possibility to abort running SE simulation** *(minor change; done 2026-11-09 on `main`)*: the SE page shows **Abbrechen** in the progress block while a run is going.
+  - **Mechanism:** the UI writes `cancel.flag` into the run's progress directory (`simulation/backtesting_progress.request_cancel`). Every worker's progress callback checks it once per simulated hour and raises `BacktestingCancelled`; the parallel loop shuts the pool down and `scripts/run_backtesting.py` exits with `EXIT_CANCELLED` (130) without writing a log, so the last complete run stays as it was. The UI clears a stale marker before it starts a run; `prepare_progress_dir` keeps a marker written before the script got there.
+  - **Run survives reruns:** `ui/backtesting_runner.py` splits the run into start / poll / cancel / finish (`BacktestingRun`); the page keeps the run in the session (`_backtesting_active_run`) and attaches to it again after a click elsewhere or a page change (maintainer decision: keep running, not cancel on any click). A browser reload starts a new session; that run finishes unseen, as before.
+  - Tests: `tests/test_backtesting_cancel.py`, `tests/apptest/test_page_backtesting_apptest.py` (cancelled vs. failed run). User doc: Benutzer-Handbuch, Szenario-Explorer „Lauf abbrechen“. Not checked end to end with a real SE run (the test fixture has no prices for its market zone); check once in the UI.
+
 ### Flaky full-suite tests closed after five green runs (2026-11-09)
 
 - [x] **Flaky full-suite tests block the pre-commit hook** *(found 2026-10-31; closed 2026-11-09)*: in three full runs (two of them pre-commit) exactly one test failed each time, a different one per run: `tests/test_navigation_specs.py::test_n2_env_value_gives_expected_modes_and_sidebar_hints` (parameters `bogus` and `scenario_exploration`) and `tests/test_flash.py::test_flash_notices_are_shown_after_rerun_and_only_once`. Both files pass when run alone (twice each). Looks like state leaking between tests in the xdist full run (environment variable or session state), not a product bug. A commit had to use `--no-verify`. Done when five consecutive full runs are green

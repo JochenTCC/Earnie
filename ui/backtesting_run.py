@@ -24,6 +24,7 @@ from runtime_store.persist_paths import resolve_backtesting_log_dir
 from simulation import backtesting_log
 from simulation.backtesting_fingerprint import fingerprint_for_current_config
 from simulation.backtesting_progress import (
+    EXIT_CANCELLED,
     ProgressEtaTracker,
     build_progress_display_rows,
     format_progress_bar_caption,
@@ -45,10 +46,14 @@ from ui.backtesting_results_helpers import (
     scenario_consumption_subheader,
 )
 from ui.backtesting_runner import (
+    BacktestingRun,
     auto_backtesting_workers,
+    cancel_backtesting_run,
     count_backtesting_parallel_tasks,
     default_progress_file_path,
-    run_backtesting_subprocess,
+    finish_backtesting_run,
+    poll_backtesting_progress,
+    start_backtesting_subprocess,
     suggest_test_month,
 )
 from ui.backtesting_time_ranges import render_time_range_help
@@ -78,6 +83,13 @@ _HORIZON_RESULTS_HIDDEN_INFO = (
     "wiederherstellen oder neu berechnen."
 )
 _BACKTESTING_LOG_ANCHOR_KEY = "_backtesting_log_anchor"
+# Running SE subprocess of this session: survives reruns and page changes, so the page
+# attaches to it again (progress, cancel) instead of losing it.
+_ACTIVE_RUN_KEY = "_backtesting_active_run"
+_CANCELLED_INFO = (
+    "Szenario-Explorer abgebrochen. Es wurde kein neues Ergebnis gespeichert; "
+    "die bisherigen Ergebnisse bleiben unverändert."
+)
 
 
 
@@ -233,40 +245,97 @@ def _execute_backtesting_run(
     ctx = _prepare_backtesting_run_context()
     if ctx is None:
         return
-    with st.status(status_label, expanded=True) as status:
-        progress_host = st.empty()
-
-        def _on_progress(snapshot: dict) -> None:
-            _render_backtesting_progress(snapshot, ctx, progress_host)
-
-        exit_code, output = run_backtesting_subprocess(
+    try:
+        run = start_backtesting_subprocess(
             start_month=start_month,
             end_month=end_month,
             progress_file=ctx["progress_file"],
             horizon_mode=horizon_mode,
             workers=ctx["workers"],
-            on_progress=_on_progress,
         )
-        if exit_code == 0:
-            status.update(label="Szenario-Explorer abgeschlossen", state="complete")
-            load_backtesting_data.clear()
-            if (
-                start_month is not None
-                and end_month is not None
-                and int(start_month) == int(end_month)
-            ):
-                st.session_state["backtesting_calendar_month"] = int(start_month)
-                st.session_state.pop("backtesting_calendar_date", None)
-            st.rerun()
-            return
-        status.update(label="Szenario-Explorer fehlgeschlagen", state="error")
-        hint = _format_backtesting_run_error(output)
-        if hint:
-            st.error(hint)
-        st.error(f"Exit-Code {exit_code}")
-        tail = output[-8000:] if len(output) > 8000 else output
-        if tail:
-            st.code(tail)
+    except FileNotFoundError as exc:
+        st.error(str(exc))
+        return
+    st.session_state[_ACTIVE_RUN_KEY] = {
+        "run": run,
+        "ctx": ctx,
+        "status_label": status_label,
+        "start_month": start_month,
+        "end_month": end_month,
+    }
+    follow_active_backtesting_run()
+
+
+def active_backtesting_run() -> dict | None:
+    return st.session_state.get(_ACTIVE_RUN_KEY)
+
+
+def _cancel_active_run() -> None:
+    active = active_backtesting_run()
+    if active is not None:
+        cancel_backtesting_run(active["run"])
+
+
+def follow_active_backtesting_run() -> bool:
+    """Show the session's running SE run (progress, cancel) until it ends. False without one.
+
+    A click elsewhere interrupts this script run (Streamlit rerun), not the subprocess: the
+    run stays in the session and the next page run attaches to it again.
+    """
+    active = active_backtesting_run()
+    if active is None:
+        return False
+    run: BacktestingRun = active["run"]
+    ctx = active["ctx"]
+    with st.status(active["status_label"], expanded=True) as status:
+        st.button(
+            "Abbrechen",
+            key="backtesting_cancel_btn",
+            on_click=_cancel_active_run,
+            disabled=run.cancel_requested,
+            help="Stoppt den Lauf nach der aktuell gerechneten Stunde; es wird nichts gespeichert.",
+        )
+        if run.cancel_requested:
+            st.caption("Abbruch angefordert – der Lauf stoppt nach der aktuellen Stunde…")
+        progress_host = st.empty()
+
+        def _on_progress(snapshot: dict) -> None:
+            _render_backtesting_progress(snapshot, ctx, progress_host)
+
+        poll_backtesting_progress(run, _on_progress)
+        st.session_state.pop(_ACTIVE_RUN_KEY, None)
+        exit_code, output = finish_backtesting_run(run)
+        _show_backtesting_run_result(status, exit_code, output, active)
+    return True
+
+
+def _show_backtesting_run_result(status, exit_code: int, output: str, active: dict) -> None:
+    start_month = active["start_month"]
+    end_month = active["end_month"]
+    if exit_code == 0:
+        status.update(label="Szenario-Explorer abgeschlossen", state="complete")
+        load_backtesting_data.clear()
+        if (
+            start_month is not None
+            and end_month is not None
+            and int(start_month) == int(end_month)
+        ):
+            st.session_state["backtesting_calendar_month"] = int(start_month)
+            st.session_state.pop("backtesting_calendar_date", None)
+        st.rerun()
+        return
+    if exit_code == EXIT_CANCELLED and active["run"].cancel_requested:
+        status.update(label="Szenario-Explorer abgebrochen", state="error")
+        st.info(_CANCELLED_INFO)
+        return
+    status.update(label="Szenario-Explorer fehlgeschlagen", state="error")
+    hint = _format_backtesting_run_error(output)
+    if hint:
+        st.error(hint)
+    st.error(f"Exit-Code {exit_code}")
+    tail = output[-8000:] if len(output) > 8000 else output
+    if tail:
+        st.code(tail)
 
 def _render_season_mirror_toggle() -> None:
     from data.cons_data_season_mirror import is_season_mirror_enabled
@@ -403,6 +472,8 @@ def render_backtesting_run_controls(
     """Rendert Start-Steuerung. True wenn Horizont-Auswahl vom Log abweicht."""
     del stale_reason
     label = "Szenario-Explorer neu berechnen" if log_exists else "Szenario-Explorer starten"
+    # A run of this session that is still going (e.g. after a page change) comes first.
+    follow_active_backtesting_run()
     log_period = meta.get("period") if meta else None
     render_time_range_help(key="backtesting_time_ranges_run", log_period=log_period)
     test_month = suggest_test_month()

@@ -317,6 +317,8 @@ Die erzeugten Verbrauchsverläufe lassen sich im Explorer prüfen (Plausibilitä
 3. Rechnung starten. Je nach Umfang kann das länger dauern.
 4. Warten, bis die Auswertung fertig ist. Die Ergebnisse legt Earnie in der Laufzeitablage des Explorers ab.
 
+**Lauf abbrechen:** Während der Rechnung steht im Fortschrittsblock die Schaltfläche **Abbrechen**. Earnie stoppt dann nach der gerade gerechneten Stunde und speichert nichts; die Ergebnisse des letzten vollständigen Laufs bleiben unverändert. Wer während der Rechnung eine andere Seite öffnet oder etwas anklickt, unterbricht nur die Anzeige: Die Rechnung läuft weiter, und beim nächsten Aufruf des Szenario-Explorers erscheinen Fortschritt und **Abbrechen** wieder. Nach einem Neuladen des Browser-Tabs ist der laufende Lauf nicht mehr sichtbar; er rechnet trotzdem zu Ende und speichert sein Ergebnis.
+
 > **Rechenzeit:** Earnie startet für jedes Szenario einen eigenen Prozess auf einem eigenen Prozessorkern. Auf Rechnern mit wenigen Kernen dauert die Rechnung entsprechend länger. Den Szenario-Explorer daher besser nicht auf der Hardware ausführen, die später den Live-Betrieb übernimmt.
 
 **Was rechnet die Zeile „Historisch“?** Die zuvor erzeugte Last mit den Tarifen des Live-Szenarios, **ohne** PV und **ohne** Batterie. Weitere Referenzen ohne Optimierung entstehen per Heuristik bzw. über die Einstellung **Eigene Referenz ohne Optimierung** (bei PV-Szenarien mit dem PV-Ertrag des jeweiligen Szenarios). Batterie und Lastverschiebung gehören zur **optimierten** Variante, nicht zur Zeile Historisch.

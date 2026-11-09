@@ -1,5 +1,6 @@
 # scripts/run_backtesting.py
 import os
+import sys
 
 if __name__ == "__main__":
     # Nur im Backtesting-Prozess — nicht beim Import aus der Streamlit-UI setzen.
@@ -63,10 +64,13 @@ from simulation.reference_ladder import (
     rule_share,
 )
 from simulation.backtesting_progress import (
+    EXIT_CANCELLED,
+    BacktestingCancelled,
     clear_progress_dir,
     ordered_backtesting_result_ids,
     prepare_progress_dir,
     reorder_results_by_ids,
+    worker_cancel_requested,
     worker_progress_path,
 )
 from simulation.horizon_mode import (
@@ -619,6 +623,10 @@ def _run_parallel_backtesting(
                     plausibility_by_scenario[result_name] = plausibility
                     cbc_events_by_scenario[result_name] = cbc_events
                     window_snapshots.extend(snapshots)
+            except BacktestingCancelled:
+                # The other workers see the same marker and stop at their next hour.
+                pool.shutdown(wait=True, cancel_futures=True)
+                raise
             except Exception as exc:
                 raise RuntimeError(
                     f"{'Szenario' if kind == 'sim' else 'Referenz'} "
@@ -688,6 +696,9 @@ def _make_progress_printer(
 
     def progress(current: int, total: int) -> None:
         nonlocal last_write_at, last_written_current
+        # The UI cancels a run by a marker next to the worker snapshots; stop at this hour.
+        if worker_cancel_requested(progress_file):
+            raise BacktestingCancelled(f"{scenario_name}: abgebrochen bei {current}/{total} h")
         pct = 100 * current / total if total else 0.0
         bar_width = 30
         filled = int(bar_width * current / total) if total else 0
@@ -1471,4 +1482,9 @@ def main(argv: list[str] | None = None):
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except BacktestingCancelled as cancelled:
+        # No log is written; the previous run's results stay as they were.
+        print(f"\nSzenario-Explorer abgebrochen ({cancelled}). Kein Log geschrieben.", flush=True)
+        sys.exit(EXIT_CANCELLED)

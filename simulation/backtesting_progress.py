@@ -299,6 +299,8 @@ def worker_progress_path(progress_path: str | None, worker_key: str) -> str | No
 
 
 def prepare_progress_dir(progress_path: str | None) -> None:
+    """Fresh worker snapshots for a new run. Keeps the cancel marker: a cancel the UI wrote
+    before the script got here still applies (the UI clears the marker before it starts a run)."""
     progress_dir = resolve_progress_dir(progress_path)
     if progress_dir is None:
         return
@@ -315,6 +317,50 @@ def clear_progress_dir(progress_path: str | None) -> None:
     if progress_dir.is_dir():
         for child in progress_dir.glob("*.json"):
             child.unlink(missing_ok=True)
+    clear_cancel_request(progress_path)
+
+
+# --- Cancel (SE run aborted from the UI) ---------------------------------------------------
+
+CANCEL_MARKER_NAME = "cancel.flag"
+# Exit code of ``scripts/run_backtesting.py`` after a cancel (like SIGINT); no log is written.
+EXIT_CANCELLED = 130
+
+
+class BacktestingCancelled(Exception):
+    """The run stopped because the cancel marker exists in its progress directory."""
+
+
+def cancel_marker_path(progress_path: str | None) -> Path | None:
+    progress_dir = resolve_progress_dir(progress_path)
+    return None if progress_dir is None else progress_dir / CANCEL_MARKER_NAME
+
+
+def request_cancel(progress_path: str | None) -> None:
+    """Ask a running SE subprocess (and its workers) to stop at the next simulated hour."""
+    marker = cancel_marker_path(progress_path)
+    if marker is None:
+        raise ValueError("SE cancel needs a progress path")
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    marker.write_text("cancel", encoding="utf-8")
+
+
+def clear_cancel_request(progress_path: str | None) -> None:
+    marker = cancel_marker_path(progress_path)
+    if marker is not None:
+        marker.unlink(missing_ok=True)
+
+
+def cancel_requested(progress_path: str | None) -> bool:
+    marker = cancel_marker_path(progress_path)
+    return marker is not None and marker.is_file()
+
+
+def worker_cancel_requested(worker_progress_file: str | None) -> bool:
+    """Cancel check for a worker that only knows its own snapshot file (``worker_progress_path``)."""
+    if not worker_progress_file:
+        return False
+    return (Path(worker_progress_file).parent / CANCEL_MARKER_NAME).is_file()
 
 
 def read_progress_file(path: str) -> dict | None:
