@@ -8,7 +8,7 @@ from typing import Any
 import streamlit as st
 
 import config
-from integrations import ehal_live
+from integrations.live_power_capture import capture_live_power
 from runtime_store.chart_debug_capture import (
     build_chart_section,
     read_zip_bytes,
@@ -66,20 +66,19 @@ def _chart1_plotly_json(bundle) -> str | None:
 def _save_debug_dump(
     bundle,
     current_soc: float | None,
-    live_power: dict[str, Any] | None,
     *,
     title: str,
     symptom: str,
 ) -> str:
     chart_payload = None
     if bundle is not None:
-        capture_live_power = live_power
-        if capture_live_power is None:
-            capture_live_power = ehal_live.fetch_live_power()
+        # Same read as the Live Sankey, taken at capture time (+ push state per signal).
+        live = capture_live_power()
         chart_payload = build_chart_section(
             bundle,
             current_soc=current_soc,
-            live_power=capture_live_power,
+            live_power=live["live_power"],
+            live_power_capture=live["live_power_capture"],
             session_meta=_session_meta(),
             chart1_plotly_json=_chart1_plotly_json(bundle),
         )
@@ -145,7 +144,6 @@ def _finish_save(
 def _debug_dump_meta_dialog(
     bundle,
     current_soc: float | None,
-    live_power: dict[str, Any] | None,
 ) -> None:
     st.caption(
         "Titel und Symptom sind optional und landen in manifest.meta. "
@@ -178,7 +176,6 @@ def _debug_dump_meta_dialog(
             zip_path = _save_debug_dump(
                 bundle,
                 current_soc,
-                live_power,
                 title=title,
                 symptom=symptom,
             )
@@ -189,7 +186,6 @@ def _debug_dump_meta_dialog(
 
 def render_chart_debug_capture_controls(
     current_soc: float | None,
-    live_power: dict[str, Any] | None = None,
 ) -> None:
     """
     Zeigt Speichern-Button, wenn ui.chart_debug_capture_enabled gesetzt ist.
@@ -235,4 +231,4 @@ def render_chart_debug_capture_controls(
         st.session_state.pop(_SESSION_AUTO_DOWNLOAD, None)
 
     if st.session_state.get(_SESSION_META_PROMPT):
-        _debug_dump_meta_dialog(bundle, current_soc, live_power)
+        _debug_dump_meta_dialog(bundle, current_soc)
