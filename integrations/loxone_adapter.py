@@ -137,8 +137,8 @@ class LoxoneConfig:
     discharge_power_name: str = ""
     active_power_name: str = ""
     control_cmd_name: str = ""
-    evcs_max_current_name: str = ""
-    evcs_mode_name: str = ""
+    # One row per charger: (Kennung in ``evcs.<Kennung>.*``, current marker, mode marker).
+    evcs_markers: tuple[tuple[str, str, str], ...] = ()
     grid_export_limit_out_name: str = ""
     ess_source_select_name: str = ""
     timeout_sec: float = 10.0
@@ -213,7 +213,9 @@ class LoxoneAdapter:
             "set_ess_charge_power_limit": cfg.charge_power_name,
             "set_ess_discharge_power_limit": cfg.discharge_power_name,
             "set_ess_source_select": cfg.ess_source_select_name,
-            "set_evcs_max_current": cfg.evcs_max_current_name,
+            "set_evcs_max_current": next(
+                (current for _cid, current, _mode in cfg.evcs_markers if current), ""
+            ),
             "set_grid_export_power_limit": cfg.grid_export_limit_out_name,
         }
         write_map.update(_inverter_limit_write_map())
@@ -228,6 +230,9 @@ class LoxoneAdapter:
         for message in incomplete_function_messages(write_map):
             logger.warning("Loxone mapping adapter_id=%s: %s", cfg.adapter_id, message)
         self._incomplete_fields = incomplete_function_fields(write_map)
+        self._evcs_markers = {cid: (current, mode) for cid, current, mode in cfg.evcs_markers}
+        # Chargers whose last publish failed; the others keep writing.
+        self._evcs_disabled: set[str] = set()
         self._last_write_error: EhalWriteError | None = None
         self._last_skipped: list[str] = []
         self._warned_skips: set[str] = set()
@@ -372,7 +377,10 @@ class LoxoneAdapter:
         setpoint: EhalSetpoint | dict[str, Any],
         **_kwargs: Any,
     ) -> EhalWriteError | None:
-        """Write ESS/EV setpoints to Loxone markers (transitional EV bindings)."""
+        """Write ESS / plant setpoints to Loxone markers.
+
+        Charger setpoints go through :meth:`write_evcs_setpoints` (one call per charger).
+        """
         raw = dict(setpoint)
         try:
             doc = validate_setpoint(raw)
@@ -387,6 +395,12 @@ class LoxoneAdapter:
                 flip_evcs=False,
             )
 
+        evcs = [k for k in ("set_evcs_max_current", "set_evcs_mode") if k in doc]
+        if evcs:
+            raise ValueError(
+                f"EVCS-Sollwerte {evcs} gehören an eine Wallbox: write_evcs_setpoints "
+                "mit der Kennung des Ladepunkts verwenden."
+            )
         failed: list[str] = []
         messages: list[str] = []
         flip_ess = False
@@ -420,7 +434,6 @@ class LoxoneAdapter:
                     failed.append("set_ess_source_select")
                     messages.append(msg)
 
-        flip_evcs = self._write_evcs_setpoints(doc, failed, messages) or flip_evcs
 
         if not failed:
             self._last_write_error = None
@@ -485,46 +498,78 @@ class LoxoneAdapter:
                     messages.append(msg)
         return flip
 
-    def _write_evcs_setpoints(
-        self, doc: dict[str, Any], failed: list[str], messages: list[str]
-    ) -> bool:
-        flip = False
-        if not self._supports_evcs_current:
-            for field_name in ("set_evcs_max_current", "set_evcs_mode"):
-                if field_name in doc:
-                    self._skip(field_name)
-            return flip
-        if "set_evcs_max_current" in doc:
-            ok, msg = self._try_marker_write(
-                self.cfg.evcs_max_current_name,
-                float(doc["set_evcs_max_current"]),
-                field="set_evcs_max_current",
-            )
-            if not ok:
-                failed.append("set_evcs_max_current")
-                messages.append(msg)
-                flip = True
-        if "set_evcs_mode" in doc and not self.cfg.evcs_mode_name:
-            self._skip("set_evcs_mode")
-        elif "set_evcs_mode" in doc:
-            ok, msg = self._try_evcs_mode_write(str(doc["set_evcs_mode"]))
-            if not ok:
-                failed.append("set_evcs_mode")
-                messages.append(msg)
-                flip = True
-        return flip
+    def write_evcs_setpoints(
+        self,
+        charger_id: str,
+        setpoint: EhalSetpoint | dict[str, Any],
+        *,
+        voltage_v: float,
+        phases: int,
+    ) -> EhalWriteError | None:
+        """Current and mode of one charger (``evcs.<charger_id>.*``) via status.json.
 
-    def _try_evcs_mode_write(self, mode: str) -> tuple[bool, str]:
-        """Publish ``set_evcs_mode`` (off=0, pv=1, now=2) via status.json."""
-        mode_l = str(mode or "").strip().lower()
-        if mode_l not in EVCS_MODE_VALUES:
-            return False, f"Unsupported set_evcs_mode: {mode!r}"
-        if not self.cfg.evcs_mode_name:
-            return False, "No set_evcs_mode marker configured"
-        return self._try_marker_write(
-            self.cfg.evcs_mode_name,
-            EVCS_MODE_VALUES[mode_l],
-            field="set_evcs_mode",
+        A failed publish disables this charger only; the other chargers keep writing.
+        """
+        from ehal.qualified_ids import qualified_charger_id
+
+        del voltage_v, phases  # Loxone takes the current in A
+        raw = dict(setpoint)
+        try:
+            doc = validate_setpoint(raw)
+        except EhalValidationError as exc:
+            return self._record_write_error(
+                failed_fields=[k for k in SETPOINT_FIELDS if k in raw]
+                or ["set_evcs_max_current"],
+                message=f"Invalid EHAL setpoint: {exc}",
+                hub_status=None,
+                retryable=False,
+                flip_ess=False,
+                flip_evcs=False,
+            )
+        self._last_skipped = []
+        current_marker, mode_marker = self._evcs_markers.get(charger_id, ("", ""))
+        usable = charger_id not in self._evcs_disabled
+        failed: list[str] = []
+        messages: list[str] = []
+        if "set_evcs_max_current" in doc:
+            if not (usable and current_marker):
+                self._skip("set_evcs_max_current")
+            else:
+                ok, msg = self._try_marker_write(
+                    current_marker,
+                    float(doc["set_evcs_max_current"]),
+                    field=qualified_charger_id(charger_id, "set_evcs_max_current"),
+                )
+                if not ok:
+                    failed.append("set_evcs_max_current")
+                    messages.append(msg)
+        if "set_evcs_mode" in doc:
+            mode_l = str(doc["set_evcs_mode"] or "").strip().lower()
+            if not (usable and mode_marker):
+                self._skip("set_evcs_mode")
+            elif mode_l not in EVCS_MODE_VALUES:
+                failed.append("set_evcs_mode")
+                messages.append(f"Unsupported set_evcs_mode: {doc['set_evcs_mode']!r}")
+            else:
+                # Publish ``set_evcs_mode`` (off=0, pv=1, now=2) via status.json.
+                ok, msg = self._try_marker_write(
+                    mode_marker,
+                    EVCS_MODE_VALUES[mode_l],
+                    field=qualified_charger_id(charger_id, "set_evcs_mode"),
+                )
+                if not ok:
+                    failed.append("set_evcs_mode")
+                    messages.append(msg)
+        if not failed:
+            return None
+        self._evcs_disabled.add(charger_id)
+        return self._record_write_error(
+            failed_fields=failed,
+            message="; ".join(messages),
+            hub_status=None,
+            retryable=True,
+            flip_ess=False,
+            flip_evcs=False,
         )
 
     def _read_or_derive_consumers(

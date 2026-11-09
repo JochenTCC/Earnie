@@ -21,7 +21,8 @@ def test_migrate_ha_entities_to_plant_without_ev_consumer():
     assert plant["set_evcs_max_current"] == ""
     aggregated = aggregate_ha_entities(house)
     assert aggregated["ess.house.sens_ess_soc"] == ""
-    assert "sens_evcs_active_power" in aggregated
+    # Multi-EV M2: charger keys come from the EV ↔ wallbox pairs only, not from the plant.
+    assert not any("evcs" in key for key in aggregated)
 
 
 def test_migrate_ha_entities_ev_to_consumer():
@@ -47,7 +48,31 @@ def test_migrate_ha_entities_ev_to_consumer():
     ev = house["profiles"]["live"]["consumers"][0]["ehal_bindings"]
     assert ev["sens_evcs_active_power"] == ""
     assert ev["set_evcs_max_current"] == ""
-    assert aggregate_ha_entities(house)["sens_evcs_active_power"] == ""
+    # Multi-EV M2: charger keys per EV, ``evcs.<Kennung>.<kind>``.
+    aggregated = aggregate_ha_entities(house)
+    assert aggregated["evcs.wallbox.sens_evcs_active_power"] == ""
+    assert aggregated["evcs.wallbox.set_evcs_max_current"] == ""
+    assert "set_evcs_max_current" not in aggregated
+
+
+def test_aggregate_activates_the_charger_keys_of_every_ev():
+    house = {
+        "profiles": {
+            "live": {
+                "consumers": [
+                    {"id": "auto_a", "type": "ev", "ehal_bindings": {"set_evcs_max_current": ""}},
+                    {
+                        "id": "auto_b",
+                        "type": "ev",
+                        "ehal_bindings": {"evcs.auto_b.set_evcs_mode": ""},
+                    },
+                ]
+            }
+        }
+    }
+    aggregated = aggregate_ha_entities(house)
+    assert "evcs.auto_a.set_evcs_max_current" in aggregated
+    assert "evcs.auto_b.set_evcs_mode" in aggregated
 
 
 def test_migrate_empty_only_does_not_overwrite_activation():

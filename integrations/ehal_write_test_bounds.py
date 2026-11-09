@@ -61,9 +61,10 @@ def probe_kind(field: str) -> str:
     from ehal.ess_fields import ess_field_kind
     from ehal.flex_fields import flex_field_kind
     from ehal.inverter_fields import inv_field_kind
+    from ehal.qualified_ids import evcs_field_kind
 
     name = canonical_probe_field(field)
-    kind = ess_field_kind(name) or inv_field_kind(name)
+    kind = ess_field_kind(name) or inv_field_kind(name) or evcs_field_kind(name)
     if kind:
         return kind
     flex_kind = flex_field_kind(name)

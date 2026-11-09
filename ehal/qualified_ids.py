@@ -114,6 +114,28 @@ def qualified_consumer_id(consumer_id: str, consumer_type: str, key: str) -> str
     return f"{consumer_namespace(consumer_id, consumer_type, kind)}.{slug}.{kind}"
 
 
+def charger_id_for_ev(consumer_id: str) -> str:
+    """Kennung in ``evcs.<Kennung>.*`` of a fixed EV ↔ wallbox pair.
+
+    Until the dynamic assignment (multi-EV M4) the charger IDs stay keyed by the EV, as the
+    pair view of the loader shows them (``house_config.wallboxes.resolve_ev_pair``).
+    """
+    return flex_ehal_slug(consumer_id)
+
+
+def qualified_charger_id(charger_id: str, key: str) -> str:
+    """``evcs.<Kennung>.<kind>`` for a charger binding key (any stored spelling)."""
+    return f"{NS_EVCS}.{str(charger_id).strip()}.{field_kind(key)}"
+
+
+def evcs_field_kind(key: str) -> str | None:
+    """Charger kind of an entity-scoped ``evcs.<Kennung>.<kind>`` key, else ``None``."""
+    parts = str(key or "").split(".")
+    if len(parts) == 3 and parts[0] == NS_EVCS and parts[1] and parts[2] in EVCS_KINDS:
+        return parts[2]
+    return None
+
+
 def qualified_battery_id(battery_id: str, key: str) -> str:
     """``ess.<Kennung>.<kind>`` for a battery binding key (entity-scoped or flat)."""
     return f"{NS_ESS}.{str(battery_id).strip()}.{field_kind(key)}"

@@ -392,7 +392,11 @@ Im Hauskonfigurator werden Auto und Wallbox getrennt gepflegt:
 - **Bereich Wallboxen:** Bezeichnung, **Spannung (V)**, **Phasen**, **Mindest-** und **Höchst-Ladestrom (A)** der Wallbox. Die Kennung entsteht beim Anlegen aus der Bezeichnung und bleibt danach fest, weil die E-Autos und die IDs `evcs.<Kennung>.*` auf sie verweisen. Unter den Feldern stehen die zugeordneten E-Autos mit dem Ladebereich des Paars. Eine Wallbox, der noch ein E-Auto zugeordnet ist, lässt sich nicht entfernen. Eine Änderung, nach der ein zugeordnetes E-Auto keinen gemeinsamen Ladestrom mehr hätte, speichert Earnie nicht und zeigt eine Meldung.
 - **E-Auto im Hausprofil:** **Phasen des Autos**, **Mindest-** und **Höchst-Ladestrom des Autos (A)** und die Auswahl **Wallbox**. Darunter zeigt Earnie die Daten der Wallbox und die Ladeleistung des Paars in kW. **Neue Wallbox für dieses E-Auto anlegen** erzeugt eine Wallbox mit den Grenzen des Autos und 230 V. Ohne Wallbox wird das E-Auto nicht gespeichert.
 
-Innerhalb eines Hausprofils lädt eine Wallbox genau ein E-Auto; zwei E-Autos eines Profils an derselben Wallbox lehnt Earnie mit einer Meldung ab. Dasselbe E-Auto in mehreren Hausprofilen (kopierte Profile) nutzt dieselbe Wallbox. Die Lade-Bindings der Wallbox pflegt die Seite EHAL-Com wie bisher beim E-Auto. Ein importiertes E-Auto (Loxone-Import) bekommt beim Speichern eine eigene Wallbox mit seiner Kennung.
+Innerhalb eines Hausprofils lädt eine Wallbox genau ein E-Auto; zwei E-Autos eines Profils an derselben Wallbox lehnt Earnie mit einer Meldung ab. Dasselbe E-Auto in mehreren Hausprofilen (kopierte Profile) nutzt dieselbe Wallbox. Die Lade-Bindings der Wallbox pflegt die Seite EHAL-Com wie bisher beim E-Auto.
+
+Im Live-Betrieb schreibt Earnie Ladestrom und Lademodus je E-Auto an dessen Wallbox, mit der Spannung der Wallbox und den Phasen des Paars. Die EHAL-IDs tragen dabei die Kennung des E-Autos (`evcs.<E-Auto>.set_evcs_max_current`). Schlägt das Schreiben an einer Wallbox fehl, schreibt Earnie an die übrigen weiter. Unter OpenEMS steht die Komponente je Wallbox im Binding `set_evcs_max_current` (`<Komponente>/SetChargePowerLimit`, z.B. `evcs0/SetChargePowerLimit`); eine Wallbox ohne diese Adresse wird nicht geschrieben.
+
+Ein importiertes E-Auto (Loxone-Import) bekommt beim Speichern eine eigene Wallbox mit seiner Kennung.
 
 In dieser Version hat jedes E-Auto eine feste Wallbox. Mehrere Autos, die sich Wallboxen teilen (`mode: dynamic`), folgen in einer späteren Version.
 

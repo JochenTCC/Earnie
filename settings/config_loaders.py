@@ -142,6 +142,13 @@ def load_ehal_params(raw_config: dict) -> dict[str, Any]:
     )
 
     reject_leftover_ha_transport(ha)
+    if "evcs_component" in openems:
+        raise ValueError(
+            "config.json: ehal.openems.evcs_component gehört seit Datenmodell 6 an die "
+            "Wallbox (Binding set_evcs_max_current = <Komponente>/SetChargePowerLimit) — "
+            "Konfiguration migrieren (Streamlit-Seite „Konfigurations-Migration“ oder "
+            "python -m scripts.migrate_config --config-dir <config>)."
+        )
     entities = ha.get("entities") if isinstance(ha.get("entities"), dict) else {}
     sign = ha.get("sign") if isinstance(ha.get("sign"), dict) else {}
     boolean_invert = (
@@ -154,7 +161,6 @@ def load_ehal_params(raw_config: dict) -> dict[str, Any]:
         "EHAL_OPENEMS_USERNAME": str(openems.get("username") or "x"),
         "EHAL_OPENEMS_PASSWORD": str(openems.get("password") or "admin"),
         "EHAL_OPENEMS_ESS_COMPONENT": str(openems.get("ess_component") or "ess0"),
-        "EHAL_OPENEMS_EVCS_COMPONENT": str(openems.get("evcs_component") or "evcs0"),
         # Deprecated: prefer house_profiles plant/consumer ehal_bindings.
         "EHAL_HA_ENTITIES": {
             str(key): str(value).strip()

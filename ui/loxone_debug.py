@@ -65,7 +65,7 @@ def _network_write_mapping() -> dict[str, str]:
     if ehal_live.is_openems_backend():
         return openems_setpoint_mapping(
             ess_component=str(config.get("EHAL_OPENEMS_ESS_COMPONENT") or "ess0"),
-            evcs_component=str(config.get("EHAL_OPENEMS_EVCS_COMPONENT") or "evcs0"),
+            evcs_channels=ehal_live.get_openems_adapter().cfg.evcs_channels,
         )
     return {}
 
@@ -104,7 +104,7 @@ def _telemetry_mapping_for_adapter(adapter: Any) -> dict[str, str]:
     cfg = getattr(adapter, "cfg", None)
     return openems_telemetry_mapping(
         ess_component=str(getattr(cfg, "ess_component", None) or "ess0"),
-        evcs_component=str(getattr(cfg, "evcs_component", None) or "evcs0"),
+        evcs_channels=tuple(getattr(cfg, "evcs_channels", None) or ()),
     )
 
 

@@ -33,7 +33,9 @@ class OpenemsConfig:
     password: str
     adapter_id: str
     ess_component: str = "ess0"
-    evcs_component: str = "evcs0"
+    # One row per charger: (Kennung in ``evcs.<Kennung>.*``, component, write channel),
+    # from the wallbox binding ``set_evcs_max_current`` = ``<component>/<channel>``.
+    evcs_channels: tuple[tuple[str, str, str], ...] = ()
     timeout_sec: float = 10.0
 
 
@@ -134,7 +136,11 @@ class OpenemsAdapter:
     def __init__(self, cfg: OpenemsConfig) -> None:
         self.cfg = cfg
         self._supports_ess_write = True
-        self._supports_evcs_current = bool(cfg.evcs_component)
+        self._evcs_channels = {
+            cid: (component, channel) for cid, component, channel in cfg.evcs_channels
+        }
+        self._supports_evcs_current = bool(self._evcs_channels)
+        self._evcs_disabled: set[str] = set()
         self._inv_limit_channels = _openems_inv_limit_channels()
         self._supports_inv_power_limit = bool(self._inv_limit_channels)
         self._last_write_error: EhalWriteError | None = None
@@ -266,12 +272,12 @@ class OpenemsAdapter:
         if ess_power is not None:
             doc["sens_ess_power"] = float(ess_power)
 
-        if self.cfg.evcs_component:
-            evcs_power = self._optional_channel(self.cfg.evcs_component, "ActivePower")
-            if evcs_power is None:
-                evcs_power = self._optional_channel(self.cfg.evcs_component, "ChargePower")
-            if evcs_power is not None:
-                doc["sens_evcs_active_power"] = max(0.0, float(evcs_power))
+        evcs_powers = [
+            self._evcs_power_w(component) for component, _channel in self._evcs_channels.values()
+        ]
+        if any(power is not None for power in evcs_powers):
+            # Plant total of all chargers (one component per wallbox).
+            doc["sens_evcs_active_power"] = sum(max(0.0, p or 0.0) for p in evcs_powers)
 
         from integrations.plant_balance import (
             balance_tolerances_from_plant,
@@ -384,37 +390,54 @@ class OpenemsAdapter:
             # OpenEMS feed-in curtailment channel not wired yet — ignore quietly.
             pass
 
-    def _write_evcs_setpoint(
+    def write_evcs_setpoints(
         self,
-        doc: dict[str, Any],
-        outcome: _OpenemsWriteOutcome,
+        charger_id: str,
+        setpoint: EhalSetpoint | dict[str, Any],
         *,
-        evcs_voltage_v: float,
-        evcs_phases: int,
-    ) -> None:
-        """EVCS-Stromgrenze als Wirkleistung schreiben."""
-        if "set_evcs_max_current" not in doc or not self._supports_evcs_current:
-            return
+        voltage_v: float,
+        phases: int,
+    ) -> EhalWriteError | None:
+        """EVCS current limit as active power on this charger's component.
+
+        A failed write disables this charger only. ``set_evcs_mode`` has no channel.
+        """
+        raw = dict(setpoint)
+        try:
+            doc = validate_setpoint(raw)
+        except EhalValidationError as exc:
+            return self._invalid_setpoint_error(raw, exc)
+        self._last_skipped = []
+        if "set_evcs_max_current" not in doc:
+            return None
+        target = self._evcs_channels.get(charger_id)
+        if target is None or charger_id in self._evcs_disabled:
+            self._last_skipped = ["set_evcs_max_current"]
+            return None
         watts = evcs_amps_to_watts(
-            doc["set_evcs_max_current"],
-            voltage_v=evcs_voltage_v,
-            phases=evcs_phases,
+            doc["set_evcs_max_current"], voltage_v=voltage_v, phases=phases
         )
-        ok, status, msg = self._try_evcs_write(watts)
-        if not ok:
-            outcome.failed.append("set_evcs_max_current")
-            outcome.messages.append(msg)
-            outcome.hub_status = status or outcome.hub_status
-            outcome.flip_evcs = True
+        ok, status, msg = self._try_evcs_write(*target, watts)
+        if ok:
+            return None
+        self._evcs_disabled.add(charger_id)
+        return self._record_write_error(
+            failed_fields=["set_evcs_max_current"],
+            message=msg,
+            hub_status=status,
+            retryable=True,
+            flip_ess=False,
+            flip_evcs=False,
+        )
 
     def write_setpoints(
         self,
         setpoint: EhalSetpoint | dict[str, Any],
-        *,
-        evcs_voltage_v: float = 230.0,
-        evcs_phases: int = 1,
     ) -> EhalWriteError | None:
-        """Write setpoints; on failure degrade capabilities and return write_error."""
+        """Write ESS setpoints; on failure degrade capabilities and return write_error.
+
+        Charger setpoints go through :meth:`write_evcs_setpoints`.
+        """
         raw = dict(setpoint)
         try:
             doc = validate_setpoint(raw)
@@ -422,13 +445,13 @@ class OpenemsAdapter:
             return self._invalid_setpoint_error(raw, exc)
 
         outcome = _OpenemsWriteOutcome()
+        evcs = [k for k in ("set_evcs_max_current", "set_evcs_mode") if k in doc]
+        if evcs:
+            raise ValueError(
+                f"EVCS-Sollwerte {evcs} gehören an eine Wallbox: write_evcs_setpoints "
+                "mit der Kennung des Ladepunkts verwenden."
+            )
         self._write_ess_setpoints(doc, outcome)
-        self._write_evcs_setpoint(
-            doc,
-            outcome,
-            evcs_voltage_v=evcs_voltage_v,
-            evcs_phases=evcs_phases,
-        )
 
         if not outcome.failed:
             self._last_write_error = None
@@ -517,11 +540,17 @@ class OpenemsAdapter:
             status = str(exc.status_code) if exc.status_code is not None else None
             return False, status, str(exc)
 
-    def _try_evcs_write(self, watts: float) -> tuple[bool, str | None, str]:
+    def _evcs_power_w(self, component: str) -> float | None:
+        power = self._optional_channel(component, "ActivePower")
+        if power is None:
+            power = self._optional_channel(component, "ChargePower")
+        return None if power is None else float(power)
+
+    def _try_evcs_write(
+        self, component: str, channel: str, watts: float
+    ) -> tuple[bool, str | None, str]:
         try:
-            self.write_channel(
-                self.cfg.evcs_component, "SetChargePowerLimit", watts
-            )
+            self.write_channel(component, channel, watts)
             return True, None, ""
         except OpenemsHttpError as exc:
             logger.warning(

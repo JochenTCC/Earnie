@@ -66,7 +66,10 @@ def setpoint_qualified_ids(house: dict, components: dict) -> dict[str, str]:
             continue
         qid = pilot_id(kind, eid, field, ctype)
         if qid:
-            out[str(field)] = qid
+            # Charger keys are often stored bare (``set_evcs_max_current``): keyed by the
+            # qualified ID so that several EV ↔ wallbox pairs do not overwrite each other.
+            key = qid if kind == "consumer" and ctype == "ev" else str(field)
+            out[key] = qid
     return out
 
 

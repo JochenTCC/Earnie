@@ -14,6 +14,10 @@ Until data model 5 an EV consumer carried both the car and its charger: the kW l
 - every Earnie-track file: ``earnie_data_model`` 6.
 - The same EV Kennung in several house profiles (profiles made by copying) gets one wallbox
   when its charger data are equal; different charger data stop the step with a blocker (Q1).
+- OpenEMS (``config.json`` ``ehal.backend: openems``): the plant-wide
+  ``ehal.openems.evcs_component`` (``evcs0`` when it was not set) becomes the wallbox binding
+  ``set_evcs_max_current`` = ``<component>/SetChargePowerLimit`` (multi-EV M2); with more than
+  one wallbox the step stops with a blocker. The key is removed from ``config.json``.
 """
 from __future__ import annotations
 
@@ -45,6 +49,11 @@ from runtime_store.migration.types import (
 STEP_ID = "dm6.wallboxes"
 HOUSE_FILE = "house_profiles.json"
 COMPONENTS_FILE = "components.json"
+CONFIG_FILE = "config.json"
+OPENEMS_EVCS_KEY = "evcs_component"
+# The pre-dm6 default of ``ehal.openems.evcs_component`` and the write channel it used.
+OLD_OPENEMS_EVCS_COMPONENT = "evcs0"
+OPENEMS_EVCS_WRITE_CHANNEL = "SetChargePowerLimit"
 
 # The pre-dm6 conversion defaults (settings.ev_power before data model 6).
 OLD_DEFAULT_VOLTAGE_V = 230.0
@@ -80,10 +89,56 @@ def _needs_stamp(docs: Docs) -> bool:
     )
 
 
+def _openems_block(config: Any) -> dict[str, Any] | None:
+    ehal = config.get("ehal") if isinstance(config, dict) else None
+    openems = ehal.get("openems") if isinstance(ehal, dict) else None
+    return openems if isinstance(openems, dict) else None
+
+
+def _is_openems_backend(config: Any) -> bool:
+    ehal = config.get("ehal") if isinstance(config, dict) else None
+    backend = str((ehal or {}).get("backend") or "").strip().lower()
+    return backend == "openems"
+
+
 def detect(docs: Docs) -> bool:
     if _needs_stamp(docs):
         return True
+    if OPENEMS_EVCS_KEY in (_openems_block(docs.get(CONFIG_FILE)) or {}):
+        return True
     return any(_ev_pending(c) for _, c in _iter_evs(docs.get(HOUSE_FILE)))
+
+
+def _move_openems_component(
+    config: Any, wallboxes: list[dict[str, Any]], *, from_old_model: bool
+) -> str | None:
+    """Plant-wide OpenEMS EVCS component → wallbox binding; German blocker text or None."""
+    openems = _openems_block(config)
+    had_key = openems is not None and OPENEMS_EVCS_KEY in openems
+    component = str((openems or {}).pop(OPENEMS_EVCS_KEY, "") or "").strip()
+    # A pack from data model 5 on OpenEMS used ``evcs0`` when the key was not set.
+    if not _is_openems_backend(config) or not (had_key or from_old_model):
+        return None
+    component = component or OLD_OPENEMS_EVCS_COMPONENT
+    boxes = [w for w in wallboxes if isinstance(w, dict)]
+    if not boxes:
+        return None
+    if len(boxes) > 1:
+        return (
+            f"OpenEMS: die EVCS-Komponente '{component}' galt bisher für die ganze Anlage, es "
+            f"gibt aber {len(boxes)} Wallboxen. Je Wallbox in components.json das Binding "
+            "set_evcs_max_current = <Komponente>/SetChargePowerLimit eintragen und "
+            "ehal.openems.evcs_component aus config.json entfernen."
+        )
+    box = boxes[0]
+    bindings = box.setdefault("ehal_bindings", {})
+    key = next(
+        (k for k in bindings if str(k).rsplit(".", 1)[-1] == "set_evcs_max_current"),
+        f"evcs.{box['id']}.set_evcs_max_current",
+    )
+    if not str(bindings.get(key) or "").strip():
+        bindings[key] = f"{component}/{OPENEMS_EVCS_WRITE_CHANNEL}"
+    return None
 
 
 def _old_conversion(consumer: dict[str, Any]) -> tuple[float, int]:
@@ -202,6 +257,13 @@ def apply(docs: Docs, answers: Answers) -> StepResult:
         _rewrite_ev(consumer, wallboxes[candidate["id"]])
     if new_ids:
         components[WALLBOXES_KEY] = [*existing, *(wallboxes[i] for i in new_ids)]
+    blocker = _move_openems_component(
+        out.get(CONFIG_FILE),
+        list(components.get(WALLBOXES_KEY) or []),
+        from_old_model=_needs_stamp(docs),
+    )
+    if blocker is not None:
+        return _blocked(docs, blocker)
     # Data model 5 → 6 for every Earnie-track file of the pack.
     for name in EARNIE_TRACK_FILES:
         doc = out.get(name)

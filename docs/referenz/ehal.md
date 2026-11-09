@@ -437,7 +437,7 @@ Fields map to known OpenEMS Edge channels (semantic reference). Channel architec
 - Adapter: `integrations/openems_adapter.py` (REST only). Live façade: `integrations/ehal_live.py`.
 - Compose lab: `docker/compose/openems-lab.yml`. Config snippet: `share/config/ehal.openems.snippet.json`. Step-by-step: `[openems-lab-setup.md](../dev/openems-lab-setup.md)`.
 - Cadence: Core expects ≥ 60 s telemetry refresh; adapter may poll faster.
-- EVCS: EHAL `set_evcs_max_current` (A) → OpenEMS `evcs0/SetChargePowerLimit` (W) via house-profile V/phases.
+- EVCS: EHAL `set_evcs_max_current` (A) → OpenEMS `<component>/<channel>` (W) with the pair's voltage and phases. The address is per wallbox: binding `set_evcs_max_current` = `<component>/SetChargePowerLimit` (e.g. `evcs0/SetChargePowerLimit`); a wallbox without it is not written. Telemetry `sens_evcs_active_power` is the sum of the wallbox components' `ActivePower` (fallback `ChargePower`). The former plant-wide `ehal.openems.evcs_component` moves onto the wallbox in migration step `dm6.wallboxes`.
 - Optional absent / holiday: set `plant.ehal_bindings.sens_absent_mode` to `componentId/ChannelId` (read via `read_channel`; no HITL plant mapper yet).
 - Optional inverter: bindings on `inverters[].ehal_bindings` as `inv.{id}.*` (capability `supports_inv_power_limit` reported false until mapped; curtailment write when mapped + `control=full`).
 - Southbound silent gate: reuse `silent_mode` (`local_settings.json`) for OpenEMS writes as well.

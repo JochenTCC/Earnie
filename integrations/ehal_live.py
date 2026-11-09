@@ -16,7 +16,8 @@ import config
 from ehal import EHAL_SCHEMA_VERSION, EhalWriteError
 from integrations import loxone_client  # noqa: F401 — read via ``live.loxone_client``
 from integrations.ehal_live_adapters import (  # noqa: F401 — façade re-exports
-    _first_ev_loxone_bindings,
+    ev_charger_markers,
+    ev_charger_openems_channels,
     _standby_source_select_merker,
     get_ha_adapter,
     get_loxone_adapter,
@@ -90,7 +91,16 @@ _soc_missing_warned: set[str] = set()
 class _EhalNetworkAdapter(Protocol):
     def read_telemetry(self) -> dict[str, Any]: ...
 
-    def write_setpoints(self, setpoint: dict[str, Any], **kwargs: Any) -> EhalWriteError | None: ...
+    def write_setpoints(self, setpoint: dict[str, Any]) -> EhalWriteError | None: ...
+
+    def write_evcs_setpoints(
+        self,
+        charger_id: str,
+        setpoint: dict[str, Any],
+        *,
+        voltage_v: float,
+        phases: int,
+    ) -> EhalWriteError | None: ...
 
     def capabilities(self) -> dict[str, Any]: ...
 
@@ -665,16 +675,60 @@ def write_evcs_max_current_from_consumers(
     charging_contexts: dict[str, dict] | None = None,
     consumer_pv_follow: dict[str, int] | None = None,
 ) -> tuple[EhalWriteError | None, list[dict[str, Any]]]:
-    """Write set_evcs_max_current from first EV consumer planned power (kW→A).
+    """Write ``set_evcs_max_current`` (kW→A) for every EV ↔ wallbox pair (multi-EV M2).
 
-    HA backend: also ``set_evcs_mode`` (skipped by the adapter when not activated). With
-    "Sofort laden" only the mode ``now`` goes out and no current, as on the Loxone path.
+    One adapter call per charger (``evcs.<Kennung>.*``) with the pair's voltage and phases:
+    a failing charger does not stop the others. HA backend: also ``set_evcs_mode``
+    (skipped by the adapter when not activated). With "Sofort laden" only the mode ``now``
+    goes out and no current, as on the Loxone path. Returns the first write error and the
+    trace rows of all chargers (fields ``evcs.<Kennung>.set_evcs_*``).
     """
-    consumer = _first_ev_consumer()
-    if consumer is None:
+    from ehal.qualified_ids import charger_id_for_ev, qualified_charger_id
+
+    consumers = live_ev_consumers()
+    if not consumers:
         logger.info("EHAL: no EV consumer configured — skip EVCS write")
         return None, []
+    adapter = get_network_adapter()
+    if not adapter.capabilities()["supports_evcs_current"]:
+        logger.info("EHAL: supports_evcs_current=false — skip EVCS write")
+        return None, []
+    first_error: EhalWriteError | None = None
+    records: list[dict[str, Any]] = []
+    for consumer in consumers:
+        charger_id = charger_id_for_ev(consumer["id"])
+        error, written, ts = _write_one_charger(
+            adapter, consumer, charger_id, consumer_powers, charging_contexts, consumer_pv_follow
+        )
+        if error is not None:
+            persist_write_error(error)
+            first_error = first_error or error
+        rows = build_ehal_write_records(
+            written,
+            written_at=ts,
+            error=error,
+            skipped=_last_skipped(adapter),
+            unconfigured=_last_unconfigured(adapter),
+        )
+        for row in rows:
+            row["field"] = qualified_charger_id(charger_id, row["field"])
+        records.extend(rows)
+    return first_error, records
 
+
+def live_ev_consumers() -> list[dict]:
+    """Live EV consumers; each is a fixed pair with its wallbox (pair view, multi-EV M2)."""
+    return [c for c in config.get_flexible_consumers() if c.get("type") == "ev"]
+
+
+def _write_one_charger(
+    adapter: _EhalNetworkAdapter,
+    consumer: dict,
+    charger_id: str,
+    consumer_powers: dict[str, float],
+    charging_contexts: dict[str, dict] | None,
+    consumer_pv_follow: dict[str, int] | None,
+) -> tuple[EhalWriteError | None, dict[str, Any], str]:
     cid = consumer["id"]
     planned_kw = max(0.0, float(consumer_powers.get(cid, 0.0) or 0.0))
     ctx = (charging_contexts or {}).get(cid)
@@ -682,16 +736,10 @@ def write_evcs_max_current_from_consumers(
         planned_kw = 0.0
     if ctx is not None and ctx.get("anticipated") and not ctx.get("plugged_in"):
         planned_kw = 0.0
-
+    # The pair view carries the wallbox voltage and the pair's phases.
     voltage_v, phases = ev_nominal_power_conversion(consumer)
-    amps = kw_to_ampere(planned_kw, voltage_v=voltage_v, phases=phases)
-    adapter = get_network_adapter()
-    if not adapter.capabilities()["supports_evcs_current"]:
-        logger.info("EHAL: supports_evcs_current=false — skip EVCS write")
-        return None, []
-
+    amps_out = max(0.0, kw_to_ampere(planned_kw, voltage_v=voltage_v, phases=phases))
     ts = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-    amps_out = max(0.0, amps)
     written: dict[str, Any] = {}
     immediate = is_ha_backend() and bool((ctx or {}).get("skip_loxone_output"))
     if not immediate:
@@ -706,19 +754,10 @@ def write_evcs_max_current_from_consumers(
         "adapter_id": adapter.cfg.adapter_id,
         **written,
     }
-    error = adapter.write_setpoints(
-        setpoint, evcs_voltage_v=voltage_v, evcs_phases=phases
+    error = adapter.write_evcs_setpoints(
+        charger_id, setpoint, voltage_v=voltage_v, phases=phases
     )
-    if error is not None:
-        persist_write_error(error)
-    records = build_ehal_write_records(
-        written,
-        written_at=ts,
-        error=error,
-        skipped=_last_skipped(adapter),
-        unconfigured=_last_unconfigured(adapter),
-    )
-    return error, records
+    return error, written, ts
 
 
 def _evcs_mode_for_cycle(
@@ -737,13 +776,5 @@ def _evcs_mode_for_cycle(
     )
 
 
-def _first_ev_consumer() -> dict | None:
-    for consumer in config.get_flexible_consumers():
-        if consumer.get("type") == "ev":
-            return consumer
-        sched = consumer.get("charging_schedule")
-        if sched and sched.get("enabled"):
-            return consumer
-    return None
 
 

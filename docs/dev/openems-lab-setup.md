@@ -133,13 +133,14 @@ Merge the snippet into `openems_lab/config/config.json` (top-level key `ehal`, n
     "base_url": "http://openems-edge:8084",
     "username": "x",
     "password": "admin",
-    "ess_component": "ess0",
-    "evcs_component": "evcs0"
+    "ess_component": "ess0"
   }
 }
 ```
 
 Canonical copy: `[share/config/ehal.openems.snippet.json](../../share/config/ehal.openems.snippet.json)`.
+
+Wallboxes (data model 6): the OpenEMS EVCS component is set per wallbox in `components.json`, binding `set_evcs_max_current` = `<component>/SetChargePowerLimit` (e.g. `evcs0/SetChargePowerLimit`). The old `ehal.openems.evcs_component` moves there in the migration step `dm6.wallboxes`.
 
 **Do not** use `http://localhost:8084` inside the Earnie container — that points at the container itself, not Edge.
 

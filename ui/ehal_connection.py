@@ -99,11 +99,10 @@ def _render_openems_form_inputs(
             key=f"{form_key}_ess_component",
             value=str(openems.get("ess_component") or "ess0"),
         ).strip() or "ess0"
-        evcs = st.text_input(
-            "EVCS-Komponente",
-            key=f"{form_key}_evcs_component",
-            value=str(openems.get("evcs_component") or "evcs0"),
-        ).strip() or "evcs0"
+        st.caption(
+            "Wallboxen: die OpenEMS-Komponente steht je Wallbox im Binding "
+            "`set_evcs_max_current` (z. B. `evcs0/SetChargePowerLimit`)."
+        )
         openems_default = default_adapter_id(BACKEND_OPENEMS)
         adapter_id = st.text_input(
             "adapter_id",
@@ -119,7 +118,6 @@ def _render_openems_form_inputs(
         "username": username,
         "password": password,
         "ess_component": ess,
-        "evcs_component": evcs,
         "adapter_id": adapter_id,
     }
     return values, bool(submitted)
@@ -135,7 +133,6 @@ def _persist_openems_connection(data: dict, values: dict[str, str]) -> None:
         "username": values["username"] or "x",
         "password": values["password"] or "admin",
         "ess_component": values["ess_component"],
-        "evcs_component": values["evcs_component"],
     }
     payload["ehal"] = block
     save_main_config(payload)

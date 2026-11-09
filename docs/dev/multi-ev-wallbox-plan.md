@@ -1,6 +1,6 @@
 # Multiple EVs and wallboxes, HouseSim wallbox write-back: design and implementation plan
 
-**Status:** W1–W3 built and merged (2026-11-09); M1a and M1b built. Decisions D1–D10 accepted by the maintainer on 2026-11-09 (D2 in its revised form: limits as current on both devices). D11 follows from D1–D3. Branch `feat/multi-ev-wallbox` (first named `docs/multi-ev-wallbox-design`), based on `main` at `fda24a4e`.
+**Status:** W1–W3 built and merged (2026-11-09); M1a, M1b and M2 built. Decisions D1–D10 accepted by the maintainer on 2026-11-09 (D2 in its revised form: limits as current on both devices). D11 follows from D1–D3. Branch `feat/multi-ev-wallbox` (first named `docs/multi-ev-wallbox-design`), based on `main` at `fda24a4e`.
 **Backlog items:** **Enable multiple EV / Wallboxes** and **HouseSim wallbox write-back** (both Version 2.+1). The write-back is the test bench for the assignment, so this plan covers both. Target release: not decided.
 
 ## Goal
@@ -118,6 +118,17 @@ Each phase is one chat session and ends with green tests and a commit. **W** = H
 - Cycle record and replay carry one entry per pair.
 - **Done:** a site with two cars, each with its own wallbox, works. This is already useful without M3.
 - **Tests:** two pairs, different phases; one pair's write failing does not stop the other; replay reproduces both.
+
+**M2 built 2026-11-09** (pair view kept as the runtime form, maintainer decision; the readers move to EV + wallbox in M4):
+
+- Adapters (HA, Loxone, OpenEMS) have `write_evcs_setpoints(charger_id, setpoint, voltage_v=, phases=)`; `write_setpoints` takes plant / ESS fields only and rejects EVCS fields. A failed charger write disables that charger only (`_evcs_disabled`), the others keep writing.
+- `ehal_live.write_evcs_max_current_from_consumers` loops over `live_ev_consumers()`, one call per pair with the pair's voltage / phases; trace rows are `evcs.<Kennung>.set_evcs_*`; the first error is returned, every error is persisted.
+- Charger Kennung = the EV's (`charger_id_for_ev`), as the pair view keys the charger bindings (`evcs.<EV>.*`); push IDs stay as they were. They become the wallbox's with the dynamic assignment (M4).
+- HA: `aggregate_ha_entities` activates `evcs.<Kennung>.<kind>` for every EV (no plant fallback for charger fields); `setpoint_qualified_ids` keys EV charger setpoints by their qualified ID. `find_first_ev_consumer` is left only in the legacy flat-map migration (`migrate_ha_entities_to_house`, `apply_ha_entities_to_house`).
+- Loxone adapter: `LoxoneConfig.evcs_markers` per charger; publishes the qualified ID (was the bare field).
+- OpenEMS (maintainer, 2026-11-09: in M2, no separate issue): one component per wallbox, address `<component>/<channel>` in the wallbox binding `set_evcs_max_current` like the inverter limits; telemetry `sens_evcs_active_power` = sum over the wallbox components. `ehal.openems.evcs_component` is gone (config loader rejects it with a migration hint); `dm6.wallboxes` moves it (or the old default `evcs0` for a model-5 OpenEMS pack) onto the one wallbox, more than one wallbox → blocker. Packs already on model 6 with the key left are detected again.
+- Write test (EHAL-Com Schreibtest): EVCS probes go through `write_evcs_setpoints` of their charger.
+- Tests: adapter tests per charger incl. failure isolation (HA, Loxone, OpenEMS), two EVs with different phases on the HA live path, HouseSim end to end with two loadpoints (`tests/test_house_sim_two_pairs_end_to_end.py`, second loadpoint built in memory from `evcc_en`), OpenEMS migration. Not covered: a replay test with two pairs (the recorder already keys the EV reads per consumer; write rows are outputs, not replayed).
 
 ### M3: Assignment engine (Live)
 

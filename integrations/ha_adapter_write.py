@@ -140,16 +140,37 @@ class HaWriteMixin:
             supported="set_grid_export_power_limit" in self.cfg.entities,
         )
 
-    def _write_evcs_setpoints(
+    def write_evcs_setpoints(
         self,
-        doc: dict[str, Any],
-        outcome: _HaWriteOutcome,
-    ) -> None:
-        """EVCS current and mode via status.json when activated."""
+        charger_id: str,
+        setpoint: EhalSetpoint | dict[str, Any],
+        *,
+        voltage_v: float,
+        phases: int,
+    ) -> EhalWriteError | None:
+        """Current and mode of one charger (``evcs.<charger_id>.*``) via status.json.
+
+        A failed publish disables this charger only; the other chargers keep writing.
+        Skipped / failed fields are reported bare (``set_evcs_max_current``).
+        """
+        from ehal.qualified_ids import qualified_charger_id
+
+        del voltage_v, phases  # HA takes the current in A
+        raw = dict(setpoint)
+        try:
+            doc = validate_setpoint(raw)
+        except EhalValidationError as exc:
+            return self._invalid_setpoint_error(raw, exc)
+        outcome = _HaWriteOutcome()
         for field_name in ("set_evcs_max_current", "set_evcs_mode"):
             if field_name not in doc:
                 continue
-            if not self._supports_evcs_current or field_name not in self.cfg.entities:
+            key = qualified_charger_id(charger_id, field_name)
+            if (
+                not self._supports_evcs_current
+                or charger_id in self._evcs_disabled
+                or key not in self.cfg.entities
+            ):
                 self._skip(field_name, outcome)
                 continue
             value = doc[field_name]
@@ -159,22 +180,33 @@ class HaWriteMixin:
                 if field_name == "set_evcs_mode"
                 else float(value)
             )
-            ok, status, msg = self._try_setpoint_write(field_name, numeric)
+            ok, status, msg = self._try_setpoint_write(key, numeric)
             if not ok:
-                outcome.failed.append(field_name)
-                outcome.messages.append(msg)
-                outcome.hub_status = status or outcome.hub_status
+                self._record_write_failure(outcome, field_name, status, msg)
                 outcome.flip_evcs = True
+        self._last_skipped = list(outcome.skipped)
+        self._last_unconfigured = list(outcome.unconfigured)
+        if not outcome.failed:
+            return None
+        if outcome.flip_evcs:
+            self._evcs_disabled.add(charger_id)
+        return self._record_write_error(
+            failed_fields=outcome.failed,
+            message="; ".join(outcome.messages),
+            hub_status=outcome.hub_status,
+            retryable=True,
+            flip_ess=False,
+            flip_evcs=False,
+        )
 
     def write_setpoints(
         self,
         setpoint: EhalSetpoint | dict[str, Any],
-        *,
-        evcs_voltage_v: float = 230.0,
-        evcs_phases: int = 1,
     ) -> EhalWriteError | None:
-        """Write setpoints; on failure degrade capabilities and return write_error."""
-        del evcs_voltage_v, evcs_phases
+        """Write plant / ESS setpoints; on failure degrade capabilities and return write_error.
+
+        Charger setpoints go through :meth:`write_evcs_setpoints` (one call per charger).
+        """
         raw = dict(setpoint)
         try:
             doc = validate_setpoint(raw)
@@ -182,8 +214,8 @@ class HaWriteMixin:
             return self._invalid_setpoint_error(raw, exc)
 
         outcome = _HaWriteOutcome()
+        self._reject_evcs_in_plant_setpoint(doc)
         self._write_ess_setpoints(doc, outcome)
-        self._write_evcs_setpoints(doc, outcome)
         self._last_skipped = list(outcome.skipped)
         self._last_unconfigured = list(outcome.unconfigured)
 
@@ -200,6 +232,15 @@ class HaWriteMixin:
             flip_ess=outcome.flip_ess,
             flip_evcs=outcome.flip_evcs,
         )
+
+    @staticmethod
+    def _reject_evcs_in_plant_setpoint(doc: dict[str, Any]) -> None:
+        evcs = [k for k in ("set_evcs_max_current", "set_evcs_mode") if k in doc]
+        if evcs:
+            raise ValueError(
+                f"EVCS-Sollwerte {evcs} gehören an eine Wallbox: write_evcs_setpoints "
+                "mit der Kennung des Ladepunkts verwenden."
+            )
 
     def _warn_if_hub_reports_unapplied(self) -> None:
         """Setpoints are only *published* here; HA reports back when it could not apply them."""

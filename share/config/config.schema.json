@@ -432,11 +432,7 @@
             },
             "ess_component": {
               "type": "string",
-              "description": "ESS component id (default ess0)."
-            },
-            "evcs_component": {
-              "type": "string",
-              "description": "EVCS component id (default evcs0)."
+              "description": "ESS component id (default ess0). Wallboxes: the OpenEMS address is the wallbox binding set_evcs_max_current (<component>/SetChargePowerLimit)."
             }
           }
         },

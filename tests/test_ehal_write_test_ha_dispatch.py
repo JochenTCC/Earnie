@@ -18,6 +18,7 @@ from integrations.ha_adapter import HaAdapter, HaConfig
 INV_QID = "inv.wr_main.set_inv_ac_power_limit"
 HEATPUMP_QID = "heatpump.waermepumpe.set_enable"
 ESS_QID = "ess.house.set_ess_charge_power_limit"
+EVCS_QID = "evcs.e_auto.set_evcs_max_current"
 
 
 @pytest.fixture
@@ -30,12 +31,12 @@ def ha_adapter(monkeypatch: pytest.MonkeyPatch) -> HaAdapter:
             entities={
                 INV_QID: "",
                 ESS_QID: "",
-                "set_evcs_max_current": "",
+                EVCS_QID: "",
             },
             setpoint_qids={
                 ESS_QID: ESS_QID,
                 HEATPUMP_QID: HEATPUMP_QID,
-                "set_evcs_max_current": "evcs.e_auto.set_evcs_max_current",
+                EVCS_QID: EVCS_QID,
             },
         )
     )
@@ -45,6 +46,12 @@ def ha_adapter(monkeypatch: pytest.MonkeyPatch) -> HaAdapter:
     monkeypatch.setattr(ehal_live, "is_ehal_network_backend", lambda: True)
     monkeypatch.setattr(ehal_live, "get_ha_adapter", lambda: adapter)
     monkeypatch.setattr(ehal_live, "get_adapter", lambda: adapter)
+    monkeypatch.setattr(ehal_live, "get_network_adapter", lambda: adapter)
+    monkeypatch.setattr(
+        ehal_live,
+        "live_ev_consumers",
+        lambda: [{"id": "e_auto", "type": "ev", "charging_schedule": {}}],
+    )
     return adapter
 
 
@@ -75,3 +82,10 @@ def test_an_unmapped_flex_row_fails_loudly(ha_adapter: HaAdapter) -> None:
     with pytest.raises(ValueError, match="pool.pool_filter.set_enable"):
         write_probes({"pool.pool_filter.set_enable": 1}, max_power_kw=10.0)
     assert "pool.pool_filter.set_enable" not in load_published()
+
+
+def test_charger_current_is_published_for_its_ev(ha_adapter: HaAdapter) -> None:
+    """Multi-EV M2: the EVCS probe goes through write_evcs_setpoints of its charger."""
+    error, _ = write_probes({EVCS_QID: 6.0}, max_power_kw=10.0, ev_nominal_a=16.0)
+    assert error is None
+    assert load_published()[EVCS_QID] == pytest.approx(6.0)

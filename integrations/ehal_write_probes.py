@@ -23,14 +23,18 @@ from integrations.ehal_write_test_bounds import (
 
 
 def _openems_mapped_targets() -> dict[str, str]:
+    from ehal.qualified_ids import qualified_charger_id
+
     adapter = live.ehal_live.get_openems_adapter()
     caps = adapter.capabilities()
     out: dict[str, str] = {}
     if caps.get("supports_ess_write"):
         for field in PLANT_LIVE_WRITE_FIELDS:
             out[field] = f"openems:{field}"
-    if caps.get("supports_evcs_current"):
-        out["set_evcs_max_current"] = "openems:set_evcs_max_current"
+    for charger_id, component, channel in adapter.cfg.evcs_channels:
+        out[qualified_charger_id(charger_id, "set_evcs_max_current")] = (
+            f"openems:{component}/{channel}"
+        )
     return out
 
 
@@ -166,9 +170,13 @@ def _dispatch_probe_writes(clamped: dict[str, Any]) -> EhalWriteError | None:
 
     entity_scoped: dict[str, float] = {}
     flex_fields: dict[str, float] = {}
+    evcs_fields: dict[str, Any] = {}
     adapter_values: dict[str, Any] = {}
     for field, value in clamped.items():
         name = canonical_probe_field(field)
+        if probe_kind(field) in ("set_evcs_max_current", "set_evcs_mode"):
+            evcs_fields[str(field)] = value
+            continue
         if is_ess_entity_scoped_field(name) or is_inv_entity_scoped_field(name):
             entity_scoped[name] = float(value)
             continue
@@ -194,6 +202,48 @@ def _dispatch_probe_writes(clamped: dict[str, Any]) -> EhalWriteError | None:
         error = _write_entity_scoped_probes(entity_scoped)
     if error is None and flex_fields:
         error = _write_flex_enable_probes(flex_fields)
+    if error is None and evcs_fields:
+        error = _write_evcs_probes(evcs_fields)
+    return error
+
+
+def _probe_charger_id(field: str) -> str:
+    """Charger Kennung of an EVCS probe: ``evcs.<Kennung>.<kind>`` or ``<EV id>:<kind>``."""
+    from ehal.qualified_ids import charger_id_for_ev, evcs_field_kind
+
+    raw = str(field or "").strip()
+    if evcs_field_kind(raw):
+        return raw.split(".")[1]
+    if ":" in raw:
+        return charger_id_for_ev(raw.split(":", 1)[0].strip())
+    raise ValueError(
+        f"Schreibtest {raw!r}: Ladepunkt fehlt – EVCS-Felder als evcs.<Kennung>.<Feld> wählen."
+    )
+
+
+def _write_evcs_probes(fields: dict[str, Any]) -> EhalWriteError | None:
+    """One ``write_evcs_setpoints`` call per charger (network backends), else Loxone publish."""
+    if not live.ehal_live.is_ehal_network_backend():
+        return _write_loxone_mapped_probes(fields)
+    from ehal.qualified_ids import charger_id_for_ev
+    from settings.ev_power import ev_nominal_power_conversion
+
+    by_charger: dict[str, dict[str, Any]] = {}
+    for field, value in fields.items():
+        by_charger.setdefault(_probe_charger_id(field), {})[probe_kind(field)] = value
+    evs = {charger_id_for_ev(c["id"]): c for c in live.ehal_live.live_ev_consumers()}
+    adapter = live.ehal_live.get_network_adapter()
+    error: EhalWriteError | None = None
+    for charger_id, values in by_charger.items():
+        ev = evs.get(charger_id)
+        if ev is None:
+            raise ValueError(f"Schreibtest: kein E-Auto mit Ladepunkt {charger_id!r}.")
+        voltage_v, phases = ev_nominal_power_conversion(ev)
+        setpoint = build_probes_setpoint(values, adapter_id=str(adapter.cfg.adapter_id))
+        result = adapter.write_evcs_setpoints(
+            charger_id, setpoint, voltage_v=voltage_v, phases=phases
+        )
+        error = error or result
     return error
 
 

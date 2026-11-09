@@ -35,33 +35,43 @@ def ha_telemetry_mapping(entities: dict[str, str] | None) -> dict[str, str]:
 def openems_telemetry_mapping(
     *,
     ess_component: str = "ess0",
-    evcs_component: str = "evcs0",
+    evcs_channels: tuple[tuple[str, str, str], ...] = (),
 ) -> dict[str, str]:
-    """Canonical OpenEMS channel labels for Live-Lesen Mapping column."""
+    """Canonical OpenEMS channel labels for Live-Lesen Mapping column.
+
+    ``evcs_channels``: (charger Kennung, component, write channel) per wallbox; the
+    telemetry ``sens_evcs_active_power`` is the sum of their ``ActivePower``.
+    """
     ess = str(ess_component or "ess0").strip() or "ess0"
-    evcs = str(evcs_component or "evcs0").strip() or "evcs0"
-    return {
+    out = {
         "sens_grid_power_active": "_sum/GridActivePower",
         "sens_pv_production_active": "_sum/ProductionActivePower",
         "sens_ess_power": f"{ess}/ActivePower",
-        "sens_evcs_active_power": f"{evcs}/ActivePower",
         "sens_power_consumers": _MAPPING_DERIVED,
     }
+    if evcs_channels:
+        out["sens_evcs_active_power"] = " + ".join(
+            f"{component}/ActivePower" for _cid, component, _channel in evcs_channels
+        )
+    return out
 
 
 def openems_setpoint_mapping(
     *,
     ess_component: str = "ess0",
-    evcs_component: str = "evcs0",
+    evcs_channels: tuple[tuple[str, str, str], ...] = (),
 ) -> dict[str, str]:
+    from ehal.qualified_ids import qualified_charger_id
+
     ess = str(ess_component or "ess0").strip() or "ess0"
-    evcs = str(evcs_component or "evcs0").strip() or "evcs0"
-    return {
+    out = {
         "set_ess_active_power": f"{ess}/SetActivePowerEquals",
         "set_ess_charge_power_limit": f"{ess}/SetActivePowerGreaterOrEquals",
         "set_ess_discharge_power_limit": f"{ess}/SetActivePowerLessOrEquals",
-        "set_evcs_max_current": f"{evcs}/SetChargePowerLimit",
     }
+    for charger_id, component, channel in evcs_channels:
+        out[qualified_charger_id(charger_id, "set_evcs_max_current")] = f"{component}/{channel}"
+    return out
 
 
 def ha_setpoint_mapping(entities: dict[str, str] | None) -> dict[str, str]:

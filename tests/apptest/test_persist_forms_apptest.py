@@ -41,7 +41,6 @@ _OPENEMS_VALUES = {
     "username": "tester-ünï",
     "password": "test-passwort",
     "ess_component": "ess7",
-    "evcs_component": "evcs3",
     "adapter_id": "openems_test",
 }
 
@@ -60,7 +59,7 @@ def test_openems_t1_submit_persists_all_fields_and_survives_new_session() -> Non
     ehal = _config()["ehal"]
     assert ehal["backend"] == "openems"
     assert ehal["adapter_id"] == _OPENEMS_VALUES["adapter_id"]
-    for name in ("base_url", "username", "password", "ess_component", "evcs_component"):
+    for name in ("base_url", "username", "password", "ess_component"):
         assert ehal["openems"][name] == _OPENEMS_VALUES[name], name
 
     fresh = _run("run_form_openems.py")

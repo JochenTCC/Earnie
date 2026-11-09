@@ -217,12 +217,8 @@ def aggregate_ha_entities(
             continue
         if field in plant_bindings:
             out[field] = plant_bindings.get(field) or ""
-    # EV keys: prefer consumer; fall back to plant (migrate without EV consumer).
-    ev_consumer = find_first_ev_consumer(house)
-    ev_bindings = bind(ev_consumer.get("ehal_bindings") if ev_consumer else None)
-    for field in HA_EV_FIELDS:
-        if field in ev_bindings or field in plant_bindings:
-            out[field] = ev_bindings.get(field) or plant_bindings.get(field) or ""
+    # Charger keys per EV ↔ wallbox pair: ``evcs.<Kennung>.<kind>`` (multi-EV M2).
+    out.update(_ev_charger_entities(house, bind))
 
     batteries = _batteries_for_aggregate(components_doc)
     _merge_entity_ehal_bindings(out, batteries, bind, push=push, require_id=True)
@@ -234,6 +230,23 @@ def aggregate_ha_entities(
     )
     _merge_plant_ess_bindings(out, plant_bindings, push=push)
     return canonicalize_ha_entity_keys(out, keep_empty=True)
+
+def _ev_charger_entities(house: dict, bind) -> dict[str, str]:
+    """Activated charger keys of every EV (pair view: the wallbox bindings merged in)."""
+    from ehal.qualified_ids import charger_id_for_ev, field_kind, qualified_charger_id
+
+    out: dict[str, str] = {}
+    for profile in _profiles_iterable(house):
+        for consumer in profile.get("consumers") or []:
+            if not (isinstance(consumer, dict) and _is_ev_consumer(consumer)):
+                continue
+            charger_id = charger_id_for_ev(str(consumer.get("id") or ""))
+            for key, value in bind(consumer.get("ehal_bindings")).items():
+                kind = field_kind(key)
+                if kind in HA_EV_FIELDS and charger_id:
+                    out[qualified_charger_id(charger_id, kind)] = value
+    return out
+
 
 def _batteries_for_aggregate(components_doc: dict | None) -> list[dict]:
     from house_config.powerstation import ehal_mappable_batteries

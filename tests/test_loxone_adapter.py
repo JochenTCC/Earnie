@@ -132,7 +132,7 @@ def test_capabilities_ess_true_evcs_false():
 
 
 def test_capabilities_evcs_true_with_current_marker():
-    caps = LoxoneAdapter(_cfg(evcs_max_current_name="EV_A")).capabilities()
+    caps = LoxoneAdapter(_cfg(evcs_markers=(("e_auto", "EV_A", ""),))).capabilities()
     assert caps["supports_evcs_current"] is True
 
 
@@ -239,80 +239,83 @@ def test_write_setpoints_ess_kw(pub_mock):
     assert ("Discharge", 2.0) in calls
 
 
+def _evcs(**fields) -> dict:
+    return {
+        "schema_version": EHAL_SCHEMA_VERSION,
+        "ts": "2026-07-28T12:00:00Z",
+        "adapter_id": "loxone-home",
+        **fields,
+    }
+
+
+_ONE_CHARGER = (("e_auto", "EV_A", "EV_Modus"),)
+
+
 @patch("integrations.loxone_writes._publish_setpoint_traced", side_effect=_pub_ok)
-def test_write_setpoints_evcs_and_mode(pub_mock):
-    adapter = LoxoneAdapter(
-        _cfg(
-            control_cmd_name="Cmd",
-            evcs_max_current_name="EV_A",
-            evcs_mode_name="EV_Modus",
-        )
-    )
-    error = adapter.write_setpoints(
-        {
-            "schema_version": EHAL_SCHEMA_VERSION,
-            "ts": "2026-07-28T12:00:00Z",
-            "adapter_id": "loxone-home",
-            "set_ess_mode": 2,
-            "set_evcs_max_current": 16,
-            "set_evcs_mode": "pv",
-        }
+def test_write_evcs_setpoints_current_and_mode(pub_mock):
+    adapter = LoxoneAdapter(_cfg(evcs_markers=_ONE_CHARGER))
+    error = adapter.write_evcs_setpoints(
+        "e_auto", _evcs(set_evcs_max_current=16, set_evcs_mode="pv"), voltage_v=230, phases=1
     )
     assert error is None
     calls = _pub_io_value_calls(pub_mock)
-    assert ("Cmd", 2.0) in calls
     assert ("EV_A", 16.0) in calls
     assert ("EV_Modus", 1.0) in calls
-    assert not [name for name, _ in calls if name in ("PVF", "NOW")]
+    qids = {c.args[0] for c in pub_mock.call_args_list}
+    assert qids == {"evcs.e_auto.set_evcs_max_current", "evcs.e_auto.set_evcs_mode"}
 
 
+def test_write_setpoints_rejects_evcs_fields():
+    adapter = LoxoneAdapter(_cfg(evcs_markers=_ONE_CHARGER))
+    with pytest.raises(ValueError, match="write_evcs_setpoints"):
+        adapter.write_setpoints(_evcs(set_evcs_max_current=16))
+
+
+@pytest.mark.parametrize("mode,code", [("off", 0.0), ("pv", 1.0), ("now", 2.0)])
 @patch("integrations.loxone_writes._publish_setpoint_traced", side_effect=_pub_ok)
-def test_write_setpoints_evcs_mode_off(pub_mock):
-    adapter = LoxoneAdapter(_cfg(evcs_max_current_name="EV_A", evcs_mode_name="EV_Modus"))
-    error = adapter.write_setpoints(
-        {
-            "schema_version": EHAL_SCHEMA_VERSION,
-            "ts": "2026-07-28T12:00:00Z",
-            "adapter_id": "loxone-home",
-            "set_evcs_mode": "off",
-        }
+def test_write_evcs_setpoints_mode_codes(pub_mock, mode, code):
+    adapter = LoxoneAdapter(_cfg(evcs_markers=_ONE_CHARGER))
+    error = adapter.write_evcs_setpoints(
+        "e_auto", _evcs(set_evcs_mode=mode), voltage_v=230, phases=1
     )
     assert error is None
-    assert ("EV_Modus", 0.0) in _pub_io_value_calls(pub_mock)
+    assert ("EV_Modus", code) in _pub_io_value_calls(pub_mock)
 
 
 @patch("integrations.loxone_writes._publish_setpoint_traced", side_effect=_pub_ok)
-def test_write_setpoints_evcs_mode_now_encodes_two(pub_mock):
-    adapter = LoxoneAdapter(_cfg(evcs_max_current_name="EV_A", evcs_mode_name="EV_Modus"))
-    error = adapter.write_setpoints(
-        {
-            "schema_version": EHAL_SCHEMA_VERSION,
-            "ts": "2026-07-28T12:00:00Z",
-            "adapter_id": "loxone-home",
-            "set_evcs_mode": "now",
-        }
-    )
-    assert error is None
-    assert ("EV_Modus", 2.0) in _pub_io_value_calls(pub_mock)
-
-
-@patch("integrations.loxone_writes._publish_setpoint_traced", side_effect=_pub_ok)
-def test_write_setpoints_evcs_mode_skipped_without_mode_marker(pub_mock):
+def test_write_evcs_setpoints_mode_skipped_without_mode_marker(pub_mock):
     """Unmapped mode marker: not written and not a live-trace row; current stays usable."""
-    adapter = LoxoneAdapter(_cfg(evcs_max_current_name="EV_A"))
-    error = adapter.write_setpoints(
-        {
-            "schema_version": EHAL_SCHEMA_VERSION,
-            "ts": "2026-07-28T12:00:00Z",
-            "adapter_id": "loxone-home",
-            "set_evcs_mode": "pv",
-            "set_evcs_max_current": 10,
-        }
+    adapter = LoxoneAdapter(_cfg(evcs_markers=(("e_auto", "EV_A", ""),)))
+    error = adapter.write_evcs_setpoints(
+        "e_auto", _evcs(set_evcs_mode="pv", set_evcs_max_current=10), voltage_v=230, phases=1
     )
     assert error is None
     assert adapter.last_skipped_fields() == []
     assert adapter.capabilities()["supports_evcs_current"] is True
     assert ("EV_A", 10.0) in _pub_io_value_calls(pub_mock)
+
+
+def test_a_failing_charger_does_not_stop_the_other():
+    def _pub(qid, value, *, io_name=""):
+        return LoxoneWriteRecord(io_name or qid, float(value), "auto_a" not in qid, "t")
+
+    adapter = LoxoneAdapter(
+        _cfg(evcs_markers=(("auto_a", "EV_A", ""), ("auto_b", "EV_B", "")))
+    )
+    with patch(
+        "integrations.loxone_writes._publish_setpoint_traced", side_effect=_pub
+    ) as pub_mock:
+        error = adapter.write_evcs_setpoints(
+            "auto_a", _evcs(set_evcs_max_current=10), voltage_v=230, phases=1
+        )
+        assert error is not None and error["failed_fields"] == ["set_evcs_max_current"]
+        assert adapter.write_evcs_setpoints(
+            "auto_b", _evcs(set_evcs_max_current=10), voltage_v=230, phases=1
+        ) is None
+        pub_mock.reset_mock()
+        adapter.write_evcs_setpoints("auto_a", _evcs(set_evcs_max_current=10), voltage_v=230, phases=1)
+        adapter.write_evcs_setpoints("auto_b", _evcs(set_evcs_max_current=10), voltage_v=230, phases=1)
+    assert [c.args[0] for c in pub_mock.call_args_list] == ["evcs.auto_b.set_evcs_max_current"]
 
 
 @patch("integrations.loxone_writes._publish_setpoint_traced", side_effect=_pub_ok)

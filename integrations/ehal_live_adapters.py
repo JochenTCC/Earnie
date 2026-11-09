@@ -35,7 +35,7 @@ def get_openems_adapter() -> OpenemsAdapter:
         password=str(live.config.get("EHAL_OPENEMS_PASSWORD") or "admin"),
         adapter_id=str(live.config.get("EHAL_ADAPTER_ID") or "openems-lab"),
         ess_component=str(live.config.get("EHAL_OPENEMS_ESS_COMPONENT") or "ess0"),
-        evcs_component=str(live.config.get("EHAL_OPENEMS_EVCS_COMPONENT") or "evcs0"),
+        evcs_channels=ev_charger_openems_channels(),
         timeout_sec=float(live.config.get("GLOBAL_TIMEOUT") or 10),
     )
     if _openems_adapter is not None and _openems_adapter.cfg != cfg:
@@ -174,7 +174,6 @@ def get_loxone_adapter() -> LoxoneAdapter:
     from house_config.ess_bindings import resolve_primary_ess_binding
     from optimizer.live_export_limit import load_house_doc
 
-    ev = _first_ev_loxone_bindings()
     house = load_house_doc()
     export_out = resolve_plant_binding(house, "set_grid_export_power_limit")
     # Capability / residual flat write_setpoints: entity-scoped standby Merker only.
@@ -191,8 +190,7 @@ def get_loxone_adapter() -> LoxoneAdapter:
             resolve_primary_ess_binding("set_ess_active_power") or ""
         ),
         control_cmd_name=str(resolve_primary_ess_binding("set_ess_mode") or ""),
-        evcs_max_current_name=str(ev.get("evcs_max_current_name") or ""),
-        evcs_mode_name=str(ev.get("evcs_mode_name") or ""),
+        evcs_markers=ev_charger_markers(),
         grid_export_limit_out_name=str(export_out or ""),
         ess_source_select_name=str(ess_source_select or ""),
         timeout_sec=float(live.config.get("GLOBAL_TIMEOUT") or 10),
@@ -204,20 +202,48 @@ def get_loxone_adapter() -> LoxoneAdapter:
     return _loxone_adapter
 
 
-def _first_ev_loxone_bindings() -> dict[str, str]:
-    """EV write markers from first EV consumer ``ehal_bindings`` (entity-scoped only)."""
+def ev_charger_openems_channels() -> tuple[tuple[str, str, str], ...]:
+    """(charger Kennung, component, channel) of every live EV with an OpenEMS address.
+
+    The address is the wallbox binding ``set_evcs_max_current`` = ``<component>/<channel>``
+    (like the inverter limits); an EV whose wallbox has none is not written.
+    """
+    from ehal.qualified_ids import charger_id_for_ev, field_kind
+
+    out: list[tuple[str, str, str]] = []
+    for consumer in live.live_ev_consumers():
+        bindings = consumer.get("ehal_bindings") or {}
+        address = next(
+            (
+                str(value or "")
+                for key, value in bindings.items()
+                if field_kind(key) == "set_evcs_max_current" and str(value or "").strip()
+            ),
+            "",
+        )
+        parts = live._openems_channel_parts(address)
+        if parts is None:
+            continue
+        out.append((charger_id_for_ev(consumer["id"]), *parts))
+    return tuple(out)
+
+
+def ev_charger_markers() -> tuple[tuple[str, str, str], ...]:
+    """(charger Kennung, current marker, mode marker) of every live EV (fixed pairs, M2)."""
+    from ehal.qualified_ids import charger_id_for_ev
     from settings.ehal_marker_resolve import (
         marker_set_evcs_max_current,
         marker_set_evcs_mode,
     )
 
-    consumer = live._first_ev_consumer()
-    if consumer is None:
-        return {}
-    return {
-        "evcs_max_current_name": marker_set_evcs_max_current(consumer),
-        "evcs_mode_name": marker_set_evcs_mode(consumer),
-    }
+    return tuple(
+        (
+            charger_id_for_ev(consumer["id"]),
+            marker_set_evcs_max_current(consumer),
+            marker_set_evcs_mode(consumer),
+        )
+        for consumer in live.live_ev_consumers()
+    )
 
 
 def reset_adapter_cache() -> None:

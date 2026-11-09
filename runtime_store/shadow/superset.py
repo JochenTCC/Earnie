@@ -60,7 +60,9 @@ def _superset_ha(seen: frozenset[str], deadline: float) -> None:
 
 def _openems_channel_pairs(adapter: Any) -> list[tuple[str, str]]:
     ess = str(getattr(adapter.cfg, "ess_component", "ess0") or "ess0")
-    evcs = str(getattr(adapter.cfg, "evcs_component", "") or "")
+    evcs_components = [
+        component for _cid, component, _channel in getattr(adapter.cfg, "evcs_channels", ())
+    ]
     pairs = [
         ("_sum", "GridActivePower"),
         ("_sum", "ProductionActivePower"),
@@ -69,7 +71,7 @@ def _openems_channel_pairs(adapter: Any) -> list[tuple[str, str]]:
         (ess, "Soc"),
         (ess, "ActivePower"),
     ]
-    if evcs:
+    for evcs in evcs_components:
         pairs.extend([(evcs, "ActivePower"), (evcs, "ChargePower")])
     return pairs
 

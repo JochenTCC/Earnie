@@ -51,7 +51,7 @@ Neu zugeordnet werden je Backend folgende Mappings:
 | ------- | -------------------------------------------------------------------- |
 | Loxone  | Merker ↔ EHAL-Felder (`plant` / `batteries[]` / `consumers[].ehal_bindings`; Assistent auf EHAL-Com) |
 | HA      | Aktivierte Signale ↔ HA-Entities im YAML-Paket (`ehal_bindings` nur als Aktivierungsschlüssel; optional `sign` / `boolean_invert` in `ehal.ha`) |
-| OpenEMS | REST-Komponenten (`ess0` / `evcs0` u. a. in `ehal.openems`)          |
+| OpenEMS | REST-Komponenten (`ess0` u. a. in `ehal.openems`; je Wallbox die EVCS-Komponente im Binding `set_evcs_max_current`, z.B. `evcs0/SetChargePowerLimit`) |
 
 ## Weiterlesen
 

@@ -86,6 +86,8 @@ class HaAdapter(HaTelemetryMixin, HaWriteMixin):
         self._supports_ess_write = "ess_limits" in functions
         self._supports_ess_active = "ess_active" in functions
         self._supports_evcs_current = "evcs_current" in functions
+        # Chargers whose last publish failed (``evcs.<Kennung>``); the others keep writing.
+        self._evcs_disabled: set[str] = set()
         self._supports_ess_source_select = "ess_source_select" in functions
         self._supports_inv_power_limit = "inverter_limit" in functions
         self._vendor_ess_active = vendor_ess_active
