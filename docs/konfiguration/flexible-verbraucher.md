@@ -387,7 +387,12 @@ Seit Datenmodell 6 sind E-Auto und Wallbox getrennt. Die Wallbox steht in `compo
 
 Für ein Paar aus Auto und Wallbox gilt der **größere** Mindeststrom, der **kleinere** Höchststrom und die **kleinere** Phasenzahl. Daraus rechnet Earnie die Ladeleistung: Strom × Spannung der Wallbox × Phasen. Ein einphasiges Auto an einer dreiphasigen Wallbox lädt also einphasig. Liegt der Mindeststrom des Paars über seinem Höchststrom, haben Auto und Wallbox keinen gemeinsamen Ladestrom: Earnie lehnt das Hausprofil beim Laden mit einer Meldung ab und begrenzt nichts stillschweigend.
 
-Im Hauskonfigurator stehen beim E-Auto **Phasen**, **Mindest-Ladestrom (A)**, **Höchst-Ladestrom (A)** und **Spannung der Wallbox (V)**; darunter zeigt Earnie die Ladeleistung in kW. Beim Speichern gelten diese Grenzen für Auto **und** Wallbox, wie die Migration sie angelegt hat. Ein neues E-Auto bekommt beim Speichern eine eigene Wallbox mit seiner Kennung. Die Lade-Bindings der Wallbox pflegt die Seite EHAL-Com wie bisher beim E-Auto.
+Im Hauskonfigurator werden Auto und Wallbox getrennt gepflegt:
+
+- **Bereich Wallboxen:** Bezeichnung, **Spannung (V)**, **Phasen**, **Mindest-** und **Höchst-Ladestrom (A)** der Wallbox. Die Kennung entsteht beim Anlegen aus der Bezeichnung und bleibt danach fest, weil die E-Autos und die IDs `evcs.<Kennung>.*` auf sie verweisen. Unter den Feldern stehen die zugeordneten E-Autos mit dem Ladebereich des Paars. Eine Wallbox, der noch ein E-Auto zugeordnet ist, lässt sich nicht entfernen. Eine Änderung, nach der ein zugeordnetes E-Auto keinen gemeinsamen Ladestrom mehr hätte, speichert Earnie nicht und zeigt eine Meldung.
+- **E-Auto im Hausprofil:** **Phasen des Autos**, **Mindest-** und **Höchst-Ladestrom des Autos (A)** und die Auswahl **Wallbox**. Darunter zeigt Earnie die Daten der Wallbox und die Ladeleistung des Paars in kW. **Neue Wallbox für dieses E-Auto anlegen** erzeugt eine Wallbox mit den Grenzen des Autos und 230 V. Ohne Wallbox wird das E-Auto nicht gespeichert.
+
+Innerhalb eines Hausprofils lädt eine Wallbox genau ein E-Auto; zwei E-Autos eines Profils an derselben Wallbox lehnt Earnie mit einer Meldung ab. Dasselbe E-Auto in mehreren Hausprofilen (kopierte Profile) nutzt dieselbe Wallbox. Die Lade-Bindings der Wallbox pflegt die Seite EHAL-Com wie bisher beim E-Auto. Ein importiertes E-Auto (Loxone-Import) bekommt beim Speichern eine eigene Wallbox mit seiner Kennung.
 
 In dieser Version hat jedes E-Auto eine feste Wallbox. Mehrere Autos, die sich Wallboxen teilen (`mode: dynamic`), folgen in einer späteren Version.
 

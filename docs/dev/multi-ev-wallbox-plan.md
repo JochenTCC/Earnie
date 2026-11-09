@@ -1,6 +1,6 @@
 # Multiple EVs and wallboxes, HouseSim wallbox write-back: design and implementation plan
 
-**Status:** W1–W3 built and merged (2026-11-09); M1a built, M1b open. Decisions D1–D10 accepted by the maintainer on 2026-11-09 (D2 in its revised form: limits as current on both devices). D11 follows from D1–D3. Branch `feat/multi-ev-wallbox` (first named `docs/multi-ev-wallbox-design`), based on `main` at `fda24a4e`.
+**Status:** W1–W3 built and merged (2026-11-09); M1a and M1b built. Decisions D1–D10 accepted by the maintainer on 2026-11-09 (D2 in its revised form: limits as current on both devices). D11 follows from D1–D3. Branch `feat/multi-ev-wallbox` (first named `docs/multi-ev-wallbox-design`), based on `main` at `fda24a4e`.
 **Backlog items:** **Enable multiple EV / Wallboxes** and **HouseSim wallbox write-back** (both Version 2.+1). The write-back is the test bench for the assignment, so this plan covers both. Target release: not decided.
 
 ## Goal
@@ -98,7 +98,14 @@ Each phase is one chat session and ends with green tests and a commit. **W** = H
 - Repo packs migrated: `share/config` templates, `studies/poc_cloud`, `tests/fixtures/backtesting`, migration goldens. Untracked local packs (`studies/viability/packs_*`, `greenfield/config`, `ha_lab/testbed/config`, the site config) migrate through the wizard / `scripts.migrate_config`.
 - Tests: full suite green, golden-master regression 12/12 unchanged (incl. the private replay cases, migrated in memory).
 
-**M1b (open):** wallbox list on the Komponenten page (label, voltage, phases, currents, bindings) and separate car limits in the EV form (D2 in full: car and wallbox may differ); readable example values in `share/config` (the migrated example keeps 15.217… A for 3.5 kW); HA greenfield / binding pages that create EVs, if any remain.
+**M1b built 2026-11-09:**
+
+- Hauskonfigurator tab **Wallboxen** (`ui/planning_wallbox_form.py`, store helpers `ui/house_config_wallbox_io.py`): label, voltage, phases, current range; the Kennung is set from the label on create and fixed afterwards (EV assignments and `evcs.<Kennung>.*` IDs point to it). An update that leaves an assigned EV without a common current and the delete of an assigned wallbox fail loud. Charger bindings stay on EHAL-Com (pair view).
+- EV form: car phases and current range of their own (D2 in full) plus the wallbox choice (`wallbox_assignment`); a button creates a wallbox with the car limits at 230 V. The form no longer sends `wallbox_voltage_v` (importers still do) and drops the view's charger bindings, so a changed wallbox choice does not carry them over.
+- Save routing: a view's wallbox limits are never written back; a view's charger bindings are applied as a diff against what the view showed (copied profiles show the same wallbox twice; an unchanged copy no longer undoes an edit).
+- Two EVs of one house profile at the same fixed wallbox fail loud on load (`reject_shared_fixed_wallboxes`): until M3 every pair is planned on its own, so they would charge at the same time. Sharing a wallbox is `mode: dynamic`.
+- `share/config` example: wallbox 3 phases 6–16 A at 230 V, car 1 phase 6–16 A (pair 1.38–3.68 kW, was 3.5 kW).
+- No other page creates EVs: the Loxone greenfield import keeps its own wallbox per EV through the import key; the HA side has no EV import.
 
 - `components.wallboxes[]` in schema, loaders and the Komponenten page; EV consumer fields as in D2; `ev.wallbox_assignment` (D3).
 - Step `dm6.wallboxes`: one wallbox per EV consumer (Kennung = the consumer's Kennung, so `evcs.<Kennung>.*` IDs stay the same), charger bindings moved, the old `min_power_kw` / `nominal_power_kw` converted into current with the consumer's voltage and phases and written to **both** wallbox and EV (they described the pair, so the pair keeps exactly its old limits), `fixed` assignment. The same EV Kennung in several house profiles raises (Q1). Release notes helper picks it up.

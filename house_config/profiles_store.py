@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 
+from house_config.wallboxes import reject_shared_fixed_wallboxes
 from house_config.netznutzung import normalize_netznutzung_config
 from house_config.baseload import normalize_baseload_distribution
 from house_config.consumption_csv import load_hourly_profile_csv
@@ -133,6 +134,7 @@ def _normalize_profile_consumers(
             f"profiles '{profile_id}': nur ein Verbraucher vom Typ "
             "'thermal_annual' (Haus Wärme) erlaubt."
         )
+    reject_shared_fixed_wallboxes(consumers, profile_id=profile_id)
     return consumers
 
 

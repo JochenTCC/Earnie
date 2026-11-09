@@ -30,6 +30,7 @@ def test_title_and_default_tab():
         "Wechselrichter",
         "PV-Felder",
         "Batterien",
+        "Wallboxen",
     ]
     assert tabs.value == "Hausprofil"
 

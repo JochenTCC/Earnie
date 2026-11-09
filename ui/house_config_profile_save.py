@@ -89,6 +89,24 @@ _PASSTHROUGH_CONSUMER_KEYS = (
     ID_PROVISIONAL_LABEL_KEY,
 )
 
+def _drop_view_charger_bindings(item: dict) -> None:
+    """The form's EV carries the charger bindings of the loaded pair view (passthrough).
+
+    They belong to the wallbox and are edited there (EHAL-Com); with a changed wallbox
+    choice they would land on the new wallbox, so the form never hands them back.
+    """
+    from house_config.wallboxes import is_charger_binding_key
+
+    bindings = item.get("ehal_bindings")
+    if not isinstance(bindings, dict):
+        return
+    kept = {k: v for k, v in bindings.items() if not is_charger_binding_key(k)}
+    if kept:
+        item["ehal_bindings"] = kept
+    else:
+        item.pop("ehal_bindings", None)
+
+
 def _merge_passthrough_consumer_fields(original: dict, edited: dict) -> dict:
     merged = dict(edited)
     for key in _PASSTHROUGH_CONSUMER_KEYS:
@@ -159,12 +177,7 @@ def _resolve_consumer_ids(consumers: list[dict], edited: list[dict]) -> list[dic
         item["id"] = consumer_id
         item["label"] = label or consumer_id
         if str(item.get("type") or "") == "ev":
-            # The EV keeps its wallbox; a new EV gets its own (house_config.wallboxes).
-            from house_config.wallboxes import WALLBOX_ASSIGNMENT_KEY
-
-            assignment = original.get(WALLBOX_ASSIGNMENT_KEY) if isinstance(original, dict) else None
-            if assignment:
-                item[WALLBOX_ASSIGNMENT_KEY] = dict(assignment)
+            _drop_view_charger_bindings(item)
         # Avoid dirty-writing id_locked onto legacy rows (missing flag ⇒ locked)
         # so Hausprofil auto_persist does not rewrite every open.
         if not id_locked:

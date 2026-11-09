@@ -65,6 +65,9 @@ def _comp(tab, entity, collection, kind, suffix, key, valid, boundaries=(), reje
 _INV = ("Wechselrichter", "wr_main", "inverters")
 _PV = ("PV-Felder", "test_pv", "pv_systems")
 _BAT = ("Batterien", "test_battery", "batteries")
+# The components apptest adds this wallbox (tests/fixtures/ev_wallbox.wallbox_entry).
+WALLBOX_ID = "test_wallbox"
+_WB = ("Wallboxen", WALLBOX_ID, "wallboxes")
 
 COMPONENT_FIELDS = [
     # Wechselrichter
@@ -105,6 +108,17 @@ COMPONENT_FIELDS = [
     _comp(*_BAT, "number_input", "planning_battery_threshold", "threshold_power", 5.0,
           boundaries=(1.0, 100.0), to_stored=lambda percent: percent / 100.0),
     _comp(*_BAT, "checkbox", "planning_battery_limits_from_live", "limits_from_live", True),
+    # Wallboxen
+    _comp(*_WB, "text_input", "planning_wb_label", "label", "Wallbox Garage – Ünï",
+          boundaries=("G",)),
+    _comp(*_WB, "number_input", "planning_wb_voltage", "voltage_v", 240.0,
+          boundaries=(100.0, 500.0)),
+    _comp(*_WB, "number_input", "planning_wb_phases", "phases", 1,
+          boundaries=(1, 3)),
+    _comp(*_WB, "number_input", "planning_wb_min_a", "min_current_a", 8.0,
+          boundaries=(0.0, 16.0)),
+    _comp(*_WB, "number_input", "planning_wb_max_a", "max_current_a", 20.0,
+          boundaries=(6.0, 63.0)),
 ]
 
 
@@ -154,11 +168,11 @@ CONSUMER_FIELDS = [
     _cons("wasch", "number_input", "shift_1", "schedule.start_shift_h", 2.0),
     _cons("wasch", "checkbox", "absent_opt_in_1", "absent_mode_enabled", True),
     # E-Auto (ev)
-    # Data model 6: the pair limits as current; the voltage is stored at the wallbox.
+    # Data model 6: the car limits as current; voltage and wallbox limits on the Wallboxen tab.
     _cons("ev1", "number_input", "ev_phases_2", "phases", 1),
     _cons("ev1", "number_input", "ev_min_a_2", "min_current_a", 7.0),
     _cons("ev1", "number_input", "ev_max_a_2", "max_current_a", 15.0),
-    _cons("ev1", "number_input", "ev_voltage_2", "wallbox.voltage_v", 235.0),
+    _cons("ev1", "selectbox", "ev_wallbox_2", "wallbox_assignment.wallbox_id", "wb_garage"),
     _cons("ev1", "number_input", "ev_min_qh_2", "min_on_quarterhours", 5),
     _cons("ev1", "number_input", "ev_cap_2", "battery_capacity_kwh", 55.0),
     _cons("ev1", "number_input", "ev_target_soc_2", "charging_schedule.target_soc_percent", 80.0),

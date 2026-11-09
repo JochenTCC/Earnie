@@ -59,7 +59,10 @@ def _profile_with_all_consumer_types(_isolated_backtesting_config):
     components_path = os.environ["EARNIE_COMPONENTS_PATH"]
     with open(components_path, encoding="utf-8") as handle:
         components = json.load(handle)
-    components = merge_wallboxes(components, [wallbox_entry("ev1", max_current_a=16.0)])
+    components = merge_wallboxes(
+        components,
+        [wallbox_entry("ev1", max_current_a=16.0), wallbox_entry("wb_garage")],
+    )
     with open(components_path, "w", encoding="utf-8") as handle:
         json.dump(components, handle, ensure_ascii=False)
     clear_house_profiles_doc_cache()
@@ -85,13 +88,6 @@ def _stored(spec: Field):
         doc = json.load(handle)
     profile = next(p for p in doc["profiles"] if p["id"] == _PROFILE_ID)
     consumer = next(c for c in profile["consumers"] if c["id"] == spec.entity)
-    if spec.profile_key.startswith("wallbox."):
-        # The EV's pair voltage is written to its wallbox (components.json wallboxes[]).
-        with open(os.environ["EARNIE_COMPONENTS_PATH"], encoding="utf-8") as handle:
-            wallboxes = json.load(handle)["wallboxes"]
-        wallbox_id = consumer["wallbox_assignment"]["wallbox_id"]
-        wallbox = next(w for w in wallboxes if w["id"] == wallbox_id)
-        return _dig(wallbox, spec.profile_key.split(".", 1)[1])
     if spec.profile_key.split(".")[0] in SYSTEM_FIELDS and "heating_system_id" in consumer:
         # Heat generation is written into the reference entry of the heating-system catalog.
         with open(os.environ["EARNIE_COMPONENTS_PATH"], encoding="utf-8") as handle:
@@ -184,14 +180,20 @@ def test_ev_without_milp_block_shows_and_saves_the_suggested_values() -> None:
 
     from optimizer.eauto_milp import suggested_min_remaining_kwh
 
+    from house_config.wallboxes import pair_limits, wallboxes_by_id
+
     at = _new_session()
-    min_power = (
-        float(at.number_input(key=_KEY_PREFIX + "ev_min_a_2").value)
-        * float(at.number_input(key=_KEY_PREFIX + "ev_voltage_2").value)
-        * int(at.number_input(key=_KEY_PREFIX + "ev_phases_2").value)
-        / 1000.0
+    car = {
+        "phases": int(at.number_input(key=_KEY_PREFIX + "ev_phases_2").value),
+        "min_current_a": float(at.number_input(key=_KEY_PREFIX + "ev_min_a_2").value),
+        "max_current_a": float(at.number_input(key=_KEY_PREFIX + "ev_max_a_2").value),
+    }
+    with open(os.environ["EARNIE_COMPONENTS_PATH"], encoding="utf-8") as handle:
+        wallbox = wallboxes_by_id(json.load(handle))["ev1"]
+    # The suggestion uses the pair minimum (car and wallbox, D2).
+    suggested = suggested_min_remaining_kwh(
+        pair_limits(car, wallbox, label="ev1")["min_power_kw"]
     )
-    suggested = suggested_min_remaining_kwh(min_power)
     assert at.number_input(key=_KEY_PREFIX + "ev_milp_rem_2").value == pytest.approx(suggested)
     assert at.number_input(key=_KEY_PREFIX + "ev_milp_eps_on_2").value == pytest.approx(
         SUGGESTED_TIE_BREAK_ON_EPSILON
@@ -206,3 +208,21 @@ def test_ev_without_milp_block_shows_and_saves_the_suggested_values() -> None:
         "tie_break_on_epsilon": pytest.approx(SUGGESTED_TIE_BREAK_ON_EPSILON),
         "tie_break_time_epsilon": pytest.approx(SUGGESTED_TIE_BREAK_TIME_EPSILON),
     }
+
+
+def test_new_wallbox_button_creates_a_wallbox_with_the_car_limits_and_assigns_it() -> None:
+    from house_config.wallboxes import wallboxes_by_id
+
+    at = _new_session()
+    at.button(key=_KEY_PREFIX + "ev_new_wallbox_2").click().run(timeout=_TIMEOUT_S)
+    assert not at.exception
+    with open(os.environ["EARNIE_COMPONENTS_PATH"], encoding="utf-8") as handle:
+        wallboxes = wallboxes_by_id(json.load(handle))
+    assert set(wallboxes) == {"ev1", "wb_garage", "wallbox_auto"}
+    created = wallboxes["wallbox_auto"]
+    car = _stored(Field(kind="", suffix="", profile_key="max_current_a", valid=None, entity="ev1"))
+    assert (created["voltage_v"], created["max_current_a"]) == (230.0, car)
+    assigned = _stored(Field(
+        kind="", suffix="", profile_key="wallbox_assignment.wallbox_id", valid=None, entity="ev1"
+    ))
+    assert assigned == "wallbox_auto"

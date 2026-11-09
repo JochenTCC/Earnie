@@ -392,14 +392,10 @@ def _render_consumer_form_body(
 
 
 def _form_power_kw(item: dict) -> float:
-    """kW of the form item; an EV's is its pair maximum (current × voltage × phases)."""
+    """kW of the form item; an EV's is its pair maximum, 0 without a usable wallbox."""
     if item.get("type") == "ev":
-        from house_config.wallboxes import WALLBOX_VOLTAGE_FORM_KEY
+        from ui.house_config_profile_ev import ev_form_pair
 
-        return (
-            float(item["max_current_a"])
-            * float(item[WALLBOX_VOLTAGE_FORM_KEY])
-            * int(item["phases"])
-            / 1000.0
-        )
+        pair = ev_form_pair(item)
+        return float(pair["max_power_kw"]) if pair is not None else 0.0
     return float(item["nominal_power_kw"])

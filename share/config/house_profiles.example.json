@@ -64,8 +64,8 @@
                     },
                     "internal_gain_factor": 0.0,
                     "phases": 1,
-                    "min_current_a": 6.086956521739131,
-                    "max_current_a": 15.217391304347826,
+                    "min_current_a": 6.0,
+                    "max_current_a": 16.0,
                     "wallbox_assignment": {
                         "mode": "fixed",
                         "wallbox_id": "ev"

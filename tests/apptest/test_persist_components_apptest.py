@@ -1,10 +1,11 @@
-"""Ebene 1 (T1, T2, T5, T8): Komponenten-Formulare (Wechselrichter, PV, Batterie).
+"""Ebene 1 (T1, T2, T5, T8): Komponenten-Formulare (Wechselrichter, PV, Batterie, Wallbox).
 
-Alle drei speichern per ``auto_persist`` (Autosave) in ``components.json``.
+Alle vier speichern per ``auto_persist`` (Autosave) in ``components.json``.
 Widget-Keys: ``<entity-id>__<suffix>``.
 """
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 
@@ -15,10 +16,22 @@ from house_config.components_store import (
     clear_components_doc_cache,
     load_components_document,
 )
-from tests.apptest.fields import COMPONENT_FIELDS, Field
+from tests.apptest.fields import COMPONENT_FIELDS, WALLBOX_ID, Field
+from tests.fixtures.ev_wallbox import merge_wallboxes, wallbox_entry
 
 _SCRIPT = Path(__file__).parent / "scripts" / "run_page_house_config.py"
 _TIMEOUT_S = 15.0
+
+
+@pytest.fixture(autouse=True)
+def _components_with_wallbox(_isolated_backtesting_config):
+    # Explicit dependency: writes only after the conftest bound the env to the tmp_path copy.
+    path = os.environ["EARNIE_COMPONENTS_PATH"]
+    with open(path, encoding="utf-8") as handle:
+        doc = json.load(handle)
+    with open(path, "w", encoding="utf-8") as handle:
+        json.dump(merge_wallboxes(doc, [wallbox_entry(WALLBOX_ID)]), handle, ensure_ascii=False)
+    clear_components_doc_cache()
 
 
 def _new_session(tab: str) -> AppTest:

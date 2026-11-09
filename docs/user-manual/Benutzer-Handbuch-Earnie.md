@@ -100,7 +100,7 @@ In dieser Phase wird das Haus so abgebildet, dass Earnie **Vergleichsszenarien**
 
 Empfohlene Reihenfolge:
 
-1. **Hauskonfigurator:** Haus, Verbraucher, Wechselrichter, PV-Felder und Speicher anlegen.
+1. **Hauskonfigurator:** Haus, Verbraucher, Wechselrichter, PV-Felder, Speicher und Wallboxen anlegen.
 2. **Szenarienkonfigurator:** Varianten bilden (mit/ohne Speicher, anderer Tarif, …).
 3. **Live-Szenario zuweisen:** festlegen, welche Bausteine als Basis gelten.
 4. **Szenario-Explorer:** Verbrauch erzeugen, Rechnung starten, Ergebnisse auswerten.
@@ -115,7 +115,7 @@ Empfohlene Reihenfolge:
 
 *Hauskonfigurator: Hausprofil, Verbraucher, PV und Speicher als Kataloge.*
 
-Unter **Konfiguration → Hauskonfigurator** werden die baulichen und technischen Bausteine des Haushalts gepflegt. Gespeichert werden sie als Kataloge (Hausprofile, Komponenten), auf die die Szenarien später verweisen. Die Bereiche sind **Hausprofil**, **Heizsysteme** (Heizsystem-Varianten für den Szenario-Vergleich, siehe [Flexible Verbraucher](../konfiguration/flexible-verbraucher.md#haus-wärme-heizsystem-heating_system_id)), **Wechselrichter**, **PV-Felder** und **Batterien**.
+Unter **Konfiguration → Hauskonfigurator** werden die baulichen und technischen Bausteine des Haushalts gepflegt. Gespeichert werden sie als Kataloge (Hausprofile, Komponenten), auf die die Szenarien später verweisen. Die Bereiche sind **Hausprofil**, **Heizsysteme** (Heizsystem-Varianten für den Szenario-Vergleich, siehe [Flexible Verbraucher](../konfiguration/flexible-verbraucher.md#haus-wärme-heizsystem-heating_system_id)), **Wechselrichter**, **PV-Felder**, **Batterien** und **Wallboxen**.
 
 Die Sidebar zeigt, welche Schritte der Ersteinrichtung noch fehlen.
 
@@ -160,7 +160,8 @@ Je genauer die thermischen Angaben, desto realistischer der Jahresvergleich. Fü
 
 E-Auto und Wallbox als planbarer Verbraucher:
 
-- **Fahrzeug und Wallbox:** Akkukapazität, Ladeleistung und Wirkungsgrad.
+- **Fahrzeug:** Akkukapazität, Wirkungsgrad sowie Phasen, Mindest- und Höchst-Ladestrom des Autos.
+- **Wallbox:** feste Zuordnung zu einer Wallbox aus dem Bereich **Wallboxen** (Spannung, Phasen, Ladestrom der Wallbox). Geladen wird im gemeinsamen Bereich von Auto und Wallbox; die Ladeleistung in kW steht unter der Auswahl. **Neue Wallbox für dieses E-Auto anlegen** erzeugt eine Wallbox mit den Grenzen des Autos und 230 V.
 - **Zeitfenster:** ab wann das Auto da ist und bis wann es geladen sein soll, getrennt für Werktage und Wochenende.
 - **Ziel-SoC:** gewünschter Ladestand beim Abfahren.
 - **Prognose, wenn nicht angeschlossen:** optionale Lade-Prognose, auch wenn das Auto nicht an der Wallbox hängt (unabhängig vom Abwesenheitsmodus des Hauses).

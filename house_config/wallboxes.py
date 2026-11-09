@@ -213,6 +213,29 @@ def normalize_ev_current_fields(raw: dict, *, label: str) -> dict[str, Any]:
     }
 
 
+def reject_shared_fixed_wallboxes(consumers: list[dict[str, Any]], *, profile_id: str) -> None:
+    """Two EVs of one house profile at the same fixed wallbox raise (D3).
+
+    Until the assignment engine (M3) every EV is planned as a fixed pair on its own: two
+    cars on one wallbox would be planned as charging at the same time. Sharing a wallbox is
+    ``mode: dynamic``. The same EV in several profiles (copied profiles) is no conflict.
+    """
+    by_wallbox: dict[str, str] = {}
+    for consumer in consumers:
+        if str(consumer.get("type") or "") != "ev":
+            continue
+        wallbox_id = assigned_wallbox_id(consumer)
+        other = by_wallbox.get(wallbox_id)
+        if other is not None:
+            raise ValueError(
+                f"profiles '{profile_id}': E-Autos '{other}' und '{consumer.get('id')}' sind "
+                f"beide fest der Wallbox '{wallbox_id}' zugeordnet. Eine Wallbox lädt in "
+                "dieser Version ein E-Auto je Hausprofil; geteilte Wallboxen folgen mit der "
+                "dynamischen Zuordnung."
+            )
+        by_wallbox[wallbox_id] = str(consumer.get("id") or "")
+
+
 def pair_limits(ev: dict[str, Any], wallbox: dict[str, Any], *, label: str) -> dict[str, Any]:
     """Current range, phases and voltage of an (EV, wallbox) pair (D2); never clamped."""
     low = max(float(ev[EV_MIN_CURRENT_KEY]), float(wallbox[EV_MIN_CURRENT_KEY]))
@@ -307,10 +330,44 @@ def split_ev_view(consumer: dict[str, Any], out: dict[str, Any]) -> None:
         out.pop("ehal_bindings", None)
 
 
-# Hauskonfigurator form key: the voltage of the EV's fixed wallbox. The form edits the pair
-# inline (one set of limits for car and wallbox, as dm6 wrote them); the save writes it to
-# ``components.json`` (:func:`route_evs_to_wallboxes`) and drops the key from the EV.
+# Import key: the voltage of a wallbox an importer creates together with its EV (one set of
+# limits for car and wallbox). The save writes it to ``components.json``
+# (:func:`route_evs_to_wallboxes`) and drops the key from the EV. The Hauskonfigurator edits
+# wallboxes on their own tab and never sends it.
 WALLBOX_VOLTAGE_FORM_KEY = "wallbox_voltage_v"
+
+
+def iter_house_evs(house: Any):
+    """(profile id, EV consumer) for every EV of a house document (file or view shape)."""
+    profiles = house.get("profiles") if isinstance(house, dict) else None
+    items = list(profiles.values()) if isinstance(profiles, dict) else profiles or []
+    for profile in items:
+        if not isinstance(profile, dict):
+            continue
+        for key in ("consumers", "inactive_consumers"):
+            for consumer in profile.get(key) or []:
+                if isinstance(consumer, dict) and str(consumer.get("type") or "") == "ev":
+                    yield str(profile.get("id") or ""), consumer
+
+
+def assigned_wallbox_id(consumer: dict[str, Any]) -> str:
+    raw = consumer.get(WALLBOX_ASSIGNMENT_KEY)
+    if not isinstance(raw, dict):
+        return ""
+    return str(raw.get("wallbox_id") or "").strip()
+
+
+def evs_at_wallbox(house: Any, wallbox_id: str) -> list[tuple[str, dict[str, Any]]]:
+    """(profile id, EV) of every EV whose fixed wallbox is ``wallbox_id``."""
+    target = str(wallbox_id or "").strip()
+    return [(pid, ev) for pid, ev in iter_house_evs(house) if assigned_wallbox_id(ev) == target]
+
+
+def check_wallbox_pairs(house: Any, wallbox: dict[str, Any]) -> None:
+    """Every EV at ``wallbox`` (normalized) keeps a common current with it, else ValueError."""
+    for profile_id, ev in evs_at_wallbox(house, wallbox["id"]):
+        label = f"Hausprofil '{profile_id}', E-Auto '{ev.get('label') or ev.get('id')}'"
+        pair_limits(normalize_ev_current_fields(ev, label=label), wallbox, label=label)
 
 
 def _wallbox_key(key: str, *, ev_id: str, wallbox_id: str) -> str:
@@ -331,10 +388,10 @@ def _route_one_ev(
     item = dict(consumer)
     ev_id = str(item.get("id") or "").strip()
     is_view = VIEW_WALLBOX_KEY in item
-    view_wallbox = item.pop(VIEW_WALLBOX_KEY, None)
+    # The view's wallbox limits are edited on the wallbox, never written back from here;
+    # its bindings are what the view showed (the base of the binding diff below).
+    view_wallbox = item.pop(VIEW_WALLBOX_KEY, None) or {}
     voltage = item.pop(WALLBOX_VOLTAGE_FORM_KEY, None)
-    if voltage is None and isinstance(view_wallbox, dict):
-        voltage = view_wallbox.get("voltage_v")
     if is_view:
         # Pair view keys (resolve_ev_pair); the stored EV has currents only.
         for key in LEGACY_EV_POWER_KEYS:
@@ -374,8 +431,21 @@ def _route_one_ev(
             )
         stored = dict(entry.get("ehal_bindings") or {})
         if is_view:
-            # The view showed every charger key of the wallbox: what the editor left is it.
-            stored = charger
+            # Only what the editor changed against the view is written: several EVs at one
+            # wallbox each show its bindings, an unchanged view must not undo another's edit.
+            if view_wallbox.get("id") != wallbox_id:
+                raise ValueError(
+                    f"E-Auto '{ev_id}': die Lade-Bindings stammen von Wallbox "
+                    f"'{view_wallbox.get('id')}', das E-Auto ist aber Wallbox '{wallbox_id}' "
+                    "zugeordnet."
+                )
+            shown = dict(view_wallbox.get("ehal_bindings") or {})
+            for key, value in charger.items():
+                if shown.get(key) != value:
+                    stored[key] = value
+            for key in shown:
+                if key not in charger:
+                    stored.pop(key, None)
         else:
             stored.update(charger)
         entry["ehal_bindings"] = stored
@@ -397,9 +467,10 @@ def route_evs_to_wallboxes(
     the wallbox's charger bindings merged in) or as the form / an import built them. The save
     writes the wallbox side to ``components.json``:
 
-    - the form's pair limits (``wallbox_voltage_v`` + the EV's phases and currents) to the
-      EV's wallbox, a new EV gets its own fixed wallbox with its Kennung;
-    - charger bindings on the EV to the wallbox (a view's set replaces the wallbox's, an
+    - an import's pair limits (``wallbox_voltage_v`` + the EV's phases and currents) to the
+      EV's wallbox; without an assignment the EV gets its own fixed wallbox with its Kennung.
+      The view's wallbox limits are never written back (the car limits are the EV's own, D2);
+    - charger bindings on the EV to the wallbox (a view's changes against what it showed, an
       import's keys are added);
     - the view keys are dropped from the EV.
     """
