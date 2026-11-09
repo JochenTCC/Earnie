@@ -109,17 +109,6 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 - **Note:** P3b, P4, P5 and P7 are built fully integrated on the feature branch (rebased on `main`, no migration; the new fields are optional and default to today's behaviour so the golden masters stay green) and shown to the Energieinstitut Vorarlberg as a SUSI comparison before they are merged into the 2.+1 cycle (then: field migration, UI finish, German docs). Branch point: earliest after **SUSI P1** on `main`, recommended after **P2** and **P3a**. Prototype steps and three reference houses: `Earnie-Projekt/Entwicklungsplan/Offen/Earnie-SUSI-Epic-Entwurf.md` § 4.
 
-- [ ] Enable multiple EV / Wallboxes *(reuse entity-scoped namespacing approach from **2.7.c** multi-ESS; schema decision early — together with **Edibert P2** — implementation after HouseSim wallbox write-back)* [feat]
-- Parametrize EVs as now (+ sensors)
-- Parametrize Wallboxes 
-  - Max power
-  - sensor / control commands
-- Assignment is done when EV is connected to a wallbox:
-  - both devices report connection
-  - confirm assignment by test charging
-  - Assignment is removed when disconnecting
-  - Cancel assignments and re-bind in case of shutdown
-
 - **Epic Account view — Chart 2 as an account view** *(design 2026-11-04, follows Ledger P7)*: spec [`docs/dev/chart2-account-view.md`](../docs/dev/chart2-account-view.md). Replaces the former Chart 2 presentation: baseline and optimized as balance lines over the whole window (falling = paying), meeting at *Jetzt* by default, with a switch to a common start; below it a consumption control showing baseline minus optimized, zero at the horizon end. Each phase is sized for **one chat session** and ends with green tests and a commit.
   - **Order:** P1–P3 are done (`Backlog-Erledigt.md`); P4 is optional.
   - **Note:** Ledger P11 "Chart 1 baseline from the shadow chain" would start the forecast baseline from the shadow SoC. Spec § 4 ("the baseline changes its definition at *Jetzt*") and the help text must then be revisited.
@@ -226,6 +215,12 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 ### Version 2.+1 - HouseSim Improvements
 
 - [ ] **HouseSim wallbox write-back** *(moved from 2.8 on 2026-11-07)* — Wallbox setpoints act on the simulated physics instead of only the scenario override: `set_evcs_max_current` / mode writes (go-e / Wattpilot `amp` + `frc`, evcc `max_current` + enable) → charge power = current × voltage × phases while an EV is connected (`car_arrives` / `car_leaves`), capped by the EV's acceptance. Mock REST (S1–S3) and S4 integration; tests on `evcc_en`, `fronius_de`, `huawei_en` (`sma_keba` stays the read-only wallbox case). Prerequisite for **HouseSim scenario import**. **Order note:** pulled directly before Multi-EV / Wallboxes as its test bench (assignment by test charging, re-bind after shutdown)
+  - **Plan (2026-11-09, draft):** phases W1–W3 of [`docs/dev/multi-ev-wallbox-plan.md`](../docs/dev/multi-ev-wallbox-plan.md), together with the item below. Proposal D10 there: this item builds the small EV model (plug state, SoC counter, acceptance) that **HouseSim scenario import** then reuses.
+
+- [ ] **Enable multiple EV / Wallboxes** `[feat]` *(moved here from the SUSI prototype block on 2026-11-09, where it was misplaced; reuse the entity-scoped namespacing of **2.7.c** multi-ESS; **Edibert P2** is done; implementation after **HouseSim wallbox write-back**)*: any number of wallboxes and EVs, an EV bound to a fixed wallbox or to whichever it is plugged into.
+  - **Plan (2026-11-09, draft, decisions D1–D11 not yet accepted):** phases M1–M5 of [`docs/dev/multi-ev-wallbox-plan.md`](../docs/dev/multi-ev-wallbox-plan.md): wallboxes as `components.wallboxes[]`, migration `dm6.wallboxes` to `fixed` assignments (no behaviour change), several fixed pairs at runtime, then the assignment engine and the planner's pool constraints. Open questions Q1–Q3 there.
+  - Parametrize EVs as now (+ sensors); parametrize wallboxes (max power, sensors, control commands).
+  - Assignment when an EV is connected to a wallbox: both devices report connection; confirm by test charging; removed when disconnecting; cancel assignments and re-bind after a shutdown.
 - [ ] **PV forecast from HA (alternative source)** *(low user value — candidate for Version 2.+1)* — Add possibility to take PV prognosis directly from HA when available, as an alternative to Earnie's own `data/pv_forecast.py` (forecast.solar). Config toggle per scenario/plant (own vs. HA source). **Note (2026-10-18):** after **Binding P5** Earnie stores no HA `entity_id`s and has no pull — the forecast would be a pushed EHAL signal (or a separate fetch path), to be designed.
   - **Open question — scope:** likely fits the **48h online optimization** (live HA connection, fresh entity value each cycle) but unclear for the **Szenarien-Explorer** (SE runs fixed/reproducible input series; a live HA forecast entity breaks reproducibility unless a snapshot/recording mechanism is added) — clarify before implementation whether SE stays forecast.solar-only or gets a recorded-snapshot path.
   - Checked 2026-09-29: no other note of this idea in `backlog/Backlog-Bugfixes.md`, `backlog/Backlog-Erledigt.md`, `docs/spec/`, `.cursor/plans/`, or the external Entwicklungsdokumente (`Entwicklungs-Plan-Earnie-cons.md`, HA add-on/compat docs) — this stub is the only prior record.
