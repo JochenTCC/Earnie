@@ -244,7 +244,7 @@ Im Formular des Verbrauchers „Haus Wärme“ (Bereich **Hausprofil**, nur bei 
 
 Alte Daten und neues Heizsystem zugleich gibt es nicht. WP-Typ, JAZ bzw. Nutzungsgrad, Leistung, Speicher und Heizstab sind Feinabstimmung und speichern ohne Warnung. Wer die Wärmequelle vor dem Speichern zurückstellt, hat nichts geändert. Eine von Hand bearbeitete `house_profiles.json` prüft Earnie nicht.
 
-**Varianten:** Weitere Heizsysteme entstehen im Hauskonfigurator im Bereich **Heizsysteme**, z. B. als Kopie des Referenzsystems. Dort ist das Referenzsystem eines Hauses nur lesbar, weil eine Änderung die Grundlast dieses Hauses verschiebt. Ein Heizsystem, auf das ein Hausprofil oder ein Szenario verweist, lässt sich nicht entfernen. Die Auswahl im Szenario beschreibt [Heizsystem im Szenario](#heizsystem-im-szenario-heating_system_ids).
+**Varianten:** Weitere Heizsysteme entstehen im Hauskonfigurator im Bereich **Heizsysteme**: Heizsystem auswählen (z. B. das Referenzsystem) und **Als neue Variante kopieren**. Dort ist das Referenzsystem eines Hauses nur lesbar, weil eine Änderung die Grundlast dieses Hauses verschiebt. Änderungen an einer Variante speichert Earnie automatisch, sobald die Eingaben gültig sind; eine Heizleistung von 0 kW wird nicht gespeichert. Ein Heizsystem, auf das ein Hausprofil oder ein Szenario verweist, lässt sich nicht entfernen. Die Auswahl im Szenario beschreibt [Heizsystem im Szenario](#heizsystem-im-szenario-heating_system_ids).
 
 <a id="haus-wärme-wärmequelle-heat_source"></a>
 

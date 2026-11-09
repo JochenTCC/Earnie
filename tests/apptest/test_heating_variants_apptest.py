@@ -162,15 +162,73 @@ def test_reference_system_is_read_only_and_can_be_copied() -> None:
     assert at.selectbox(key="hsv_select").value == copies[0]["label"]
 
 
+def _gas() -> dict:
+    return next(e for e in _catalog() if e["id"] == "gas_variante")
+
+
+def _field_key(at: AppTest, widgets, suffix: str) -> str:
+    return next(w.key for w in widgets if str(w.key).endswith(suffix))
+
+
+def test_editor_offers_no_new_variant_option_besides_copy() -> None:
+    """A new variant is created only by copying an entry; there is no second, equal path."""
+    at = _editor_session()
+    assert all("neue Variante" not in o for o in at.selectbox(key="hsv_select").options)
+    assert not [sb for sb in at.selectbox if sb.key == "hsv_new_source"]
+    at.selectbox(key="hsv_select").set_value("Gas-Variante").run(timeout=_TIMEOUT_S)
+    at.button(key="hsv_copy").click().run(timeout=_TIMEOUT_S)
+    assert not at.exception
+    copy = next(e for e in _catalog() if e["label"] == "Gas-Variante (Kopie)")
+    assert copy["heat_source"] == {"type": "gas"}
+    assert at.selectbox(key="hsv_select").value == "Gas-Variante (Kopie)"
+
+
+def test_opening_a_variant_writes_nothing() -> None:
+    before = _components_path().read_bytes()
+    at = _editor_session()
+    at.selectbox(key="hsv_select").set_value("Gas-Variante").run(timeout=_TIMEOUT_S)
+    at.run(timeout=_TIMEOUT_S)
+    assert not at.exception
+    assert not [b for b in at.button if str(b.key).endswith("__save")]
+    assert "Gespeichert" not in [c.value for c in at.caption]
+    assert _components_path().read_bytes() == before
+
+
+def test_variant_changes_are_saved_automatically() -> None:
+    at = _editor_session()
+    at.selectbox(key="hsv_select").set_value("Gas-Variante").run(timeout=_TIMEOUT_S)
+    power_key = _field_key(at, at.number_input, "__heat_power")
+    at.number_input(key=power_key).set_value(12.5).run(timeout=_TIMEOUT_S)
+    assert not at.exception
+    assert _gas()["heating_power_kw"] == 12.5
+    assert "Gespeichert" in [c.value for c in at.caption]
+
+    label_key = _field_key(at, at.text_input, "__label")
+    at.text_input(key=label_key).set_value("Gas neu").run(timeout=_TIMEOUT_S)
+    assert not at.exception
+    assert _gas()["label"] == "Gas neu"
+    assert at.selectbox(key="hsv_select").value == "Gas neu"
+    assert at.text_input(key=label_key).value == "Gas neu"
+    assert "Gespeichert" in [c.value for c in at.caption]
+
+
+def test_invalid_variant_is_not_saved() -> None:
+    at = _editor_session()
+    at.selectbox(key="hsv_select").set_value("Gas-Variante").run(timeout=_TIMEOUT_S)
+    power_key = _field_key(at, at.number_input, "__heat_power")
+    at.number_input(key=power_key).set_value(0.0).run(timeout=_TIMEOUT_S)
+    assert not at.exception
+    assert any("Variante nicht gespeichert" in e.value for e in at.error)
+    assert _gas()["heating_power_kw"] == 9.0
+
+
 def test_variant_edit_and_delete_guard() -> None:
     at = _editor_session()
     at.selectbox(key="hsv_select").set_value("Gas-Variante").run(timeout=_TIMEOUT_S)
-    label_key = next(t.key for t in at.text_input if str(t.key).endswith("__label"))
+    label_key = _field_key(at, at.text_input, "__label")
     at.text_input(key=label_key).set_value("Gas neu").run(timeout=_TIMEOUT_S)
-    save_key = next(b.key for b in at.button if str(b.key).endswith("__save"))
-    at.button(key=save_key).click().run(timeout=_TIMEOUT_S)
     assert not at.exception
-    assert next(e for e in _catalog() if e["id"] == "gas_variante")["label"] == "Gas neu"
+    assert _gas()["label"] == "Gas neu"
 
     # Referenced by a scenario → delete refused, entry stays.
     _session().selectbox(key=_PICK_KEY).set_value("Gas neu").run(timeout=_TIMEOUT_S)

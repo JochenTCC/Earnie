@@ -83,9 +83,12 @@ Heating systems become a catalog, following the pattern of batteries and PV syst
 2. A heating-variants editor (Hauskonfigurator area „Heizsysteme“, moved there from the bottom
    of the Szenarienkonfigurator on 2026-11-03) lists all catalog entries. The reference system of a house is
    shown **read-only** there ("reference system of house X, edit in the house configurator"),
-   because changing it changes that house's baseload. It can be copied as the starting point of
-   a new variant.
-3. Further variants are created and edited only in the variants editor.
+   because changing it changes that house's baseload. Every entry (reference system or variant)
+   can be copied as the starting point of a new variant; copying is the only way to create one
+   (the former „— neue Variante —“ option with a template select did the same and was removed
+   on 2026-11-09).
+3. Further variants are created and edited only in the variants editor. Edits are saved
+   automatically (`ui.auto_persist`) once the entry validates; opening a variant writes nothing.
 4. An entry referenced by a house profile or a scenario cannot be deleted (fail loud, as for a
    battery referenced by a scenario).
 5. Deleting a house profile keeps its reference entry in the catalog; without an owner it is an
