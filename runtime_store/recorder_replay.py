@@ -68,6 +68,13 @@ class ReplayResult:
     cbc_events: list[dict[str, Any]] = field(default_factory=list)
     timestamp: str | None = None
     config_hash: str | None = None
+    # One record per MILP solve of the replay (``optimizer.cbc_solver.take_solve_log``).
+    solver: list[dict[str, Any]] = field(default_factory=list)
+
+    @property
+    def time_limit_hit(self) -> bool:
+        """True when a solve of the replay stopped at a time limit (plan depends on CPU speed)."""
+        return any(solve_hit_time_limit(rec) for rec in self.solver)
 
 
 def load_config_snapshot(recorder_root: Path | str, config_hash: str) -> dict[str, Any]:
@@ -234,7 +241,12 @@ def _solve_prepared_entry(
 ) -> ReplayResult:
     import config
     from optimizer.cbc_events import begin_cbc_event_collection, take_cbc_events
-    from optimizer.cbc_solver import apply_cbc_solver_env, clear_cbc_solver_env
+    from optimizer.cbc_solver import (
+        apply_cbc_solver_env,
+        begin_solve_log,
+        clear_cbc_solver_env,
+        take_solve_log,
+    )
 
     config.reinit_config()
     clear_cbc_solver_env()
@@ -268,6 +280,7 @@ def _solve_prepared_entry(
         stack.enter_context(_recorded_thermal_readings(entry))
         prepared_ctx = _prepare_replay_inputs(entry, config)
         begin_cbc_event_collection()
+        begin_solve_log()
         t0 = time.perf_counter()
         result = _run_milp_replay(
             prepared_ctx,
@@ -276,6 +289,7 @@ def _solve_prepared_entry(
         )
     result.seconds = time.perf_counter() - t0
     result.stage = _stage_from_events(take_cbc_events(), solver_mode)
+    result.solver = take_solve_log()
     result.timestamp = entry.get("timestamp")
     result.config_hash = str(entry.get("config_hash") or "")
     return result
@@ -923,12 +937,33 @@ def _entry_slot_count(entry: dict[str, Any]) -> int:
         return 0
 
 
+# ``outage`` is the name cycles recorded before 2026-11-09 use for ``out_of_band``.
+_FLAG_NAMES = ("override", "out_of_band", "outage", "manual_intervention")
+
+
 def _entry_is_flagged(entry: dict[str, Any]) -> bool:
     flags = ((entry.get("outputs") or {}).get("flags")) or {}
-    return any(
-        bool(flags.get(name))
-        for name in ("override", "outage", "manual_intervention")
-    )
+    return any(bool(flags.get(name)) for name in _FLAG_NAMES)
+
+
+def solve_hit_time_limit(record: dict[str, Any]) -> bool:
+    """True when the plan of one solve record comes from a stage stopped at its time limit."""
+    if record.get("stage") == "strict":
+        return bool(record.get("strict_time_limit_hit"))
+    if record.get("stage") == "gap":
+        return bool(record.get("gap_time_limit_hit"))
+    return False
+
+
+def recorded_time_limit_hit(entry: dict[str, Any]) -> bool | None:
+    """Whether the live cycle's plan came from a solve stopped at a time limit.
+
+    ``None`` for cycles recorded before ``outputs.solver`` existed: unknown, not ``False``.
+    """
+    solver = (entry.get("outputs") or {}).get("solver")
+    if solver is None:
+        return None
+    return any(solve_hit_time_limit(rec) for rec in solver)
 
 
 def _best_effort_rmtree(path: Path) -> None:

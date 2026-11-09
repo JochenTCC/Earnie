@@ -155,7 +155,7 @@ def test_begin_finish_writes_gzip_jsonl(tmp_path, monkeypatch):
         target_power_kw=2.5,
         battery_plan_kw=-1.0,
         consumer_powers_kw={"eauto": 3.68},
-        flags={"override": False, "immediate_charging": False, "outage": False, "manual_intervention": False},
+        flags={"override": False, "immediate_charging": False, "out_of_band": False, "manual_intervention": False},
     )
     assert ok is True
     segment = cycle_recorder.segment_path_for_day(now.date())
@@ -167,6 +167,22 @@ def test_begin_finish_writes_gzip_jsonl(tmp_path, monkeypatch):
     assert entry["optimization_matrix"]["n_rows"] == 4
     assert entry["outputs"]["plan_hash"]
     assert (cycle_recorder.configs_dir() / f"{entry['config_hash']}.json").is_file()
+    assert "solver" not in entry["outputs"]
+
+
+def test_finish_cycle_stores_the_solve_log(tmp_path, monkeypatch):
+    _cfg(tmp_path, monkeypatch)
+    now = datetime.now().replace(microsecond=0)
+    token = cycle_recorder.begin_cycle(
+        optimization_matrix=_sample_matrix(),
+        planning_window=_sample_window(),
+        soc_percent=55.0,
+        timestamp=now,
+    )
+    solve = {"stage": "strict", "strict_elapsed_sec": 3.21, "strict_time_limit_hit": True, "objective": 315.88}
+    cycle_recorder.finish_cycle(token, mode=0, target_power_kw=0.0, battery_plan_kw=0.0, solver=[solve])
+    entry = cycle_recorder.read_segment_cycles(cycle_recorder.segment_path_for_day(now.date()))[0]
+    assert entry["outputs"]["solver"] == [solve]
 
 
 def test_disabled_writes_nothing(tmp_path, monkeypatch):

@@ -216,7 +216,7 @@ def _seed_recorder(
             flags={
                 "override": False,
                 "immediate_charging": False,
-                "outage": False,
+                "out_of_band": False,
                 "manual_intervention": False,
             },
         )

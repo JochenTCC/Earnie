@@ -48,6 +48,43 @@ _milp_solver_override: ContextVar[str | None] = ContextVar(
     "milp_solver_override",
     default=None,
 )
+# Per-solve records of ``solve_with_strict_fallback`` while a caller collects them (live cycle,
+# recorder replay); ``None`` = not collecting.
+_solve_log: ContextVar[list[dict[str, Any]] | None] = ContextVar("milp_solve_log", default=None)
+
+
+def begin_solve_log() -> None:
+    """Start collecting one record per ``solve_with_strict_fallback`` call (replaces a running log)."""
+    _solve_log.set([])
+
+
+def take_solve_log() -> list[dict[str, Any]]:
+    """Return the collected solve records and stop collecting."""
+    collected = _solve_log.get()
+    _solve_log.set(None)
+    return list(collected) if collected else []
+
+
+def _append_solve_record(record: dict[str, Any]) -> None:
+    collected = _solve_log.get()
+    if collected is not None:
+        collected.append(record)
+
+
+def stopped_at_limit(prob: pulp.LpProblem) -> bool:
+    """True when the solver returned a solution it did not prove optimal (time or iteration limit).
+
+    PuLP reports such a stop as ``Optimal`` for HiGHS and CBC; only the solution status tells
+    it apart (``LpSolutionIntegerFeasible`` instead of ``LpSolutionOptimal``).
+    """
+    return prob.status == pulp.LpStatusOptimal and prob.sol_status == pulp.LpSolutionIntegerFeasible
+
+
+def _objective_value(prob: pulp.LpProblem) -> float | None:
+    if prob.status != pulp.LpStatusOptimal:
+        return None
+    value = pulp.value(prob.objective)
+    return None if value is None else round(float(value), 4)
 
 
 def _read_optional_float_env(suffix: str) -> float | None:
@@ -265,10 +302,20 @@ def solve_with_strict_fallback(
     """
     backend = resolve_milp_solver()
     label = "HiGHS" if backend == "highs" else "CBC"
+    record: dict[str, Any] = {"backend": backend}
 
     if _is_strict_cbc_mode():
+        t0 = time.perf_counter()
         prob.solve(_build_solver_cmd(backend=backend, msg=msg, strict=True))
-        return pulp.LpStatus[prob.status]
+        status = pulp.LpStatus[prob.status]
+        record.update(
+            stage="strict_unlimited",
+            strict_elapsed_sec=round(time.perf_counter() - t0, 3),
+            final_status=status,
+            objective=_objective_value(prob),
+        )
+        _append_solve_record(record)
+        return status
 
     strict_limit = resolve_cbc_strict_time_limit_sec()
     gap_rel = resolve_cbc_gap_rel()
@@ -285,26 +332,31 @@ def solve_with_strict_fallback(
         )
         elapsed = time.perf_counter() - t0
         status = pulp.LpStatus[prob.status]
-        if status == "Optimal":
-            maybe_record_strict_timing(
-                strict_limit_sec=strict_limit,
-                strict_elapsed_sec=elapsed,
-                strict_status=status,
-                gap_rel=gap_rel,
-            )
-            return status
+        limit_hit = stopped_at_limit(prob)
+        record.update(
+            strict_limit_sec=strict_limit,
+            strict_elapsed_sec=round(elapsed, 3),
+            strict_status=status,
+            strict_time_limit_hit=limit_hit,
+        )
         maybe_record_strict_timing(
             strict_limit_sec=strict_limit,
             strict_elapsed_sec=elapsed,
             strict_status=status,
             gap_rel=gap_rel,
+            time_limit_hit=limit_hit,
         )
+        if status == "Optimal":
+            record.update(stage="strict", final_status=status, objective=_objective_value(prob))
+            _append_solve_record(record)
+            return status
         if verbose:
             print(
                 f"{label} strict ({strict_limit:.1f} s) Status {status} "
                 f"→ Fallback gapRel={gap_rel * 100:.1f}%"
             )
 
+    t0 = time.perf_counter()
     prob.solve(
         _build_solver_cmd(
             backend=backend,
@@ -314,6 +366,15 @@ def solve_with_strict_fallback(
         )
     )
     final_status = pulp.LpStatus[prob.status]
+    record.update(
+        stage="gap",
+        gap_rel=gap_rel,
+        gap_elapsed_sec=round(time.perf_counter() - t0, 3),
+        gap_time_limit_hit=stopped_at_limit(prob),
+        final_status=final_status,
+        objective=_objective_value(prob),
+    )
+    _append_solve_record(record)
     return final_status
 
 

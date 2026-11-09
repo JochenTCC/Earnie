@@ -511,7 +511,7 @@ def _default_flags() -> dict[str, bool]:
     return {
         "override": False,
         "immediate_charging": False,
-        "outage": False,
+        "out_of_band": False,
         "manual_intervention": False,
     }
 
@@ -526,6 +526,7 @@ def _build_cycle_entry(
     target_power_kw: Any,
     battery_plan_kw: Any,
     consumer_powers_kw: Any,
+    solver: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     resolved_hash = plan_hash or compute_plan_hash(
         mode=mode,
@@ -539,6 +540,14 @@ def _build_cycle_entry(
         "battery_plan_kw": _json_safe(battery_plan_kw),
         "consumer_powers_kw": _json_safe(consumer_powers_kw),
     }
+    outputs: dict[str, Any] = {
+        "setpoints": _json_safe(resolved_setpoints),
+        "plan_hash": resolved_hash,
+        "flags": _json_safe(flags or _default_flags()),
+    }
+    if solver is not None:
+        # One record per MILP solve of the cycle (stage, elapsed, time limit hit, objective).
+        outputs["solver"] = _json_safe(solver)
     return {
         "schema": RECORDER_SCHEMA,
         "timestamp": token.timestamp,
@@ -547,11 +556,7 @@ def _build_cycle_entry(
         "optimization_matrix": token.optimization_matrix,
         "planning_window": token.planning_window,
         "start_state": token.start_state,
-        "outputs": {
-            "setpoints": _json_safe(resolved_setpoints),
-            "plan_hash": resolved_hash,
-            "flags": _json_safe(flags or _default_flags()),
-        },
+        "outputs": outputs,
     }
 
 
@@ -572,6 +577,7 @@ def finish_cycle(
     target_power_kw: Any = None,
     battery_plan_kw: Any = None,
     consumer_powers_kw: Any = None,
+    solver: list[dict[str, Any]] | None = None,
 ) -> bool:
     """Append one cycle line with outputs. Soft-fails; never raises to caller."""
     if token is None:
@@ -592,6 +598,7 @@ def finish_cycle(
             target_power_kw=target_power_kw,
             battery_plan_kw=battery_plan_kw,
             consumer_powers_kw=consumer_powers_kw,
+            solver=solver,
         )
         _append_cycle_line(entry, day=_segment_day_from_timestamp(token.timestamp))
         prune_old_segments()

@@ -27,6 +27,7 @@ from runtime_store import live_optimization_debug
 from runtime_store import cycle_duration_stats
 from runtime_store.cycle_timing import CycleTimer
 from optimizer.live_cycle_scope import live_cycle_scope
+from optimizer.cbc_solver import begin_solve_log, take_solve_log
 from runtime_store.live_display_loader import serialize_planning_window
 from runtime_store.single_instance import SingleInstanceError, ensure_single_instance
 from optimizer import schedule as optimization_schedule
@@ -645,6 +646,7 @@ def _main_cycle(
 
         import_ctx = resolve_live_import_caps(optimization_matrix)
         cycle_recorder.record_import_caps(recorder_token, import_ctx)
+    begin_solve_log()
     with timing.phase("milp_live"):
         mode, target_power, target_soc, consumer_powers, consumer_pv_follow, milp_plan, urgent_obs = optimizer.milp_optimizer(
             optimization_matrix,
@@ -664,6 +666,7 @@ def _main_cycle(
             current_soc_by_id=current_soc_by_id or None,
             import_caps=import_ctx["import_caps"],
         )
+    solve_log = take_solve_log()
     cycle_duration_stats.mark_ready()
     if early_start:
         with timing.phase("hold"):
@@ -1051,9 +1054,10 @@ def _main_cycle(
                 flags={
                     "override": bool(config.is_silent_mode()),
                     "immediate_charging": immediate,
-                    "outage": bool(out_of_band),
+                    "out_of_band": bool(out_of_band),
                     "manual_intervention": False,
                 },
+                solver=solve_log,
             )
         except Exception as exc:  # noqa: BLE001 — never abort live run
             logger.warning("cycle_recorder: finish_cycle failed: %s", exc)
