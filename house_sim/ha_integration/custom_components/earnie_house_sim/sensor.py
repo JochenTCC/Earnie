@@ -85,8 +85,11 @@ class HouseSimSensor(CoordinatorEntity[HouseSimCoordinator], SensorEntity):
         return value is not None and super().available
 
     @property
-    def native_value(self) -> float | None:
+    def native_value(self) -> float | str | None:
         value = self.coordinator.entity_state_value(self._fixture_id)
         if value is None:
             return None
+        if isinstance(value, str):
+            # Text states from the wallbox model (vehicle name, vendor car status).
+            return value
         return float(value)

@@ -162,6 +162,16 @@ class StateStore:
                 self._huawei_force_active_w = -power
             return 200, "ok"
 
+    def text_state(self, entity_id: str) -> str | None:
+        """Raw state string, ``None`` for a missing or unavailable entity."""
+        payload = self.get(entity_id)
+        if payload is None:
+            return None
+        text = str(payload.get("state", ""))
+        if text.strip().lower() in ("unavailable", "unknown"):
+            return None
+        return text
+
     def numeric_state(self, entity_id: str) -> float | None:
         payload = self.get(entity_id)
         if payload is None:

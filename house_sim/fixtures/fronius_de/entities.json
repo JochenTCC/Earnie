@@ -40,7 +40,8 @@
       "entity_ids": [
         "sensor.goe_91234567_nrg_11",
         "number.goe_91234567_amp",
-        "select.goe_91234567_frc"
+        "select.goe_91234567_frc",
+        "sensor.goe_91234567_car"
       ]
     }
   ],
@@ -157,6 +158,13 @@
           "1",
           "2"
         ]
+      }
+    },
+    {
+      "entity_id": "sensor.goe_91234567_car",
+      "state": "1",
+      "attributes": {
+        "friendly_name": "Wattpilot Fahrzeugstatus"
       }
     }
   ]
