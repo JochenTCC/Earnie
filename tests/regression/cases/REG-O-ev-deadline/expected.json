@@ -1,6 +1,6 @@
 {
   "engine": {
-    "earnie_version": "2.8.0-dev.8",
+    "earnie_version": "2.8.0-dev.13",
     "solver": "highs",
     "solver_mode": "strict",
     "highspy": "1.15.1",
@@ -14,10 +14,10 @@
   "metrics": {
     "status_optimal": 1,
     "n_slots": 192,
-    "cost_euro": 0.1290250000000001,
-    "import_kwh": 4.9625,
-    "export_kwh": 31.759999999999998,
-    "battery_throughput_kwh": 20.555,
+    "cost_euro": 0.13199999999999995,
+    "import_kwh": 4.9799999999999995,
+    "export_kwh": 31.799999999999997,
+    "battery_throughput_kwh": 20.505,
     "plausibility_failures": 0.0
   },
   "plan": {
@@ -25,8 +25,8 @@
     "diff_slots": null
   },
   "baseline": {
-    "git_sha": "4866576230d2c6f0063cf8c6f63bbfd7ffff194a",
-    "recorded_at": "2026-11-06T06:46:02Z",
+    "git_sha": "058c87e2ca3f1e3e35517cf347f21313fd296c27",
+    "recorded_at": "2026-11-09T15:25:29Z",
     "source": "update-golden"
   },
   "inputs": {
@@ -35,8 +35,9 @@
       "fixtures/components.json": "55ec9e6db654d771",
       "fixtures/config.json": "590426fa4620c716",
       "fixtures/cons_data.csv": "9dcccd6817385b2e",
+      "fixtures/cons_data.meta.json": "518b553dbff2d5c2",
       "fixtures/flex_consumers.json": "21be86172fc50e43",
-      "fixtures/grid_fees.json": "f2f800a84ee7dc3e",
+      "fixtures/grid_fees.json": "ea40bffb4f3bdde2",
       "fixtures/house_profiles.json": "9846fa4690b8618c",
       "fixtures/open_meteo/47.4000_9.7000_2025-01-01_2025-12-31_Europe-Vienna_none.json": "cced3026b26261c3",
       "fixtures/open_meteo/47.4040_9.7430_2026-01-01_2026-10-17_Europe-Vienna_18.0_28.0.json": "ba5564dba8d71740",
