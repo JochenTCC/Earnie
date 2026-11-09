@@ -1,6 +1,6 @@
 # Multiple EVs and wallboxes, HouseSim wallbox write-back: design and implementation plan
 
-**Status:** design draft (2026-11-09); W1 built, the rest not. All decisions below are **proposals** until the maintainer accepts them. Branch `feat/multi-ev-wallbox` (first named `docs/multi-ev-wallbox-design`), based on `main` at `fda24a4e`.
+**Status:** design draft (2026-11-09); W1 built, the rest not. Decisions D1–D10 accepted by the maintainer on 2026-11-09 (D2 in its revised form: limits as current on both devices). D11 follows from D1–D3. Branch `feat/multi-ev-wallbox` (first named `docs/multi-ev-wallbox-design`), based on `main` at `fda24a4e`.
 **Backlog items:** **Enable multiple EV / Wallboxes** and **HouseSim wallbox write-back** (both Version 2.+1). The write-back is the test bench for the assignment, so this plan covers both. Target release: not decided.
 
 ## Goal
@@ -29,20 +29,22 @@ Not in this plan: load management across wallboxes (a shared current limit for s
 | HouseSim fixtures | `evcc_en`: evcc loadpoint (`max_current`, `enable`). `fronius_de`, `huawei_en`: go-e / Wattpilot (`amp`, power `nrg_11`). `sma_keba`: KEBA P30, read-only. | `house_sim/fixtures/` |
 | Docs | The binding UX draft already states that the adapter uses only the first EV and that multi-EV runtime is this item. | `docs/dev/EHAL-Binding-UX-Draft.md:263-268` |
 
-## Decisions (proposals)
+## Decisions
 
-| # | Question | Proposal | Why |
+All accepted on 2026-11-09 (maintainer). D2 was revised in the review: the first proposal kept a kW acceptance on the car; the maintainer wants the limits as current on both devices.
+
+| # | Question | Decision | Why |
 |---|---|---|---|
 | D1 | Where does a wallbox live? | New list `components.wallboxes[]`, next to `batteries[]`, with its own Kennung and `ehal_bindings`. EVs stay consumers in the house profiles. | A wallbox is plant hardware like a battery; the EV's schedules differ per house profile. |
-| D2 | What moves to the wallbox? | Voltage, phases, minimum and maximum current (A), the charger bindings (`sens_evcs_active_power`, `sens_evcs_connected`, `get_evcs_nominal_current`, `set_evcs_max_current`, `set_evcs_mode`) and a new optional `sens_evcs_vehicle_id`. The EV keeps capacity, schedules, SoC / limit / ready-by bindings, `min_on_quarterhours`, and gets `max_charge_power_kw` (what the car accepts) and optional `max_phases`. `min_power_kw` is no longer stored: it is the wallbox's minimum current × voltage × effective phases. | Each property is stored once, on the device that has it. A 1-phase car on a 3-phase box charges on one phase, so the effective phases are `min(wallbox, car)`. |
+| D2 | Which limits live where, and in which unit? | **Limits are currents, on both devices.** Wallbox: `voltage_v`, `phases`, `min_current_a`, `max_current_a`, the charger bindings (`sens_evcs_active_power`, `sens_evcs_connected`, `get_evcs_nominal_current`, `set_evcs_max_current`, `set_evcs_mode`) and a new optional `sens_evcs_vehicle_id`. EV: `phases`, `min_current_a`, `max_current_a`, capacity, schedules, SoC / limit / ready-by bindings, `min_on_quarterhours`. For a pair: minimum current = the larger minimum, maximum current = the smaller maximum, phases = the smaller count, power = current × voltage × phases. A pair whose minimum exceeds its maximum is a configuration error for that pair, never clamped. `nominal_power_kw` and `min_power_kw` are no longer stored; the UI shows the kW of a pair and converts a datasheet kW value (230 V, the car's phases) into current on input. | A kW value depends on the pair (voltage, phases); a current is a property of one device. A 1-phase car on a 3-phase box charges on one phase. |
 | D3 | How is an EV bound? | `ev.wallbox_assignment`: `{"mode": "fixed", "wallbox_id": "<id>"}` or `{"mode": "dynamic", "wallbox_ids": [...]}` (the wallboxes this car may use). Required field; migration writes `fixed`. | `fixed` keeps every existing pack exactly as it is; `dynamic` is opt-in. |
 | D4 | Evidence for an assignment, in order | (a) the wallbox reports a vehicle ID (`sens_evcs_vehicle_id`, e.g. evcc vehicle detection, RFID) that matches the EV's `vehicle_ref`; (b) one wallbox and one dynamic EV report "plugged" inside the matching window, and no other candidate is open; (c) test charge (D5); (d) the user picks the car on the Monitor page. If none applies, the wallbox stays "unknown vehicle" (D6). | Backlog: "both devices report connection, confirm by test charging". (a) is cheaper and exact where the hardware has it. No step guesses (`no-implicit-fallbacks.mdc`). |
 | D5 | Test charge | Earnie sets the wallbox to its minimum current for at most 120 s and watches the candidates' charge power or charging state. Positive when exactly one candidate reacts. Only for EVs with such a sensor (SoC steps of 1 % are too slow); one wallbox at a time; never while the user forces "Sofort laden" or a manual mode. Window and duration are documented settings, not hidden constants. | About 0.05 kWh per test. Running boxes one after another keeps the reaction unambiguous. |
 | D6 | Wallbox with an unknown vehicle | Per wallbox `unknown_vehicle`: `off`, `pv_only` or `immediate`. Required once any EV is `dynamic`; no default. | A guest car or a car without sensors must charge in a way the user chose, not in one Earnie assumed. |
 | D7 | Unplug and restart | Unplugging the wallbox ends the assignment at once. On daemon start all assignments are dropped and the D4 ladder runs again (test charge allowed). The last assignments are kept in `runtime/ev_assignments.json` for display and the cycle record only, never as truth. | Backlog: "cancel assignments and re-bind in case of shutdown". While Earnie was down a car may have changed boxes; only the vehicle ID sensor could tell. |
-| D8 | Planning a dynamic EV that is not plugged in | Per slot, the dynamic EVs that may arrive share the wallboxes they may use: Σ power ≤ Σ maximum power of those wallboxes that are free, and the number of charging cars ≤ the number of those wallboxes. A plugged and assigned EV takes its wallbox out of the pool and is limited by `min(car, wallbox)`. | Picking a wallbox for a future arrival would be a guess, and a wrong one would block the other car's plan. |
+| D8 | Planning a dynamic EV that is not plugged in | Per slot, the dynamic EVs that may arrive share the wallboxes they may use: Σ power ≤ Σ maximum power of those wallboxes that are free, and the number of charging cars ≤ the number of those wallboxes. A plugged and assigned EV takes its wallbox out of the pool and is planned with the limits of that pair (D2). A car that is not plugged in is planned with the smallest maximum power among the free wallboxes it may use, and re-planned with the real pair once plugged in. | Picking a wallbox for a future arrival would be a guess, and a wrong one would block the other car's plan. |
 | D9 | SE (Scenario Explorer) | `fixed` behaves as today. `dynamic` in the SE: first come, first served by arrival time in the schedule, ties by EV Kennung, so the SE stays deterministic. | The SE has no plug events; it needs a fixed rule, and the rule must be visible in the result. |
-| D10 | HouseSim EV model | The write-back builds a small EV model (plug state, SoC as an energy counter, acceptance in kW, charging state). The HouseSim scenario series reuses it instead of building its own. | The assignment needs a car that reacts to a test charge. This changes the note under the series item that says the EV SoC model "builds on" the write-back. |
+| D10 | HouseSim EV model | The write-back builds a small EV model (plug state, SoC as an energy counter, current limits and phases as in D2). The HouseSim scenario series reuses it instead of building its own. | The assignment needs a car that reacts to a test charge. This changes the note under the series item that says the EV SoC model "builds on" the write-back. |
 | D11 | Data model | `earnie_data_model` 6 with step `dm6.wallboxes` (`config-migration.mdc`). | Moving fields between files is a structural change. |
 
 Open questions for the maintainer:
@@ -57,13 +59,13 @@ Each phase is one chat session and ends with green tests and a commit. **W** = H
 
 ### W1: HouseSim core — wallbox and EV physics
 
-**Built 2026-11-09** (D10 taken as accepted for this phase): `house_sim/core/evcs.py`, wired into `step_physics` / `run_ticks`, S4 copy synced, tests `tests/test_house_sim_core_evcs.py`. Archetypes without `house_params.wallboxes` keep the fixed power override, so no shipped fixture changes until W2. Not built: the vendor entities that feed `WallboxSetpoints` (W2), persistence of the EV state in the S4 coordinator (W2).
+**Built 2026-11-09**, EV limits switched to current after D2 was revised: `house_sim/core/evcs.py`, wired into `step_physics` / `run_ticks`, S4 copy synced, tests `tests/test_house_sim_core_evcs.py`. Archetypes without `house_params.wallboxes` keep the fixed power override, so no shipped fixture changes until W2. Not built: the vendor entities that feed `WallboxSetpoints` (W2), persistence of the EV state in the S4 coordinator (W2).
 
-- `house_params.wallboxes[]` (Kennung, voltage, phases, min / max current, `read_only`) and `house_params.evs[]` (Kennung, capacity, start SoC, acceptance kW, phases, optional vehicle ID).
+- `house_params.wallboxes[]` (Kennung, voltage, phases, min / max current, `read_only`) and `house_params.evs[]` (Kennung, capacity, start SoC, min / max current, phases, optional vehicle ID).
 - `WallboxSetpoints` per wallbox: `max_current_a`, `enabled` (from the vendor's enable or mode field). Read like `EssSetpoints` today.
-- Charge power per wallbox: 0 when no car, not enabled, or current below the minimum; otherwise `min(I × U × min(phases), acceptance)`; never above the car's remaining energy to 100 %. A `read_only` wallbox charges at the car's acceptance while a car is connected (today's behaviour of `car_arrives`, now explicit).
+- Charge power per wallbox: 0 when no car, not enabled, or the setpoint below the pair's minimum current; otherwise `I × U × min(phases)` with `I` capped at the pair's maximum current (D2); never above the car's remaining energy to 100 %. A `read_only` wallbox charges at the pair's maximum current while a car is connected (today's behaviour of `car_arrives`, now explicit). A pair whose minimum exceeds its maximum raises.
 - The EV's SoC counts the charged energy. `car_arrives(ev=…, wallbox=…, soc=…)` and `car_leaves(wallbox=…)` replace the fixed power override; `evcs_power_w` in the state becomes the sum over wallboxes.
-- **Tests:** current × voltage × phases; 1-phase car on 3-phase box; current below minimum gives 0; acceptance caps; SoC stops at 100 %; disabled box gives 0; `read_only` keeps the old values of the existing core tests.
+- **Tests:** current × voltage × phases; 1-phase car on 3-phase box; current below the pair's minimum gives 0; the car's maximum current caps; impossible pair raises; SoC stops at 100 %; disabled box gives 0; `read_only` keeps the old values of the existing core tests.
 
 ### W2: HouseSim vendor projections, S1–S4
 
@@ -81,7 +83,7 @@ Each phase is one chat session and ends with green tests and a commit. **W** = H
 ### M1: Schema and migration (no behaviour change)
 
 - `components.wallboxes[]` in schema, loaders and the Komponenten page; EV consumer fields as in D2; `ev.wallbox_assignment` (D3).
-- Step `dm6.wallboxes`: one wallbox per EV consumer (Kennung = the consumer's Kennung, so `evcs.<Kennung>.*` IDs stay the same), charger fields and bindings moved, `max_charge_power_kw` = old `nominal_power_kw`, `fixed` assignment. Release notes helper picks it up.
+- Step `dm6.wallboxes`: one wallbox per EV consumer (Kennung = the consumer's Kennung, so `evcs.<Kennung>.*` IDs stay the same), charger bindings moved, the old `min_power_kw` / `nominal_power_kw` converted into current with the consumer's voltage and phases and written to **both** wallbox and EV (they described the pair, so the pair keeps exactly its old limits), `fixed` assignment. Release notes helper picks it up.
 - `power_limits_kw` and `ev_nominal_power_conversion` read the assigned wallbox. Earnie Points counts `wallboxes[]`. Loxone and HA greenfield import create a wallbox and an EV.
 - **Tests:** migration of the example pack and of a pack with two EVs; golden-master regression unchanged (all packs migrate to `fixed`); points unchanged for migrated packs.
 
@@ -100,7 +102,7 @@ Each phase is one chat session and ends with green tests and a commit. **W** = H
 
 ### M4: Planner and SE
 
-- Pool constraints for dynamic EVs (D8) in the MILP, using the EVs' existing on-variables where they have them; plugged, assigned EVs limited by `min(car, wallbox)`.
+- Pool constraints for dynamic EVs (D8) in the MILP, using the EVs' existing on-variables where they have them; plugged, assigned EVs planned with the limits of their pair (D2).
 - SE rule D9, and the result says which car charged where.
 - **Tests:** two dynamic cars, one wallbox: never both charging in one slot, the deadline that matters wins; three cars, two boxes; regression goldens unchanged for `fixed` packs.
 

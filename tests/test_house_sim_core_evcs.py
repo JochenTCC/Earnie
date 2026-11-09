@@ -25,7 +25,8 @@ BOX_3P = WallboxParams(
     id="lp1", voltage_v=230.0, phases=3, min_current_a=6.0, max_current_a=16.0
 )
 CAR_3P = EvParams(
-    id="car_a", capacity_kwh=60.0, initial_soc_pct=40.0, max_charge_power_kw=11.0, phases=3
+    id="car_a", capacity_kwh=60.0, initial_soc_pct=40.0,
+    min_current_a=6.0, max_current_a=16.0, phases=3
 )
 
 
@@ -45,9 +46,9 @@ def _two_box_package(**extra) -> ArchetypePackage:
         ],
         evs=[
             {"id": "car_a", "capacity_kwh": 60, "initial_soc_pct": 40,
-             "max_charge_power_kw": 11, "phases": 3},
+             "min_current_a": 6, "max_current_a": 16, "phases": 3},
             {"id": "car_b", "capacity_kwh": 40, "initial_soc_pct": 80,
-             "max_charge_power_kw": 7.4, "phases": 1},
+             "min_current_a": 6, "max_current_a": 32, "phases": 1},
         ],
         **extra,
     )
@@ -88,15 +89,31 @@ def test_current_below_minimum_gives_zero():
 
 
 def test_current_above_wallbox_maximum_is_capped():
-    car = replace(CAR_3P, max_charge_power_kw=50.0)
+    car = replace(CAR_3P, max_current_a=32.0)
     power = charge_power_w(BOX_3P, car, soc_pct=40.0, setpoints=WallboxSetpoints(32.0), dt_h=0.25)
     assert power == pytest.approx(16.0 * 230.0 * 3)
 
 
-def test_car_acceptance_caps_power():
-    car = replace(CAR_3P, max_charge_power_kw=7.0)
+def test_car_maximum_current_caps_power():
+    car = replace(CAR_3P, max_current_a=10.0)
     power = charge_power_w(BOX_3P, car, soc_pct=40.0, setpoints=WallboxSetpoints(16.0), dt_h=0.25)
-    assert power == pytest.approx(7000.0)
+    assert power == pytest.approx(10.0 * 230.0 * 3)
+
+
+def test_car_minimum_current_above_wallbox_minimum_applies():
+    car = replace(CAR_3P, min_current_a=8.0)
+    assert charge_power_w(
+        BOX_3P, car, soc_pct=40.0, setpoints=WallboxSetpoints(7.0), dt_h=0.25
+    ) == 0.0
+    assert charge_power_w(
+        BOX_3P, car, soc_pct=40.0, setpoints=WallboxSetpoints(8.0), dt_h=0.25
+    ) == pytest.approx(8.0 * 230.0 * 3)
+
+
+def test_pair_without_common_current_raises():
+    car = replace(CAR_3P, min_current_a=20.0, max_current_a=32.0)
+    with pytest.raises(ValueError, match="no common charge current"):
+        charge_power_w(BOX_3P, car, soc_pct=40.0, setpoints=WallboxSetpoints(16.0), dt_h=0.25)
 
 
 def test_disabled_wallbox_gives_zero():
@@ -118,10 +135,12 @@ def test_full_car_draws_no_more_than_remaining_energy():
     ) == 0.0
 
 
-def test_read_only_wallbox_charges_at_what_the_car_accepts():
+def test_read_only_wallbox_charges_at_the_pairs_maximum_current():
     box = replace(BOX_3P, read_only=True)
-    car = replace(CAR_3P, max_charge_power_kw=7.0)
-    assert charge_power_w(box, car, soc_pct=40.0, setpoints=None, dt_h=0.25) == pytest.approx(7000.0)
+    car = replace(CAR_3P, max_current_a=10.0)
+    assert charge_power_w(box, car, soc_pct=40.0, setpoints=None, dt_h=0.25) == pytest.approx(
+        10.0 * 230.0 * 3
+    )
 
 
 def test_writable_wallbox_with_car_but_no_setpoints_raises():
@@ -138,7 +157,7 @@ def test_parse_rejects_missing_field_and_bad_phases():
                                         "min_current_a": 6, "max_current_a": 16}]})
     with pytest.raises(ValueError, match="phases"):
         parse_evs({"evs": [{"id": "c", "capacity_kwh": 40, "initial_soc_pct": 50,
-                            "max_charge_power_kw": 7, "phases": 4}]})
+                            "min_current_a": 6, "max_current_a": 16, "phases": 4}]})
 
 
 def test_parse_rejects_duplicate_ids():
@@ -158,7 +177,7 @@ def test_initial_ev_must_exist():
         wallboxes=[{"id": "lp1", "voltage_v": 230, "phases": 3, "min_current_a": 6,
                     "max_current_a": 16, "initial_ev_id": "ghost"}],
         evs=[{"id": "car_a", "capacity_kwh": 60, "initial_soc_pct": 40,
-              "max_charge_power_kw": 11, "phases": 3}],
+              "min_current_a": 6, "max_current_a": 16, "phases": 3}],
     )
     with pytest.raises(ValueError, match="ghost"):
         initial_physics(package)
@@ -193,7 +212,7 @@ def test_two_wallboxes_charge_two_cars_with_own_setpoints():
         {"lp1": WallboxSetpoints(6.0), "lp2": WallboxSetpoints(32.0)},
     )
     assert nxt.evcs.wallbox_power_w["lp1"] == pytest.approx(6.0 * 230.0 * 3)
-    # lp2: 32 A × 230 V × 1 phase = 7.36 kW, car_b accepts 7.4 kW.
+    # lp2: 32 A × 230 V × 1 phase = 7.36 kW, car_b allows 32 A.
     assert nxt.evcs.wallbox_power_w["lp2"] == pytest.approx(32.0 * 230.0)
     assert nxt.evcs.ev_soc_pct["car_b"] == pytest.approx(20.0 + 7.36 * 0.25 / 40.0 * 100.0)
     assert nxt.evcs_power_w == pytest.approx(6.0 * 230.0 * 3 + 32.0 * 230.0)
@@ -277,14 +296,14 @@ def test_initial_ev_charges_from_first_tick_and_as_dict_carries_state():
         wallboxes=[{"id": "lp1", "voltage_v": 230, "phases": 3, "min_current_a": 6,
                     "max_current_a": 16, "initial_ev_id": "car_a"}],
         evs=[{"id": "car_a", "capacity_kwh": 60, "initial_soc_pct": 40,
-              "max_charge_power_kw": 11, "phases": 3}],
+              "min_current_a": 6, "max_current_a": 16, "phases": 3}],
     )
     state = initial_physics(package)
     assert state.evcs.ev_at_wallbox == {"lp1": "car_a"}
     nxt = _step(state, package, None, {"lp1": WallboxSetpoints(16.0)})
-    assert nxt.evcs_power_w == pytest.approx(11000.0)
+    assert nxt.evcs_power_w == pytest.approx(16.0 * 230.0 * 3)
     doc = nxt.as_dict()
-    assert doc["evcs_power_w"] == pytest.approx(11000.0)
+    assert doc["evcs_power_w"] == pytest.approx(16.0 * 230.0 * 3)
     assert doc["evcs"]["ev_at_wallbox"] == {"lp1": "car_a"}
 
 

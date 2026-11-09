@@ -1,9 +1,12 @@
 """Wallbox and EV physics (HouseSim wallbox write-back, W1).
 
-A wallbox charges the EV plugged into it with ``I × U × phases``, where the
-current comes from the wallbox setpoint, the phases are the smaller of wallbox
-and car, and the car's acceptance and remaining energy cap the result. The EV's
-SoC counts the AC energy charged (no charge losses in this model).
+Limits are currents on both devices (decision D2 of
+``docs/dev/multi-ev-wallbox-plan.md``). For a pair, the minimum current is the
+larger of the two minimums, the maximum current the smaller of the two
+maximums, the phases the smaller count. A wallbox charges the EV plugged into
+it with ``I × U × phases``, where ``I`` is the wallbox setpoint capped at the
+pair's maximum (0 below the pair's minimum); the energy left to 100 % caps the
+result. The EV's SoC counts the AC energy charged (no charge losses here).
 
 Parameters come from ``house_params``::
 
@@ -11,10 +14,11 @@ Parameters come from ``house_params``::
                    "min_current_a": 6, "max_current_a": 16,
                    "read_only": false, "initial_ev_id": "car_a"}],
     "evs": [{"id": "car_a", "capacity_kwh": 60, "initial_soc_pct": 40,
-             "max_charge_power_kw": 11, "phases": 3, "vehicle_id": "Car A"}]
+             "min_current_a": 6, "max_current_a": 16, "phases": 3,
+             "vehicle_id": "Car A"}]
 
 ``read_only`` (optional, default ``false``) marks a wallbox that takes no
-setpoints (e.g. KEBA without write access): it charges at what the car accepts.
+setpoints (e.g. KEBA without write access): it charges at the pair's maximum.
 ``initial_ev_id`` and ``vehicle_id`` are optional.
 
 No Earnie imports: this module is copied into the S4 HA integration.
@@ -41,7 +45,8 @@ class EvParams:
     id: str
     capacity_kwh: float
     initial_soc_pct: float
-    max_charge_power_kw: float
+    min_current_a: float
+    max_current_a: float
     phases: int
     vehicle_id: str | None = None
 
@@ -106,6 +111,14 @@ def _phases(value: Any, where: str) -> int:
     return phases
 
 
+def _current_range(raw: Mapping[str, Any], where: str) -> tuple[float, float]:
+    min_a = float(_require(raw, "min_current_a", where))
+    max_a = float(_require(raw, "max_current_a", where))
+    if min_a < 0 or max_a < min_a:
+        raise ValueError(f"{where}: need 0 <= min_current_a <= max_current_a")
+    return min_a, max_a
+
+
 def _id(raw: Mapping[str, Any], where: str) -> str:
     value = str(_require(raw, "id", where)).strip()
     if not value:
@@ -126,12 +139,9 @@ def parse_wallboxes(house_params: Mapping[str, Any]) -> tuple[WallboxParams, ...
             raise ValueError(f"{where} must be an object")
         wid = _id(raw, where)
         voltage = float(_require(raw, "voltage_v", where))
-        min_a = float(_require(raw, "min_current_a", where))
-        max_a = float(_require(raw, "max_current_a", where))
         if voltage <= 0:
             raise ValueError(f"{where}: voltage_v must be > 0")
-        if min_a < 0 or max_a < min_a:
-            raise ValueError(f"{where}: need 0 <= min_current_a <= max_current_a")
+        min_a, max_a = _current_range(raw, where)
         initial = raw.get("initial_ev_id")
         out.append(
             WallboxParams(
@@ -161,20 +171,19 @@ def parse_evs(house_params: Mapping[str, Any]) -> tuple[EvParams, ...]:
             raise ValueError(f"{where} must be an object")
         capacity = float(_require(raw, "capacity_kwh", where))
         soc = float(_require(raw, "initial_soc_pct", where))
-        accept = float(_require(raw, "max_charge_power_kw", where))
         if capacity <= 0:
             raise ValueError(f"{where}: capacity_kwh must be > 0")
         if not 0.0 <= soc <= 100.0:
             raise ValueError(f"{where}: initial_soc_pct must be within 0..100")
-        if accept <= 0:
-            raise ValueError(f"{where}: max_charge_power_kw must be > 0")
+        min_a, max_a = _current_range(raw, where)
         vehicle = raw.get("vehicle_id")
         out.append(
             EvParams(
                 id=_id(raw, where),
                 capacity_kwh=capacity,
                 initial_soc_pct=soc,
-                max_charge_power_kw=accept,
+                min_current_a=min_a,
+                max_current_a=max_a,
                 phases=_phases(_require(raw, "phases", where), where),
                 vehicle_id=str(vehicle).strip() if vehicle else None,
             )
@@ -258,6 +267,19 @@ def apply_events(
     return replace(state, ev_at_wallbox=connected, ev_soc_pct=soc)
 
 
+def pair_current_range(wallbox: WallboxParams, ev: EvParams) -> tuple[float, float]:
+    """Current range (A) of a wallbox–EV pair; raises when the ranges do not overlap."""
+    min_a = max(wallbox.min_current_a, ev.min_current_a)
+    max_a = min(wallbox.max_current_a, ev.max_current_a)
+    if min_a > max_a:
+        raise ValueError(
+            f"Wallbox {wallbox.id!r} ({wallbox.min_current_a:g}–{wallbox.max_current_a:g} A) "
+            f"and EV {ev.id!r} ({ev.min_current_a:g}–{ev.max_current_a:g} A) "
+            "have no common charge current"
+        )
+    return min_a, max_a
+
+
 def charge_power_w(
     wallbox: WallboxParams,
     ev: EvParams,
@@ -269,9 +291,10 @@ def charge_power_w(
     """AC charge power (W) of ``wallbox`` into ``ev`` for one tick of ``dt_h`` hours."""
     if dt_h <= 0:
         raise ValueError("dt_h must be > 0")
+    min_a, max_a = pair_current_range(wallbox, ev)
     phases = min(wallbox.phases, ev.phases)
     if wallbox.read_only:
-        current_a = wallbox.max_current_a
+        current_a = max_a
     else:
         if setpoints is None:
             raise ValueError(
@@ -279,11 +302,10 @@ def charge_power_w(
             )
         if not setpoints.enabled:
             return 0.0
-        current_a = min(max(0.0, float(setpoints.max_current_a)), wallbox.max_current_a)
-        if current_a < wallbox.min_current_a or current_a <= 0.0:
+        current_a = min(max(0.0, float(setpoints.max_current_a)), max_a)
+        if current_a < min_a or current_a <= 0.0:
             return 0.0
     power_w = current_a * wallbox.voltage_v * phases
-    power_w = min(power_w, ev.max_charge_power_kw * 1000.0)
     room_kwh = max(0.0, (100.0 - float(soc_pct)) / 100.0 * ev.capacity_kwh)
     return max(0.0, min(power_w, room_kwh / dt_h * 1000.0))
 
