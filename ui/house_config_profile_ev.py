@@ -24,9 +24,12 @@ from house_config.generic_schedule import (
 )
 from house_config.id_slug import slug_id
 from house_config.wallboxes import (
+    ASSIGNMENT_DYNAMIC,
     ASSIGNMENT_FIXED,
     WALLBOX_ASSIGNMENT_KEY,
     assigned_wallbox_id,
+    dynamic_wallbox_ids,
+    is_dynamic_ev,
     pair_limits,
 )
 from house_config.profile_schema_defaults import consumer_default, ev_schedule_default
@@ -49,10 +52,16 @@ from ui.auto_persist import auto_persist
 from ui.form_layout import (
     WIDE_LABEL_RATIOS,
     labeled_checkbox,
+    labeled_multiselect,
     labeled_number_input,
     labeled_selectbox,
     labeled_text_input,
 )
+
+_ASSIGNMENT_MODE_LABELS = {
+    ASSIGNMENT_FIXED: "Fest an einer Wallbox",
+    ASSIGNMENT_DYNAMIC: "Dynamisch (an mehreren Wallboxen)",
+}
 
 
 _PASSTHROUGH_CONSUMER_KEYS = (
@@ -308,6 +317,63 @@ def _render_wallbox_choice(consumer: dict, car: dict, index: int, *, session_sco
     return wallbox_id
 
 
+def _render_assignment_mode(consumer: dict, index: int, *, session_scope: str) -> str:
+    key = _scoped_key(session_scope, f"hc_ev_assign_mode_{index}")
+    if key not in st.session_state:
+        st.session_state[key] = ASSIGNMENT_DYNAMIC if is_dynamic_ev(consumer) else ASSIGNMENT_FIXED
+    return str(
+        labeled_selectbox(
+            "Wallbox-Zuordnung",
+            options=list(_ASSIGNMENT_MODE_LABELS),
+            format_func=lambda mode: _ASSIGNMENT_MODE_LABELS[mode],
+            key=key,
+            help=(
+                "Dynamisch: Earnie erkennt, an welcher Wallbox das Auto steckt (Steckabgleich, "
+                "Probeladung oder Auswahl im Monitor) und plant es erst dann."
+            ),
+        )
+    )
+
+
+def _render_dynamic_wallboxes(consumer: dict, index: int, *, session_scope: str) -> list[str]:
+    """Wallboxes a dynamic EV may use (multi-EV M3)."""
+    from ui.house_config_wallbox_io import wallboxes_map
+
+    wallboxes = wallboxes_map()
+    if not wallboxes:
+        st.warning("Noch keine Wallbox angelegt (Tab „Wallboxen“).")
+        return []
+    key = _scoped_key(session_scope, f"hc_ev_dynamic_wallboxes_{index}")
+    if key in st.session_state:
+        st.session_state[key] = [w for w in st.session_state[key] if w in wallboxes]
+    else:
+        st.session_state[key] = [w for w in dynamic_wallbox_ids(consumer) if w in wallboxes]
+    chosen = list(
+        labeled_multiselect(
+            "Erlaubte Wallboxen",
+            options=list(wallboxes),
+            format_func=lambda wid: str(wallboxes[wid]["label"]),
+            key=key,
+            help="An diesen Wallboxen darf das Auto laden.",
+        )
+    )
+    if not chosen:
+        st.warning("Mindestens eine Wallbox wählen — sonst wird das E-Auto nicht gespeichert.")
+    missing = [w for w in chosen if not wallboxes[w].get("unknown_vehicle")]
+    if missing:
+        st.warning(
+            "Für "
+            + ", ".join(str(wallboxes[w]["label"]) for w in missing)
+            + " fehlt „Unbekanntes Auto“ (Tab „Wallboxen“)."
+        )
+    st.caption(
+        "Geplant wird das Auto erst, wenn es einer Wallbox zugeordnet ist; die Zuordnung "
+        "steht im Monitor. Für Steckabgleich und Probeladung braucht das Auto die Signale "
+        "„Auto meldet angesteckt“ und „Auto-Ladeleistung“ (EHAL-Com)."
+    )
+    return chosen
+
+
 def _render_pair_caption(item: dict) -> None:
     from ui.house_config_wallbox_io import wallboxes_map
 
@@ -363,11 +429,20 @@ def _render_ev_power_fields(consumer: dict, index: int, *, session_scope: str) -
         )
     )
     car = {"phases": phases, "min_current_a": min_a, "max_current_a": max_a}
-    wallbox_id = _render_wallbox_choice(consumer, car, index, session_scope=session_scope)
     item: dict = dict(car)
-    if wallbox_id:
-        item[WALLBOX_ASSIGNMENT_KEY] = {"mode": ASSIGNMENT_FIXED, "wallbox_id": wallbox_id}
-        _render_pair_caption({**item, "label": consumer.get("label")})
+    mode = _render_assignment_mode(consumer, index, session_scope=session_scope)
+    if mode == ASSIGNMENT_DYNAMIC:
+        wallbox_ids = _render_dynamic_wallboxes(consumer, index, session_scope=session_scope)
+        if wallbox_ids:
+            item[WALLBOX_ASSIGNMENT_KEY] = {
+                "mode": ASSIGNMENT_DYNAMIC,
+                "wallbox_ids": wallbox_ids,
+            }
+    else:
+        wallbox_id = _render_wallbox_choice(consumer, car, index, session_scope=session_scope)
+        if wallbox_id:
+            item[WALLBOX_ASSIGNMENT_KEY] = {"mode": ASSIGNMENT_FIXED, "wallbox_id": wallbox_id}
+            _render_pair_caption({**item, "label": consumer.get("label")})
     item.update(
         {
             "min_on_quarterhours": labeled_number_input(
@@ -389,8 +464,17 @@ def _render_ev_power_fields(consumer: dict, index: int, *, session_scope: str) -
     return item
 
 def _render_ev_charging_schedule(
-    sched: dict, index: int, *, session_scope: str
+    sched: dict, index: int, *, session_scope: str, dynamic: bool = False
 ) -> dict:
+    forecast_key = _scoped_key(session_scope, f"hc_ev_forecast_{index}")
+    forecast_opts: dict = {}
+    if dynamic:
+        # Planning ahead of a dynamic EV needs the wallbox pool (multi-EV M4).
+        st.session_state[forecast_key] = False
+    elif forecast_key not in st.session_state:
+        forecast_opts["value"] = bool(
+            sched.get("forecast_when_absent", ev_schedule_default("forecast_when_absent"))
+        )
     return {
         "target_soc_percent": labeled_number_input(
             "Ziel-SOC (%)",
@@ -409,10 +493,13 @@ def _render_ev_charging_schedule(
         ),
         "forecast_when_absent": labeled_checkbox(
             "Prognose, wenn nicht angeschlossen",
-            value=bool(sched.get("forecast_when_absent", ev_schedule_default("forecast_when_absent"))),
-            key=_scoped_key(session_scope, f"hc_ev_forecast_{index}"),
+            **forecast_opts,
+            key=forecast_key,
+            disabled=dynamic,
             help=(
-                "Lade-Prognose ohne Wallbox-Anschluss (charging_schedule). "
+                "Bei dynamischer Wallbox-Zuordnung noch nicht möglich."
+                if dynamic
+                else "Lade-Prognose ohne Wallbox-Anschluss (charging_schedule). "
                 "Unabhängig vom Haus-Abwesenheitsmodus."
             ),
         ),
@@ -434,7 +521,10 @@ def _render_ev_fields(consumer: dict, index: int, *, session_scope: str) -> dict
     sched = dict(consumer.get("charging_schedule") or {})
     item: dict = _render_ev_power_fields(consumer, index, session_scope=session_scope)
     item["charging_schedule"] = _render_ev_charging_schedule(
-        sched, index, session_scope=session_scope
+        sched,
+        index,
+        session_scope=session_scope,
+        dynamic=is_dynamic_ev(item),
     )
     pair = ev_form_pair(item)
     item["charging_schedule"]["milp"] = _render_ev_milp_fields(

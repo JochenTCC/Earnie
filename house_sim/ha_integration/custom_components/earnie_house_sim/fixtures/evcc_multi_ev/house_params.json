@@ -1,0 +1,100 @@
+{
+  "battery_capacity_kwh": 10.0,
+  "initial_soc_pct": 55.0,
+  "load_kw": 1.5,
+  "thermal_entity_id": "sensor.house_sim_buffer_temp",
+  "battery_energy_entities": {
+    "charge": "sensor.evcc_battery_charge_energy",
+    "discharge": "sensor.evcc_battery_discharge_energy"
+  },
+  "thermal": {
+    "initial_temp_c": 42.0,
+    "ambient_c": 18.0,
+    "heat_kw": 0.0,
+    "capacity_kwh_per_k": 0.5,
+    "heat_loss_kw_per_k": 0.05,
+    "heating_efficiency": 1.0
+  },
+  "wallboxes": [
+    {
+      "id": "lp1",
+      "voltage_v": 230,
+      "phases": 3,
+      "min_current_a": 6,
+      "max_current_a": 16,
+      "entities": {
+        "max_current": "number.evcc_loadpoint_1_max_current",
+        "enable": {
+          "entity_id": "switch.evcc_loadpoint_1_enable",
+          "off_states": [
+            "off"
+          ]
+        },
+        "power": "sensor.evcc_loadpoint_1_charge_power",
+        "plugged": "binary_sensor.evcc_loadpoint_1_connected",
+        "vehicle": "sensor.evcc_loadpoint_1_vehicle_name"
+      }
+    },
+    {
+      "id": "lp2",
+      "voltage_v": 230,
+      "phases": 3,
+      "min_current_a": 6,
+      "max_current_a": 16,
+      "entities": {
+        "max_current": "number.evcc_loadpoint_2_max_current",
+        "enable": {
+          "entity_id": "switch.evcc_loadpoint_2_enable",
+          "off_states": [
+            "off"
+          ]
+        },
+        "power": "sensor.evcc_loadpoint_2_charge_power",
+        "plugged": "binary_sensor.evcc_loadpoint_2_connected",
+        "vehicle": "sensor.evcc_loadpoint_2_vehicle_name"
+      }
+    }
+  ],
+  "evs": [
+    {
+      "id": "car_a",
+      "capacity_kwh": 60,
+      "initial_soc_pct": 45,
+      "min_current_a": 6,
+      "max_current_a": 16,
+      "phases": 3,
+      "vehicle_id": "Car A",
+      "entities": {
+        "soc": "sensor.evcc_car_a_soc",
+        "plugged": "binary_sensor.car_a_plugged",
+        "power": "sensor.car_a_charge_power"
+      }
+    },
+    {
+      "id": "car_b",
+      "capacity_kwh": 60,
+      "initial_soc_pct": 70,
+      "min_current_a": 6,
+      "max_current_a": 16,
+      "phases": 1,
+      "vehicle_id": "Car B",
+      "entities": {
+        "soc": "sensor.evcc_car_b_soc",
+        "plugged": "binary_sensor.car_b_plugged",
+        "power": "sensor.car_b_charge_power"
+      }
+    },
+    {
+      "id": "car_c",
+      "capacity_kwh": 40,
+      "initial_soc_pct": 30,
+      "min_current_a": 6,
+      "max_current_a": 16,
+      "phases": 3,
+      "vehicle_id": "Car C",
+      "entities": {
+        "soc": "sensor.evcc_car_c_soc"
+      }
+    }
+  ]
+}

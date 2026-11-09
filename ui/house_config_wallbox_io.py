@@ -20,7 +20,14 @@ from house_config.wallboxes import (
 )
 from runtime_store.persist_paths import resolve_house_profiles_json_path
 
-WALLBOX_FIELDS = ("label", "voltage_v", "phases", "min_current_a", "max_current_a")
+WALLBOX_FIELDS = (
+    "label",
+    "voltage_v",
+    "phases",
+    "min_current_a",
+    "max_current_a",
+    "unknown_vehicle",
+)
 
 
 def _components() -> dict:

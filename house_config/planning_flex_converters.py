@@ -225,7 +225,31 @@ def planning_ev_to_milp(consumer: dict) -> dict:
         )
     reject_legacy_id(consumer, str(consumer["id"]))
     _attach_ehal_bindings(result, consumer)
+    _attach_wallbox_fields(result, consumer)
     return result
+
+
+def _attach_wallbox_fields(result: dict, consumer: dict) -> None:
+    """Car currents, assignment and wallboxes of a dynamic EV (multi-EV M3).
+
+    The daemon's live assignment builds the pair of a dynamic EV from these
+    (``runtime_store.ev_assignments``). Fixed pairs keep the shape they had.
+    """
+    from house_config.wallboxes import (
+        EV_MAX_CURRENT_KEY,
+        EV_MIN_CURRENT_KEY,
+        EV_PHASES_KEY,
+        VIEW_DYNAMIC_KEY,
+        WALLBOX_ASSIGNMENT_KEY,
+        is_dynamic_ev,
+    )
+
+    if not is_dynamic_ev(consumer):
+        return
+    for key in (EV_PHASES_KEY, EV_MIN_CURRENT_KEY, EV_MAX_CURRENT_KEY):
+        result[key] = consumer[key]
+    result[WALLBOX_ASSIGNMENT_KEY] = dict(consumer[WALLBOX_ASSIGNMENT_KEY])
+    result[VIEW_DYNAMIC_KEY] = [dict(w) for w in consumer[VIEW_DYNAMIC_KEY]]
 
 
 def planning_ev_consumers(house_profile: dict) -> list[dict]:

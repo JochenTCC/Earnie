@@ -11,6 +11,7 @@ from runtime_store import power_interval_sampler
 config = load_config_or_exit()
 import logger_config
 from integrations import ehal_live
+from integrations import ev_assignment_live
 from integrations.loxone_comm_trace import serialize_write_records
 from data import profile_manager, consumer_targets, pv_tuner, cons_data_store, live_consumption, pv_forecast
 from data.edibert_live_market import fetch_live_day_ahead_prices
@@ -134,6 +135,8 @@ def _daemon_wait_poll() -> None:
 
     touch_daemon_heartbeat()
     spawn_maybe_send_ping()
+    # Dynamic EV assignment: plug events and the test charge between cycles (multi-EV M3).
+    ev_assignment_live.poll()
     if power_interval_sampler.tick():
         from runtime_store.shadow.hooks import maybe_flush_after_sampler
 
@@ -427,6 +430,9 @@ def _main_cycle(
             )
 
     current_hour = planning_now().hour
+    # Dynamic EV assignment before any consumer is read: assigned cars are planned with
+    # their wallbox, unassigned ones are not planned (multi-EV M3).
+    ev_assignment_live.tick()
     targets = consumer_targets.resolve_consumer_daily_targets(matrix=optimization_matrix)
     if ehal_live.is_ehal_network_backend():
         live_consumers = config.get_flexible_consumers()
@@ -768,6 +774,9 @@ def _main_cycle(
             err_evcs, evcs_records = ehal_live.write_evcs_max_current_from_consumers(
                 consumer_powers, charging_contexts, consumer_pv_follow
             )
+            err_unassigned, unassigned_records = ev_assignment_live.write_unassigned_wallboxes()
+            err_evcs = err_evcs or err_unassigned
+            evcs_records = list(evcs_records) + list(unassigned_records)
             logger.info("Sende EHAL WR-AC-Limits an %s...", backend)
             err_inv, inv_records = ehal_live.write_inv_ac_limits_from_plan(
                 plant_curtail_kw=plant_curtail_kw,
@@ -809,9 +818,10 @@ def _main_cycle(
                 matrix_row=optimization_matrix[0] if optimization_matrix else None,
                 milp_plan=milp_plan if isinstance(milp_plan, dict) else None,
             )
+            _err_unassigned, unassigned_rows = ev_assignment_live.write_unassigned_wallboxes()
             loxone_writes = serialize_write_records(
                 list(huawei_writes) + list(flex_writes) + list(powerstation_writes)
-            ) + list(inv_rows)
+            ) + list(inv_rows) + list(unassigned_rows)
 
         if live_power is None:
             live_power = ehal_live.read_live_power_kw()
@@ -988,6 +998,7 @@ def _main_cycle(
                     charging_contexts
                 ),
                 "filter_contexts": optimizer.serialize_filter_contexts(filter_contexts),
+                "ev_assignments": ev_assignment_live.snapshot(),
                 "urgent_rule_observability": urgent_obs,
                 "consumer_pv_follow": {
                     k: int(v) for k, v in consumer_pv_follow.items()
@@ -1128,6 +1139,8 @@ if __name__ == "__main__":
         start_http_fn=lambda: start_ehal_request_http(config.get_ehal_http_port()),
     )
     run_loxone_verify_on_startup()
+    # Before the first write: no EV ↔ wallbox assignment survives a restart (D7).
+    ev_assignment_live.start()
     ehal_live.push_safe_setpoints_on_startup()
 
     from runtime_store.dotenv_io import (

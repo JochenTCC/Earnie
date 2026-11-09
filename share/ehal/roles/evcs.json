@@ -23,6 +23,18 @@
       "notes": "Vehicle SoC in %."
     },
     {
+      "field": "sens_ev_connected",
+      "required": false,
+      "kind": "telemetry",
+      "notes": "Vehicle side: the car reports it is plugged in (EV namespace; plug match for dynamic wallbox assignment)."
+    },
+    {
+      "field": "sens_ev_charge_power",
+      "required": false,
+      "kind": "telemetry",
+      "notes": "Vehicle side: charge power in W reported by the car (EV namespace; test charge for dynamic wallbox assignment)."
+    },
+    {
       "field": "get_evcs_nominal_current",
       "required": false,
       "kind": "input",

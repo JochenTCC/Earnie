@@ -225,13 +225,13 @@ def _write_evcs_probes(fields: dict[str, Any]) -> EhalWriteError | None:
     """One ``write_evcs_setpoints`` call per charger (network backends), else Loxone publish."""
     if not live.ehal_live.is_ehal_network_backend():
         return _write_loxone_mapped_probes(fields)
-    from ehal.qualified_ids import charger_id_for_ev
+    from ehal.qualified_ids import charger_id_of_ev
     from settings.ev_power import ev_nominal_power_conversion
 
     by_charger: dict[str, dict[str, Any]] = {}
     for field, value in fields.items():
         by_charger.setdefault(_probe_charger_id(field), {})[probe_kind(field)] = value
-    evs = {charger_id_for_ev(c["id"]): c for c in live.ehal_live.live_ev_consumers()}
+    evs = {charger_id_of_ev(c): c for c in live.ehal_live.live_charger_consumers()}
     adapter = live.ehal_live.get_network_adapter()
     error: EhalWriteError | None = None
     for charger_id, values in by_charger.items():

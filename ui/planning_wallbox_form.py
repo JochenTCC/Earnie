@@ -6,7 +6,12 @@ import os
 import streamlit as st
 
 from house_config.label_uniqueness import allocate_unique_label
-from house_config.wallboxes import pair_limits
+from house_config.wallboxes import (
+    UNKNOWN_VEHICLE_IMMEDIATE,
+    UNKNOWN_VEHICLE_OFF,
+    UNKNOWN_VEHICLE_PV_ONLY,
+    pair_limits,
+)
 from runtime_store.persist_paths import resolve_components_json_path
 from ui.auto_persist import (
     auto_persist,
@@ -40,6 +45,15 @@ DEFAULT_WALLBOX = {
 }
 
 
+# Policy for a car Earnie has not identified (multi-EV M3, D6); "" = not set.
+_UNKNOWN_VEHICLE_LABELS = {
+    "": "— nicht festgelegt —",
+    UNKNOWN_VEHICLE_OFF: "Nicht laden",
+    UNKNOWN_VEHICLE_PV_ONLY: "Nur PV-Überschuss (PV-Modus der Wallbox)",
+    UNKNOWN_VEHICLE_IMMEDIATE: "Sofort laden (Höchststrom)",
+}
+
+
 def _scoped_key(session_scope: str, base: str) -> str:
     return f"{session_scope}__{base}"
 
@@ -69,6 +83,9 @@ def _seed_widgets(session_scope: str, existing: dict, wallboxes: dict[str, dict]
     st.session_state[_scoped_key(session_scope, "planning_wb_phases")] = int(source["phases"])
     st.session_state[_scoped_key(session_scope, "planning_wb_min_a")] = float(source["min_current_a"])
     st.session_state[_scoped_key(session_scope, "planning_wb_max_a")] = float(source["max_current_a"])
+    st.session_state[_scoped_key(session_scope, "planning_wb_unknown")] = str(
+        source.get("unknown_vehicle") or ""
+    )
 
 
 def _sync_session(session_scope: str, existing: dict, wallboxes: dict[str, dict]) -> None:
@@ -139,12 +156,24 @@ def _render_fields(session_scope: str) -> dict:
         step=1.0,
         key=_scoped_key(session_scope, "planning_wb_max_a"),
     )
+    unknown = labeled_selectbox(
+        "Unbekanntes Auto",
+        options=list(_UNKNOWN_VEHICLE_LABELS),
+        format_func=lambda key: _UNKNOWN_VEHICLE_LABELS[key],
+        key=_scoped_key(session_scope, "planning_wb_unknown"),
+        help=(
+            "So lädt die Wallbox, solange Earnie das angesteckte Auto nicht kennt. Pflicht, "
+            "wenn ein E-Auto mit dynamischer Zuordnung diese Wallbox nutzen darf. "
+            "„Nur PV-Überschuss“ braucht das Binding set_evcs_mode (EHAL-Com)."
+        ),
+    )
     fields = {
         "label": str(label or "").strip(),
         "voltage_v": float(voltage),
         "phases": int(phases),
         "min_current_a": float(min_a),
         "max_current_a": float(max_a),
+        "unknown_vehicle": str(unknown) or None,
     }
     kw = fields["voltage_v"] * fields["phases"] / 1000.0
     st.caption(
@@ -225,9 +254,9 @@ def _render_assigned_evs(stable_id: str, fields: dict) -> None:
 def render_wallbox_planning_tab() -> None:
     st.caption(
         "Wallboxen sind Anlagenteile wie Batterien und Wechselrichter. Das E-Auto im "
-        "Hausprofil wird einer Wallbox fest zugeordnet; geladen wird im gemeinsamen Bereich "
-        "von Auto und Wallbox. Lade-Bindings `evcs.<Kennung>.*` unter "
-        "**Daemon Control → EHAL-Com**."
+        "Hausprofil wird einer Wallbox fest zugeordnet oder darf dynamisch an mehreren "
+        "laden; geladen wird im gemeinsamen Bereich von Auto und Wallbox. Lade-Bindings "
+        "`evcs.<Kennung>.*` unter **Daemon Control → EHAL-Com**."
     )
     wallboxes = wallboxes_map()
     stable_id, is_new = _render_select(wallboxes)

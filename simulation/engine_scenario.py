@@ -25,10 +25,23 @@ def _flexible_consumers_from_scenario(scenario_params: dict | None) -> list:
     from house_config.planning_flex_bridge import merge_flexible_consumers
 
     if not scenario_params:
-        return config.get_flexible_consumers(optimizer_only=True)
+        return _reject_dynamic_evs(config.get_flexible_consumers(optimizer_only=True))
     base = _scenario_base_consumers(scenario_params, optimizer_only=True)
     planning = scenario_params.get("_planning_flex_consumers") or []
-    return merge_flexible_consumers(base, planning)
+    return _reject_dynamic_evs(merge_flexible_consumers(base, planning))
+
+
+def _reject_dynamic_evs(consumers: list) -> list:
+    """The simulation has no plug events: dynamic EVs need the D9 rule (multi-EV M4)."""
+    from house_config.wallboxes import is_dynamic_ev
+
+    dynamic = sorted(str(c.get("id")) for c in consumers if is_dynamic_ev(c))
+    if dynamic:
+        raise ValueError(
+            f"Simulation: E-Autos mit dynamischer Wallbox-Zuordnung ({', '.join(dynamic)}) "
+            "werden im Scenario Explorer und im Backtesting noch nicht unterstützt."
+        )
+    return consumers
 
 
 def resolved_flexible_consumers(

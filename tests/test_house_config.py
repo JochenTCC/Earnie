@@ -1970,3 +1970,37 @@ def test_save_main_config_roundtrip_strips_triggers_and_blocks(tmp_path, monkeyp
     assert "event_triggers" not in reloaded.get("system", {})
     assert "event_trigger_enabled" not in reloaded.get("system", {})
     assert "loxone_blocks" not in reloaded
+
+
+def test_dynamic_ev_loads_with_a_view_and_keeps_its_wallboxes_for_the_live_overlay():
+    """Multi-EV M3: a dynamic EV loads; the MILP shape carries what the overlay needs."""
+    from house_config.planning_flex_converters import planning_ev_to_milp
+    from house_config.profiles_store import normalize_house_profiles_document
+    from house_config.wallboxes import VIEW_DYNAMIC_KEY
+    from tests.fixtures.ev_wallbox import ev_fields, wallbox_catalog, wallbox_entry
+
+    doc = _ev_profile_doc(**ev_fields("e_auto", min_current_a=6.0, max_current_a=16.0))
+    consumer = doc["profiles"][0]["consumers"][0]
+    for key in ("nominal_power_kw", "min_power_kw"):
+        consumer.pop(key)
+    consumer["wallbox_assignment"] = {"mode": "dynamic", "wallbox_ids": ["wb_1", "wb_2"]}
+    consumer["charging_schedule"]["forecast_when_absent"] = False
+    boxes = [
+        {
+            **wallbox_entry(wid, max_current_a=max_a, ehal_bindings={f"evcs.{wid}.sens_evcs_connected": ""}),
+            "unknown_vehicle": policy,
+        }
+        for wid, max_a, policy in (("wb_1", 16.0, "off"), ("wb_2", 10.0, "immediate"))
+    ]
+    loaded = normalize_house_profiles_document(doc, wallboxes=wallbox_catalog(*boxes))
+    ev = loaded["profiles"]["ev_profile"]["consumers"][0]
+    assert [w["id"] for w in ev[VIEW_DYNAMIC_KEY]] == ["wb_1", "wb_2"]
+    assert ev["nominal_power_kw"] == pytest.approx(10 * 230 * ev["phases"] / 1000)
+    milp = planning_ev_to_milp(ev)
+    assert milp["wallbox_assignment"]["mode"] == "dynamic"
+    assert [w["id"] for w in milp[VIEW_DYNAMIC_KEY]] == ["wb_1", "wb_2"]
+    assert milp["phases"] == ev["phases"]
+
+    consumer["charging_schedule"]["forecast_when_absent"] = True
+    with pytest.raises(ValueError, match="forecast_when_absent muss false"):
+        normalize_house_profiles_document(doc, wallboxes=wallbox_catalog(*boxes))

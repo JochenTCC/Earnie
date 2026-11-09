@@ -64,6 +64,7 @@ FIELD_QUANTITY: dict[str, str] = {
     "sens_inv_power_ac": "power",
     "sens_inv_power_pv": "power",
     "sens_evcs_active_power": "power",
+    "sens_ev_charge_power": "power",
     "sens_power_consumers": "power",
     "flex.sens_power_act": "power",
     "sens_pv_energy": "energy",

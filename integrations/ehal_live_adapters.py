@@ -208,10 +208,10 @@ def ev_charger_openems_channels() -> tuple[tuple[str, str, str], ...]:
     The address is the wallbox binding ``set_evcs_max_current`` = ``<component>/<channel>``
     (like the inverter limits); an EV whose wallbox has none is not written.
     """
-    from ehal.qualified_ids import charger_id_for_ev, field_kind
+    from ehal.qualified_ids import charger_id_of_ev, field_kind
 
     out: list[tuple[str, str, str]] = []
-    for consumer in live.live_ev_consumers():
+    for consumer in live.live_charger_consumers():
         bindings = consumer.get("ehal_bindings") or {}
         address = next(
             (
@@ -224,13 +224,13 @@ def ev_charger_openems_channels() -> tuple[tuple[str, str, str], ...]:
         parts = live._openems_channel_parts(address)
         if parts is None:
             continue
-        out.append((charger_id_for_ev(consumer["id"]), *parts))
+        out.append((charger_id_of_ev(consumer), *parts))
     return tuple(out)
 
 
 def ev_charger_markers() -> tuple[tuple[str, str, str], ...]:
-    """(charger Kennung, current marker, mode marker) of every live EV (fixed pairs, M2)."""
-    from ehal.qualified_ids import charger_id_for_ev
+    """(charger Kennung, current marker, mode marker) of every live charger (M2, M3)."""
+    from ehal.qualified_ids import charger_id_of_ev
     from settings.ehal_marker_resolve import (
         marker_set_evcs_max_current,
         marker_set_evcs_mode,
@@ -238,11 +238,11 @@ def ev_charger_markers() -> tuple[tuple[str, str, str], ...]:
 
     return tuple(
         (
-            charger_id_for_ev(consumer["id"]),
+            charger_id_of_ev(consumer),
             marker_set_evcs_max_current(consumer),
             marker_set_evcs_mode(consumer),
         )
-        for consumer in live.live_ev_consumers()
+        for consumer in live.live_charger_consumers()
     )
 
 

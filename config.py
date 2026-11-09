@@ -230,11 +230,14 @@ class Config:
     def get_battery_params_list(self) -> list:
         return live_scenario.battery_params_list_snapshot(self.get)
 
-    def get_flexible_consumers(self, optimizer_only: bool = False) -> list:
+    def get_flexible_consumers(
+        self, optimizer_only: bool = False, *, raw_dynamic: bool = False
+    ) -> list:
         """Lädt alle konfigurierten flexiblen Verbraucher."""
         return fc_settings.load_flexible_consumers(
             self.get_resolved_runtime_settings(),
             optimizer_only=optimizer_only,
+            raw_dynamic=raw_dynamic,
         )
 
     def get_appliances(self) -> list[dict]:
@@ -582,8 +585,8 @@ def get_battery_params_list() -> list:
     return CONFIG.get_battery_params_list()
 
 
-def get_flexible_consumers(optimizer_only: bool = False) -> list:
-    return CONFIG.get_flexible_consumers(optimizer_only=optimizer_only)
+def get_flexible_consumers(optimizer_only: bool = False, *, raw_dynamic: bool = False) -> list:
+    return CONFIG.get_flexible_consumers(optimizer_only=optimizer_only, raw_dynamic=raw_dynamic)
 
 
 def get_appliances() -> list[dict]:

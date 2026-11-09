@@ -4,11 +4,16 @@ A wallbox is plant hardware next to the batteries: Kennung, voltage, phases, cur
 the charger bindings (``EVCS_KINDS``). The EV stays a consumer in the house profile with its own
 phases and current range and ``wallbox_assignment``.
 
-Until M2 the runtime handles fixed pairs only. :func:`resolve_ev_pair` builds the view the
-runtime code reads today from the EV and its fixed wallbox: ``nominal_power_kw`` /
-``min_power_kw`` of the pair, voltage and phases in ``charging_schedule`` and the charger
-bindings merged into the EV's ``ehal_bindings``. Only the new shape is stored; the view is
-never written back (:func:`split_ev_view`).
+:func:`resolve_ev_pair` builds the view the runtime code reads from the EV and its fixed
+wallbox: ``nominal_power_kw`` / ``min_power_kw`` of the pair, voltage and phases in
+``charging_schedule`` and the charger bindings merged into the EV's ``ehal_bindings``. Only the
+new shape is stored; the view is never written back (:func:`split_ev_view`).
+
+A ``dynamic`` EV (multi-EV M3) has no wallbox of its own: the loader gives it the limits of
+the pair with the smallest maximum power among the wallboxes it may use (D8) and no charger
+bindings (:func:`resolve_dynamic_ev_view`). The live daemon replaces that view per cycle by the
+pair with the wallbox it was assigned to, or drops the EV while it is not assigned
+(``runtime_store.ev_assignments``).
 """
 from __future__ import annotations
 
@@ -21,6 +26,13 @@ WALLBOXES_KEY = "wallboxes"
 WALLBOX_ASSIGNMENT_KEY = "wallbox_assignment"
 ASSIGNMENT_FIXED = "fixed"
 ASSIGNMENT_DYNAMIC = "dynamic"
+
+# Wallbox policy for a car Earnie has not identified (D6, M3).
+UNKNOWN_VEHICLE_KEY = "unknown_vehicle"
+UNKNOWN_VEHICLE_OFF = "off"
+UNKNOWN_VEHICLE_PV_ONLY = "pv_only"
+UNKNOWN_VEHICLE_IMMEDIATE = "immediate"
+UNKNOWN_VEHICLE_POLICIES = (UNKNOWN_VEHICLE_OFF, UNKNOWN_VEHICLE_PV_ONLY, UNKNOWN_VEHICLE_IMMEDIATE)
 
 # EV consumer fields of the current model (D2).
 EV_PHASES_KEY = "phases"
@@ -35,6 +47,10 @@ LEGACY_SCHEDULE_CONVERSION_KEYS = ("nominal_power_voltage_v", "nominal_power_pha
 VIEW_SCHEDULE_VOLTAGE = "nominal_power_voltage_v"
 VIEW_SCHEDULE_PHASES = "nominal_power_phases"
 VIEW_WALLBOX_KEY = "wallbox"
+# Dynamic EV view: the wallboxes it may use (normalized), runtime only.
+VIEW_DYNAMIC_KEY = "dynamic_wallboxes"
+# Charger Kennung of the view (``evcs.<charger_id>.*``): the wallbox for a dynamic EV.
+VIEW_CHARGER_ID_KEY = "charger_id"
 
 # kW of a pair = A × V × phases / 1000; the round trip kW → A → kW of a migrated pack must
 # give back the stored kW, so float noise below this precision is cut (not a unit rounding).
@@ -101,7 +117,7 @@ def normalize_wallbox(raw: Any, *, index: int) -> dict[str, Any]:
         raise ValueError(
             f"{label}: ehal_bindings enthält Felder, die nicht zur Wallbox gehören: {foreign}."
         )
-    return {
+    out = {
         "id": wallbox_id,
         "label": str(raw.get("label") or wallbox_id).strip() or wallbox_id,
         "voltage_v": _positive_float(raw.get("voltage_v"), label=label, field="voltage_v"),
@@ -110,6 +126,32 @@ def normalize_wallbox(raw: Any, *, index: int) -> dict[str, Any]:
         EV_MAX_CURRENT_KEY: high,
         "ehal_bindings": {str(k).strip(): str(v or "").strip() for k, v in bindings.items()},
     }
+    if raw.get(UNKNOWN_VEHICLE_KEY) is not None:
+        out[UNKNOWN_VEHICLE_KEY] = _unknown_vehicle_policy(raw, out, label=label)
+    return out
+
+
+def _unknown_vehicle_policy(raw: dict, wallbox: dict[str, Any], *, label: str) -> str:
+    policy = str(raw.get(UNKNOWN_VEHICLE_KEY) or "").strip()
+    if policy not in UNKNOWN_VEHICLE_POLICIES:
+        raise ValueError(
+            f"{label}: {UNKNOWN_VEHICLE_KEY} muss {', '.join(UNKNOWN_VEHICLE_POLICIES)} sein "
+            f"(ist {policy!r})."
+        )
+    if policy == UNKNOWN_VEHICLE_PV_ONLY and not wallbox_binding_key(wallbox, "set_evcs_mode"):
+        raise ValueError(
+            f"{label}: {UNKNOWN_VEHICLE_KEY} 'pv_only' braucht ein Binding set_evcs_mode an "
+            "der Wallbox (PV-Modus des Herstellers)."
+        )
+    return policy
+
+
+def wallbox_binding_key(wallbox: dict[str, Any], kind: str) -> str:
+    """The wallbox's binding key of ``kind`` (bare or qualified), or ``""``."""
+    for key in wallbox.get("ehal_bindings") or {}:
+        if field_kind(key) == kind:
+            return str(key)
+    return ""
 
 
 def normalize_wallboxes(raw: Any) -> list[dict[str, Any]]:
@@ -129,7 +171,7 @@ def normalize_wallboxes(raw: Any) -> list[dict[str, Any]]:
 
 
 def serialize_wallbox(spec: dict[str, Any]) -> dict[str, Any]:
-    return {
+    out = {
         "id": spec["id"],
         "label": spec["label"],
         "voltage_v": float(spec["voltage_v"]),
@@ -138,6 +180,9 @@ def serialize_wallbox(spec: dict[str, Any]) -> dict[str, Any]:
         EV_MAX_CURRENT_KEY: float(spec[EV_MAX_CURRENT_KEY]),
         "ehal_bindings": dict(spec.get("ehal_bindings") or {}),
     }
+    if spec.get(UNKNOWN_VEHICLE_KEY):
+        out[UNKNOWN_VEHICLE_KEY] = str(spec[UNKNOWN_VEHICLE_KEY])
+    return out
 
 
 def wallboxes_by_id(components: dict | None) -> dict[str, dict[str, Any]]:
@@ -168,11 +213,19 @@ def normalize_wallbox_assignment(raw: Any, *, label: str) -> dict[str, Any]:
             raise ValueError(f"{label}: {WALLBOX_ASSIGNMENT_KEY}.wallbox_id fehlt.")
         return {"mode": ASSIGNMENT_FIXED, "wallbox_id": wallbox_id}
     if mode == ASSIGNMENT_DYNAMIC:
-        # D3: dynamic assignment comes with the assignment engine (M3).
-        raise ValueError(
-            f"{label}: {WALLBOX_ASSIGNMENT_KEY}.mode 'dynamic' wird von dieser Version noch "
-            "nicht unterstützt."
-        )
+        raw_ids = raw.get("wallbox_ids")
+        if not isinstance(raw_ids, list) or not raw_ids:
+            raise ValueError(
+                f"{label}: {WALLBOX_ASSIGNMENT_KEY}.wallbox_ids muss mindestens eine Wallbox "
+                "nennen."
+            )
+        ids = [str(i or "").strip() for i in raw_ids]
+        if any(not i for i in ids) or len(set(ids)) != len(ids):
+            raise ValueError(
+                f"{label}: {WALLBOX_ASSIGNMENT_KEY}.wallbox_ids enthält leere oder doppelte "
+                f"Einträge ({raw_ids!r})."
+            )
+        return {"mode": ASSIGNMENT_DYNAMIC, "wallbox_ids": ids}
     raise ValueError(
         f"{label}: {WALLBOX_ASSIGNMENT_KEY}.mode muss 'fixed' oder 'dynamic' sein (ist {mode!r})."
     )
@@ -216,15 +269,31 @@ def normalize_ev_current_fields(raw: dict, *, label: str) -> dict[str, Any]:
 def reject_shared_fixed_wallboxes(consumers: list[dict[str, Any]], *, profile_id: str) -> None:
     """Two EVs of one house profile at the same fixed wallbox raise (D3).
 
-    Until the assignment engine (M3) every EV is planned as a fixed pair on its own: two
-    cars on one wallbox would be planned as charging at the same time. Sharing a wallbox is
-    ``mode: dynamic``. The same EV in several profiles (copied profiles) is no conflict.
+    A fixed pair is planned on its own: two cars on one wallbox would be planned as charging
+    at the same time. Sharing a wallbox is ``mode: dynamic``. A wallbox is either fixed to one
+    EV or open to dynamic EVs within one profile (M3). The same EV in several profiles
+    (copied profiles) is no conflict.
     """
     by_wallbox: dict[str, str] = {}
+    dynamic: dict[str, str] = {}
+    for consumer in consumers:
+        if str(consumer.get("type") or "") != "ev":
+            continue
+        for wallbox_id in dynamic_wallbox_ids(consumer):
+            dynamic.setdefault(wallbox_id, str(consumer.get("id") or ""))
     for consumer in consumers:
         if str(consumer.get("type") or "") != "ev":
             continue
         wallbox_id = assigned_wallbox_id(consumer)
+        if not wallbox_id:
+            continue
+        if wallbox_id in dynamic:
+            raise ValueError(
+                f"profiles '{profile_id}': Wallbox '{wallbox_id}' ist dem E-Auto "
+                f"'{consumer.get('id')}' fest zugeordnet und zugleich für das dynamische "
+                f"E-Auto '{dynamic[wallbox_id]}' freigegeben. Eine Wallbox ist entweder fest "
+                "oder dynamisch."
+            )
         other = by_wallbox.get(wallbox_id)
         if other is not None:
             raise ValueError(
@@ -274,24 +343,112 @@ def resolve_ev_pair(
     *,
     label: str,
 ) -> None:
-    """Fill the runtime view of the fixed pair into the normalized EV ``spec`` (in place)."""
+    """Fill the runtime view of the fixed pair into the normalized EV ``spec`` (in place).
+
+    A dynamic EV gets the view of :func:`resolve_dynamic_ev_view` instead.
+    """
+    if is_dynamic_ev(spec):
+        resolve_dynamic_ev_view(spec, wallboxes, label=label)
+        return
     wallbox_id = spec[WALLBOX_ASSIGNMENT_KEY]["wallbox_id"]
     wallbox = (wallboxes or {}).get(wallbox_id)
     if wallbox is None:
         raise ValueError(
             f"{label}: Wallbox '{wallbox_id}' fehlt in components.json (wallboxes)."
         )
-    limits = pair_limits(spec, wallbox, label=label)
-    spec["nominal_power_kw"] = limits["max_power_kw"]
-    spec["min_power_kw"] = limits["min_power_kw"]
-    sched = spec["charging_schedule"]
-    sched[VIEW_SCHEDULE_VOLTAGE] = limits["voltage_v"]
-    sched[VIEW_SCHEDULE_PHASES] = limits["phases"]
+    _apply_pair_limits(spec, pair_limits(spec, wallbox, label=label))
     spec[VIEW_WALLBOX_KEY] = dict(wallbox)
     merged = _charger_bindings_for_ev(wallbox, spec["id"])
     merged.update(spec.get("ehal_bindings") or {})
     if merged:
         spec["ehal_bindings"] = merged
+
+
+def _apply_pair_limits(spec: dict[str, Any], limits: dict[str, Any]) -> None:
+    spec["nominal_power_kw"] = limits["max_power_kw"]
+    spec["min_power_kw"] = limits["min_power_kw"]
+    sched = spec["charging_schedule"]
+    sched[VIEW_SCHEDULE_VOLTAGE] = limits["voltage_v"]
+    sched[VIEW_SCHEDULE_PHASES] = limits["phases"]
+
+
+def resolve_dynamic_ev_view(
+    spec: dict[str, Any],
+    wallboxes: dict[str, dict[str, Any]] | None,
+    *,
+    label: str,
+) -> None:
+    """Loader view of a dynamic EV (in place): no wallbox of its own, no charger bindings.
+
+    Every wallbox it may use must exist, share a current range with the car and carry an
+    ``unknown_vehicle`` policy (D6). The limits are those of the pair with the smallest
+    maximum power (D8: a car that is not plugged in; ties by wallbox Kennung). The live
+    daemon replaces this view by :func:`assigned_dynamic_ev_view` or drops the EV.
+    """
+    if spec["charging_schedule"].get("forecast_when_absent"):
+        raise ValueError(
+            f"{label}: ein dynamisch zugeordnetes E-Auto wird erst geplant, wenn es einer "
+            "Wallbox zugeordnet ist; charging_schedule.forecast_when_absent muss false sein "
+            "(Vorausplanen folgt mit der Pool-Planung)."
+        )
+    bindings = spec.get("ehal_bindings") or {}
+    charger = sorted(k for k in bindings if is_charger_binding_key(k))
+    if charger:
+        raise ValueError(
+            f"{label}: ein dynamisch zugeordnetes E-Auto hat keine Lade-Bindings "
+            f"({', '.join(charger)}); sie gehören an die Wallboxen."
+        )
+    resolved: list[dict[str, Any]] = []
+    for wallbox_id in dynamic_wallbox_ids(spec):
+        wallbox = (wallboxes or {}).get(wallbox_id)
+        if wallbox is None:
+            raise ValueError(
+                f"{label}: Wallbox '{wallbox_id}' fehlt in components.json (wallboxes)."
+            )
+        if not wallbox.get(UNKNOWN_VEHICLE_KEY):
+            raise ValueError(
+                f"wallboxes '{wallbox_id}': {UNKNOWN_VEHICLE_KEY} fehlt — Pflicht an jeder "
+                "Wallbox, die ein dynamisch zugeordnetes E-Auto nutzen darf "
+                f"({', '.join(UNKNOWN_VEHICLE_POLICIES)})."
+            )
+        if not wallbox_binding_key(wallbox, "sens_evcs_connected"):
+            raise ValueError(
+                f"wallboxes '{wallbox_id}': Binding sens_evcs_connected fehlt — ohne "
+                "Stecker-Signal erkennt Earnie kein angestecktes Auto (EHAL-Com)."
+            )
+        resolved.append(dict(wallbox))
+    smallest = min(
+        resolved,
+        key=lambda w: (pair_limits(spec, w, label=label)["max_power_kw"], w["id"]),
+    )
+    _apply_pair_limits(spec, pair_limits(spec, smallest, label=label))
+    spec[VIEW_DYNAMIC_KEY] = resolved
+
+
+def assigned_dynamic_ev_view(consumer: dict[str, Any], wallbox_id: str) -> dict[str, Any]:
+    """Live view of a dynamic EV assigned to ``wallbox_id`` (a copy; M3).
+
+    Limits of that pair (D2), the wallbox's charger bindings under their own Kennung
+    (``evcs.<Wallbox>.*``: the binding stays with the box while the car moves) and
+    ``charger_id`` = the wallbox.
+    """
+    by_id = {w["id"]: w for w in consumer.get(VIEW_DYNAMIC_KEY) or []}
+    wallbox = by_id.get(wallbox_id)
+    if wallbox is None:
+        raise ValueError(
+            f"E-Auto '{consumer['id']}' darf Wallbox '{wallbox_id}' nicht nutzen "
+            f"(wallbox_ids: {sorted(by_id)})."
+        )
+    out = dict(consumer)
+    out["charging_schedule"] = dict(consumer["charging_schedule"])
+    _apply_pair_limits(out, pair_limits(out, wallbox, label=f"E-Auto '{consumer['id']}'"))
+    if not out["min_power_kw"]:
+        out["min_power_kw"] = None  # MILP shape: no minimum (planning_ev_to_milp)
+    out[VIEW_CHARGER_ID_KEY] = wallbox_id
+    merged = dict(wallbox.get("ehal_bindings") or {})
+    merged.update(consumer.get("ehal_bindings") or {})
+    out["ehal_bindings"] = merged
+    return out
 
 
 def split_ev_view(consumer: dict[str, Any], out: dict[str, Any]) -> None:
@@ -302,6 +459,8 @@ def split_ev_view(consumer: dict[str, Any], out: dict[str, Any]) -> None:
     """
     out.pop("nominal_power_kw", None)
     out.pop("min_power_kw", None)
+    out.pop(VIEW_DYNAMIC_KEY, None)
+    out.pop(VIEW_CHARGER_ID_KEY, None)
     for key in (EV_PHASES_KEY, EV_MIN_CURRENT_KEY, EV_MAX_CURRENT_KEY):
         out[key] = consumer[key]
     out[WALLBOX_ASSIGNMENT_KEY] = dict(consumer[WALLBOX_ASSIGNMENT_KEY])
@@ -351,16 +510,70 @@ def iter_house_evs(house: Any):
 
 
 def assigned_wallbox_id(consumer: dict[str, Any]) -> str:
+    """Fixed wallbox of an EV; ``""`` for a dynamic EV or without an assignment."""
     raw = consumer.get(WALLBOX_ASSIGNMENT_KEY)
-    if not isinstance(raw, dict):
+    if not isinstance(raw, dict) or raw.get("mode") == ASSIGNMENT_DYNAMIC:
         return ""
     return str(raw.get("wallbox_id") or "").strip()
 
 
+def is_dynamic_ev(consumer: dict[str, Any]) -> bool:
+    raw = consumer.get(WALLBOX_ASSIGNMENT_KEY)
+    return isinstance(raw, dict) and raw.get("mode") == ASSIGNMENT_DYNAMIC
+
+
+def dynamic_wallbox_ids(consumer: dict[str, Any]) -> list[str]:
+    """Wallboxes a dynamic EV may use; ``[]`` for a fixed EV."""
+    if not is_dynamic_ev(consumer):
+        return []
+    raw = consumer[WALLBOX_ASSIGNMENT_KEY].get("wallbox_ids") or []
+    return [str(i or "").strip() for i in raw]
+
+
 def evs_at_wallbox(house: Any, wallbox_id: str) -> list[tuple[str, dict[str, Any]]]:
-    """(profile id, EV) of every EV whose fixed wallbox is ``wallbox_id``."""
+    """(profile id, EV) of every EV whose fixed wallbox is ``wallbox_id`` or that may use it."""
     target = str(wallbox_id or "").strip()
-    return [(pid, ev) for pid, ev in iter_house_evs(house) if assigned_wallbox_id(ev) == target]
+    return [
+        (pid, ev)
+        for pid, ev in iter_house_evs(house)
+        if assigned_wallbox_id(ev) == target or target in dynamic_wallbox_ids(ev)
+    ]
+
+
+def dynamic_charger_consumers(
+    house: Any, components: dict | None = None
+) -> list[dict[str, Any]]:
+    """One charger entry per wallbox open to dynamic EVs (multi-EV M3), file or view shape.
+
+    ``{"id": <Wallbox>, "type": "ev", "ehal_bindings": <wallbox bindings>}``: binding and
+    push code treats it like an EV consumer, so its IDs are ``evcs.<Wallbox>.*``. The
+    wallboxes come from ``components["wallboxes"]`` when given, else from the dynamic EVs'
+    view (:data:`VIEW_DYNAMIC_KEY`). A wallbox named by a dynamic EV but missing raises.
+    """
+    catalog: dict[str, dict[str, Any]] = {}
+    if isinstance(components, dict) and components.get(WALLBOXES_KEY) is not None:
+        catalog = wallboxes_by_id(components)
+    wanted: list[str] = []
+    for _pid, ev in iter_house_evs(house):
+        for wallbox in ev.get(VIEW_DYNAMIC_KEY) or []:
+            catalog.setdefault(wallbox["id"], wallbox)
+        for wallbox_id in dynamic_wallbox_ids(ev):
+            if wallbox_id not in wanted:
+                wanted.append(wallbox_id)
+    out: list[dict[str, Any]] = []
+    for wallbox_id in wanted:
+        wallbox = catalog.get(wallbox_id)
+        if wallbox is None:
+            raise ValueError(f"Wallbox '{wallbox_id}' fehlt in components.json (wallboxes).")
+        out.append(
+            {
+                "id": wallbox_id,
+                "type": "ev",
+                "ehal_bindings": dict(wallbox.get("ehal_bindings") or {}),
+                VIEW_WALLBOX_KEY: dict(wallbox),
+            }
+        )
+    return out
 
 
 def check_wallbox_pairs(house: Any, wallbox: dict[str, Any]) -> None:
@@ -387,6 +600,8 @@ def _route_one_ev(
 
     item = dict(consumer)
     ev_id = str(item.get("id") or "").strip()
+    if is_dynamic_ev(item):
+        return _route_dynamic_ev(item)
     is_view = VIEW_WALLBOX_KEY in item
     # The view's wallbox limits are edited on the wallbox, never written back from here;
     # its bindings are what the view showed (the base of the binding diff below).
@@ -455,6 +670,34 @@ def _route_one_ev(
         item["ehal_bindings"] = kept
     else:
         item.pop("ehal_bindings", None)
+    return item
+
+
+def _route_dynamic_ev(item: dict[str, Any]) -> dict[str, Any]:
+    """Stored shape of a dynamic EV: view keys dropped; it has no wallbox side to write."""
+    ev_id = str(item.get("id") or "").strip()
+    is_view = VIEW_DYNAMIC_KEY in item
+    item.pop(VIEW_DYNAMIC_KEY, None)
+    item.pop(VIEW_CHARGER_ID_KEY, None)
+    if item.pop(WALLBOX_VOLTAGE_FORM_KEY, None) is not None:
+        raise ValueError(
+            f"E-Auto '{ev_id}': ein dynamisch zugeordnetes E-Auto legt keine Wallbox an."
+        )
+    if is_view:
+        for key in LEGACY_EV_POWER_KEYS:
+            item.pop(key, None)
+        sched = item.get("charging_schedule")
+        if isinstance(sched, dict):
+            item["charging_schedule"] = {
+                k: v for k, v in sched.items() if k not in LEGACY_SCHEDULE_CONVERSION_KEYS
+            }
+    bindings = item.get("ehal_bindings") if isinstance(item.get("ehal_bindings"), dict) else {}
+    charger = sorted(k for k in bindings if is_charger_binding_key(k))
+    if charger:
+        raise ValueError(
+            f"E-Auto '{ev_id}': Lade-Bindings ({', '.join(charger)}) gehören an die Wallboxen "
+            "eines dynamisch zugeordneten E-Autos (Komponenten)."
+        )
     return item
 
 

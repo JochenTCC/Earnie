@@ -232,19 +232,28 @@ def aggregate_ha_entities(
     return canonicalize_ha_entity_keys(out, keep_empty=True)
 
 def _ev_charger_entities(house: dict, bind) -> dict[str, str]:
-    """Activated charger keys of every EV (pair view: the wallbox bindings merged in)."""
-    from ehal.qualified_ids import charger_id_for_ev, field_kind, qualified_charger_id
+    """Activated charger keys of every EV (pair view: the wallbox bindings merged in).
 
-    out: dict[str, str] = {}
+    Wallboxes open to dynamic EVs are activated under their own Kennung (multi-EV M3).
+    """
+    from ehal.qualified_ids import charger_id_of_ev, field_kind, qualified_charger_id
+    from house_config.wallboxes import dynamic_charger_consumers, is_dynamic_ev
+
+    chargers: list[dict] = []
     for profile in _profiles_iterable(house):
         for consumer in profile.get("consumers") or []:
             if not (isinstance(consumer, dict) and _is_ev_consumer(consumer)):
                 continue
-            charger_id = charger_id_for_ev(str(consumer.get("id") or ""))
-            for key, value in bind(consumer.get("ehal_bindings")).items():
-                kind = field_kind(key)
-                if kind in HA_EV_FIELDS and charger_id:
-                    out[qualified_charger_id(charger_id, kind)] = value
+            if not is_dynamic_ev(consumer):
+                chargers.append(consumer)
+    chargers.extend(dynamic_charger_consumers(house))
+    out: dict[str, str] = {}
+    for consumer in chargers:
+        charger_id = charger_id_of_ev(consumer)
+        for key, value in bind(consumer.get("ehal_bindings")).items():
+            kind = field_kind(key)
+            if kind in HA_EV_FIELDS and charger_id:
+                out[qualified_charger_id(charger_id, kind)] = value
     return out
 
 

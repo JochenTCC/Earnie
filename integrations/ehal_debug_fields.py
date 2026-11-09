@@ -101,6 +101,8 @@ EV_LIVE_READ_FIELDS: tuple[str, ...] = (
     "sens_evcs_active_power",
     "sens_evcs_connected",
     "sens_evcs_soc_act",
+    "sens_ev_connected",
+    "sens_ev_charge_power",
     "get_evcs_nominal_current",
     "sens_evcs_bat_capacity",
     "get_evcs_ready_by_time",

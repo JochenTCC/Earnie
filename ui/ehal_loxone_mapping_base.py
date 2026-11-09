@@ -7,6 +7,8 @@ PLANT_ENTITY_ID = "plant"
 BATTERY_ENTITY_KIND = "battery"
 INVERTER_ENTITY_KIND = "inverter"
 PV_ENTITY_KIND = "pv_system"
+# Wallbox open to dynamic EVs (multi-EV M3): its charger bindings live on the wallbox.
+WALLBOX_ENTITY_KIND = "wallbox"
 
 
 def _nonempty(value: object) -> str:

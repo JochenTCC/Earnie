@@ -46,6 +46,9 @@ def render() -> None:
         page_docs_key="cockpit",
     )
     _render_absent_mode_hint()
+    from ui.ev_assignment_panel import render_ev_assignment_panel
+
+    render_ev_assignment_panel()
 
     current_soc = ehal_live.read_ess_soc()
     render_optimization_savings_and_chart(current_soc)

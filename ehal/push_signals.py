@@ -168,6 +168,12 @@ def _binding_entries(house: dict, components: dict) -> list[tuple[str, str, str,
                     ("consumer", str(consumer.get("id")), str(consumer.get("type") or ""), field, name)
                 )
         entries.extend(_rod_entries(profile))
+    # Wallboxes open to dynamic EVs: ``evcs.<Wallbox>.*`` (multi-EV M3).
+    from house_config.wallboxes import dynamic_charger_consumers
+
+    for charger in dynamic_charger_consumers(house, components):
+        for field, name in charger["ehal_bindings"].items():
+            entries.append(("consumer", charger["id"], "ev", field, name))
     for battery in components.get("batteries", []):
         for field, name in (battery.get("ehal_bindings") or {}).items():
             entries.append(("battery", str(battery.get("id")), "", field, name))

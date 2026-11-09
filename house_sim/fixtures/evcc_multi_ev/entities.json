@@ -1,0 +1,363 @@
+{
+  "devices": [
+    {
+      "key": "grid",
+      "name": "evcc Grid",
+      "manufacturer": "evcc",
+      "model": "Meter",
+      "entity_ids": [
+        "sensor.evcc_grid_power",
+        "sensor.evcc_grid_import_energy",
+        "sensor.evcc_grid_export_energy"
+      ]
+    },
+    {
+      "key": "pv",
+      "name": "evcc PV",
+      "manufacturer": "evcc",
+      "model": "Inverter",
+      "entity_ids": [
+        "sensor.evcc_pv_power",
+        "sensor.evcc_pv_energy"
+      ]
+    },
+    {
+      "key": "battery",
+      "name": "evcc Battery",
+      "manufacturer": "evcc",
+      "model": "ESS",
+      "entity_ids": [
+        "sensor.evcc_battery_soc",
+        "sensor.evcc_battery_power",
+        "sensor.evcc_battery_charge_energy",
+        "sensor.evcc_battery_discharge_energy",
+        "input_number.ess_active_power_w",
+        "input_number.ess_charge_limit_w",
+        "input_number.ess_discharge_limit_w",
+        "input_number.ess_mode_hint"
+      ]
+    },
+    {
+      "key": "wallbox",
+      "name": "evcc Loadpoint 1",
+      "manufacturer": "evcc",
+      "model": "Wallbox",
+      "entity_ids": [
+        "sensor.evcc_loadpoint_1_charge_power",
+        "number.evcc_loadpoint_1_max_current",
+        "switch.evcc_loadpoint_1_enable",
+        "binary_sensor.evcc_loadpoint_1_connected",
+        "sensor.evcc_loadpoint_1_vehicle_name",
+        "sensor.evcc_car_a_soc"
+      ]
+    },
+    {
+      "key": "thermal",
+      "name": "House Sim Buffer",
+      "manufacturer": "earnie_house_sim",
+      "model": "RC Buffer",
+      "entity_ids": [
+        "sensor.house_sim_buffer_temp"
+      ]
+    }
+  ],
+  "entities": [
+    {
+      "entity_id": "sensor.evcc_grid_power",
+      "state": "500.0",
+      "attributes": {
+        "device_class": "power",
+        "unit_of_measurement": "W",
+        "friendly_name": "evcc Grid Power",
+        "state_class": "measurement"
+      }
+    },
+    {
+      "entity_id": "sensor.evcc_grid_import_energy",
+      "state": "100.0",
+      "attributes": {
+        "device_class": "energy",
+        "unit_of_measurement": "kWh",
+        "friendly_name": "evcc Grid Import Energy",
+        "state_class": "total_increasing"
+      }
+    },
+    {
+      "entity_id": "sensor.evcc_grid_export_energy",
+      "state": "20.0",
+      "attributes": {
+        "device_class": "energy",
+        "unit_of_measurement": "kWh",
+        "friendly_name": "evcc Grid Export Energy",
+        "state_class": "total_increasing"
+      }
+    },
+    {
+      "entity_id": "sensor.evcc_pv_power",
+      "state": "0.8",
+      "attributes": {
+        "device_class": "power",
+        "unit_of_measurement": "kW",
+        "friendly_name": "evcc PV Power",
+        "state_class": "measurement"
+      }
+    },
+    {
+      "entity_id": "sensor.evcc_pv_energy",
+      "state": "10.0",
+      "attributes": {
+        "device_class": "energy",
+        "unit_of_measurement": "kWh",
+        "friendly_name": "evcc PV Energy",
+        "state_class": "total_increasing"
+      }
+    },
+    {
+      "entity_id": "sensor.evcc_battery_soc",
+      "state": "55.0",
+      "attributes": {
+        "device_class": "battery",
+        "unit_of_measurement": "%",
+        "friendly_name": "evcc Battery SoC",
+        "state_class": "measurement"
+      }
+    },
+    {
+      "entity_id": "sensor.evcc_battery_power",
+      "state": "0.0",
+      "attributes": {
+        "device_class": "power",
+        "unit_of_measurement": "W",
+        "friendly_name": "evcc Battery Power",
+        "state_class": "measurement"
+      }
+    },
+    {
+      "entity_id": "sensor.evcc_battery_charge_energy",
+      "state": "0.0",
+      "attributes": {
+        "device_class": "energy",
+        "unit_of_measurement": "kWh",
+        "friendly_name": "evcc Battery Charge Energy",
+        "state_class": "total_increasing"
+      }
+    },
+    {
+      "entity_id": "sensor.evcc_battery_discharge_energy",
+      "state": "0.0",
+      "attributes": {
+        "device_class": "energy",
+        "unit_of_measurement": "kWh",
+        "friendly_name": "evcc Battery Discharge Energy",
+        "state_class": "total_increasing"
+      }
+    },
+    {
+      "entity_id": "sensor.evcc_loadpoint_1_charge_power",
+      "state": "0.0",
+      "attributes": {
+        "device_class": "power",
+        "unit_of_measurement": "W",
+        "friendly_name": "evcc Loadpoint 1 Charge Power",
+        "state_class": "measurement"
+      }
+    },
+    {
+      "entity_id": "input_number.ess_active_power_w",
+      "state": "0.0",
+      "attributes": {
+        "friendly_name": "ESS Active Power",
+        "unit_of_measurement": "W",
+        "min": -10000,
+        "max": 10000,
+        "step": 100
+      }
+    },
+    {
+      "entity_id": "input_number.ess_charge_limit_w",
+      "state": "5000.0",
+      "attributes": {
+        "friendly_name": "ESS Charge Limit",
+        "unit_of_measurement": "W",
+        "min": 0,
+        "max": 10000,
+        "step": 100
+      }
+    },
+    {
+      "entity_id": "input_number.ess_discharge_limit_w",
+      "state": "5000.0",
+      "attributes": {
+        "friendly_name": "ESS Discharge Limit",
+        "unit_of_measurement": "W",
+        "min": 0,
+        "max": 10000,
+        "step": 100
+      }
+    },
+    {
+      "entity_id": "input_number.ess_mode_hint",
+      "state": "0.0",
+      "attributes": {
+        "friendly_name": "ESS Mode Hint",
+        "min": 0,
+        "max": 2,
+        "step": 1
+      }
+    },
+    {
+      "entity_id": "number.evcc_loadpoint_1_max_current",
+      "state": "16.0",
+      "attributes": {
+        "friendly_name": "evcc Loadpoint 1 Max Current",
+        "unit_of_measurement": "A",
+        "min": 6,
+        "max": 32,
+        "step": 1,
+        "mode": "slider"
+      }
+    },
+    {
+      "entity_id": "switch.evcc_loadpoint_1_enable",
+      "state": "on",
+      "attributes": {
+        "friendly_name": "evcc Loadpoint 1 Enable"
+      }
+    },
+    {
+      "entity_id": "sensor.house_sim_buffer_temp",
+      "state": "42.0",
+      "attributes": {
+        "device_class": "temperature",
+        "unit_of_measurement": "°C",
+        "friendly_name": "House Sim Buffer Temp",
+        "state_class": "measurement"
+      }
+    },
+    {
+      "entity_id": "binary_sensor.evcc_loadpoint_1_connected",
+      "state": "off",
+      "attributes": {
+        "device_class": "plug",
+        "friendly_name": "evcc Loadpoint 1 Connected"
+      }
+    },
+    {
+      "entity_id": "sensor.evcc_loadpoint_1_vehicle_name",
+      "state": "",
+      "attributes": {
+        "friendly_name": "evcc Loadpoint 1 Vehicle"
+      }
+    },
+    {
+      "entity_id": "sensor.evcc_car_a_soc",
+      "state": "45.0",
+      "attributes": {
+        "device_class": "battery",
+        "unit_of_measurement": "%",
+        "friendly_name": "evcc Car A SoC",
+        "state_class": "measurement"
+      }
+    },
+    {
+      "entity_id": "sensor.evcc_loadpoint_2_charge_power",
+      "state": "0.0",
+      "attributes": {
+        "device_class": "power",
+        "unit_of_measurement": "W",
+        "friendly_name": "evcc Loadpoint 2 Charge Power",
+        "state_class": "measurement"
+      }
+    },
+    {
+      "entity_id": "number.evcc_loadpoint_2_max_current",
+      "state": "16.0",
+      "attributes": {
+        "friendly_name": "evcc Loadpoint 2 Max Current",
+        "unit_of_measurement": "A",
+        "min": 6,
+        "max": 32,
+        "step": 1,
+        "mode": "slider"
+      }
+    },
+    {
+      "entity_id": "switch.evcc_loadpoint_2_enable",
+      "state": "on",
+      "attributes": {
+        "friendly_name": "evcc Loadpoint 2 Enable"
+      }
+    },
+    {
+      "entity_id": "binary_sensor.evcc_loadpoint_2_connected",
+      "state": "off",
+      "attributes": {
+        "device_class": "plug",
+        "friendly_name": "evcc Loadpoint 2 Connected"
+      }
+    },
+    {
+      "entity_id": "sensor.evcc_loadpoint_2_vehicle_name",
+      "state": "",
+      "attributes": {
+        "friendly_name": "evcc Loadpoint 2 Vehicle"
+      }
+    },
+    {
+      "entity_id": "sensor.evcc_car_b_soc",
+      "state": "70.0",
+      "attributes": {
+        "device_class": "battery",
+        "unit_of_measurement": "%",
+        "friendly_name": "evcc Car B SoC",
+        "state_class": "measurement"
+      }
+    },
+    {
+      "entity_id": "sensor.evcc_car_c_soc",
+      "state": "30.0",
+      "attributes": {
+        "device_class": "battery",
+        "unit_of_measurement": "%",
+        "friendly_name": "evcc Car C SoC",
+        "state_class": "measurement"
+      }
+    },
+    {
+      "entity_id": "binary_sensor.car_a_plugged",
+      "state": "off",
+      "attributes": {
+        "device_class": "plug",
+        "friendly_name": "Car A Plugged"
+      }
+    },
+    {
+      "entity_id": "sensor.car_a_charge_power",
+      "state": "0.0",
+      "attributes": {
+        "device_class": "power",
+        "unit_of_measurement": "W",
+        "friendly_name": "Car A Charge Power",
+        "state_class": "measurement"
+      }
+    },
+    {
+      "entity_id": "binary_sensor.car_b_plugged",
+      "state": "off",
+      "attributes": {
+        "device_class": "plug",
+        "friendly_name": "Car B Plugged"
+      }
+    },
+    {
+      "entity_id": "sensor.car_b_charge_power",
+      "state": "0.0",
+      "attributes": {
+        "device_class": "power",
+        "unit_of_measurement": "W",
+        "friendly_name": "Car B Charge Power",
+        "state_class": "measurement"
+      }
+    }
+  ]
+}

@@ -83,6 +83,12 @@ def binding_sources_from_docs(house: dict, components: dict) -> list[BindingSour
         from ehal.push_signals import _rod_entries
 
         entries.extend(_rod_entries(profile))
+    # Wallboxes open to dynamic EVs: ``evcs.<Wallbox>.*`` (multi-EV M3).
+    from house_config.wallboxes import dynamic_charger_consumers
+
+    for charger in dynamic_charger_consumers(house, components):
+        for field, name in charger["ehal_bindings"].items():
+            entries.append(("consumer", charger["id"], "ev", str(field), str(name)))
     for battery in components.get("batteries", []):
         bid = str(battery.get("id") or "")
         for field, name in (battery.get("ehal_bindings") or {}).items():

@@ -41,7 +41,7 @@ def install_fixture_flex_consumers() -> None:
 
     original = fc_settings.load_flexible_consumers
 
-    def load_with_fixture_consumers(resolved, *, optimizer_only=False):
+    def load_with_fixture_consumers(resolved, *, optimizer_only=False, raw_dynamic=False):
         if _fixture_config_bound():
             extra = json.loads(
                 (FIXTURES_ROOT / "flex_consumers.json").read_text(encoding="utf-8")
@@ -51,7 +51,7 @@ def install_fixture_flex_consumers() -> None:
                 "_planning_flex_consumers": extra
                 + list(resolved.get("_planning_flex_consumers") or []),
             }
-        return original(resolved, optimizer_only=optimizer_only)
+        return original(resolved, optimizer_only=optimizer_only, raw_dynamic=raw_dynamic)
 
     fc_settings.load_flexible_consumers = load_with_fixture_consumers
 

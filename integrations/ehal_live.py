@@ -683,7 +683,7 @@ def write_evcs_max_current_from_consumers(
     goes out and no current, as on the Loxone path. Returns the first write error and the
     trace rows of all chargers (fields ``evcs.<Kennung>.set_evcs_*``).
     """
-    from ehal.qualified_ids import charger_id_for_ev, qualified_charger_id
+    from ehal.qualified_ids import charger_id_of_ev, qualified_charger_id
 
     consumers = live_ev_consumers()
     if not consumers:
@@ -696,7 +696,7 @@ def write_evcs_max_current_from_consumers(
     first_error: EhalWriteError | None = None
     records: list[dict[str, Any]] = []
     for consumer in consumers:
-        charger_id = charger_id_for_ev(consumer["id"])
+        charger_id = charger_id_of_ev(consumer)
         error, written, ts = _write_one_charger(
             adapter, consumer, charger_id, consumer_powers, charging_contexts, consumer_pv_follow
         )
@@ -717,8 +717,22 @@ def write_evcs_max_current_from_consumers(
 
 
 def live_ev_consumers() -> list[dict]:
-    """Live EV consumers; each is a fixed pair with its wallbox (pair view, multi-EV M2)."""
+    """Live EV consumers as pairs with their wallbox (pair view, multi-EV M2).
+
+    Dynamic EVs appear only while assigned, with ``charger_id`` = their wallbox (M3).
+    """
     return [c for c in config.get_flexible_consumers() if c.get("type") == "ev"]
+
+
+def live_charger_consumers() -> list[dict]:
+    """Every charger the adapters address: fixed pairs (``evcs.<EV>.*``) and every wallbox
+    open to dynamic EVs (``evcs.<Wallbox>.*``, multi-EV M3), assigned or not.
+    """
+    from house_config.wallboxes import VIEW_CHARGER_ID_KEY
+    from integrations.ev_assignment_live import dynamic_charger_consumers
+
+    fixed = [c for c in live_ev_consumers() if not c.get(VIEW_CHARGER_ID_KEY)]
+    return fixed + dynamic_charger_consumers()
 
 
 def _write_one_charger(

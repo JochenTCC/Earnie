@@ -1,6 +1,6 @@
 # Multiple EVs and wallboxes, HouseSim wallbox write-back: design and implementation plan
 
-**Status:** W1–W3 built and merged (2026-11-09); M1a, M1b and M2 built. Decisions D1–D10 accepted by the maintainer on 2026-11-09 (D2 in its revised form: limits as current on both devices). D11 follows from D1–D3. Branch `feat/multi-ev-wallbox` (first named `docs/multi-ev-wallbox-design`), based on `main` at `fda24a4e`.
+**Status:** W1–W3 built and merged (2026-11-09); M1a, M1b, M2 and M3 built. Decisions D1–D10 accepted by the maintainer on 2026-11-09 (D2 in its revised form: limits as current on both devices). D11 follows from D1–D3. Branch `feat/multi-ev-wallbox` (first named `docs/multi-ev-wallbox-design`), based on `main` at `fda24a4e`.
 **Backlog items:** **Enable multiple EV / Wallboxes** and **HouseSim wallbox write-back** (both Version 2.+1). The write-back is the test bench for the assignment, so this plan covers both. Target release: not decided.
 
 ## Goal
@@ -135,6 +135,27 @@ Each phase is one chat session and ends with green tests and a commit. **W** = H
 - State per wallbox: `free` → `plugged_unknown` → `testing` → `assigned` → `free` on unplug. Evidence ladder D4, test charge D5, unknown-vehicle policy D6, restart D7.
 - `runtime/ev_assignments.json` (display and record only). Monitor page: assignment per wallbox, source of the evidence, and a pick list for (d).
 - **Tests:** in HouseSim with a new fixture of two evcc loadpoints and three cars: vehicle ID match; plug match; ambiguous plug → test charge → assigned; car without sensor → user pick; unplug clears; restart re-binds; test charge skipped during "Sofort laden"; unknown car follows its policy.
+
+**M3 built 2026-11-09** (design above):
+
+- Schema: `wallbox_assignment` `{"mode": "dynamic", "wallbox_ids": [...]}`; wallbox `unknown_vehicle` (`pv_only` needs `set_evcs_mode`); loader view of a dynamic EV (`resolve_dynamic_ev_view`: limits of the smallest pair, no charger bindings, `dynamic_wallboxes`); load rejects a missing policy, a missing `sens_evcs_connected` on a dynamic wallbox, `forecast_when_absent: true`, charger bindings on a dynamic EV, and a wallbox both fixed and dynamic in one profile. EV kinds `sens_ev_connected`, `sens_ev_charge_power`.
+- Engine `optimizer/ev_assignment.py` (settings `AssignmentSettings`: poll 10 s, window 300 s, test 120 s, 500 W; module defaults, not in `config.json` yet). Driver `integrations/ev_assignment_live.py`: `start()` before the safe setpoints, `tick()` before the cycle reads consumers, `poll()` from `_daemon_wait_poll` (wakes a plan on change), the test charge only while setpoints are written (`should_invoke_setpoint_writes`; silent → no test, the wallbox waits for plug match or pick), `write_unassigned_wallboxes()` after the EV writes on every backend (through `write_evcs_setpoints` of the HA / OpenEMS / Loxone adapter), snapshot in `optimizer_run_state.ev_assignments`.
+- Overlay `runtime_store/ev_assignments.py` in `settings.flexible_consumers.load_flexible_consumers` (`raw_dynamic=True` skips it): assigned → `assigned_dynamic_ev_view` with `charger_id` = wallbox; unassigned → dropped. `charger_id_of_ev` replaces `charger_id_for_ev(id)` at the call sites; `live_charger_consumers()` = fixed pairs + every dynamic wallbox (`dynamic_charger_consumers`), used for the Loxone markers, OpenEMS channels and write probes; HA activation, push read / setpoint IDs and the signal export list the dynamic wallboxes as `evcs.<Wallbox>.*`.
+- UI: Monitor section **Wallboxen** (`ui/ev_assignment_panel.py`, pick → `runtime/ev_assignment_picks.json` + Request-Optimize); EV form „Wallbox-Zuordnung“ fixed / dynamic with allowed wallboxes (forecast switched off); Wallboxen tab „Unbekanntes Auto“; EHAL-Com row per dynamic wallbox (`wallbox` kind → `components.json`), dynamic EV rows show car fields only.
+- Scenario Explorer / backtesting reject dynamic EVs (`simulation.engine_scenario._reject_dynamic_evs`) until M4 (D9).
+- HouseSim fixture `evcc_multi_ev` (two loadpoints, three cars); tests `tests/test_ev_assignment_engine.py`, `tests/test_house_sim_ev_assignment_end_to_end.py` (plug match + plan follows the wallbox + unplug; simultaneous plug → test charges → restart re-binds; car without sensors charges by policy → user pick), `tests/test_wallbox_dynamic_assignment.py`, AppTest of the Monitor panel. "Sofort laden" skip and timeouts are covered in the engine tests only.
+- **Not covered / open:** a live run on the HA testbed or a real site; the S4 integration with the new fixture in a running HA; the settings in `config.json`; the startup safe setpoints do not touch dynamic wallboxes (their policy goes out with the first cycle); evcc's own PV mode overriding the test current (risk noted below) is not modelled.
+
+**M3 design agreed 2026-11-09** (maintainer, before the code):
+
+- **Vehicle sensors:** two new optional EV fields `ev.<Kennung>.sens_ev_connected` (bool) and `ev.<Kennung>.sens_ev_charge_power` (W). Plug match (b) needs the first, the test charge (c) the second; a car without them is assigned by the user (d).
+- **Vehicle ID (a) is not built in M3** (Q2: no source). No `sens_evcs_vehicle_id`, no `vehicle_ref`; the M3 test "vehicle ID match" is dropped. Open for later.
+- **State:** a pure state machine (`optimizer/ev_assignment.py`) and a live driver (`integrations/ev_assignment_live.py`). The state lives in the daemon's memory only and is dropped on start (D7). `runtime/ev_assignments.json` is written on every change for display and the cycle record. The Monitor writes a pick request (`runtime/ev_assignment_picks.json`) and wakes the daemon; the daemon applies it only for the same plug session.
+- **Hook:** the driver ticks at the start of every cycle and in the daemon's wait loop every `poll_sec`. The test charge runs in the wait loop and never delays a plan; an assignment or an unplug wakes a new plan at once. Plug match waits `match_window_sec` after the wallbox's plug edge before it decides. `poll_sec`, `match_window_sec`, `test_duration_sec` and `test_power_threshold_w` are documented settings.
+- **Charger Kennung:** wallboxes used by dynamic EVs are addressed as `evcs.<Wallbox>.*` already in M3; fixed pairs keep `evcs.<EV>.*` until M4.
+- **Planning:** a dynamic EV is planned only while it is assigned, with the limits of its pair. Not assigned → not planned (the pool of D8 is M4). `forecast_when_absent: true` on a dynamic EV is rejected on load until M4. The Scenario Explorer and backtesting reject dynamic EVs until M4 (D9).
+- **Unknown vehicle:** `unknown_vehicle` is required on the wallboxes a dynamic EV may use (narrower than D6: a fixed wallbox always has its car). `off` → 0 A; `immediate` → the wallbox's maximum current, mode `now`; `pv_only` → mode `pv` of the vendor and therefore requires a `set_evcs_mode` binding on that wallbox. A wallbox is either fixed to one EV or open to dynamic EVs within one house profile.
+- No new data model step: the new keys are optional and additive; only `mode: dynamic` is unlocked.
 
 ### M4: Planner and SE
 

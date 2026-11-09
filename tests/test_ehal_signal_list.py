@@ -399,6 +399,8 @@ _SETUP_LIVE_READ_IDS = {
     "ev.e_auto.get_evcs_ready_by_time",
     "ev.e_auto.get_evcs_limit_soc",
     "ev.e_auto.get_evcs_soc_min_immediate",
+    "ev.e_auto.sens_ev_connected",
+    "ev.e_auto.sens_ev_charge_power",
     "ev.e_auto.sens_energy_total",
     "consumer.verbraucher.sens_power_act",
     "consumer.verbraucher.sens_consumer_active",

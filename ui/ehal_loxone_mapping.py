@@ -20,6 +20,7 @@ from ehal.ess_fields import (
 from ehal.inverter_fields import INVERTER_MAPPING_KINDS, inv_field, inv_field_kind
 from ehal.pv_fields import PV_MAPPING_KINDS, pv_field, pv_field_kind
 from ehal.profiles import group_fields_by_role, role_field_labels, role_group_label
+from ehal.qualified_ids import EVCS_KINDS
 from house_config.ehal_bindings import (
     FILTER_EHAL_FIELDS,
     THERMAL_ANNUAL_EHAL_FIELDS,
@@ -50,6 +51,7 @@ from ui.ehal_loxone_mapping_base import (  # noqa: F401 — re-exports
     INVERTER_ENTITY_KIND,
     PLANT_ENTITY_ID,
     PV_ENTITY_KIND,
+    WALLBOX_ENTITY_KIND,
     _nonempty,
 )
 from ui.ehal_loxone_mapping_persist import (  # noqa: F401 — re-exports
@@ -100,6 +102,8 @@ EV_FIELDS: tuple[str, ...] = (
     "sens_evcs_active_power",
     "sens_evcs_connected",
     "sens_evcs_soc_act",
+    "sens_ev_connected",
+    "sens_ev_charge_power",
     "get_evcs_nominal_current",
     "sens_evcs_bat_capacity",
     "get_evcs_ready_by_time",
@@ -108,6 +112,10 @@ EV_FIELDS: tuple[str, ...] = (
     "set_evcs_max_current",
     "set_evcs_mode",
 )
+
+# Charger fields of a wallbox row and car fields of a dynamic EV (multi-EV M3).
+WALLBOX_FIELDS: tuple[str, ...] = tuple(f for f in EV_FIELDS if f in EVCS_KINDS)
+EV_VEHICLE_FIELDS: tuple[str, ...] = tuple(f for f in EV_FIELDS if f not in EVCS_KINDS)
 
 FLEX_FIELDS: tuple[str, ...] = (
     "flex.sens_power_act",
@@ -147,6 +155,8 @@ def proposal_for_mapping_field(
 _EXTRA_LABELS: dict[str, str] = {
     "sens_evcs_connected": "EV angeschlossen",
     "sens_evcs_soc_act": "EV Ist-SOC (%)",
+    "sens_ev_connected": "Auto meldet angesteckt",
+    "sens_ev_charge_power": "Auto-Ladeleistung (W)",
     "get_evcs_nominal_current": "EV Nennstrom (A)",
     "sens_evcs_bat_capacity": "EV Batteriekapazität (kWh)",
     "get_evcs_ready_by_time": "EV FertigUm",
@@ -251,6 +261,11 @@ def fields_for_consumer(consumer: dict) -> tuple[str, ...]:
     """EHAL mapping fields for a house-profile consumer type."""
     ctype = str(consumer.get("type") or "").strip()
     if ctype == "ev":
+        from house_config.wallboxes import is_dynamic_ev
+
+        if is_dynamic_ev(consumer):
+            # The charger fields belong to the wallboxes (row kind ``wallbox``).
+            return EV_VEHICLE_FIELDS
         return EV_FIELDS
     from ehal.flex_fields import consumer_fields_for_consumer
 
@@ -424,7 +439,31 @@ def build_entity_rows(
             fields_for=lambda _cid, rod: fields_for_consumer(rod),
         )
     )
+    rows.extend(_dynamic_wallbox_rows(house_doc, profile_id, components))
     return rows
+
+
+def _dynamic_wallbox_rows(house_doc: dict, profile_id: str, components: dict) -> list[dict[str, Any]]:
+    """Wallboxes the profile's dynamic EVs may use; charger bindings go to ``components.json``."""
+    from house_config.wallboxes import dynamic_charger_consumers
+
+    profile_house = {"profiles": {profile_id: {"consumers": consumers_for_profile(house_doc, profile_id)}}}
+    from ehal.qualified_ids import field_kind
+
+    chargers = dynamic_charger_consumers(profile_house, components)
+    for charger in chargers:
+        wallbox = charger.get("wallbox") or {}
+        charger["label"] = f"Wallbox {wallbox.get('label') or charger['id']}"
+        # Stored as ``evcs.<Wallbox>.<kind>``; the row shows the bare kinds.
+        charger["ehal_bindings"] = {
+            field_kind(k): v for k, v in charger["ehal_bindings"].items()
+        }
+    return _entity_rows(
+        chargers,
+        kind=WALLBOX_ENTITY_KIND,
+        entity_key="wallbox",
+        fields_for=lambda _wid, _charger: WALLBOX_FIELDS,
+    )
 
 
 def entity_kind_for_id(

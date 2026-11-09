@@ -383,7 +383,8 @@ Seit Datenmodell 6 sind E-Auto und Wallbox getrennt. Die Wallbox steht in `compo
 | `min_current_a` | Wallbox und E-Auto | Kleinster Ladestrom (A) |
 | `max_current_a` | Wallbox und E-Auto | Größter Ladestrom (A) |
 | `ehal_bindings` | Wallbox | Lade-Felder: `sens_evcs_active_power`, `sens_evcs_connected`, `get_evcs_nominal_current`, `set_evcs_max_current` (Pflicht), `set_evcs_mode` |
-| `wallbox_assignment` | E-Auto | `{"mode": "fixed", "wallbox_id": "<Kennung>"}`: feste Wallbox |
+| `wallbox_assignment` | E-Auto | `{"mode": "fixed", "wallbox_id": "<Kennung>"}`: feste Wallbox; `{"mode": "dynamic", "wallbox_ids": ["<Kennung>", …]}`: das Auto darf an diesen Wallboxen laden (siehe [Dynamische Zuordnung](#dynamische-zuordnung-mehrere-autos-mehrere-wallboxen)) |
+| `unknown_vehicle` | Wallbox | Nur bei dynamischer Zuordnung: wie die Wallbox ein noch nicht erkanntes Auto lädt (`off`, `pv_only`, `immediate`) |
 
 Für ein Paar aus Auto und Wallbox gilt der **größere** Mindeststrom, der **kleinere** Höchststrom und die **kleinere** Phasenzahl. Daraus rechnet Earnie die Ladeleistung: Strom × Spannung der Wallbox × Phasen. Ein einphasiges Auto an einer dreiphasigen Wallbox lädt also einphasig. Liegt der Mindeststrom des Paars über seinem Höchststrom, haben Auto und Wallbox keinen gemeinsamen Ladestrom: Earnie lehnt das Hausprofil beim Laden mit einer Meldung ab und begrenzt nichts stillschweigend.
 
@@ -398,7 +399,37 @@ Im Live-Betrieb schreibt Earnie Ladestrom und Lademodus je E-Auto an dessen Wall
 
 Ein importiertes E-Auto (Loxone-Import) bekommt beim Speichern eine eigene Wallbox mit seiner Kennung.
 
-In dieser Version hat jedes E-Auto eine feste Wallbox. Mehrere Autos, die sich Wallboxen teilen (`mode: dynamic`), folgen in einer späteren Version.
+### Dynamische Zuordnung: mehrere Autos, mehrere Wallboxen
+
+Ein E-Auto mit **Wallbox-Zuordnung: Dynamisch** hat keine feste Wallbox, sondern eine Liste **Erlaubte Wallboxen**. Earnie findet selbst heraus, an welcher Wallbox es steckt, und plant es erst dann, mit dem Ladebereich dieses Paars. Solange ein dynamisches Auto keiner Wallbox zugeordnet ist, plant Earnie es nicht.
+
+Earnie rät nie. Es ordnet ein Auto nur mit einem dieser Belege zu, in dieser Reihenfolge:
+
+1. **Steckabgleich:** Die Wallbox meldet „angesteckt“, und innerhalb von 5 Minuten meldet genau ein in Frage kommendes Auto über sein eigenes Signal **Auto meldet angesteckt** (`ev.<Kennung>.sens_ev_connected`) dasselbe. Wurde zur selben Zeit noch eine andere Wallbox angesteckt, an der dieses Auto laden dürfte, gilt der Abgleich nicht.
+2. **Probeladung:** Earnie stellt die Wallbox für höchstens 2 Minuten auf den Mindeststrom und beobachtet die **Auto-Ladeleistung** (`ev.<Kennung>.sens_ev_charge_power`) der Kandidaten. Lädt genau ein Auto mit mindestens 500 W, ist es zugeordnet. Probeladungen laufen nacheinander, nie an zwei Wallboxen zugleich, und nicht, solange ein Kandidat „Sofort laden“ anfordert. Etwa 0,05 kWh je Probeladung.
+3. **Auswahl im Monitor:** Unter **Live-Cockpit → Monitor**, Abschnitt **Wallboxen**, wählst du das Auto für die angesteckte Wallbox aus.
+
+Ein Auto ohne die beiden Signale lässt sich nur im Monitor zuordnen. Im Silent-Modus sendet Earnie keine Sollwerte, also auch keine Probeladung; dann bleiben Steckabgleich und Auswahl. Abstecken an der Wallbox beendet die Zuordnung sofort. Nach einem Neustart des Optimierer-Dienstes beginnt jede Zuordnung von vorn: Ein schon angestecktes Auto wird per Probeladung oder Auswahl neu erkannt.
+
+Die Feldwerte (5 Minuten, 2 Minuten, 500 W, Abfrage alle 10 Sekunden) sind feste, dokumentierte Werte dieser Version.
+
+**Unbekanntes Auto** (`unknown_vehicle`, Bereich **Wallboxen**): Solange an einer Wallbox kein Auto erkannt ist, lädt sie so:
+
+| Wert | Hauskonfigurator | Verhalten |
+| --- | --- | --- |
+| `off` | Nicht laden | 0 A |
+| `pv_only` | Nur PV-Überschuss (PV-Modus der Wallbox) | Earnie setzt den PV-Modus der Wallbox (`set_evcs_mode = pv`) und den Höchststrom; die Wallbox regelt selbst. Braucht das Binding `set_evcs_mode`. |
+| `immediate` | Sofort laden (Höchststrom) | Höchststrom der Wallbox, Modus `now` |
+
+Die Angabe ist Pflicht an jeder Wallbox, die ein dynamisches Auto nutzen darf. Lädt an einer Wallbox mit `immediate` ein unbekanntes Auto, während an einer anderen eine Probeladung läuft, kann die Probeladung mehrdeutig werden; dann bleibt die Auswahl im Monitor.
+
+**Regeln beim Laden des Hausprofils:**
+
+- Eine Wallbox ist innerhalb eines Hausprofils entweder einem Auto fest zugeordnet oder für dynamische Autos freigegeben, nicht beides.
+- Jede Wallbox eines dynamischen Autos braucht das Binding `sens_evcs_connected`, sonst erkennt Earnie kein angestecktes Auto.
+- **Prognose, wenn nicht angeschlossen** ist bei dynamischen Autos noch nicht möglich (`forecast_when_absent: false`); der Hauskonfigurator schaltet sie ab.
+- Ein dynamisches Auto trägt keine Lade-Bindings; die stehen an den Wallboxen. Auf der Seite **EHAL-Com** hat jede solche Wallbox eine eigene Zeile (`evcs.<Wallbox>.*`), die Zeile des Autos zeigt nur die Auto-Felder.
+- Szenario-Explorer und Backtesting lehnen dynamische Autos in dieser Version mit einer Meldung ab.
 
 ## E-Auto: `charging_schedule`
 

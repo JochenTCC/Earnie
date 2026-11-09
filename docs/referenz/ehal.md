@@ -54,7 +54,7 @@ Exchange / display form of every signal on the push/exchange wire and in `status
 | Grid meter | `grid.meter.sens_grid_power_active` | First Kennung `meter`; more `grid.<Kennung>.*` meters may follow. Plant **storage** keeps bare kind keys |
 | Battery | `ess.<Kennung>.sens_ess_soc` | Entity-scoped binding key |
 | Consumer by type | `consumer.<slug>.set_enable`, `heatpump.<slug>.*`, `pool.<slug>.*` (incl. `pool_filter`) | Storage and exchange; legacy `flex.<slug>.*` accepted on parse / dual-read until migrated |
-| EV split | `evcs.<slug>.set_evcs_max_current`, `ev.<slug>.sens_evcs_soc_act` | Same Kennung; namespace chosen by field kind |
+| EV split | `evcs.<slug>.set_evcs_max_current`, `ev.<slug>.sens_evcs_soc_act` | Same Kennung; namespace chosen by field kind. A wallbox open to dynamic EVs uses its **own** Kennung: `evcs.<Wallbox>.*` (multi-EV M3) |
 | Inverter | `inv.<Kennung>.*` | Entity-scoped on `inverters[].ehal_bindings` (**2.7.l P4**) |
 | Heartbeat (read) | `heartbeat_smarthome` | Link proof Hub→Earnie; not a field kind |
 | Heartbeat (write) | `heartbeat_earnie` | Earnie→Hub Unix watchdog in `status.json`; not a field kind |
@@ -139,6 +139,8 @@ Every adapter, derived value (`sens_power_consumers` when not mapped), and Live 
 | `sens_power_consumers`        | no       | W      | House load; mapped binding or derive                                                                       |
 | `sens_evcs_connected`         | no       | bool   | EV plugged in                                                                                              |
 | `sens_evcs_soc_act`           | no       | %      | Vehicle SoC                                                                                                |
+| `ev.{id}.sens_ev_connected`   | no       | bool   | The car itself reports it is plugged in (vehicle integration); plug match of the dynamic wallbox assignment. Binding / push key only |
+| `ev.{id}.sens_ev_charge_power` | no      | W      | ≥ 0; charge power reported by the car; test charge of the dynamic wallbox assignment. Binding / push key only |
 | `get_evcs_nominal_current`    | no       | A      | Nominal / max current                                                                                      |
 | `sens_evcs_bat_capacity`      | no       | kWh    | EV battery capacity                                                                                        |
 | `get_evcs_ready_by_time`      | no       | string | Ready-by deadline (Loxone: AlarmClock SpecialState10 via `/all`, Tna text backup; binding = baustein name) |

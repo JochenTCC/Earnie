@@ -190,6 +190,7 @@ Domain `earnie_house_sim`: scenarios `cloud_pass`, `car_arrives`, `car_leaves`, 
 | `fronius_de` | `wattpilot`, 6–16 A, 3 ph | `number.goe_…_amp`, `select.goe_…_frc` (off: `1`) | power, go-e `car` status 1–4 | `car_a` 77 kWh, 6–16 A, 3 ph |
 | `huawei_en` | `goe`, 6–32 A, 3 ph | as above | as above | `car_a` 40 kWh, 6–32 A, **1 ph** |
 | `sma_keba` | `keba`, 6–16 A, 3 ph, `read_only` | none | power (kW), energy counter | `car_a` 58 kWh, 6–16 A, 3 ph |
+| `evcc_multi_ev` | `lp1`, `lp2`, 6–16 A, 3 ph (copies of `evcc_en`'s loadpoint) | `number.evcc_loadpoint_{1,2}_max_current`, enable switches | as `evcc_en`, per loadpoint | `car_a` 3 ph and `car_b` 1 ph with own plug (`binary_sensor.car_*_plugged`) and charge power (`sensor.car_*_charge_power`); `car_c` 40 kWh with SoC only. Bench of the dynamic assignment (multi-EV M3, `tests/test_house_sim_ev_assignment_end_to_end.py`) |
 
 The mock store still rejects `switch` services (negative write-domain case); tests set the evcc enable state directly.
 

@@ -83,6 +83,9 @@ EV_KINDS = frozenset(
         "get_evcs_limit_soc",
         "get_evcs_soc_min_immediate",
         "get_evcs_ready_by_time",
+        # Vehicle-side plug state and charge power (multi-EV M3: plug match, test charge).
+        "sens_ev_connected",
+        "sens_ev_charge_power",
     }
 )
 
@@ -121,6 +124,19 @@ def charger_id_for_ev(consumer_id: str) -> str:
     pair view of the loader shows them (``house_config.wallboxes.resolve_ev_pair``).
     """
     return flex_ehal_slug(consumer_id)
+
+
+def charger_id_of_ev(consumer: dict) -> str:
+    """Charger Kennung of an EV view: ``charger_id`` when set, else the EV's own.
+
+    A dynamic EV assigned to a wallbox carries ``charger_id`` = that wallbox (multi-EV M3,
+    ``house_config.wallboxes.assigned_dynamic_ev_view``); a fixed pair keeps the EV's
+    Kennung until M4.
+    """
+    explicit = str(consumer.get("charger_id") or "").strip()
+    if explicit:
+        return flex_ehal_slug(explicit)
+    return charger_id_for_ev(str(consumer.get("id") or ""))
 
 
 def qualified_charger_id(charger_id: str, key: str) -> str:

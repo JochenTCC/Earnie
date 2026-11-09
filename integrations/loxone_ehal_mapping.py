@@ -146,6 +146,8 @@ _HINTS: dict[str, tuple[str, ...]] = {
     ),
     "sens_evcs_connected": ("angeschlossen", "plugged", "connected", "ev da"),
     "sens_evcs_soc_act": ("ev soc", "fahrzeug soc", "ist-soc", "vehicle soc"),
+    "sens_ev_connected": ("auto angesteckt", "fahrzeug angesteckt", "vehicle plugged"),
+    "sens_ev_charge_power": ("auto ladeleistung", "fahrzeug ladeleistung", "vehicle charge power"),
     "sens_evcs_bat_capacity": ("kapazität", "capacity", "akkukapazität"),
     "get_evcs_nominal_current": ("nennstrom", "nominal", "maxstrom ev"),
     "get_evcs_ready_by_time": (
