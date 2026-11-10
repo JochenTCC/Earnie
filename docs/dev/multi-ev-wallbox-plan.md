@@ -1,6 +1,6 @@
 # Multiple EVs and wallboxes, HouseSim wallbox write-back: design and implementation plan
 
-**Status:** W1–W3 built and merged (2026-11-09); M1a, M1b, M2, M3 and M4 built. Decisions D1–D10 accepted by the maintainer on 2026-11-09 (D2 in its revised form: limits as current on both devices). D11 follows from D1–D3. Branch `feat/multi-ev-wallbox` (first named `docs/multi-ev-wallbox-design`), based on `main` at `fda24a4e`.
+**Status:** W1–W3 built and merged (2026-11-09); M1a, M1b, M2, M3, M4 and M5 built (2026-11-10); **Enable multiple EV / Wallboxes** and **HouseSim wallbox write-back** are done (archived in `backlog/Backlog-Erledigt.md`). Decisions D1–D10 accepted by the maintainer on 2026-11-09 (D2 in its revised form: limits as current on both devices). D11 follows from D1–D3. Branch `feat/multi-ev-wallbox` (first named `docs/multi-ev-wallbox-design`), based on `main` at `fda24a4e`.
 **Backlog items:** **Enable multiple EV / Wallboxes** and **HouseSim wallbox write-back** (both Version 2.+1). The write-back is the test bench for the assignment, so this plan covers both. Target release: not decided.
 
 ## Goal
@@ -184,6 +184,14 @@ Each phase is one chat session and ends with green tests and a commit. **W** = H
 
 - German user docs (`docs/konfiguration/`, Monitor page), EHAL reference (`docs/referenz/ehal.md`: `sens_evcs_vehicle_id`, Kennung of a wallbox), `EHAL-Binding-UX-Draft.md` note on the first EV removed.
 - Release notes draft. **Done:** closes **Enable multiple EV / Wallboxes**.
+
+**M5 built 2026-11-10:**
+
+- The vehicle ID field `sens_evcs_vehicle_id` named above was not built (Q2, M3 design); `docs/referenz/ehal.md` states that no vehicle ID source is relied on.
+- User docs: neutral wording for the pick on the Monitor page (`docs/konfiguration/flexible-verbraucher.md`, Benutzer-Handbuch § Monitor), fixed vs. dynamic sharing of a wallbox, pool planning and the SE rule in the Benutzer-Handbuch, `runtime/ev_assignments.json` and `ev_assignment_picks.json` in `docs/einrichtung/betrieb.md`, charger vs. vehicle Kennung on `docs/ui/ehal-com.md`. M4 had already updated the dynamic-assignment section and the EV split row of the EHAL reference.
+- Dev docs: `EHAL-Binding-UX-Draft.md` multi-EV note (final charger Kennung), `house-sim.md` (no "first EV consumer"), `docs/workflow/earnie-points.md` (distinct wallboxes, the pre-dm6 note removed).
+- Release-notes fragment `.github/release-notes/drafts/v2.8.0-wallboxes.draft.md` covers M1–M4; target release still open (Q3).
+- Backlog item **Enable multiple EV / Wallboxes** archived with the open points of M3 / M4.
 
 ## Risks
 

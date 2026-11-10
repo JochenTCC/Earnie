@@ -72,7 +72,7 @@ Out of scope for S1: `simulation/engine.py::run_simulation()`, `data/pv_forecast
 ### Run the mock, then start Earnie
 
 1. Start the mock (leave this process running).
-2. Start Earnie with `ehal.backend=ha` (Earnie no longer uses an HA URL / token — this mock bench belongs to the retired pull path, see the contract mode below for push). Optional `sign` under `ehal.ha` in `config.json`. Merge the golden field→entity IDs into **`plant.ehal_bindings`** in `house_profiles.json` (EV keys go on the first EV consumer when present). Do **not** rely on flat `ehal.ha.entities` for new installs.
+2. Start Earnie with `ehal.backend=ha` (Earnie no longer uses an HA URL / token — this mock bench belongs to the retired pull path, see the contract mode below for push). Optional `sign` under `ehal.ha` in `config.json`. Merge the golden field→entity IDs into **`plant.ehal_bindings`** in `house_profiles.json` (EV charger keys go on the wallbox in `components.json`, vehicle keys on the EV consumer). Do **not** rely on flat `ehal.ha.entities` for new installs.
 
 | Setting | Value |
 | --- | --- |

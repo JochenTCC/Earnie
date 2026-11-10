@@ -180,6 +180,8 @@ A battery belongs to an inverter via `batteries[].inverter_id`. `batteries[].kin
 | SOC charge target             | Input value   | `get_evcs_limit_soc`                                                |                                                 | number.evcc_lab_limit_soc              |                                                                     | `Earnie_EAuto_LimitSOC` / `ehal_bindings.get_evcs_limit_soc`             |
 | SOC min immediate             | Input value   | `get_evcs_soc_min_immediate`                                        |                                                 |                                         |                                                                     | `Earnie_EAuto_SOCMinSofort` / `ehal_bindings.get_evcs_soc_min_immediate` (≤0 = inactive) |
 
+Die Lade-Felder tragen die Kennung der Wallbox (`evcs.<Wallbox>.*`), die Auto-Felder die des E-Autos (`ev.<E-Auto>.*`). Nach der Migration auf Datenmodell 6 hat jede Wallbox die Kennung ihres E-Autos, die IDs bleiben also gleich.
+
 Bei **dynamischer Wallbox-Zuordnung** (mehrere Autos, mehrere Wallboxen) hat jede Wallbox, die ein dynamisches Auto nutzen darf, im Mapping eine eigene Zeile **Wallbox …** mit den Lade-Feldern (`evcs.<Wallbox>.*`, gespeichert in `components.json`). `sens_evcs_connected` ist dort Pflicht. Die Zeile des dynamischen Autos zeigt nur die Auto-Felder, darunter **Auto meldet angesteckt** und **Auto-Ladeleistung** für Steckabgleich und Probeladung ([Dynamische Zuordnung](../konfiguration/flexible-verbraucher.md#dynamische-zuordnung-mehrere-autos-mehrere-wallboxen)).
 
 

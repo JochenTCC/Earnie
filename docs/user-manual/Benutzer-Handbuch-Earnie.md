@@ -161,7 +161,7 @@ Je genauer die thermischen Angaben, desto realistischer der Jahresvergleich. Fü
 E-Auto und Wallbox als planbarer Verbraucher:
 
 - **Fahrzeug:** Akkukapazität, Wirkungsgrad sowie Phasen, Mindest- und Höchst-Ladestrom des Autos.
-- **Wallbox:** feste Zuordnung zu einer Wallbox aus dem Bereich **Wallboxen** (Spannung, Phasen, Ladestrom der Wallbox). Geladen wird im gemeinsamen Bereich von Auto und Wallbox; die Ladeleistung in kW steht unter der Auswahl. **Neue Wallbox für dieses E-Auto anlegen** erzeugt eine Wallbox mit den Grenzen des Autos und 230 V. Mit **Wallbox-Zuordnung: Dynamisch** darf das Auto an mehreren Wallboxen laden; Earnie erkennt, wo es steckt ([Dynamische Zuordnung](../konfiguration/flexible-verbraucher.md#dynamische-zuordnung-mehrere-autos-mehrere-wallboxen)).
+- **Wallbox:** feste Zuordnung zu einer Wallbox aus dem Bereich **Wallboxen** (Spannung, Phasen, Ladestrom der Wallbox). Geladen wird im gemeinsamen Bereich von Auto und Wallbox; die Ladeleistung in kW steht unter der Auswahl. **Neue Wallbox für dieses E-Auto anlegen** erzeugt eine Wallbox mit den Grenzen des Autos und 230 V. Mit **Wallbox-Zuordnung: Dynamisch** darf das Auto an mehreren Wallboxen laden, und mehrere Autos können sich Wallboxen teilen; Earnie erkennt, wo es steckt. Im Szenario-Explorer gilt dafür „wer zuerst kommt, lädt zuerst“ ([Dynamische Zuordnung](../konfiguration/flexible-verbraucher.md#dynamische-zuordnung-mehrere-autos-mehrere-wallboxen)).
 - **Zeitfenster:** ab wann das Auto da ist und bis wann es geladen sein soll, getrennt für Werktage und Wochenende.
 - **Ziel-SoC:** gewünschter Ladestand beim Abfahren.
 - **Prognose, wenn nicht angeschlossen:** optionale Lade-Prognose, auch wenn das Auto nicht an der Wallbox hängt (unabhängig vom Abwesenheitsmodus des Hauses).
@@ -459,7 +459,7 @@ Die Abschnitte folgen der Navigation: zuerst die Seiten unter **Live-Cockpit** (
 
 *Monitor (Chart 1): Vergangenheit, laufender Plan und Preisprognose in einem Sunset-2-Sunset-Fenster.*
 
-Gibt es E-Autos mit dynamischer Wallbox-Zuordnung, steht oben der Abschnitt **Wallboxen**: je Wallbox frei, angesteckt und noch nicht erkannt, Probeladung läuft, oder das zugeordnete Auto mit dem Beleg (Steckabgleich, Probeladung, Auswahl im Monitor). Bei einer angesteckten Wallbox wählst du das Auto aus der Liste und drückst **Zuordnen**; der Optimierer-Dienst übernimmt die Auswahl sofort.
+Gibt es E-Autos mit dynamischer Wallbox-Zuordnung, steht oben der Abschnitt **Wallboxen**: je Wallbox frei, angesteckt und noch nicht erkannt, Probeladung läuft, oder das zugeordnete Auto mit dem Beleg (Steckabgleich, Probeladung, Auswahl im Monitor). Bei einer angesteckten Wallbox wird das Auto aus der Liste gewählt und mit **Zuordnen** bestätigt; der Optimierer-Dienst übernimmt die Auswahl sofort. Ein dynamisches Auto, das noch nicht zugeordnet ist, plant Earnie mit **Prognose, wenn nicht angeschlossen** gegen die freien Wallboxen; Sollwerte bekommt es erst nach der Zuordnung.
 
 Der Monitor unter **Live-Cockpit → Monitor** (Sunset-2-Sunset) zeigt Vergangenheit, Gegenwart und Vorausschau in einem Cockpit. Am Desktop umfasst das Fenster SA₀→SA₂ (SA = Sonnenaufgang), auf dem Smartphone wird es in Abschnitte von Sonnenaufgang zu Sonnenaufgang geteilt. Chart 1, SoC-Linien und Sankey: [Charts & Panels](../ui/charts.md) · Modus: [Betriebsmodi](../ui/betriebsmodi.md)
 

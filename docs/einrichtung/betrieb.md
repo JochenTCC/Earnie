@@ -189,6 +189,8 @@ Standardverzeichnis: `earnie_env/runtime/`. Es lässt sich mit `EARNIE_RUNTIME_P
 | `profile/`                      | Optional: `cProfile`-Dumps (`cycle_*.prof`, `*_top30.txt`). Nur bei `EARNIE_CYCLE_PROFILE=1`, und nur kurz aktiv lassen. |
 | `appliance_schedules.json`      | Geplante Laufzeiten manueller Geräte.                                                        |
 | `powerstation_reserves.json`    | Reserve-Zustand virtueller/physischer Powerstations (stored/target kWh, Trigger).            |
+| `ev_assignments.json`           | Zuordnung Auto ↔ Wallbox bei dynamischer Wallbox-Zuordnung, mit Beleg; vom Optimierer-Dienst bei jeder Änderung geschrieben. Nur Anzeige und Protokoll: Nach einem Neustart beginnt jede Zuordnung von vorn. |
+| `ev_assignment_picks.json`      | Auswahl eines Autos im Monitor (Abschnitt **Wallboxen**); der Optimierer-Dienst übernimmt sie nur für dieselbe Steckung. |
 | `backtesting_log.json`          | Ergebnis von Szenario-Explorer / `run_backtesting`.                                          |
 | `usage_ping.json`               | Zustimmung und Zustand der optionalen Nutzungsstatistik (siehe [Nutzungsstatistik](#nutzungsstatistik)). |
 | `feature_reviews.json`          | Zustand der einmaligen Feedback-Abfrage (gesendet oder abgebrochen, siehe [Feedback zum Szenario-Explorer](#feedback-zum-szenario-explorer)). |
