@@ -52,12 +52,11 @@ Boundaries: 3.4 kWp = 0, 3.5 kWp = 1, 10.5 kWp = 2; with 10 kWp: 2.4 kWh = 0, 2.
 - **Bidirectional** is the optional bool `bidirectional` on `ev` consumers (absent = false). The car battery counts a quarter of a stationary storage: the wallbox part gets the storage points it would add on top of the stationary storage, at least 1 point per bidirectional wallbox (maintainer's decision 2026-11-08). The car battery does not lift the "without storage" extra. A bidirectional `ev` consumer without `battery_capacity_kwh` raises.
 - **Without storage:** the +4 applies once per plant, not per wallbox; the threshold uses the stationary storage only (house batteries plus powerstations).
 - **Heating rod:** the business plan names gas (also for oil) and pellets. Wood scores like pellets, district heat like gas; beside an electric direct heating or a heat pump a rod scores 0 (maintainer's decision 2026-11-08). The heat source comes from the heating system the live scenario uses (`heating_system_ids` variant, else the house's reference system). An unknown source type raises.
-- **Number of EVs is not rated**; only wallboxes (EV consumers) are.
+- **Number of EVs is not rated**; only wallboxes are: the distinct wallboxes the profile's EVs use (`components.wallboxes[]`, data model 6): the fixed wallbox of an EV, every allowed wallbox of a dynamic EV. An EV without a valid `wallbox_assignment` raises. A wallbox shared by several cars counts once.
 - **Manual consumers are never counted.** For `generic` consumers only the role `flex` is eligible (`manual` and `known` are not controlled by Earnie). `thermal_annual`, `thermal_rc` and `ev` consumers are always controlled by Earnie.
 - **Air conditioner:** the `cooling` block of the house's `thermal_annual` consumer, counted only with the profile switch `cooling_enabled` („Kühlung betrachten“). `type: split` (a device of its own) counts 1 point in `heat` regardless of power; `type: heat_pump` (the reversible heat pump) counts 1 point only when the heating consumer is not counted (switch „Heizung betrachten“ off), so one device never counts twice.
 - **No double counting:** each consumer contributes to one part (`wallbox`, `heat` / `heating_rod`, or `other`). Powerstation-attached consumers are ordinary consumers of the profile and are counted once there.
 - **One plant = one location = one ping.** No cross-location sums.
-- Several wallboxes behind one `ev` consumer, or an EV without its own wallbox (car API only), count as one wallbox as long as there is no wallbox entity (see backlog "Enable multiple EV / Wallboxes").
 - Invalid or missing numeric fields raise `ValueError` naming the component; there are no silent defaults.
 
 ### Version 1 (until 2.8.0-dev.9)

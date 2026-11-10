@@ -141,6 +141,19 @@ def _consumers(profile: dict) -> list[dict]:
     return consumers
 
 
+def _ev_wallbox_ids(consumer: dict) -> set[str]:
+    """Wallboxes an EV uses: its fixed wallbox, or every wallbox a dynamic EV may use."""
+    assignment = consumer.get("wallbox_assignment")
+    mode = assignment.get("mode") if isinstance(assignment, dict) else None
+    if mode == "fixed":
+        return {str(assignment["wallbox_id"])}
+    if mode == "dynamic":
+        return {str(w) for w in assignment["wallbox_ids"]}
+    raise ValueError(
+        f"earnie_points: E-Auto {consumer.get('id')!r} hat keine gültige wallbox_assignment."
+    )
+
+
 def compute_earnie_points(components: dict, profile: dict) -> dict[str, int]:
     """Earnie-Points of the plant: ``components`` (raw ``components.json`` document)
     and the live house ``profile`` (normalized, with ``consumers``).
@@ -165,7 +178,7 @@ def compute_earnie_points(components: dict, profile: dict) -> dict[str, int]:
         kind = consumer.get("type")
         if kind == "ev":
             # A wallbox counts once, however many cars it serves (data model 6).
-            wallbox_ids.add(str(consumer["wallbox_assignment"]["wallbox_id"]))
+            wallbox_ids.update(_ev_wallbox_ids(consumer))
             if consumer.get("bidirectional") is True:
                 bidirectional += 1
                 ev_kwh += _ev_storage_kwh(consumer)

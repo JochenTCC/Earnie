@@ -267,3 +267,20 @@ def test_two_cars_at_one_wallbox_count_one_wallbox():
         {"consumers": [_ev("a", **shared), _ev("b", **shared)]},
     )
     assert two["wallbox"] == one["wallbox"]
+
+
+def test_dynamic_cars_count_each_allowed_wallbox_once():
+    """Dynamic EVs: every wallbox they may use counts once, however many cars share it."""
+    dyn = {"wallbox_assignment": {"mode": "dynamic", "wallbox_ids": ["box1", "box2"]}}
+    points = compute_earnie_points(
+        _components(kwh=(10.0,)),
+        {"consumers": [_ev("a", **dyn), _ev("b", **dyn), _ev("c")]},
+    )
+    assert points["wallbox"] == 6
+
+
+def test_ev_without_wallbox_assignment_raises():
+    car = _ev("a")
+    del car["wallbox_assignment"]
+    with pytest.raises(ValueError, match="wallbox_assignment"):
+        compute_earnie_points(_components(), {"consumers": [car]})
