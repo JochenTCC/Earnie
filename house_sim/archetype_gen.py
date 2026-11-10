@@ -10,7 +10,10 @@ Design (docs/dev/ha-contract-testbed.md §3b):
 
 * Physics looks up *flat* field names; the generator emits flat keys for the
   physical subset, so ``house_sim/core`` stays untouched and ``ehal``-free.
-* Only grid, PV (one inverter), one house battery and a wallbox are physical.
+* Only grid, PV (one inverter), one house battery and the wallboxes are physical.
+  With ``components.wallboxes`` (data model 6) every wallbox with activated
+  ``evcs.<id>.*`` signals and every EV run on the wallbox / EV model of
+  ``house_sim/core/evcs.py``; an older pack keeps one flat wallbox power.
   Every other signal gets an explicit static value, listed in ``meta.json``.
   S4 serves static values only from numbers, so static *reads* are ``number``
   entities seeded from the fixture state.
@@ -74,6 +77,23 @@ _BATTERY_ENERGY = {
     "sens_ess_energy_charge": "charge",
     "sens_ess_energy_discharge": "discharge",
 }
+
+# Wallbox / EV model (data model 6, ``components.wallboxes``): field kind → entity role
+# of ``house_params.wallboxes[].entities`` / ``house_params.evs[].entities``.
+_WALLBOX_ROLES = {
+    "set_evcs_max_current": "max_current",
+    "sens_evcs_active_power": "power",
+    "sens_evcs_connected": "plugged",
+}
+_EV_ROLES = {
+    "sens_evcs_soc_act": "soc",
+    "sens_ev_connected": "plugged",
+    "sens_ev_charge_power": "power",
+}
+# Plug states are text ``on`` / ``off`` in the model: binary sensors, not numbers.
+_PLUG_KINDS = frozenset({"sens_evcs_connected", "sens_ev_connected"})
+_EV_MODEL_KEYS = ("battery_capacity_kwh", "phases", "min_current_a", "max_current_a")
+_WALLBOX_MODEL_KEYS = ("voltage_v", "phases", "min_current_a", "max_current_a")
 
 
 @dataclass(frozen=True)
@@ -337,6 +357,126 @@ def _limit_w(battery: dict[str, Any], key: str, ehal_id: str) -> float:
     return _positive(battery[key], f"battery {battery.get('id')!r} {key}") * 1000.0
 
 
+@dataclass(frozen=True)
+class _ModelRole:
+    """One activated signal that the wallbox / EV model drives."""
+
+    owner: str  # "wallbox" | "ev"
+    owner_id: str
+    role: str  # key of the model's ``entities``
+
+
+def _pack_evs(house: dict[str, Any]) -> list[dict[str, Any]]:
+    """EV consumers of all house profiles, once per Kennung.
+
+    The same EV in several profiles must have the same charge data: the simulator has
+    one car per Kennung.
+    """
+    profiles = house.get("profiles") or {}
+    items = list(profiles.values()) if isinstance(profiles, dict) else list(profiles)
+    by_id: dict[str, dict[str, Any]] = {}
+    for profile in items:
+        if not isinstance(profile, dict):
+            continue
+        for consumer in profile.get("consumers") or []:
+            if str(consumer.get("type") or "") != "ev":
+                continue
+            ev_id = str(consumer.get("id") or "").strip()
+            known = by_id.get(ev_id)
+            if known is None:
+                by_id[ev_id] = consumer
+                continue
+            if any(known.get(k) != consumer.get(k) for k in _EV_MODEL_KEYS):
+                raise ValueError(
+                    f"EV {ev_id!r} has different charge data in two house profiles "
+                    f"({', '.join(_EV_MODEL_KEYS)}); the simulator models one car per Kennung"
+                )
+    return list(by_id.values())
+
+
+def _model_value(raw: dict[str, Any], key: str, where: str) -> Any:
+    if raw.get(key) in (None, ""):
+        raise ValueError(f"{where} has no {key}; the wallbox model needs it")
+    return raw[key]
+
+
+def _wallbox_model(
+    house: dict[str, Any],
+    components: dict[str, Any],
+    activated: set[str],
+    ev_initial_soc_pct: float,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, _ModelRole]]:
+    """``house_params`` wallboxes and EVs (entities still keyed by EHAL id) and the roles.
+
+    Every wallbox of ``components.wallboxes`` with an activated ``evcs.<id>.*`` model
+    signal is physical; a wallbox without ``set_evcs_max_current`` is read-only (it
+    charges at the pair maximum). Every EV of the pack is physical: cars are plugged in
+    with the simulator service ``car_arrives``. Missing charge data aborts.
+    """
+    roles: dict[str, _ModelRole] = {}
+    wallboxes: list[dict[str, Any]] = []
+    for raw in components.get("wallboxes") or []:
+        wb_id = str(raw.get("id") or "").strip()
+        where = f"wallbox {wb_id!r}"
+        mapped = {
+            f"evcs.{wb_id}.{kind}": role
+            for kind, role in _WALLBOX_ROLES.items()
+            if f"evcs.{wb_id}.{kind}" in activated
+        }
+        if not mapped:
+            continue
+        for ehal_id, role in mapped.items():
+            roles[ehal_id] = _ModelRole("wallbox", wb_id, role)
+        wallboxes.append(
+            {
+                "id": wb_id,
+                **{key: _model_value(raw, key, where) for key in _WALLBOX_MODEL_KEYS},
+                "read_only": "max_current" not in mapped.values(),
+                "entities": {role: ehal_id for ehal_id, role in mapped.items()},
+            }
+        )
+    evs: list[dict[str, Any]] = []
+    if not wallboxes:
+        return wallboxes, evs, roles
+    for raw in _pack_evs(house):
+        ev_id = str(raw.get("id") or "").strip()
+        where = f"EV {ev_id!r}"
+        mapped = {
+            f"ev.{ev_id}.{kind}": role
+            for kind, role in _EV_ROLES.items()
+            if f"ev.{ev_id}.{kind}" in activated
+        }
+        for ehal_id, role in mapped.items():
+            roles[ehal_id] = _ModelRole("ev", ev_id, role)
+        evs.append(
+            {
+                "id": ev_id,
+                "capacity_kwh": _model_value(raw, "battery_capacity_kwh", where),
+                "initial_soc_pct": float(ev_initial_soc_pct),
+                "min_current_a": _model_value(raw, "min_current_a", where),
+                "max_current_a": _model_value(raw, "max_current_a", where),
+                "phases": _model_value(raw, "phases", where),
+                "vehicle_id": str(raw.get("label") or ev_id),
+                "entities": {role: ehal_id for ehal_id, role in mapped.items()},
+            }
+        )
+    if not evs:
+        raise ValueError("the pack has wallbox signals but no EV; the wallbox model needs a car")
+    return wallboxes, evs, roles
+
+
+def _plug_state_object(ehal_id: str) -> dict[str, Any]:
+    """Plug state as a binary sensor (``on`` / ``off``); the carrier pushes it as 1 / 0."""
+    obj = _ha_state_object(ehal_id, write=False)
+    obj["entity_id"] = "binary_sensor." + obj["entity_id"].split(".", 1)[1]
+    obj["state"] = "off"
+    obj["attributes"] = {
+        "friendly_name": obj["attributes"]["friendly_name"],
+        "device_class": "plug",
+    }
+    return obj
+
+
 def generate_archetype(
     house: dict[str, Any],
     components: dict[str, Any],
@@ -346,6 +486,7 @@ def generate_archetype(
     initial_soc_pct: float = DEFAULT_INITIAL_SOC_PCT,
     static_overrides: dict[str, str] | None = None,
     pv_points: int = DEFAULT_PV_POINTS,
+    ev_initial_soc_pct: float = DEFAULT_INITIAL_SOC_PCT,
 ) -> GeneratedArchetype:
     """Build the archetype for a pack; raises ``ValueError`` on anything missing."""
     overrides = dict(static_overrides or {})
@@ -371,7 +512,21 @@ def generate_archetype(
         )
     if kwp > 0 and not pv_ids:
         raise ValueError("pack has PV systems but no inv.<id>.sens_inv_power_pv activated")
-    evcs_ids = sorted(s.ehal_id for s in reads if field_kind(s.ehal_id) == "sens_evcs_active_power")
+    if not 0.0 <= float(ev_initial_soc_pct) <= 100.0:
+        raise ValueError(f"EV initial SoC must be within 0..100 %, got {ev_initial_soc_pct!r}")
+    model_wallboxes, model_evs, model_roles = _wallbox_model(
+        house,
+        components,
+        {s.ehal_id for s in reads + writes},
+        ev_initial_soc_pct,
+    )
+    # Without a wallbox model (pack before data model 6) the first wallbox power is the
+    # flat physics field, as before.
+    evcs_ids = (
+        []
+        if model_wallboxes
+        else sorted(s.ehal_id for s in reads if field_kind(s.ehal_id) == "sens_evcs_active_power")
+    )
 
     physical: dict[str, str] = {}  # flat key → ehal_id
     battery_energy: dict[str, str] = {}  # charge/discharge → ehal_id
@@ -409,6 +564,18 @@ def generate_archetype(
 
     for sig in reads:
         ehal_id = sig.ehal_id
+        if ehal_id in model_roles:
+            if field_kind(ehal_id) in _PLUG_KINDS:
+                obj = _plug_state_object(ehal_id)
+            else:
+                obj = _ha_state_object(ehal_id, write=False)
+                obj["state"] = (
+                    _state(ev_initial_soc_pct)
+                    if model_roles[ehal_id].role == "soc"
+                    else "0.0"
+                )
+            _register(ehal_id, obj)
+            continue
         if ehal_id in physical_ids:
             obj = _ha_state_object(ehal_id, write=False)
             obj["state"] = _state(initial_soc_pct) if field_kind(ehal_id) == "sens_ess_soc" else "0.0"
@@ -429,7 +596,9 @@ def generate_archetype(
     for sig in writes:
         ehal_id, kind = sig.ehal_id, field_kind(sig.ehal_id)
         obj = _ha_state_object(ehal_id, write=True)
-        if ehal_id in physical_ids and kind == "set_ess_active_power":
+        if ehal_id in model_roles:
+            obj["state"] = "0.0"  # wallbox current setpoint (A): no charge until Earnie writes
+        elif ehal_id in physical_ids and kind == "set_ess_active_power":
             obj["state"] = "0.0"
         elif ehal_id in physical_ids:
             key = "battery_max_charge_power_kw" if "charge_power_limit" in kind and "discharge" not in kind else "battery_max_discharge_power_kw"
@@ -468,6 +637,15 @@ def generate_archetype(
         "load_kw": base_load,
         "initial_evcs_power_w": 0.0,
     }
+    if model_wallboxes:
+        house_params["wallboxes"] = [
+            {**w, "entities": {role: entity_by_ehal[eid] for role, eid in w["entities"].items()}}
+            for w in model_wallboxes
+        ]
+        house_params["evs"] = [
+            {**e, "entities": {role: entity_by_ehal[eid] for role, eid in e["entities"].items()}}
+            for e in model_evs
+        ]
     if battery_energy:
         house_params["battery_energy_entities"] = {
             direction: entity_by_ehal[eid] for direction, eid in battery_energy.items()
@@ -487,6 +665,10 @@ def generate_archetype(
         "source_pack_sha256": pack_sha256(house, components),
         "physical": {flat: {"ehal_id": eid, "entity_id": entity_by_ehal[eid]} for flat, eid in sorted(physical.items())},
         "physical_battery_energy": {d: entity_by_ehal[e] for d, e in sorted(battery_energy.items())},
+        "physical_wallboxes": {
+            eid: {"owner": r.owner, "id": r.owner_id, "role": r.role, "entity_id": entity_by_ehal[eid]}
+            for eid, r in sorted(model_roles.items())
+        },
         "static_signals": sorted(static_signals, key=lambda s: s["ehal_id"]),
         "params": {
             "battery_capacity_kwh": {"value": capacity, "source": capacity_src},
@@ -499,11 +681,21 @@ def generate_archetype(
                 "inverter_signal": pv_ids[0] if pv_ids else None,
             },
             "ess_fallback": "self_consumption" if self_consumption else None,
+            "ev_initial_soc_pct": (
+                {"value": float(ev_initial_soc_pct), "source": "argument"} if model_evs else None
+            ),
         },
         "notes": [
             "Static reads are number entities: S4 serves static values from numbers only.",
             "Setpoints are numbers (carrier writes via number.set_value); switch/select setpoints are not modelled.",
-            "Wallboxes beyond the first and all non-physical signals are static; consumer loads are not simulated.",
+            (
+                "Wallboxes of components.wallboxes and all EVs use the wallbox model "
+                "(current setpoint, charge power, plug state, car SoC); cars are plugged in "
+                "with the service car_arrives(wallbox=<Kennung>, ev=<Kennung>)."
+                if model_wallboxes
+                else "Wallboxes beyond the first are static (pack without components.wallboxes)."
+            ),
+            "All non-physical signals are static; consumer loads are not simulated.",
         ],
     }
 

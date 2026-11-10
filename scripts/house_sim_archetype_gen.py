@@ -33,6 +33,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--battery-kwh", type=float, help="battery capacity (default: components.json)")
     parser.add_argument("--load-kw", type=float, help="base load (default: profile annual_kwh / 8760)")
     parser.add_argument("--initial-soc", type=float, default=DEFAULT_INITIAL_SOC_PCT)
+    parser.add_argument(
+        "--ev-initial-soc",
+        type=float,
+        default=DEFAULT_INITIAL_SOC_PCT,
+        help="start SoC of every simulated EV (wallbox model, data model 6)",
+    )
     parser.add_argument("--pv-points", type=int, default=DEFAULT_PV_POINTS)
     parser.add_argument(
         "--static",
@@ -50,6 +56,7 @@ def main(argv: list[str] | None = None) -> int:
             battery_kwh=args.battery_kwh,
             load_kw=args.load_kw,
             initial_soc_pct=args.initial_soc,
+            ev_initial_soc_pct=args.ev_initial_soc,
             static_overrides=_parse_static(args.static),
             pv_points=args.pv_points,
         )
