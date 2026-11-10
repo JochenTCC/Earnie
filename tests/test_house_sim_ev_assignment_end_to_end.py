@@ -18,7 +18,7 @@ import pytest
 
 import config
 from house_config.ha_ehal_bindings import aggregate_ha_entities
-from house_config.wallboxes import normalize_wallbox, resolve_dynamic_ev_view
+from house_config.wallboxes import VIEW_POOL_KEY, normalize_wallbox, resolve_dynamic_ev_view
 from house_sim.archetype import load_archetype
 from house_sim.contract import build_contract
 from house_sim.core.physics import ScenarioOverlay
@@ -209,11 +209,21 @@ def _start(bench: Bench) -> None:
     eal.tick(T0 + timedelta(seconds=5))
 
 
+def _pools() -> dict[str, list[str]]:
+    """Pool wallboxes of every planned dynamic EV that is not assigned."""
+    return {
+        str(c["id"]): c[VIEW_POOL_KEY]
+        for c in config.get_flexible_consumers()
+        if VIEW_POOL_KEY in c
+    }
+
+
 def test_plug_match_assigns_and_the_plan_follows_the_wallbox(monkeypatch):
     bench = Bench(monkeypatch, policies={"lp1": "off", "lp2": "off"})
     _start(bench)
     assert bench.current(1) == pytest.approx(0.0)
-    assert config.get_flexible_consumers() == []  # no car assigned → none planned
+    # No car assigned: every car is planned against the pool of free wallboxes (M4, D8).
+    assert _pools() == {"car_a": ["lp1", "lp2"], "car_b": ["lp1", "lp2"], "car_c": ["lp1", "lp2"]}
 
     bench.overlay.car_arrives(wallbox="lp1", ev="car_a")
     bench.sim()
@@ -224,7 +234,12 @@ def test_plug_match_assigns_and_the_plan_follows_the_wallbox(monkeypatch):
     assert bench.state("lp1").evidence == EVIDENCE_PLUG_MATCH
 
     planned = config.get_flexible_consumers()
-    assert [(c["id"], c["charger_id"]) for c in planned] == [("car_a", "lp1")]
+    assert [(c["id"], c.get("charger_id")) for c in planned] == [
+        ("car_a", "lp1"),
+        ("car_b", None),
+        ("car_c", None),
+    ]
+    assert _pools() == {"car_b": ["lp2"], "car_c": ["lp2"]}
     rows = bench.cycle_writes({"car_a": 6.9})  # 10 A × 230 V × 3
     fields = {row["field"]: row["value"] for row in rows}
     assert fields["evcs.lp1.set_evcs_max_current"] == pytest.approx(10.0)
@@ -245,7 +260,7 @@ def test_plug_match_assigns_and_the_plan_follows_the_wallbox(monkeypatch):
     bench.sim()
     eal.tick(T0 + timedelta(seconds=400))
     assert bench.state("lp1").status == STATUS_FREE
-    assert config.get_flexible_consumers() == []
+    assert _pools() == {"car_a": ["lp1", "lp2"], "car_b": ["lp1", "lp2"], "car_c": ["lp1", "lp2"]}
 
 
 def test_ambiguous_plug_goes_to_the_test_charge_and_restart_rebinds(monkeypatch):
@@ -279,7 +294,8 @@ def test_ambiguous_plug_goes_to_the_test_charge_and_restart_rebinds(monkeypatch)
     # Daemon restart: assignments are dropped and found again (D7).
     bench.sim()
     eal.start()
-    assert config.get_flexible_consumers() == []
+    # After a start nothing is known: no assignment and no wallbox known to be free.
+    assert _pools() == {"car_a": [], "car_b": [], "car_c": []}
     eal.tick(T0 + timedelta(seconds=400))
     assert bench.state("lp1").status == STATUS_TESTING
     assert bench.state("lp1").plugged_at is None  # plugged before the start: no plug edge

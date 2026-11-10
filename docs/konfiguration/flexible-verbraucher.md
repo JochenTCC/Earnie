@@ -395,13 +395,21 @@ Im Hauskonfigurator werden Auto und Wallbox getrennt gepflegt:
 
 Innerhalb eines Hausprofils lädt eine Wallbox genau ein E-Auto; zwei E-Autos eines Profils an derselben Wallbox lehnt Earnie mit einer Meldung ab. Dasselbe E-Auto in mehreren Hausprofilen (kopierte Profile) nutzt dieselbe Wallbox. Die Lade-Bindings der Wallbox pflegt die Seite EHAL-Com wie bisher beim E-Auto.
 
-Im Live-Betrieb schreibt Earnie Ladestrom und Lademodus je E-Auto an dessen Wallbox, mit der Spannung der Wallbox und den Phasen des Paars. Die EHAL-IDs tragen dabei die Kennung des E-Autos (`evcs.<E-Auto>.set_evcs_max_current`). Schlägt das Schreiben an einer Wallbox fehl, schreibt Earnie an die übrigen weiter. Unter OpenEMS steht die Komponente je Wallbox im Binding `set_evcs_max_current` (`<Komponente>/SetChargePowerLimit`, z.B. `evcs0/SetChargePowerLimit`); eine Wallbox ohne diese Adresse wird nicht geschrieben.
+Im Live-Betrieb schreibt Earnie Ladestrom und Lademodus je E-Auto an dessen Wallbox, mit der Spannung der Wallbox und den Phasen des Paars. Die EHAL-IDs tragen dabei die Kennung der Wallbox (`evcs.<Wallbox>.set_evcs_max_current`). Nach der Migration hat jede Wallbox die Kennung ihres E-Autos, die IDs bleiben dort also gleich. Schlägt das Schreiben an einer Wallbox fehl, schreibt Earnie an die übrigen weiter. Unter OpenEMS steht die Komponente je Wallbox im Binding `set_evcs_max_current` (`<Komponente>/SetChargePowerLimit`, z.B. `evcs0/SetChargePowerLimit`); eine Wallbox ohne diese Adresse wird nicht geschrieben.
 
 Ein importiertes E-Auto (Loxone-Import) bekommt beim Speichern eine eigene Wallbox mit seiner Kennung.
 
 ### Dynamische Zuordnung: mehrere Autos, mehrere Wallboxen
 
-Ein E-Auto mit **Wallbox-Zuordnung: Dynamisch** hat keine feste Wallbox, sondern eine Liste **Erlaubte Wallboxen**. Earnie findet selbst heraus, an welcher Wallbox es steckt, und plant es erst dann, mit dem Ladebereich dieses Paars. Solange ein dynamisches Auto keiner Wallbox zugeordnet ist, plant Earnie es nicht.
+Ein E-Auto mit **Wallbox-Zuordnung: Dynamisch** hat keine feste Wallbox, sondern eine Liste **Erlaubte Wallboxen**. Earnie findet selbst heraus, an welcher Wallbox es steckt, und plant es dann mit dem Ladebereich dieses Paars.
+
+Solange ein dynamisches Auto keiner Wallbox zugeordnet ist, plant Earnie es nur mit **Prognose, wenn nicht angeschlossen**, und zwar gegen die Wallboxen, die gerade frei sind:
+
+- Es zählen nur erlaubte Wallboxen, an denen bei Planungsbeginn kein Auto steckt. Eine belegte Wallbox bleibt für den ganzen Planungshorizont belegt; nach dem Abstecken plant Earnie sofort neu.
+- Je Viertelstunde laden höchstens so viele dieser Autos, wie freie Wallboxen da sind, die sie nutzen dürfen, und zusammen nicht mehr als deren Höchstleistung. Welches Auto an welche Wallbox kommt, legt Earnie im Voraus nicht fest. Hat ein Auto die frühere Fertig-um-Zeit, bekommt es die günstigen Viertelstunden zuerst.
+- Geplant wird mit der kleinsten Höchstleistung unter den freien Wallboxen, die das Auto nutzen darf. Sobald es zugeordnet ist, gilt der Ladebereich des echten Paars.
+- Ist keine erlaubte Wallbox frei, plant Earnie das Auto nicht (Ladekontext „keine freie Wallbox“). Ohne Prognose wird ein nicht zugeordnetes Auto nicht geplant.
+- Für ein nicht zugeordnetes Auto sendet Earnie keine Sollwerte.
 
 Earnie rät nie. Es ordnet ein Auto nur mit einem dieser Belege zu, in dieser Reihenfolge:
 
@@ -427,9 +435,16 @@ Die Angabe ist Pflicht an jeder Wallbox, die ein dynamisches Auto nutzen darf. L
 
 - Eine Wallbox ist innerhalb eines Hausprofils entweder einem Auto fest zugeordnet oder für dynamische Autos freigegeben, nicht beides.
 - Jede Wallbox eines dynamischen Autos braucht das Binding `sens_evcs_connected`, sonst erkennt Earnie kein angestecktes Auto.
-- **Prognose, wenn nicht angeschlossen** ist bei dynamischen Autos noch nicht möglich (`forecast_when_absent: false`); der Hauskonfigurator schaltet sie ab.
 - Ein dynamisches Auto trägt keine Lade-Bindings; die stehen an den Wallboxen. Auf der Seite **EHAL-Com** hat jede solche Wallbox eine eigene Zeile (`evcs.<Wallbox>.*`), die Zeile des Autos zeigt nur die Auto-Felder.
-- Szenario-Explorer und Backtesting lehnen dynamische Autos in dieser Version mit einer Meldung ab.
+- Höchstens 8 Wallboxen, die sich dynamische Autos teilen, je zusammenhängender Gruppe.
+
+**Szenario-Explorer und Backtesting:** Dort gibt es kein Anstecken. Earnie ordnet deshalb einmal pro Lauf zu:
+
+- **Wer zuerst kommt, lädt zuerst:** Reihenfolge nach `car_available_from_hour` des Werktags-Plans, bei gleicher Ankunft nach Kennung.
+- Jedes Auto bekommt die erste Wallbox seiner Liste, deren Ladefenster (`car_available_from_hour` bis `ready_by_hour`) frei ist. Zwei Autos mit getrennten Fenstern können sich also eine Wallbox teilen.
+- Ein Auto ohne freie Wallbox wird nicht geladen.
+- Ergibt der Wochenend-Plan eine andere Zuordnung, bricht der Lauf mit einer Meldung ab.
+- Die Zuordnung steht vor dem Start im Scenario Explorer und im Lauf-Log.
 
 ## E-Auto: `charging_schedule`
 

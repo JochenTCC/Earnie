@@ -468,10 +468,7 @@ def _render_ev_charging_schedule(
 ) -> dict:
     forecast_key = _scoped_key(session_scope, f"hc_ev_forecast_{index}")
     forecast_opts: dict = {}
-    if dynamic:
-        # Planning ahead of a dynamic EV needs the wallbox pool (multi-EV M4).
-        st.session_state[forecast_key] = False
-    elif forecast_key not in st.session_state:
+    if forecast_key not in st.session_state:
         forecast_opts["value"] = bool(
             sched.get("forecast_when_absent", ev_schedule_default("forecast_when_absent"))
         )
@@ -495,9 +492,9 @@ def _render_ev_charging_schedule(
             "Prognose, wenn nicht angeschlossen",
             **forecast_opts,
             key=forecast_key,
-            disabled=dynamic,
             help=(
-                "Bei dynamischer Wallbox-Zuordnung noch nicht möglich."
+                "Lade-Prognose ohne Wallbox-Anschluss (charging_schedule). Bei dynamischer "
+                "Wallbox-Zuordnung plant Earnie das Auto an den Wallboxen, die gerade frei sind."
                 if dynamic
                 else "Lade-Prognose ohne Wallbox-Anschluss (charging_schedule). "
                 "Unabhängig vom Haus-Abwesenheitsmodus."

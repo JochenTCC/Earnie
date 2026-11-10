@@ -719,19 +719,26 @@ def write_evcs_max_current_from_consumers(
 def live_ev_consumers() -> list[dict]:
     """Live EV consumers as pairs with their wallbox (pair view, multi-EV M2).
 
-    Dynamic EVs appear only while assigned, with ``charger_id`` = their wallbox (M3).
+    Dynamic EVs appear only while assigned, with ``charger_id`` = their wallbox (M3); the pool
+    view of a dynamic EV that is not assigned has no charger and is left out (M4).
     """
-    return [c for c in config.get_flexible_consumers() if c.get("type") == "ev"]
+    from house_config.wallboxes import is_pool_ev
+
+    return [
+        c
+        for c in config.get_flexible_consumers()
+        if c.get("type") == "ev" and not is_pool_ev(c)
+    ]
 
 
 def live_charger_consumers() -> list[dict]:
-    """Every charger the adapters address: fixed pairs (``evcs.<EV>.*``) and every wallbox
-    open to dynamic EVs (``evcs.<Wallbox>.*``, multi-EV M3), assigned or not.
+    """Every charger the adapters address (``evcs.<Wallbox>.*``): the wallboxes of the fixed
+    pairs (M4) and every wallbox open to dynamic EVs (multi-EV M3), assigned or not.
     """
-    from house_config.wallboxes import VIEW_CHARGER_ID_KEY
+    from house_config.wallboxes import is_dynamic_ev
     from integrations.ev_assignment_live import dynamic_charger_consumers
 
-    fixed = [c for c in live_ev_consumers() if not c.get(VIEW_CHARGER_ID_KEY)]
+    fixed = [c for c in live_ev_consumers() if not is_dynamic_ev(c)]
     return fixed + dynamic_charger_consumers()
 
 

@@ -48,11 +48,9 @@ def test_migrate_ha_entities_ev_to_consumer():
     ev = house["profiles"]["live"]["consumers"][0]["ehal_bindings"]
     assert ev["sens_evcs_active_power"] == ""
     assert ev["set_evcs_max_current"] == ""
-    # Multi-EV M2: charger keys per EV, ``evcs.<Kennung>.<kind>``.
-    aggregated = aggregate_ha_entities(house)
-    assert aggregated["evcs.wallbox.sens_evcs_active_power"] == ""
-    assert aggregated["evcs.wallbox.set_evcs_max_current"] == ""
-    assert "set_evcs_max_current" not in aggregated
+    # The result is a pre-dm6 EV: dm6.wallboxes moves these keys to the wallbox, and the
+    # charger keys are aggregated from the loader view (multi-EV M4,
+    # test_wallbox_dynamic_assignment.test_fixed_pair_uses_the_wallbox_kennung_as_charger).
 
 
 def test_aggregate_activates_the_charger_keys_of_every_ev():
@@ -60,11 +58,18 @@ def test_aggregate_activates_the_charger_keys_of_every_ev():
         "profiles": {
             "live": {
                 "consumers": [
-                    {"id": "auto_a", "type": "ev", "ehal_bindings": {"set_evcs_max_current": ""}},
+                    # Loader views of fixed pairs: charger = the wallbox (M4).
+                    {
+                        "id": "auto_a",
+                        "type": "ev",
+                        "charger_id": "auto_a",
+                        "ehal_bindings": {"set_evcs_max_current": ""},
+                    },
                     {
                         "id": "auto_b",
                         "type": "ev",
-                        "ehal_bindings": {"evcs.auto_b.set_evcs_mode": ""},
+                        "charger_id": "wb_b",
+                        "ehal_bindings": {"evcs.wb_b.set_evcs_mode": ""},
                     },
                 ]
             }
@@ -72,7 +77,7 @@ def test_aggregate_activates_the_charger_keys_of_every_ev():
     }
     aggregated = aggregate_ha_entities(house)
     assert "evcs.auto_a.set_evcs_max_current" in aggregated
-    assert "evcs.auto_b.set_evcs_mode" in aggregated
+    assert "evcs.wb_b.set_evcs_mode" in aggregated
 
 
 def test_migrate_empty_only_does_not_overwrite_activation():

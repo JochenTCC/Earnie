@@ -1,6 +1,7 @@
 # simulation_engine.py
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from typing import NamedTuple
@@ -99,7 +100,13 @@ from simulation.engine_scenario import (  # noqa: F401  (re-exported)
     flex_consumers_for_backtesting_scenario,
     flex_consumers_from_snapshot,
     resolved_flexible_consumers,
+    scenario_ev_wallbox_lines,
 )
+
+logger = logging.getLogger(__name__)
+
+# SE result attribute: D9 lines "car → wallbox" of the run (multi-EV M4).
+EV_WALLBOX_ATTR = "ev_wallbox_assignment"
 
 
 
@@ -571,6 +578,11 @@ def run_simulation(
         all_chart_rows, all_timestamps, init.flexible_consumers
     )
     df_res.attrs[RUN_END_SOC_ATTR] = float(sim_soc)
+    ev_lines = scenario_ev_wallbox_lines(scenario_params)
+    if ev_lines:
+        # D9: which car charged where (multi-EV M4); the same for the whole run.
+        df_res.attrs[EV_WALLBOX_ATTR] = ev_lines
+        logger.info("Simulation: Wallbox-Zuordnung (D9): %s", "; ".join(ev_lines))
     cbc_events = take_cbc_events() if collect_cbc else []
     return df_res, plausibility, cbc_events
 

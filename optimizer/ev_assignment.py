@@ -149,6 +149,10 @@ class AssignmentEngine:
             if s.status == STATUS_ASSIGNED and s.ev_id
         }
 
+    def free_wallboxes(self) -> list[str]:
+        """Wallboxes in state ``free`` (the pool of the EVs that are not assigned, M4 / D8)."""
+        return sorted(wid for wid, s in self.states.items() if s.status == STATUS_FREE)
+
     def candidates(self, wallbox_id: str, ev_obs: dict[str, EvObservation]) -> list[str]:
         """Cars that may be at ``wallbox_id``: allowed there, not assigned elsewhere, and not
         reporting "not plugged" through their own plug sensor."""

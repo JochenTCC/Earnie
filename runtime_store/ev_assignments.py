@@ -1,10 +1,11 @@
 """Live EV ↔ wallbox assignments of the daemon and their files (multi-EV M3, D7).
 
-- **Overlay:** the daemon installs the current assignments (EV id → wallbox id) with
-  :func:`set_live_assignments`. :func:`apply_live_assignments` then gives every dynamic EV the
-  view of its wallbox pair, or drops it while it is not assigned (it is not planned until
-  then). Outside the daemon (UI, Scenario Explorer, tests) no overlay is installed and the
-  loader view is returned unchanged.
+- **Overlay:** the daemon installs the current assignments (EV id → wallbox id) and the free
+  wallboxes with :func:`set_live_assignments`. :func:`apply_live_assignments` then gives every
+  dynamic EV the view of its wallbox pair, or, while it is not assigned, the pool view of the
+  free wallboxes it may use (multi-EV M4, D8; the MILP plans those EVs as a pool). Outside the
+  daemon (UI, Scenario Explorer, tests) no overlay is installed and the loader view is
+  returned unchanged.
 - ``runtime/ev_assignments.json``: the engine's snapshot, written on every change, for the
   Monitor page and the cycle record. Never read back as truth: the daemon starts empty.
 - ``runtime/ev_assignment_picks.json``: pick requests of the Monitor page (user evidence,
@@ -16,7 +17,7 @@ import json
 import os
 import threading
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Iterable
 
 ASSIGNMENTS_FILENAME = "ev_assignments.json"
 PICKS_FILENAME = "ev_assignment_picks.json"
@@ -24,13 +25,17 @@ SCHEMA_VERSION = 1
 
 _lock = threading.Lock()
 _live: dict[str, str] | None = None
+_free: tuple[str, ...] = ()
 
 
-def set_live_assignments(assignments: dict[str, str] | None) -> None:
-    """Install the daemon's assignments (``None`` removes the overlay)."""
-    global _live
+def set_live_assignments(
+    assignments: dict[str, str] | None, *, free_wallbox_ids: Iterable[str] = ()
+) -> None:
+    """Install the daemon's assignments and free wallboxes (``None`` removes the overlay)."""
+    global _live, _free
     with _lock:
         _live = dict(assignments) if assignments is not None else None
+        _free = tuple(sorted(str(w) for w in free_wallbox_ids)) if assignments is not None else ()
 
 
 def live_assignments() -> dict[str, str] | None:
@@ -38,13 +43,23 @@ def live_assignments() -> dict[str, str] | None:
         return dict(_live) if _live is not None else None
 
 
+def live_free_wallboxes() -> tuple[str, ...]:
+    with _lock:
+        return _free
+
+
 def apply_live_assignments(consumers: list[dict]) -> list[dict]:
     """Consumers with the daemon's overlay applied to dynamic EVs (see module doc)."""
-    from house_config.wallboxes import assigned_dynamic_ev_view, is_dynamic_ev
+    from house_config.wallboxes import (
+        assigned_dynamic_ev_view,
+        is_dynamic_ev,
+        pool_dynamic_ev_view,
+    )
 
     current = live_assignments()
     if current is None:
         return consumers
+    free = live_free_wallboxes()
     out: list[dict] = []
     for consumer in consumers:
         if str(consumer.get("type") or "") != "ev" or not is_dynamic_ev(consumer):
@@ -53,6 +68,8 @@ def apply_live_assignments(consumers: list[dict]) -> list[dict]:
         wallbox_id = current.get(str(consumer.get("id") or ""))
         if wallbox_id:
             out.append(assigned_dynamic_ev_view(consumer, wallbox_id))
+        else:
+            out.append(pool_dynamic_ev_view(consumer, free))
     return out
 
 

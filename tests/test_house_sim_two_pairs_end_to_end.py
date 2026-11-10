@@ -37,6 +37,9 @@ def _ev(ev_id: str, *, phases: int) -> dict:
         "id": ev_id,
         "label": ev_id,
         "type": "ev",
+        # Charger = its wallbox (same Kennung, as after dm6.wallboxes; M4).
+        "charger_id": ev_id,
+        "wallbox_assignment": {"mode": "fixed", "wallbox_id": ev_id},
         # Pair limits 6–16 A at 230 V (resolve_ev_pair).
         "nominal_power_kw": 16 * 230.0 * phases / 1000.0,
         "min_power_kw": 6 * 230.0 * phases / 1000.0,

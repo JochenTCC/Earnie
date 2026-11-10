@@ -111,32 +111,35 @@ def consumer_namespace(consumer_id: str, consumer_type: str = "", kind: str = ""
 
 
 def qualified_consumer_id(consumer_id: str, consumer_type: str, key: str) -> str:
-    """``<namespace>.<Kennung>.<kind>`` for a consumer binding key (any stored spelling)."""
+    """``<namespace>.<Kennung>.<kind>`` for a consumer binding key (any stored spelling).
+
+    A charger key that already names its wallbox (``evcs.<Wallbox>.<kind>``) keeps that
+    Kennung: an EV's view carries the bindings of its wallbox (multi-EV M4).
+    """
+    if consumer_type == "ev" and evcs_field_kind(key):
+        return str(key).strip()
     kind = field_kind(key)
     slug = flex_ehal_slug(consumer_id)
     return f"{consumer_namespace(consumer_id, consumer_type, kind)}.{slug}.{kind}"
 
 
-def charger_id_for_ev(consumer_id: str) -> str:
-    """Kennung in ``evcs.<Kennung>.*`` of a fixed EV ↔ wallbox pair.
-
-    Until the dynamic assignment (multi-EV M4) the charger IDs stay keyed by the EV, as the
-    pair view of the loader shows them (``house_config.wallboxes.resolve_ev_pair``).
-    """
-    return flex_ehal_slug(consumer_id)
-
-
 def charger_id_of_ev(consumer: dict) -> str:
-    """Charger Kennung of an EV view: ``charger_id`` when set, else the EV's own.
+    """Charger Kennung (``evcs.<Kennung>.*``) of an EV view or a charger entry.
 
-    A dynamic EV assigned to a wallbox carries ``charger_id`` = that wallbox (multi-EV M3,
-    ``house_config.wallboxes.assigned_dynamic_ev_view``); a fixed pair keeps the EV's
-    Kennung until M4.
+    EV views carry ``charger_id`` = their wallbox (fixed pairs: ``resolve_ev_pair``, M4;
+    assigned dynamic EVs: ``assigned_dynamic_ev_view``, M3). A charger entry of a wallbox
+    (``dynamic_charger_consumers``) is the wallbox itself, so its ``id``. An EV view without
+    a wallbox (a dynamic EV that is not assigned) has no charger: ValueError.
     """
     explicit = str(consumer.get("charger_id") or "").strip()
     if explicit:
         return flex_ehal_slug(explicit)
-    return charger_id_for_ev(str(consumer.get("id") or ""))
+    if consumer.get("wallbox_assignment") is None and consumer.get("wallbox"):
+        return flex_ehal_slug(str(consumer.get("id") or ""))
+    raise ValueError(
+        f"E-Auto '{consumer.get('id')}': keine Wallbox zugeordnet — kein Ladepunkt "
+        "(evcs.<Wallbox>.*) zum Lesen oder Schreiben."
+    )
 
 
 def qualified_charger_id(charger_id: str, key: str) -> str:

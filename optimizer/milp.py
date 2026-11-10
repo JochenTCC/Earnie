@@ -45,6 +45,7 @@ from .milp_horizon import (
     _terminal_soc_energy_kwh,
 )
 from .import_power_limit import ImportCaps
+from .milp_ev_pool import add_ev_pool_constraints
 from .milp_import_cap import add_import_cap_constraints
 from .milp_vendor_mode import add_vendor_mode_export_constraints, plan_vendor_mode_enabled
 from .milp_result import (
@@ -217,6 +218,7 @@ def _add_flex_side_constraints(
         consumer_continue_on,
         filter_contexts=inputs.filters,
     )
+    add_ev_pool_constraints(model)
     window = matrix[: inputs.horizon]
     add_thermal_flex_constraints(
         model,

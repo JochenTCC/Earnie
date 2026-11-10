@@ -11,6 +11,7 @@ from optimizer.charging_context import (
     matrix_slot_datetime,
     schedule_indices_for_consumer,
 )
+from house_config.wallboxes import is_pool_ev
 from optimizer.consumer_power import power_limits_kw, uses_power_setpoint
 from optimizer.charging_schedule import charging_schedule_enabled
 from optimizer.slot_duration import DEFAULT_DT_H, validate_dt_h
@@ -408,6 +409,10 @@ def split_eauto_preset(
         params = milp_params_from_consumer(consumer)
         rem = remaining.get(cid, 0.0)
         ctx = charging_contexts.get(cid)
+        if is_pool_ev(consumer):
+            # Pool EVs (multi-EV M4): only the MILP sees the shared wallboxes (D8).
+            milp_consumers.append(consumer)
+            continue
         if logged and is_ev_milp_consumer(consumer):
             placement = ev_preset_horizon_placement(
                 matrix, consumer, rem, schedule_indices, ctx, params, dt_h=dt_h

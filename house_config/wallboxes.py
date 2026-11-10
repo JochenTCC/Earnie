@@ -6,14 +6,15 @@ phases and current range and ``wallbox_assignment``.
 
 :func:`resolve_ev_pair` builds the view the runtime code reads from the EV and its fixed
 wallbox: ``nominal_power_kw`` / ``min_power_kw`` of the pair, voltage and phases in
-``charging_schedule`` and the charger bindings merged into the EV's ``ehal_bindings``. Only the
+``charging_schedule``, ``charger_id`` = the wallbox and the wallbox's charger bindings under its
+own Kennung (``evcs.<Wallbox>.*``, M4) merged into the EV's ``ehal_bindings``. Only the
 new shape is stored; the view is never written back (:func:`split_ev_view`).
 
 A ``dynamic`` EV (multi-EV M3) has no wallbox of its own: the loader gives it the limits of
 the pair with the smallest maximum power among the wallboxes it may use (D8) and no charger
 bindings (:func:`resolve_dynamic_ev_view`). The live daemon replaces that view per cycle by the
-pair with the wallbox it was assigned to, or drops the EV while it is not assigned
-(``runtime_store.ev_assignments``).
+pair with the wallbox it was assigned to, or by the pool view of the free wallboxes while it is
+not assigned (:func:`pool_dynamic_ev_view`, ``runtime_store.ev_assignments``, M4).
 """
 from __future__ import annotations
 
@@ -49,8 +50,12 @@ VIEW_SCHEDULE_PHASES = "nominal_power_phases"
 VIEW_WALLBOX_KEY = "wallbox"
 # Dynamic EV view: the wallboxes it may use (normalized), runtime only.
 VIEW_DYNAMIC_KEY = "dynamic_wallboxes"
-# Charger Kennung of the view (``evcs.<charger_id>.*``): the wallbox for a dynamic EV.
+# Charger Kennung of the view (``evcs.<charger_id>.*``): the wallbox of the pair (M4: fixed
+# pairs too; migrated packs have wallbox Kennung = EV Kennung).
 VIEW_CHARGER_ID_KEY = "charger_id"
+# Live view of a dynamic EV that is not assigned (multi-EV M4, D8): the wallboxes it may use
+# that are free at the start of the horizon. The MILP plans these EVs as one pool per slot.
+VIEW_POOL_KEY = "pool_wallbox_ids"
 
 # kW of a pair = A × V × phases / 1000; the round trip kW → A → kW of a migrated pack must
 # give back the stored kW, so float noise below this precision is cut (not a unit rounding).
@@ -326,15 +331,16 @@ def pair_limits(ev: dict[str, Any], wallbox: dict[str, Any], *, label: str) -> d
     }
 
 
-def _charger_bindings_for_ev(wallbox: dict[str, Any], ev_id: str) -> dict[str, str]:
-    """Wallbox charger bindings keyed as the EV consumer's ``evcs.<EV>.*`` today."""
-    prefix = f"{NS_EVCS}.{wallbox['id']}."
-    out: dict[str, str] = {}
-    for key, value in (wallbox.get("ehal_bindings") or {}).items():
-        if key.startswith(prefix):
-            key = f"{NS_EVCS}.{ev_id}.{key[len(prefix):]}"
-        out[key] = value
-    return out
+def _charger_bindings_of(wallbox: dict[str, Any]) -> dict[str, str]:
+    """Charger bindings of a wallbox under its own Kennung (``evcs.<Wallbox>.<kind>``, M4).
+
+    A bare key (``set_evcs_max_current``) is qualified with the wallbox: on an EV's view it
+    would otherwise read as the EV's own (``evcs.<EV>.*``).
+    """
+    return {
+        f"{NS_EVCS}.{wallbox['id']}.{field_kind(key)}": value
+        for key, value in (wallbox.get("ehal_bindings") or {}).items()
+    }
 
 
 def resolve_ev_pair(
@@ -358,7 +364,8 @@ def resolve_ev_pair(
         )
     _apply_pair_limits(spec, pair_limits(spec, wallbox, label=label))
     spec[VIEW_WALLBOX_KEY] = dict(wallbox)
-    merged = _charger_bindings_for_ev(wallbox, spec["id"])
+    spec[VIEW_CHARGER_ID_KEY] = wallbox_id
+    merged = _charger_bindings_of(wallbox)
     merged.update(spec.get("ehal_bindings") or {})
     if merged:
         spec["ehal_bindings"] = merged
@@ -383,14 +390,8 @@ def resolve_dynamic_ev_view(
     Every wallbox it may use must exist, share a current range with the car and carry an
     ``unknown_vehicle`` policy (D6). The limits are those of the pair with the smallest
     maximum power (D8: a car that is not plugged in; ties by wallbox Kennung). The live
-    daemon replaces this view by :func:`assigned_dynamic_ev_view` or drops the EV.
+    daemon replaces this view by :func:`assigned_dynamic_ev_view` or :func:`pool_dynamic_ev_view`.
     """
-    if spec["charging_schedule"].get("forecast_when_absent"):
-        raise ValueError(
-            f"{label}: ein dynamisch zugeordnetes E-Auto wird erst geplant, wenn es einer "
-            "Wallbox zugeordnet ist; charging_schedule.forecast_when_absent muss false sein "
-            "(Vorausplanen folgt mit der Pool-Planung)."
-        )
     bindings = spec.get("ehal_bindings") or {}
     charger = sorted(k for k in bindings if is_charger_binding_key(k))
     if charger:
@@ -445,10 +446,44 @@ def assigned_dynamic_ev_view(consumer: dict[str, Any], wallbox_id: str) -> dict[
     if not out["min_power_kw"]:
         out["min_power_kw"] = None  # MILP shape: no minimum (planning_ev_to_milp)
     out[VIEW_CHARGER_ID_KEY] = wallbox_id
-    merged = dict(wallbox.get("ehal_bindings") or {})
+    merged = _charger_bindings_of(wallbox)
     merged.update(consumer.get("ehal_bindings") or {})
     out["ehal_bindings"] = merged
     return out
+
+
+def wallbox_max_power_kw(wallbox: dict[str, Any]) -> float:
+    """Maximum power of a wallbox on its own (max current × voltage × phases)."""
+    kw = float(wallbox[EV_MAX_CURRENT_KEY]) * float(wallbox["voltage_v"]) * int(wallbox["phases"])
+    return round(kw / 1000.0, _KW_DIGITS)
+
+
+def pool_dynamic_ev_view(consumer: dict[str, Any], free_wallbox_ids) -> dict[str, Any]:
+    """Live view of a dynamic EV that is not assigned (a copy; M4, D8).
+
+    :data:`VIEW_POOL_KEY` lists the wallboxes it may use that are free; the limits are those
+    of the pair with the smallest maximum power among them (ties by wallbox Kennung). With no
+    free wallbox the list is empty and the loader limits stay: the charging context makes the
+    EV inactive (``optimizer.charging_resolve``). No charger: the EV is never written.
+    """
+    free = {str(w) for w in free_wallbox_ids}
+    usable = [dict(w) for w in consumer.get(VIEW_DYNAMIC_KEY) or [] if w["id"] in free]
+    out = dict(consumer)
+    out["charging_schedule"] = dict(consumer["charging_schedule"])
+    out[VIEW_POOL_KEY] = [w["id"] for w in usable]
+    if not usable:
+        return out
+    label = f"E-Auto '{consumer['id']}'"
+    smallest = min(usable, key=lambda w: (pair_limits(out, w, label=label)["max_power_kw"], w["id"]))
+    _apply_pair_limits(out, pair_limits(out, smallest, label=label))
+    if not out["min_power_kw"]:
+        out["min_power_kw"] = None  # MILP shape: no minimum (planning_ev_to_milp)
+    return out
+
+
+def is_pool_ev(consumer: dict[str, Any]) -> bool:
+    """True for the live view of a dynamic EV that is not assigned (:func:`pool_dynamic_ev_view`)."""
+    return VIEW_POOL_KEY in consumer
 
 
 def split_ev_view(consumer: dict[str, Any], out: dict[str, Any]) -> None:
@@ -461,6 +496,7 @@ def split_ev_view(consumer: dict[str, Any], out: dict[str, Any]) -> None:
     out.pop("min_power_kw", None)
     out.pop(VIEW_DYNAMIC_KEY, None)
     out.pop(VIEW_CHARGER_ID_KEY, None)
+    out.pop(VIEW_POOL_KEY, None)
     for key in (EV_PHASES_KEY, EV_MIN_CURRENT_KEY, EV_MAX_CURRENT_KEY):
         out[key] = consumer[key]
     out[WALLBOX_ASSIGNMENT_KEY] = dict(consumer[WALLBOX_ASSIGNMENT_KEY])
@@ -472,7 +508,7 @@ def split_ev_view(consumer: dict[str, Any], out: dict[str, Any]) -> None:
     if not isinstance(bindings, dict):
         return
     wallbox = consumer.get(VIEW_WALLBOX_KEY) or {}
-    expected = _charger_bindings_for_ev(wallbox, consumer["id"]) if wallbox else {}
+    expected = _charger_bindings_of(wallbox) if wallbox else {}
     kept: dict[str, str] = {}
     for key, value in bindings.items():
         if not is_charger_binding_key(key):
@@ -584,11 +620,16 @@ def check_wallbox_pairs(house: Any, wallbox: dict[str, Any]) -> None:
 
 
 def _wallbox_key(key: str, *, ev_id: str, wallbox_id: str) -> str:
-    """EV view key ``evcs.<EV>.<kind>`` → the wallbox's ``evcs.<Wallbox>.<kind>``."""
+    """EV key ``evcs.<EV>.<kind>`` (an importer's or a pre-M4 editor's) → ``evcs.<Wallbox>.<kind>``."""
     prefix = f"{NS_EVCS}.{ev_id}."
     if key.startswith(prefix):
         return f"{NS_EVCS}.{wallbox_id}.{key[len(prefix):]}"
     return key
+
+
+def _drop_kind(bindings: dict[str, str], kind: str) -> None:
+    for key in [k for k in bindings if field_kind(k) == kind]:
+        bindings.pop(key)
 
 
 def _route_one_ev(
@@ -606,6 +647,7 @@ def _route_one_ev(
     # The view's wallbox limits are edited on the wallbox, never written back from here;
     # its bindings are what the view showed (the base of the binding diff below).
     view_wallbox = item.pop(VIEW_WALLBOX_KEY, None) or {}
+    item.pop(VIEW_CHARGER_ID_KEY, None)
     voltage = item.pop(WALLBOX_VOLTAGE_FORM_KEY, None)
     if is_view:
         # Pair view keys (resolve_ev_pair); the stored EV has currents only.
@@ -654,13 +696,16 @@ def _route_one_ev(
                     f"'{view_wallbox.get('id')}', das E-Auto ist aber Wallbox '{wallbox_id}' "
                     "zugeordnet."
                 )
-            shown = dict(view_wallbox.get("ehal_bindings") or {})
+            # The view shows them qualified (``evcs.<Wallbox>.*``); a stored bare key of the
+            # same kind stays as it is unless its value changed.
+            shown = _charger_bindings_of(view_wallbox)
             for key, value in charger.items():
                 if shown.get(key) != value:
+                    _drop_kind(stored, field_kind(key))
                     stored[key] = value
             for key in shown:
                 if key not in charger:
-                    stored.pop(key, None)
+                    _drop_kind(stored, field_kind(key))
         else:
             stored.update(charger)
         entry["ehal_bindings"] = stored

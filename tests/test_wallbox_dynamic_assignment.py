@@ -6,12 +6,14 @@ import pytest
 from house_config.wallboxes import (
     VIEW_CHARGER_ID_KEY,
     VIEW_DYNAMIC_KEY,
+    VIEW_POOL_KEY,
     _route_one_ev,
     assigned_dynamic_ev_view,
     assigned_wallbox_id,
     dynamic_charger_consumers,
     normalize_wallbox,
     normalize_wallbox_assignment,
+    pool_dynamic_ev_view,
     reject_shared_fixed_wallboxes,
     resolve_dynamic_ev_view,
     serialize_wallbox,
@@ -97,11 +99,11 @@ def test_loader_view_uses_the_smallest_wallbox_and_no_charger_bindings() -> None
     assert assigned_wallbox_id(spec) == ""
 
 
-def test_loader_view_rejects_what_m3_cannot_do() -> None:
-    with pytest.raises(ValueError, match="forecast_when_absent"):
-        resolve_dynamic_ev_view(
-            _ev(charging_schedule={"forecast_when_absent": True}), WALLBOXES, label="car_a"
-        )
+def test_loader_view_rejects_invalid_dynamic_evs() -> None:
+    # Planning ahead is allowed since the pool planning (M4, D8).
+    ahead = _ev(charging_schedule={"forecast_when_absent": True})
+    resolve_dynamic_ev_view(ahead, WALLBOXES, label="car_a")
+    assert ahead["charging_schedule"]["forecast_when_absent"] is True
     with pytest.raises(ValueError, match="Lade-Bindings"):
         resolve_dynamic_ev_view(
             _ev(ehal_bindings={"set_evcs_max_current": ""}), WALLBOXES, label="car_a"
@@ -159,7 +161,7 @@ def test_dynamic_charger_consumers_from_file_shape() -> None:
         dynamic_charger_consumers(house, {"wallboxes": []})
 
 
-def test_overlay_plans_only_assigned_dynamic_evs() -> None:
+def test_overlay_plans_assigned_evs_as_pairs_and_the_others_as_pool() -> None:
     spec = _ev(name="car_a")
     resolve_dynamic_ev_view(spec, WALLBOXES, label="car_a")
     fixed = {"id": "car_b", "type": "ev"}
@@ -167,10 +169,17 @@ def test_overlay_plans_only_assigned_dynamic_evs() -> None:
         store.set_live_assignments(None)
         assert store.apply_live_assignments([spec, fixed]) == [spec, fixed]
         store.set_live_assignments({})
-        assert store.apply_live_assignments([spec, fixed]) == [fixed]
+        pool, kept = store.apply_live_assignments([spec, fixed])
+        assert (pool[VIEW_POOL_KEY], kept) == ([], fixed)
+        store.set_live_assignments({}, free_wallbox_ids=["wb_big"])
+        pool, _ = store.apply_live_assignments([spec, fixed])
+        assert pool[VIEW_POOL_KEY] == ["wb_big"]
+        assert pool["nominal_power_kw"] == pytest.approx(16 * 230 * 3 / 1000)
+        assert VIEW_CHARGER_ID_KEY not in pool
         store.set_live_assignments({"car_a": "wb_big"})
         planned = store.apply_live_assignments([spec, fixed])
         assert [c.get(VIEW_CHARGER_ID_KEY) for c in planned] == ["wb_big", None]
+        assert VIEW_POOL_KEY not in planned[0]
     finally:
         store.set_live_assignments(None)
 
@@ -185,9 +194,42 @@ def test_pick_requests_are_consumed_once(tmp_path, monkeypatch) -> None:
     assert store.consume_picks() == []
 
 
-def test_simulation_rejects_dynamic_evs() -> None:
-    from simulation.engine_scenario import _reject_dynamic_evs
+def test_fixed_pair_uses_the_wallbox_kennung_as_charger() -> None:
+    """Multi-EV M4: a fixed pair is addressed as ``evcs.<Wallbox>.*`` like a dynamic one."""
+    from ehal.qualified_ids import charger_id_of_ev, qualified_consumer_id
+    from house_config.ha_ehal_bindings import aggregate_ha_entities
+    from house_config.wallboxes import resolve_ev_pair
 
-    with pytest.raises(ValueError, match="dynamischer Wallbox-Zuordnung"):
-        _reject_dynamic_evs([_ev()])
-    assert _reject_dynamic_evs([{"id": "car_b", "type": "ev"}]) == [{"id": "car_b", "type": "ev"}]
+    wallbox = _wallbox("garage")
+    wallbox["ehal_bindings"] = {"set_evcs_max_current": "", "evcs.garage.sens_evcs_connected": ""}
+    spec = _ev(
+        wallbox_assignment={"mode": "fixed", "wallbox_id": "garage"},
+        ehal_bindings={"ev.car_a.sens_evcs_soc_act": ""},
+    )
+    resolve_ev_pair(spec, {"garage": wallbox}, label="car_a")
+    assert spec[VIEW_CHARGER_ID_KEY] == "garage"
+    assert charger_id_of_ev(spec) == "garage"
+    # A bare wallbox key is qualified with the wallbox, never with the EV.
+    assert spec["ehal_bindings"] == {
+        "evcs.garage.set_evcs_max_current": "",
+        "evcs.garage.sens_evcs_connected": "",
+        "ev.car_a.sens_evcs_soc_act": "",
+    }
+    assert (
+        qualified_consumer_id("car_a", "ev", "evcs.garage.set_evcs_max_current")
+        == "evcs.garage.set_evcs_max_current"
+    )
+    house = {"profiles": {"p": {"consumers": [spec]}}}
+    aggregated = aggregate_ha_entities(house)
+    assert "evcs.garage.set_evcs_max_current" in aggregated
+    assert not any(key.startswith("evcs.car_a.") for key in aggregated)
+
+
+def test_an_ev_without_a_wallbox_has_no_charger() -> None:
+    from ehal.qualified_ids import charger_id_of_ev
+
+    spec = _ev()
+    resolve_dynamic_ev_view(spec, WALLBOXES, label="car_a")
+    pool = pool_dynamic_ev_view(spec, ["wb_big"])
+    with pytest.raises(ValueError, match="keine Wallbox zugeordnet"):
+        charger_id_of_ev(pool)

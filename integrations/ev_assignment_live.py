@@ -228,7 +228,7 @@ def tick(now: datetime | None = None, *, wake: bool = False) -> StepResult | Non
     )
     for write in result.writes:
         _write_test(write)
-    set_live_assignments(_engine.assignments())
+    set_live_assignments(_engine.assignments(), free_wallbox_ids=_engine.free_wallboxes())
     if result.changed:
         write_assignments_snapshot(_engine.snapshot(ev_obs), updated_at=stamp.isoformat())
         for row in _engine.snapshot(ev_obs):

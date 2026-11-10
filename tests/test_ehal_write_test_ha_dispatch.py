@@ -50,7 +50,7 @@ def ha_adapter(monkeypatch: pytest.MonkeyPatch) -> HaAdapter:
     monkeypatch.setattr(
         ehal_live,
         "live_ev_consumers",
-        lambda: [{"id": "e_auto", "type": "ev", "charging_schedule": {}}],
+        lambda: [{"id": "e_auto", "type": "ev", "charger_id": "e_auto", "charging_schedule": {}}],
     )
     return adapter
 

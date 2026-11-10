@@ -208,14 +208,19 @@ def _dispatch_probe_writes(clamped: dict[str, Any]) -> EhalWriteError | None:
 
 
 def _probe_charger_id(field: str) -> str:
-    """Charger Kennung of an EVCS probe: ``evcs.<Kennung>.<kind>`` or ``<EV id>:<kind>``."""
-    from ehal.qualified_ids import charger_id_for_ev, evcs_field_kind
+    """Charger Kennung of an EVCS probe: ``evcs.<Kennung>.<kind>`` or ``<EV id>:<kind>``
+    (the EV's wallbox, multi-EV M4)."""
+    from ehal.qualified_ids import charger_id_of_ev, evcs_field_kind
 
     raw = str(field or "").strip()
     if evcs_field_kind(raw):
         return raw.split(".")[1]
     if ":" in raw:
-        return charger_id_for_ev(raw.split(":", 1)[0].strip())
+        ev_id = raw.split(":", 1)[0].strip()
+        ev = next((c for c in live.ehal_live.live_ev_consumers() if c.get("id") == ev_id), None)
+        if ev is None:
+            raise ValueError(f"Schreibtest {raw!r}: kein E-Auto {ev_id!r} mit Wallbox.")
+        return charger_id_of_ev(ev)
     raise ValueError(
         f"Schreibtest {raw!r}: Ladepunkt fehlt – EVCS-Felder als evcs.<Kennung>.<Feld> wählen."
     )

@@ -2001,6 +2001,8 @@ def test_dynamic_ev_loads_with_a_view_and_keeps_its_wallboxes_for_the_live_overl
     assert [w["id"] for w in milp[VIEW_DYNAMIC_KEY]] == ["wb_1", "wb_2"]
     assert milp["phases"] == ev["phases"]
 
+    # Planning ahead against the free wallboxes (M4, D8).
     consumer["charging_schedule"]["forecast_when_absent"] = True
-    with pytest.raises(ValueError, match="forecast_when_absent muss false"):
-        normalize_house_profiles_document(doc, wallboxes=wallbox_catalog(*boxes))
+    loaded = normalize_house_profiles_document(doc, wallboxes=wallbox_catalog(*boxes))
+    ev = loaded["profiles"]["ev_profile"]["consumers"][0]
+    assert ev["charging_schedule"]["forecast_when_absent"] is True

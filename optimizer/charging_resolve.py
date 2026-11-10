@@ -25,6 +25,7 @@ from optimizer.ev_connect_prognosis import (
     resolve_absent_availability,
     resolve_connect_prognosis,
 )
+from house_config.wallboxes import VIEW_POOL_KEY, is_pool_ev
 from settings.ehal_marker_resolve import marker_sens_evcs_connected
 from settings.flexible_consumers import flex_kw_lookup
 from optimizer.charging_urgent import urgent_min_kwh_from_soc
@@ -162,11 +163,14 @@ def fetch_loxone_charging_context(
     open_cycle_deadline: datetime | None = None,
 ) -> dict:
     sched = consumer.get("charging_schedule") or {}
-    plug_name = marker_sens_evcs_connected(consumer)
-    plugged_val = (
-        ehal_live.read_generic_value(plug_name) if plug_name else None
-    )
-    plugged_in = plugged_val is not None and int(round(float(plugged_val))) == 1
+    if is_pool_ev(consumer):
+        plugged_in = False  # not assigned: at no wallbox yet (multi-EV M4, D8)
+    else:
+        plug_name = marker_sens_evcs_connected(consumer)
+        plugged_val = (
+            ehal_live.read_generic_value(plug_name) if plug_name else None
+        )
+        plugged_in = plugged_val is not None and int(round(float(plugged_val))) == 1
     if not plugged_in:
         if sched.get("forecast_when_absent"):
             return _loxone_absent_forecast_context(
@@ -251,11 +255,14 @@ def _config_path_with_plugged_in(
     open_cycle_deadline: datetime | None = None,
 ) -> dict:
     """Attach Loxone plugged_in; suppress live output when absent (anticipated)."""
-    plug_name = marker_sens_evcs_connected(consumer)
-    if not plug_name:
-        return result
-    plugged_val = ehal_live.read_generic_value(plug_name)
-    plugged_in = plugged_val is not None and int(round(float(plugged_val))) == 1
+    if is_pool_ev(consumer):
+        plugged_in = False  # not assigned: at no wallbox yet (multi-EV M4, D8)
+    else:
+        plug_name = marker_sens_evcs_connected(consumer)
+        if not plug_name:
+            return result
+        plugged_val = ehal_live.read_generic_value(plug_name)
+        plugged_in = plugged_val is not None and int(round(float(plugged_val))) == 1
     if plugged_in:
         out = dict(result)
         out["plugged_in"] = True
@@ -385,6 +392,10 @@ def resolve_charging_context(
         return {"active": True, "deadline": None, "target_kwh": None, "use_time_window": False}
     horizon_start = matrix_slot_datetime(matrix, 0)
     target_source = consumer.get("daily_target_source", "config")
+    if is_pool_ev(consumer) and not consumer[VIEW_POOL_KEY]:
+        return _loxone_inactive_context(
+            "dynamisch (keiner Wallbox zugeordnet, keine freie Wallbox)"
+        )
     if logged_simulation or target_source == "historical":
         return historical_charging_context(
             consumer,

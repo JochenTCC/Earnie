@@ -20,6 +20,7 @@ EV = {
     "id": "e_auto",
     "name": "E-Auto",
     "type": "ev",
+    "charger_id": "e_auto",  # the pair view's wallbox (resolve_ev_pair, M4)
     "nominal_power_kw": 11.0,
     "min_power_kw": 1.4,
     "max_power_kw": 11.0,
@@ -131,10 +132,10 @@ def test_mode_is_not_published_when_not_activated(ha_cycle) -> None:
 def test_two_evs_each_write_their_own_charger(monkeypatch: pytest.MonkeyPatch) -> None:
     """Multi-EV M2: one write per EV ↔ wallbox pair, with the pair's own voltage / phases."""
     adapter = _adapter(mode_activated=True, chargers=("auto_a", "auto_b"))
-    three_phase = dict(EV, id="auto_b", charging_schedule={
+    three_phase = dict(EV, id="auto_b", charger_id="auto_b", charging_schedule={
         "nominal_power_voltage_v": 230.0, "nominal_power_phases": 3,
     })
-    one_phase = dict(EV, id="auto_a", charging_schedule={
+    one_phase = dict(EV, id="auto_a", charger_id="auto_a", charging_schedule={
         "nominal_power_voltage_v": 230.0, "nominal_power_phases": 1,
     })
     monkeypatch.setattr(ehal_live, "is_ha_backend", lambda: True)

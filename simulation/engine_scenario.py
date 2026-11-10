@@ -22,26 +22,33 @@ def _scenario_base_consumers(scenario_params: dict, *, optimizer_only: bool) -> 
 
 
 def _flexible_consumers_from_scenario(scenario_params: dict | None) -> list:
-    from house_config.planning_flex_bridge import merge_flexible_consumers
+    """Optimizer consumers of a scenario; dynamic EVs assigned by D9 (multi-EV M4)."""
+    from simulation.ev_wallbox_fcfs import assign_dynamic_evs_fcfs
 
     if not scenario_params:
-        return _reject_dynamic_evs(config.get_flexible_consumers(optimizer_only=True))
+        return assign_dynamic_evs_fcfs(config.get_flexible_consumers(optimizer_only=True))
+    return assign_dynamic_evs_fcfs(_scenario_planning_consumers(scenario_params))
+
+
+def _scenario_planning_consumers(scenario_params: dict) -> list:
+    """Optimizer consumers of a scenario before the D9 assignment of dynamic EVs."""
+    from house_config.planning_flex_bridge import merge_flexible_consumers
+
     base = _scenario_base_consumers(scenario_params, optimizer_only=True)
     planning = scenario_params.get("_planning_flex_consumers") or []
-    return _reject_dynamic_evs(merge_flexible_consumers(base, planning))
+    return merge_flexible_consumers(base, planning)
 
 
-def _reject_dynamic_evs(consumers: list) -> list:
-    """The simulation has no plug events: dynamic EVs need the D9 rule (multi-EV M4)."""
-    from house_config.wallboxes import is_dynamic_ev
+def scenario_ev_wallbox_lines(scenario_params: dict | None) -> list[str]:
+    """German D9 lines (which car charges where) of a scenario; ``[]`` without dynamic EVs."""
+    from simulation.ev_wallbox_fcfs import describe_fcfs, fcfs_assignment
 
-    dynamic = sorted(str(c.get("id")) for c in consumers if is_dynamic_ev(c))
-    if dynamic:
-        raise ValueError(
-            f"Simulation: E-Autos mit dynamischer Wallbox-Zuordnung ({', '.join(dynamic)}) "
-            "werden im Scenario Explorer und im Backtesting noch nicht unterstützt."
-        )
-    return consumers
+    consumers = (
+        _scenario_planning_consumers(scenario_params)
+        if scenario_params
+        else config.get_flexible_consumers(optimizer_only=True)
+    )
+    return describe_fcfs(fcfs_assignment(consumers))
 
 
 def resolved_flexible_consumers(

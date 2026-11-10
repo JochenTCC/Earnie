@@ -1,6 +1,6 @@
 # Multiple EVs and wallboxes, HouseSim wallbox write-back: design and implementation plan
 
-**Status:** W1–W3 built and merged (2026-11-09); M1a, M1b, M2 and M3 built. Decisions D1–D10 accepted by the maintainer on 2026-11-09 (D2 in its revised form: limits as current on both devices). D11 follows from D1–D3. Branch `feat/multi-ev-wallbox` (first named `docs/multi-ev-wallbox-design`), based on `main` at `fda24a4e`.
+**Status:** W1–W3 built and merged (2026-11-09); M1a, M1b, M2, M3 and M4 built. Decisions D1–D10 accepted by the maintainer on 2026-11-09 (D2 in its revised form: limits as current on both devices). D11 follows from D1–D3. Branch `feat/multi-ev-wallbox` (first named `docs/multi-ev-wallbox-design`), based on `main` at `fda24a4e`.
 **Backlog items:** **Enable multiple EV / Wallboxes** and **HouseSim wallbox write-back** (both Version 2.+1). The write-back is the test bench for the assignment, so this plan covers both. Target release: not decided.
 
 ## Goal
@@ -162,6 +162,23 @@ Each phase is one chat session and ends with green tests and a commit. **W** = H
 - Pool constraints for dynamic EVs (D8) in the MILP, using the EVs' existing on-variables where they have them; plugged, assigned EVs planned with the limits of their pair (D2).
 - SE rule D9, and the result says which car charged where.
 - **Tests:** two dynamic cars, one wallbox: never both charging in one slot, the deadline that matters wins; three cars, two boxes; regression goldens unchanged for `fixed` packs.
+
+**M4 design agreed 2026-11-10** (maintainer, before the code):
+
+- **Occupied wallbox:** a wallbox that is not `free` in the engine at the start of the horizon (assigned, `plugged_unknown`, `testing`) stays out of the pool for the whole horizon; unplugging wakes a new plan. No assumption about departure times.
+- **SE (D9):** one assignment per run from the `weekday` block; a `weekend` block that gives another assignment stops the run with a German message.
+- **Pair view:** stays the derived planner input (never stored); the ~160 readers of `nominal_power_kw` are not rewritten. Only the charger Kennung of fixed pairs moves to the wallbox (`evcs.<Wallbox>.*`). This replaces "readers move to EV + wallbox in M4" (M2 note above).
+
+**M4 built 2026-11-10:**
+
+- Live overlay (`runtime_store.ev_assignments`): the engine's free wallboxes (`AssignmentEngine.free_wallboxes`) go with the assignments; a dynamic EV that is not assigned gets `pool_dynamic_ev_view` (`pool_wallbox_ids` = free allowed wallboxes, limits of the smallest free pair) instead of being dropped. Its charging context is never `plugged_in` (no plug read); `forecast_when_absent: true` → anticipated (connect prognosis), false → inactive; no free wallbox → inactive "keine freie Wallbox". The load no longer rejects `forecast_when_absent` on dynamic EVs; the EV form no longer disables it.
+- MILP (`optimizer/milp_ev_pool.py`): per slot and per group of EVs sharing free wallboxes, for every wallbox subset `U`: Σ on of the EVs that may use only `U` ≤ |U| (Hall's condition, so the charging cars always fit onto distinct wallboxes), and Σ power of the group ≤ Σ wallbox maximum power. Existing on-variables only, no new binaries; at most 8 wallboxes per group (fails loud above). Pool EVs never take the preset path (`split_eauto_preset`), so only the MILP places them.
+- Writes: pool EVs have no charger; `live_ev_consumers` leaves them out, `charger_id_of_ev` raises for them.
+- Charger Kennung: `resolve_ev_pair` sets `charger_id` = wallbox and merges the wallbox bindings as `evcs.<Wallbox>.<kind>` (bare wallbox keys qualified with the wallbox, also in `assigned_dynamic_ev_view`); `qualified_consumer_id` keeps an `evcs.<X>.*` key's Kennung; `charger_id_for_ev` is gone. Saving a view keeps a stored bare wallbox key unless its value changed. Migrated packs (wallbox Kennung = EV Kennung) keep every ID.
+- SE / backtesting (`simulation/ev_wallbox_fcfs.py`): D9 in `_flexible_consumers_from_scenario` (assigned EVs as pairs, an EV without free wallbox left out); the run log and `df.attrs["ev_wallbox_assignment"]` carry "car → wallbox"; the SE run panel shows the rule and the assignment per scenario before the start.
+- Tests: `tests/test_milp_ev_pool.py` (two cars / one wallbox incl. control without pool, three cars / two wallboxes, different wallbox lists, pool view, charging contexts), `tests/test_se_ev_wallbox_fcfs.py`, `tests/test_wallbox_dynamic_assignment.py` (fixed pair charger = wallbox, pool EV has no charger), HouseSim end to end with pool views. Full suite green, regression 12/12 unchanged.
+- **Solve time** (synthetic 36 h quarter-hour horizon on the test fixture config, anticipated cars with 20 kWh each, median of 5): 2 cars / 1 wallbox 0.45 s → 0.33 s with pool; 3 cars / 2 wallboxes 0.53 → 0.57 s; 4 cars / 2 wallboxes 0.78 → 0.80 s.
+- **Not covered / open:** no live run (HA testbed or site); no full SE run with a dynamic EV (D9 is tested on the consumer resolution, not through `run_simulation`); a car plugged but not yet identified is still planned against the other free wallboxes until it is assigned; the user docs got only the M4 behaviour (pool, D9, charger Kennung), the rest stays with M5.
 
 ### M5: Docs and wrap-up
 

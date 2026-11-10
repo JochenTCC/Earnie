@@ -54,7 +54,7 @@ Exchange / display form of every signal on the push/exchange wire and in `status
 | Grid meter | `grid.meter.sens_grid_power_active` | First Kennung `meter`; more `grid.<Kennung>.*` meters may follow. Plant **storage** keeps bare kind keys |
 | Battery | `ess.<Kennung>.sens_ess_soc` | Entity-scoped binding key |
 | Consumer by type | `consumer.<slug>.set_enable`, `heatpump.<slug>.*`, `pool.<slug>.*` (incl. `pool_filter`) | Storage and exchange; legacy `flex.<slug>.*` accepted on parse / dual-read until migrated |
-| EV split | `evcs.<slug>.set_evcs_max_current`, `ev.<slug>.sens_evcs_soc_act` | Same Kennung; namespace chosen by field kind. A wallbox open to dynamic EVs uses its **own** Kennung: `evcs.<Wallbox>.*` (multi-EV M3) |
+| EV split | `evcs.<slug>.set_evcs_max_current`, `ev.<slug>.sens_evcs_soc_act` | Namespace chosen by field kind. Charger fields carry the **wallbox's** Kennung (`evcs.<Wallbox>.*`), vehicle fields the EV's (`ev.<EV>.*`); fixed pairs since multi-EV M4, wallboxes open to dynamic EVs since M3. After `dm6.wallboxes` a migrated wallbox has its EV's Kennung, so the IDs are unchanged |
 | Inverter | `inv.<Kennung>.*` | Entity-scoped on `inverters[].ehal_bindings` (**2.7.l P4**) |
 | Heartbeat (read) | `heartbeat_smarthome` | Link proof Hub→Earnie; not a field kind |
 | Heartbeat (write) | `heartbeat_earnie` | Earnie→Hub Unix watchdog in `status.json`; not a field kind |

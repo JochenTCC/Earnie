@@ -459,6 +459,26 @@ def _render_worker_and_pv_notice() -> None:
             f"({len(scenarios)} optimierte Szenarien + Referenzberechnungen)."
         )
     _render_imported_pv_run_notice(scenarios)
+    _render_dynamic_ev_notice(scenarios)
+
+
+def _render_dynamic_ev_notice(scenarios: dict[str, dict]) -> None:
+    """D9 (multi-EV M4): which car charges at which wallbox, per scenario."""
+    from simulation.engine_scenario import scenario_ev_wallbox_lines
+    from simulation.ev_wallbox_fcfs import RULE_TEXT
+
+    labels = scenario_labels_map()
+    for sid, params in scenarios.items():
+        try:
+            lines = scenario_ev_wallbox_lines(params)
+        except ValueError as exc:
+            st.error(f"{labels.get(sid, sid)}: {exc}")
+            continue
+        if lines:
+            st.info(
+                f"{labels.get(sid, sid)} — Wallbox-Zuordnung im Scenario Explorer. "
+                f"{RULE_TEXT}\n\n" + "\n".join(f"- {line}" for line in lines)
+            )
 
 
 def render_backtesting_run_controls(
