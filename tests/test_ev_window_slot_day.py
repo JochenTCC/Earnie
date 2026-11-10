@@ -33,7 +33,7 @@ def _matrix() -> list[dict]:
 def _eligible_slots(monkeypatch) -> set[datetime]:
     monkeypatch.setattr(
         "optimizer.targets.resolve_horizon_consumer_targets_kwh",
-        lambda _matrix, targets: dict(targets),
+        lambda _matrix, targets, **_kwargs: dict(targets),
     )
     matrix = _matrix()
     context = historical_charging_context(

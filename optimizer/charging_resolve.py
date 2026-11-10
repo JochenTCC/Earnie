@@ -224,8 +224,10 @@ def historical_charging_context(
     charging_anchor = matrix_charging_anchor(matrix)
     schedule_ref = charging_anchor or horizon_start
     day_sched = config_day_schedule(consumer, schedule_ref)
+    # Pass the consumer: without a list the helper takes the Live profile's consumers,
+    # and an SE scenario on another house profile has consumers Live does not know.
     targets = optimizer_targets.resolve_horizon_consumer_targets_kwh(
-        matrix, consumer_daily_targets_kwh
+        matrix, consumer_daily_targets_kwh, flexible_consumers=[consumer]
     )
     target_kwh = float(targets.get(consumer["id"], 0.0))
     if charging_anchor is not None:
