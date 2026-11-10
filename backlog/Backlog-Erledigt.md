@@ -2,6 +2,16 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### SE: consumers of a scenario's own house profile (2026-11-10)
+
+- [x] **Bugfix — SE charges no EV that only the scenario's house profile has** *(found and fixed 2026-11-10 on `main`, `387e3eb8`)*: in an SE run with two dynamic EVs (smart and a second car on the scenario profile) the second car charged 0 kWh in every optimized variant, also with fixed wallboxes; the reference booked its energy, so 31 windows warned about deviating energy.
+  - **Cause:** `optimizer.charging_resolve.historical_charging_context` resolved the horizon targets without the consumer list; `resolve_horizon_consumer_targets_kwh` then took the Live profile's consumers, which do not include the second car, so its target was 0.
+  - **Fix:** the call passes the consumer (`flexible_consumers=[consumer]`). Test: `tests/test_ev_target_scenario_only_consumer.py`. SE March run after the fix: the second car charges the same 760 kWh as the reference, no energy warnings.
+  - **Checked, not affected:** the other callers without a consumer list (`get_consumer_remaining_kwh`, live savings, matched-baseline targets, `consistency.check_consumer_targets`) run only in Live or in tests, where the Live list is the right one.
+- [x] **Bugfix — SE window view leaves scenario-only consumers out of the baselines** *(found and fixed 2026-11-10 on `main`, `dd104a11`)*: the window view of the SE built the profile, same-energy and same-flex baselines from the Live profile's consumers. In the two-car scenario the same-energy baseline had only the smart, so the window showed Earnie more expensive than the baseline (10.18 € vs 5.06 €).
+  - **Fix:** the baseline simulations in `optimizer/sim_baseline.py` take an optional consumer list (default unchanged: Live); `ui/backtesting_display_bundle.py` passes the snapshot's consumers to `prepare_optimization_matrix`, `resolve_filter_contexts`, the horizon targets and all three baselines. Test: `tests/test_baseline_scenario_consumers.py`. All 46 window snapshots of the run open in the sunrise view; the two-car baseline holds both cars (10.18 € vs 11.08 €).
+  - **Note:** immediate charge in chart rows (`apply_immediate_charge_to_chart_rows`) still reads the Live list; the SE has no immediate charge. Not checked in the Streamlit page itself, only through the display bundle.
+
 ### Multiple EVs and wallboxes (2026-11-10)
 
 - [x] **Enable multiple EV / Wallboxes** `[feat]` *(Version 2.+1; built 2026-11-09/10 on `main` in phases M1a–M5, plan [`docs/dev/multi-ev-wallbox-plan.md`](../docs/dev/multi-ev-wallbox-plan.md))*: any number of wallboxes and EVs; an EV charges at a fixed wallbox or at whichever allowed wallbox it is plugged into.
