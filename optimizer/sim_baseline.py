@@ -57,9 +57,12 @@ def build_matched_flex_kw_per_hour(
     optimization_matrix: list,
     consumer_targets_kwh: dict[str, float],
     charging_contexts: dict[str, dict] | None = None,
+    *,
+    consumers: list[dict] | None = None,
 ) -> list[dict[str, float]]:
     """
     Skaliert das historische Flex-Profil auf die aktuellen Horizont-Ziele (kWh).
+    ``consumers``: flex consumers of the window (default: the live scenario's).
     Zeitliche Form bleibt erhalten (auch unter Nennleistung); außerhalb des
     Ladezeitfensters null – wie im MILP. Live-Snapshot-Slots zählen nicht als Profil.
     """
@@ -67,7 +70,11 @@ def build_matched_flex_kw_per_hour(
     # ``optimizer.simulation.config`` / ``consumer_charging_eligible_indices``.
     from optimizer import simulation as sim
 
-    consumers_cfg = sim.config.get_flexible_consumers(optimizer_only=True)
+    consumers_cfg = (
+        consumers
+        if consumers is not None
+        else sim.config.get_flexible_consumers(optimizer_only=True)
+    )
     rows = optimization_matrix
     hour_count = len(rows)
     contexts = charging_contexts or {}
@@ -657,23 +664,34 @@ def simulate_baseline_horizon(
     charging_contexts: dict[str, dict] | None = None,
     *,
     battery_params: dict | list[dict] | None = None,
+    consumers: list[dict] | None = None,
 ) -> list:
-    """Simuliert den 24h-Verlauf ohne Optimierung: Batterie folgt nur dem aktuellen PV-Überschuss."""
+    """Simuliert den 24h-Verlauf ohne Optimierung: Batterie folgt nur dem aktuellen PV-Überschuss.
+
+    ``consumers``: flex consumers of the window (default: the live scenario's).
+    """
     chart_rows = []
     sim_soc = initial_soc
     battery_params = _baseline_battery_params(battery_params)
     for row in optimization_matrix:
-        sim_soc, chart_row = _simulate_single_hour_baseline(row, sim_soc, battery_params)
+        sim_soc, chart_row = _simulate_single_hour_baseline(
+            row, sim_soc, battery_params, consumers=consumers
+        )
         chart_rows.append(chart_row)
     _finalize_chart_rows_for_display(chart_rows, charging_contexts)
     return chart_rows
 
 
-def _flex_kw_from_chart_row(chart_row: dict) -> dict[str, float]:
+def _flex_kw_from_chart_row(
+    chart_row: dict, consumers: list[dict] | None = None
+) -> dict[str, float]:
     """Flex-Leistungen je Verbraucher aus einer Simulationszeile."""
+    source = (
+        consumers if consumers is not None else config.get_flexible_consumers(optimizer_only=True)
+    )
     return {
         consumer["id"]: float(chart_row.get(consumer_column_name(consumer), 0.0) or 0.0)
-        for consumer in config.get_flexible_consumers(optimizer_only=True)
+        for consumer in source
     }
 
 
@@ -683,6 +701,7 @@ def simulate_baseline_with_optimized_flex(
     initial_soc: float,
     *,
     battery_params: dict | list[dict] | None = None,
+    consumers: list[dict] | None = None,
 ) -> list:
     """
     Baseline-Batterie (nur PV-Überschuss), aber dieselbe stündliche Flex-Last wie optimiert.
@@ -696,11 +715,12 @@ def simulate_baseline_with_optimized_flex(
             row,
             sim_soc,
             battery_params,
-            flex_kw_override=_flex_kw_from_chart_row(optimized_row),
+            flex_kw_override=_flex_kw_from_chart_row(optimized_row, consumers),
             steuerbefehl="Baseline (Ziel)",
             baseload_kw_override=float(
                 optimized_row.get("Verbrauch-Prognose (kW)", row["expected_p_act"]) or 0.0
             ),
+            consumers=consumers,
         )
         chart_rows.append(chart_row)
     return chart_rows
@@ -713,6 +733,7 @@ def simulate_matched_baseline_horizon(
     charging_contexts: dict[str, dict] | None = None,
     *,
     battery_params: dict | list[dict] | None = None,
+    consumers: list[dict] | None = None,
 ) -> list:
     """
     Baseline mit gleicher Flex-Energie wie die Optimierung,
@@ -722,6 +743,7 @@ def simulate_matched_baseline_horizon(
         optimization_matrix,
         consumer_targets_kwh,
         charging_contexts,
+        consumers=consumers,
     )
     chart_rows = []
     sim_soc = initial_soc
@@ -733,6 +755,7 @@ def simulate_matched_baseline_horizon(
             battery_params,
             flex_kw_override=flex_kw,
             steuerbefehl="Baseline (Ziel)",
+            consumers=consumers,
         )
         chart_rows.append(chart_row)
     _finalize_chart_rows_for_display(chart_rows, charging_contexts)

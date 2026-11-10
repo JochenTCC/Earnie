@@ -136,16 +136,24 @@ def _backtesting_baseline_rows(
     *,
     initial_soc: float,
     battery_params: dict | list[dict],
+    consumers: list[dict],
 ) -> dict[str, list[dict]]:
-    """Baseline-, Matched-Baseline- und Same-Flex-Zeilen; `prep` wie prepare_optimization_matrix."""
+    """Baseline-, Matched-Baseline- und Same-Flex-Zeilen; `prep` wie prepare_optimization_matrix.
+
+    ``consumers`` are the window's own (snapshot): a scenario on another house profile has
+    consumers the Live profile does not know.
+    """
     matrix_prep, charging_contexts, targets = prep
     baseline_rows = simulate_baseline_horizon(
         matrix_prep,
         initial_soc,
         charging_contexts=charging_contexts,
         battery_params=battery_params,
+        consumers=consumers,
     )
-    horizon_targets = resolve_horizon_consumer_targets_kwh(matrix_prep, targets)
+    horizon_targets = resolve_horizon_consumer_targets_kwh(
+        matrix_prep, targets, flexible_consumers=consumers
+    )
     horizon_targets = apply_horizon_charging_limits(horizon_targets, charging_contexts)
     matched_baseline_rows = simulate_matched_baseline_horizon(
         matrix_prep,
@@ -153,12 +161,14 @@ def _backtesting_baseline_rows(
         horizon_targets,
         charging_contexts,
         battery_params=battery_params,
+        consumers=consumers,
     )
     baseline_same_flex_rows = simulate_baseline_with_optimized_flex(
         matrix_prep,
         optimized_rows,
         initial_soc,
         battery_params=battery_params,
+        consumers=consumers,
     )
     return {
         "baseline_rows": baseline_rows,
@@ -225,19 +235,22 @@ def _build_backtesting_savings_info(
     consumer_daily_targets_kwh: dict[str, float] | None,
     sunrise_soc_min_index: int | None,
     battery_params: dict | list[dict],
+    consumers: list[dict],
 ) -> dict:
     """Savings-Dict für Charts aus persistierten Backtesting-Zeilen (ohne Legacy-Profile)."""
     matrix_prep, charging_contexts, targets = prepare_optimization_matrix(
         matrix,
         consumer_daily_targets_kwh,
+        consumers=consumers,
     )
-    resolve_filter_contexts(matrix_prep)
+    resolve_filter_contexts(matrix_prep, consumers)
     optimized_rows = chart_rows
     rows = _backtesting_baseline_rows(
         (matrix_prep, charging_contexts, targets),
         optimized_rows,
         initial_soc=initial_soc,
         battery_params=battery_params,
+        consumers=consumers,
     )
     return {
         **_backtesting_cost_fields(rows, optimized_rows),
@@ -295,6 +308,7 @@ def build_backtesting_display_bundle(
         sunrise_soc_min_index = None
 
     battery_params = _battery_params_from_snapshot(snapshot)
+    flex = flex_consumers_from_snapshot(snapshot)
     savings_info = _build_backtesting_savings_info(
         matrix,
         chart_rows,
@@ -302,8 +316,8 @@ def build_backtesting_display_bundle(
         consumer_daily_targets_kwh=targets,
         sunrise_soc_min_index=sunrise_soc_min_index,
         battery_params=battery_params,
+        consumers=list(flex),
     )
-    flex = flex_consumers_from_snapshot(snapshot)
     if standard_rules is not None:
         savings_info = apply_standard_rules(savings_info, chart_rows, standard_rules, list(flex))
     optimized_df = pd.DataFrame(chart_rows)
