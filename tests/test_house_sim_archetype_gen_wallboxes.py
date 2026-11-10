@@ -161,3 +161,12 @@ def test_no_entity_placeholder_left_after_fill():
     filled = fill_yaml_placeholders(raw, arch.placeholders)
     assert not re.search(r"ENTITY_\w+", filled)
     assert arch.placeholders["evcs.wb_b.sens_evcs_connected"] in filled
+
+
+def test_car_plug_state_is_pushed_as_a_digital_signal():
+    """The carrier pushes the car's binary_sensor plug state like the wallbox's (on → 1)."""
+    house, components = _dm6_pack()
+    raw = build_carrier_yaml(house, components, earnie_host="h", earnie_port=8541, token="t", repeat_s=10.0)
+    for qid in ("ev_car_a_sens_ev_connected", "evcs_wb_a_sens_evcs_connected"):
+        block = raw.split(f"id: earnie_push_{qid}", 1)[1].split("  - id:", 1)[0]
+        assert "is_state(" in block, qid

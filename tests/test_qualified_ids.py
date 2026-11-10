@@ -72,6 +72,8 @@ def test_flex_is_legacy_only() -> None:
 def test_digital_ids() -> None:
     assert q.is_digital_id("sens_absent_mode")
     assert q.is_digital_id("evcs.e_auto.sens_evcs_connected")
+    # Car-side plug state (multi-EV M3): an HA binary_sensor pushes on / off as 1 / 0.
+    assert q.is_digital_id("ev.e_auto.sens_ev_connected")
     assert q.is_digital_id("pool.pool_filter.sens_filter_active")
     assert q.is_digital_id("consumer.waschmaschine.sens_consumer_active")
     assert not q.is_digital_id("evcs.e_auto.sens_evcs_active_power")

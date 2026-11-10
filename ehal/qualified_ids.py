@@ -195,6 +195,7 @@ DIGITAL_KINDS = frozenset(
     {
         "sens_absent_mode",
         "sens_evcs_connected",
+        "sens_ev_connected",
         "sens_heating_active",
         "sens_filter_active",
         "sens_consumer_active",
