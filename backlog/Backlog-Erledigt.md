@@ -2,6 +2,15 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Edibert tariff overview — pin bump (2026-11-11)
+
+- [x] **Edibert tariff overview — pin bump** `[dev]` *(2026-11-11; taken into 2.8 by the maintainer the same day; Edibert `0.1.c2`, tag `v0.1.15`)*: the embedded editor on the Tarife page gets an overview with two tabs (import, export) listing own, catalog and template tariffs with their parameters, row selection with actions (open, copy as template, delete, compare) and a comparison chart; the "my tariffs" button list, the delete button in the form and the catalog copy expander are gone. Earnie needs no code for it (`render_editor` is unchanged), only the pin and what follows from the removed controls.
+  - **Done (2026-11-11, `d42d61fe`, fast-forwarded to `main`):** `edibert[ui]` pinned to the `v0.1.15` tag archive in `pyproject.toml`. The three delete AppTests in `tests/apptest/test_page_tariffs_apptest.py` use the overview route (`earnie.tariffs.view.switch` → overview, table selection via the new helper `tests/apptest/helpers.py::select_table_rows`, `earnie.tariffs.ov.import.delete`); `delete.confirm` / `delete.cancel` unchanged. Manual section "Tarife (Benutzertarife)" describes overview / edit, tables, selection and actions, comparison and templates; `_HELP` in `ui/pages/page_tariffs.py` mentions the overview; pin note in `docs/dev/edibert-integration.md`.
+  - **Tests:** full suite 6578 passed, 20 skipped against the `v0.1.15` archive (also in the pre-commit hook); Playwright smoke `tests/apptest/e2e` 7 passed. The Playwright steps needed no change ("Neuer Bezugstarif" and "Tarif speichern" still exist).
+  - **Checked in the browser (fixture config):** both tabs fit the page width (wide columns scroll inside the table); deleting a user tariff used by a scenario names the scenario and waits, "Nicht löschen" keeps it; "Benutzertarif bearbeiten" in the Szenarienkonfigurator lands in the edit view with the tariff open.
+  - **Environment:** the shared venv was updated from the `v0.1.14` to the `v0.1.15` archive. A stale `edibert.egg-info` (0.1.9) in the Edibert clone's `src/` shadows the metadata when `src/` is put on `PYTHONPATH`; clean-up belongs to the Edibert side.
+  - **Open, not part of this item:** link "Tarife vergleichen" from the Szenarienkonfigurator (optional); a "used in scenario" column needs a host hook in Edibert first (open item in the Edibert backlog).
+
 ### RuleRef study findings: SE look-ahead past SA₂ and heat pump band (2026-11-11)
 
 - [x] **MILP look-ahead past SA₂ — close the morning gap** `[dev]` *(found 2026-11-05 in the viability sample runs; prototype first, SE only; full concept split off on 2026-11-07)*: the plan ends at sunrise, so the SoC at SA₂ has no value and the battery reaches SOC_min there, although PV does not cover the load until hours later. House S5 on Duo: L3 imports 25 kWh in June where L2 imports none, and L3 ends the year about 39 € above L2. A stricter solver does not change this (1 % gap, 30 s: 291.33 € instead of 291.18 €), so the solver is not the cause there.
