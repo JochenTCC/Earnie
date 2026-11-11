@@ -56,6 +56,8 @@ _KEPT_FIELDS = (
     "k_push_act",
     # native filter window per cycle: the v2 day replay's filter timing
     "filter_contexts",
+    # plug state per EV per cycle: the v2 day replay charges an EV from plug-in
+    "charging_contexts",
 )
 
 

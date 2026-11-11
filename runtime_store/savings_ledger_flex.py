@@ -38,13 +38,15 @@ TIMING_LOGGED_NO_METER = "logged_no_meter"
 TIMING_NO_ENERGY = "no_energy"
 # Heating rod beside a fuel heat source: 0 kWh in the shadow plant, its heat bought as fuel (plan § 4.4).
 TIMING_FUEL = "fuel"
+# EV: the day's energy at nominal power from the first plugged-in slot of the day (plan § 4.3, D5).
+TIMING_PLUG_IN = "plug_in"
+# EV that charged in a slot without logged plug state: keeps its logged timing (plan § 4.3).
+TIMING_LOGGED_NO_PLUG_STATE = "logged_no_plug_state"
 
 # Why a consumer with a meter and energy keeps its logged timing (``FlexRetiming.logged_reasons``).
 REASON_NO_SHAPE_NO_WINDOW = "no_shape_no_window"
 REASON_EXCEEDS_ELIGIBLE = "exceeds_eligible_slots"
 REASON_NOT_CONFIGURED = "not_configured"
-# The EV rule (from plug-in, plan § 4.3) is step Ledger P10a; until then an EV keeps its timing.
-REASON_EV_RULE_MISSING = "ev_rule_missing"
 # The profile file exists but cannot be read: which consumers had a profile is unknown, so no
 # consumer is re-timed that day (not the windows instead: that would hide the broken file).
 REASON_PROFILE_READ_ERROR = "profile_read_error"
@@ -194,6 +196,21 @@ def _reference_shape(
     return None
 
 
+def _ev_plugged_slots(rows: list[dict[str, Any]], counted: list[int], cid: str) -> list[int] | None:
+    """Counted slots an EV could charge in: plugged in, or charged (the plug state is read at the
+    cycle's start, so a car plugged in during the slot shows ``False`` there). ``None`` when a slot
+    it charged in has no plug state."""
+    eligible: list[int] = []
+    for i in counted:
+        charged = float((rows[i].get("flex_delivered_kwh") or {}).get(cid, 0.0)) > 0.0
+        state = (rows[i].get("plugged_in") or {}).get(cid)
+        if charged and state is None:
+            return None
+        if charged or state is True:
+            eligible.append(i)
+    return eligible
+
+
 def retime_flex_day(
     slot_rows: list[dict[str, Any]] | tuple[dict[str, Any], ...],
     consumers: list[dict],
@@ -207,8 +224,10 @@ def retime_flex_day(
     Per configured consumer, in this order:
 
     - no ``flex_delivered_kwh`` key in any counted slot: no own meter, ``logged_no_meter``;
-    - an EV: logged timing (``ev_rule_missing``) until the plug-in rule exists (P10a);
     - no energy over the counted slots: ``no_energy``, logged timing (nothing to place);
+    - an EV: ``plug_in``, the day's energy at nominal power from the first plugged-in slot of
+      the day over the slots it was plugged in or charged in (slot rows' ``plugged_in``); a
+      charging slot without plug state keeps the logged timing (``logged_no_plug_state``);
     - heating rod beside a fuel heat source (``parent_heat_electric`` false): ``fuel``, zero in the
       shadow plant and its delivered kWh bought as fuel in the slot it ran in; without a fuel
       price logged timing (``no_fuel_price``). Beside an electric source the rod is ordinary;
@@ -260,11 +279,24 @@ def retime_flex_day(
         if not has_meter:
             keep_logged(cid, TIMING_LOGGED_NO_METER)
             continue
-        if _is_ev_consumer(consumer):
-            keep_logged(cid, TIMING_LOGGED, REASON_EV_RULE_MISSING)
-            continue
         if energy <= _ENERGY_EPSILON_KWH:
             keep_logged(cid, TIMING_NO_ENERGY)
+            continue
+        if _is_ev_consumer(consumer):
+            eligible = _ev_plugged_slots(rows, counted, cid)
+            if eligible is None:
+                keep_logged(cid, TIMING_LOGGED_NO_PLUG_STATE)
+                continue
+            _, max_kw = power_limits_kw(consumer)
+            if energy > len(eligible) * max_kw * dt_h + _ENERGY_EPSILON_KWH:
+                keep_logged(cid, TIMING_LOGGED, REASON_EXCEEDS_ELIGIBLE)
+                continue
+            # one unit at plug-in: the builder caps it at nominal and carries the rest forward
+            shape = [1.0 if i == eligible[0] else 0.0 for i in range(n)]
+            shaped = build_shaped_flex_kw_per_slot(n, [consumer], {cid: energy}, {cid: shape}, {cid: eligible})
+            for i in range(n):
+                per_slot[i][cid] = shaped.per_slot[i][cid]
+            timing[cid] = TIMING_PLUG_IN
             continue
         if is_heating_rod_consumer(consumer) and not consumer["parent_heat_electric"]:
             credit = consumer.get("fuel_credit_cent_per_kwh")

@@ -121,8 +121,9 @@ A consumer whose energy cannot be placed (no shape and no window, or more energy
 | Case | `flex_timing` | Reference |
 |---|---|---|
 | no `flex_delivered_kwh` key in any counted slot of the day (D6) | `logged_no_meter` | logged (zero) |
-| EV | `logged`, reason `ev_rule_missing` | logged; P10a replaces this with the plug-in rule |
 | ≤ 1 Wh delivered | `no_energy` | logged |
+| EV with plug state in every slot it charged in | `plug_in` | the day's energy at nominal power from the first plugged-in slot, over the slots it was plugged in or charged in (§ 4.3, P10a) |
+| EV that charged in a slot without plug state | `logged_no_plug_state` | logged |
 | heating rod beside a fuel source (`parent_heat_electric` false) with `fuel_credit_cent_per_kwh` | `fuel` | 0 kWh; its delivered kWh bought as fuel in the slot it ran in (§ 4.4) |
 | same, without a fuel price (no `fuel_credit_cent_per_kwh`) | `logged`, reason `no_fuel_price` | logged |
 | profile with energy in the counted slots of the enable window | `profile` | profile shape over the enable window (whole day without one) |
@@ -170,6 +171,8 @@ Ledger row, new:
 
 The reference charges the energy delivered in the SA-day at nominal power from the first plugged-in slot of the day (D5). The daemon stores `plugged_in` per EV in the slot row, from the cycle's charging context. A day without that field for a slot the car charged in keeps the logged timing for the EV (`flex_timing: "logged_no_plug_state"`).
 
+*Implemented 2026-11-11 (Ledger P10a):* `pending_slot_from_entry` keeps the boolean `plugged_in` of each consumer in the entry's `charging_contexts`; `LedgerInput.plugged_in` carries it, counted slot rows store it as `plugged_in`; the backfill CLI keeps `charging_contexts`. In `retime_flex_day` an EV (`type: ev` or an enabled `charging_schedule`) is eligible in the counted slots where it was plugged in **or** charged: the plug state is read when the cycle starts, so a car plugged in during a slot reads `False` there although it charged. The reference puts the energy at nominal power from the first eligible slot and carries it forward over eligible slots only, so a car that left and came back is not charged while away. Energy above what the eligible slots hold at nominal power keeps the logged timing (`exceeds_eligible_slots`). Logs from before the plug state was logged give `logged_no_plug_state` for every EV day (risk § 7: backfill).
+
 ### 4.4 Heating rod
 
 Rule in the timing function: a consumer with `daily_target_source: heating_rod` beside a fuel source gets 0 kWh in the shadow plant; `fuel_saved_kwh` = delivered rod kWh ÷ the source's efficiency, priced like the MILP's fuel credit. Beside an electric heat source the rod is an ordinary consumer. A rod without its own meter: D6.
@@ -194,7 +197,7 @@ One chat session each; branch `feat/ledger-v2`, merged after the last step. `SAV
 | **Ledger P9b** (done 2026-11-11) | Timing function, pure: day slot rows + consumers → `flex_retimed` per slot and `flex_timing` per consumer (profile, native window, flat over the enable window). Slot rows carry `pv_kwh` and `k_push_cent`. | Tests: energy parity per day and consumer with full and partial coverage; cap at nominal power; consumer without shape; consumer that cannot be placed is recorded. |
 | **Ledger P9c** (done 2026-11-11) | Day replay in `close_day`, state with `shadow_soc_day_start`, shadow plant without battery (D3), row and slot file from the replay, `saving_logged_timing_eur` (D4). Backfill CLI uses the same replay. Still behind `SAVINGS_V = 1` in production (the replay is called with an explicit version in tests). | Tests: synthetic 2-day log where a consumer is moved from an expensive to a cheap slot gives the hand-computed saving; a day without flex equals the v1 row to the cent; slots add up to the row; no battery → row without SoC correction. |
 | **Heating rod** (backlog item, done 2026-11-11) | Rod rule and fuel in the replay (§ 4.4). | Tests: rod beside gas → `fuel_saved_eur` and rod electricity only on the "with" side; rod beside an electric source unchanged; price equals the MILP credit. |
-| **Ledger P10a** | `plugged_in` in the slot row; EV rule (§ 4.3, D5). | Tests: car plugged in at 18:00, charged 02:00–05:00 → reference charges from 18:00; session across SA; day without plug state is recorded. |
+| **Ledger P10a** (done 2026-11-11) | `plugged_in` in the slot row; EV rule (§ 4.3, D5). | Tests: car plugged in at 18:00, charged 02:00–05:00 → reference charges from 18:00; session across SA; day without plug state is recorded. |
 | **Ledger P10b** | Consumers without their own meter (D6): detected, logged timing, named in the row and in the tile help. | Tests: such a consumer changes nothing against v1 and appears in `flex_timing`. |
 | **Ledger P9e** | Per-consumer power in the slot log on HA (§ 3.1): reader for measured consumers, wired into the sampler; log and Chart 1 "Ist" only, planning unchanged. | Tests: bound, unbound and stale values; slot mean in `closed_interval.flex_kw`; HA testbed check case with one consumer power entity. |
 | **Ledger P9d** | `SAVINGS_V = 2`; tile, method note, chain-switch note, user docs, release note draft (§ 4.5). Backfill `--rebuild --dry-run` on the maintainer's log; one day checked by hand against the log. | UI tests for tile and help; the hand check is written into the backlog item; live check on the maintainer's install is a tracker row. |

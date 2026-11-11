@@ -293,6 +293,15 @@ def _filter_native_windows(entry: dict[str, Any]) -> dict[str, dict[str, float]]
     return windows
 
 
+def _plugged_in_by_consumer(entry: dict[str, Any]) -> dict[str, bool]:
+    """Plug state per EV the entry's cycle read (``charging_contexts``), where it is a boolean."""
+    states: dict[str, bool] = {}
+    for cid, ctx in (entry.get("charging_contexts") or {}).items():
+        if isinstance(ctx, dict) and isinstance(ctx.get("plugged_in"), bool):
+            states[str(cid)] = ctx["plugged_in"]
+    return states
+
+
 def pending_slot_from_entry(
     slot_start: datetime,
     slot_entry: dict[str, Any] | None,
@@ -309,6 +318,7 @@ def pending_slot_from_entry(
         "k_push_cent": float(slot_entry["k_push_act"]),
         "planned_flex_kw": _planned_flex_kw(slot_entry),
         "filter_native": _filter_native_windows(slot_entry),
+        "plugged_in": _plugged_in_by_consumer(slot_entry),
     }
 
 
@@ -327,6 +337,7 @@ def ledger_input_from_pending(
         k_push_cent=float(pending["k_push_cent"]),
         planned_flex_kw=dict(pending.get("planned_flex_kw") or {}),
         filter_native=dict(pending.get("filter_native") or {}),
+        plugged_in=dict(pending.get("plugged_in") or {}),
     )
 
 

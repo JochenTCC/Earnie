@@ -157,12 +157,12 @@ def test_consumer_without_meter_keeps_logged_timing():
     assert all(slot["trockner"] == 0.0 for slot in result.per_slot_kw)
 
 
-def test_unconfigured_consumer_and_ev_keep_logged_timing():
+def test_unconfigured_consumer_and_ev_without_plug_state_keep_logged_timing():
     ev = {"id": "wallbox", "type": "ev", "nominal_power_kw": 11.0}
     rows = _rows({"wallbox": {i: 11.0 for i in range(80, 84)}, "alt": {5: 1.0}})
     result = slf.retime_flex_day(rows, [ev], {"wallbox": [1.0] * N}, _no_windows("wallbox"), dt_h=DT)
-    assert result.timing == {"wallbox": slf.TIMING_LOGGED, "alt": slf.TIMING_LOGGED}
-    assert result.logged_reasons == {"wallbox": slf.REASON_EV_RULE_MISSING, "alt": slf.REASON_NOT_CONFIGURED}
+    assert result.timing == {"wallbox": slf.TIMING_LOGGED_NO_PLUG_STATE, "alt": slf.TIMING_LOGGED}
+    assert result.logged_reasons == {"alt": slf.REASON_NOT_CONFIGURED}
     assert _energy(result, "wallbox") == pytest.approx(11.0)
     assert _energy(result, "alt") == pytest.approx(0.25)
 

@@ -257,7 +257,8 @@ class LedgerInput:
     the slot-0 plan of that entry per consumer. ``filter_native`` is the native filter
     window the cycle used per consumer (``native_start_hour``, ``native_duration_hours``
     from the entry's ``filter_contexts``); the v2 day replay takes it as the filter's
-    unshifted timing.
+    unshifted timing. ``plugged_in`` is the plug state per EV the cycle read
+    (``charging_contexts``); the v2 replay charges an EV from plug-in (plan § 4.3).
     """
 
     slot_start: datetime
@@ -266,6 +267,7 @@ class LedgerInput:
     k_push_cent: float | None
     planned_flex_kw: dict[str, float] = field(default_factory=dict)
     filter_native: dict[str, dict[str, float]] = field(default_factory=dict)
+    plugged_in: dict[str, bool] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -568,6 +570,8 @@ def _slot_row(inp: LedgerInput, slot: LedgerSlot, dt_h: float) -> dict[str, Any]
         }
         if inp.filter_native:
             row["filter_native"] = {str(cid): dict(window) for cid, window in inp.filter_native.items()}
+        if inp.plugged_in:
+            row["plugged_in"] = {str(cid): bool(state) for cid, state in inp.plugged_in.items()}
     return row
 
 
