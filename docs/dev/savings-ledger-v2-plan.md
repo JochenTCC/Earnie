@@ -119,7 +119,7 @@ Side note: windows across midnight end at midnight in the ledger as in the MILP,
 - State: `shadow_soc_day_start` (written and required for `savings_v >= 2` only, so v1 state files are unchanged); after a v2 close both `shadow_soc` and `shadow_soc_day_start` are the replay's end SoC.
 - No battery (D3): `start_chain(..., savings_v=2, with_battery=False)`, `shadow_soc` `None`, `grid = load − pv`; the row has `p_ref_basis: "no_battery"`, both corrections 0 and `soc_shadow_end_pct` / `p_ref_cent` `None`. v1 refuses a chain or a day without battery.
 - New row fields (v2): `flex_retimed_kwh`, `flex_timing`, `flex_logged_reasons`, `flex_native_window_source`, `saving_logged_timing_eur`, `fuel_saved_kwh`, `fuel_saved_eur` (heating rod step).
-- Left for P9d: the daemon still stops without a house battery (`ledger inactive`), the CLI still refuses without one, and Chart 1's shadow SoC series reads `float(shadow_soc_end)`, which is `None` without battery.
+- Left for P9d (done there): the daemon stopped without a house battery (`ledger inactive`), the CLI refused without one, and Chart 1's shadow SoC series read `float(shadow_soc_end)`, which is `None` without battery.
 
 The causal step per cycle stays for the open day (D2). Its SoC is kept apart from the chain SoC at the day start (`shadow_soc_day_start` in the state), so the replay does not depend on it.
 
@@ -196,6 +196,16 @@ Rule in the timing function: a consumer with `daily_target_source: heating_rod` 
 - Chart 2 account view and Chart 1 "SoC BL Ziel": check that closed days read the replay and the open day the running chain; no new drawing.
 - `docs/ui/charts.md`, user manual, spec § 3 / § 4 / § 7, release note draft for 2.8.
 
+*Implemented 2026-11-11 (Ledger P9d):*
+
+- `SAVINGS_V = 2`. A v1 state file starts a new chain (`savings_v_changed`), as designed; `lifetime_summary` counts v2 rows only.
+- No house battery (D3): the daemon books with `battery_params=None` and `start_chain(..., with_battery=False)`; the backfill CLI runs too; Chart 2 builds its figures without battery and Chart 1's shadow SoC series skips `None`. The tile's "ruht" notice is gone.
+- Tile (`ui/ledger_kpi.py`): the method note of v2 (equal day energy per consumer at the usual time, EV from plug-in, rod off beside fuel, battery in vendor mode, "Heute bisher" provisional, the Scenario Explorer compares stricter with L2), the consumers of the newest closed day without their own meter (`logged_no_meter`, by configured name), a line for OpenEMS (battery only), "Heute bisher (vorläufig)", and a chain-switch note during the first 7 closed days of a chain that started with `savings_v_changed`.
+- User docs: `docs/ui/charts.md` (Chart 2, tile), user manual (Monitor), `docs/einrichtung/betrieb.md` (ledger file), `docs/konfiguration/flexible-verbraucher.md` (heating rod beside fuel).
+- Release note fragment: `.github/release-notes/drafts/v2.8.0-ledger-v2.draft.md` (draft; two sentences of `UNRELEASED.md` are now outdated, marked there for review).
+- Tests that exercised v1 mechanics now run v2 with a `day_flex` without consumers (`tests/ledger_flex_helpers.py::no_flex`), which equals the causal day; state fixtures carry `shadow_soc_day_start`. Expected values are unchanged except the "Heute bisher" wording and the no-battery behaviour.
+- Open: backfill `--rebuild --dry-run` on the maintainer's log, one day checked by hand, the live check as a tracker row.
+
 ## 5. Steps
 
 One chat session each; branch `feat/ledger-v2`, merged after the last step. `SAVINGS_V` stays 1 until P9d.
@@ -209,7 +219,7 @@ One chat session each; branch `feat/ledger-v2`, merged after the last step. `SAV
 | **Ledger P10a** (done 2026-11-11) | `plugged_in` in the slot row; EV rule (§ 4.3, D5). | Tests: car plugged in at 18:00, charged 02:00–05:00 → reference charges from 18:00; session across SA; day without plug state is recorded. |
 | **Ledger P10b** (done 2026-11-11) | Consumers without their own meter (D6): detected, logged timing, named in the row and in the tile help. *Done: detection and logged timing came with P9b (`logged_no_meter` in `flex_timing`); P10b added the end-to-end tests (`tests/test_savings_ledger_no_meter.py`). The tile help moved to P9d: it describes v1 until `SAVINGS_V` is 2.* | Tests: such a consumer changes nothing against v1 and appears in `flex_timing`. |
 | **Ledger P9e** (done 2026-11-11) | Per-consumer power in the slot log on HA (§ 3.1): reader for measured consumers, wired into the sampler; log and Chart 1 "Ist" only, planning unchanged. | Tests: bound, unbound and stale values; slot mean in `closed_interval.flex_kw`; HA testbed check case with one consumer power entity. |
-| **Ledger P9d** | `SAVINGS_V = 2`; tile, method note, chain-switch note, user docs, release note draft (§ 4.5). The tile help names consumers without their own meter (`flex_timing: logged_no_meter`, from P10b). Daemon and CLI run without a house battery (D3), and Chart 1's shadow SoC handles `None` (from P9c). Backfill `--rebuild --dry-run` on the maintainer's log; one day checked by hand against the log. | UI tests for tile and help; the hand check is written into the backlog item; live check on the maintainer's install is a tracker row. |
+| **Ledger P9d** (code, UI, docs done 2026-11-11; backfill dry-run and hand check open) | `SAVINGS_V = 2`; tile, method note, chain-switch note, user docs, release note draft (§ 4.5). The tile help names consumers without their own meter (`flex_timing: logged_no_meter`, from P10b). Daemon and CLI run without a house battery (D3), and Chart 1's shadow SoC handles `None` (from P9c). Backfill `--rebuild --dry-run` on the maintainer's log; one day checked by hand against the log. | UI tests for tile and help; the hand check is written into the backlog item; live check on the maintainer's install is a tracker row. |
 
 Order: P9a → P9b → P9c, then Heating rod, P10a and P10b in any order, P9e at any point, P9d last. Estimate: 8 sessions (the backlog said 1 each for P9 and P10; the day replay was not in that estimate).
 

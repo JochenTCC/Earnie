@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
+from ledger_flex_helpers import no_flex
 from runtime_store import savings_ledger as sl
 from runtime_store import savings_ledger_store as store
 
@@ -54,7 +55,7 @@ def _run(inputs, state=None):
     if state is None:
         state = sl.start_chain(inputs[0], day_bounds, reason=sl.CHAIN_FIRST_RUN)
     for inp in inputs:
-        state, row = sl.advance(state, inp, BATTERY, day_bounds, app_version="test")
+        state, row = sl.advance(state, inp, BATTERY, day_bounds, app_version="test", day_flex=no_flex)
         if row is not None:
             rows.append(row)
     return state, rows
@@ -210,7 +211,7 @@ def test_slot_without_price_is_skipped():
 def test_replayed_slot_is_ignored():
     inputs = [_inp(s, _closed()) for s in _slots(DAY1, 4)]
     state, _ = _run(inputs)
-    again, row = sl.advance(state, inputs[2], BATTERY, day_bounds, app_version="t")
+    again, row = sl.advance(state, inputs[2], BATTERY, day_bounds, app_version="t", day_flex=no_flex)
     assert again is state and row is None
 
 

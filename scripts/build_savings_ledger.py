@@ -112,7 +112,7 @@ def read_entries(
 def build(
     entries: list[dict[str, Any]],
     since: datetime,
-    battery: dict[str, Any],
+    battery: dict[str, Any] | None,
     day_bounds: sl.DayBounds,
     timezone_name: str,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], sl.LedgerState | None, int]:
@@ -120,6 +120,7 @@ def build(
 
     Returns the closed-day rows, their slot records, the state with the open day
     (``None`` without any slot that has a SoC) and the number of closed slots read.
+    ``battery`` ``None``: a house without battery (v2: shadow plant without battery).
     """
     inputs = [
         inp
@@ -133,7 +134,9 @@ def build(
     day_flex = store.flex_day_provider(timezone_name)
     for inp in inputs:
         if state is None:
-            state = sl.start_chain(inp, day_bounds, reason=sl.CHAIN_BACKFILL)
+            state = sl.start_chain(
+                inp, day_bounds, reason=sl.CHAIN_BACKFILL, with_battery=battery is not None
+            )
             if state is None:
                 continue
         state, closed_day = sl.advance_with_slots(
@@ -247,10 +250,7 @@ def main(argv: list[str] | None = None) -> int:
             return 2
 
     batteries = config.get_battery_params_list()
-    if not batteries:
-        print("No house battery configured: the ledger has nothing to book.", file=sys.stderr)
-        return 1
-    battery = sl.shadow_battery_params(batteries)
+    battery = sl.shadow_battery_params(batteries) if batteries else None
     timezone_name = config.get_planning_timezone()
     since = datetime.combine(args.since, datetime.min.time(), tzinfo=ZoneInfo(timezone_name))
     day_bounds = store.sunrise_day_bounds(
@@ -276,11 +276,13 @@ def main(argv: list[str] | None = None) -> int:
     if state is None:
         print("No slot with a SoC since that date: no chain, nothing written.", file=sys.stderr)
         return 1
-    print(
-        f"chain {state.chain_start:%Y-%m-%d %H:%M} ({state.chain_start_reason}), "
+    battery_text = (
         f"battery {battery['battery_capacity_kwh']} kWh, path efficiency {battery['efficiency']:.3f}, "
         f"standby {battery.get('standby_power_kw', 0.0)} kW"
+        if battery is not None
+        else "no house battery"
     )
+    print(f"chain {state.chain_start:%Y-%m-%d %H:%M} ({state.chain_start_reason}), {battery_text}")
     for line in format_table(rows):
         print(line)
     total = sl.lifetime_summary(rows, state.chain_start)

@@ -1,7 +1,7 @@
 # Savings ledger — realised savings from logged actuals
 
-**Status:** implemented (v1), 2026-11-04. Flex re-timing (`savings_v: 2`, § 7) and the usage ping (§ 6) are open. Language: English (docs/dev).
-**Decided 2026-11-11 (Ledger P9a):** the definition of `savings_v: 2` (§ 7, § 9 items 7–13); planned for 2.8, steps in [`savings-ledger-v2-plan.md`](savings-ledger-v2-plan.md). Not implemented.
+**Status:** `savings_v: 2` implemented, 2026-11-11 (Ledger P9d: `SAVINGS_V = 2`). The usage ping (§ 6) is open. Language: English (docs/dev).
+**Decided 2026-11-11 (Ledger P9a), implemented 2026-11-11 (Ledger P9b–P9e, P10a, P10b, heating rod, P9d):** the definition of `savings_v: 2` (§ 7, § 9 items 7–13); steps in [`savings-ledger-v2-plan.md`](savings-ledger-v2-plan.md).
 **Fixed 2026-11-02:** D2 (Ledger P1) and D3 (Ledger P2); D1 is replaced by the ledger.
 **Implemented 2026-11-02:** slot engine and day close `runtime_store/savings_ledger.py` (Ledger P3, P4), files `runtime_store/savings_ledger_store.py` (P4), daemon hook `runtime_store/savings_ledger_daemon.py` (P5), backfill CLI `scripts/build_savings_ledger.py` (P6).
 **Decision 2026-11-02 (Ledger P0):** `p_ref`, partial days and powerstations are decided (§ 3, § 4, § 9).
@@ -59,7 +59,7 @@ One definition, versioned as `savings_v`. Any later change starts a new version;
 | Prices | `market_price_cent` (buy), `k_push_act` (sell) of the cycle | identical |
 | Flex timing | as logged | v1: as logged (see § 7 for v2 flex re-timing) |
 
-**`savings_v: 2`** (implemented behind `SAVINGS_V = 1` until Ledger P9d; [`savings-ledger-v2-plan.md`](savings-ledger-v2-plan.md) § 4.1)
+**`savings_v: 2`** (current since Ledger P9d; [`savings-ledger-v2-plan.md`](savings-ledger-v2-plan.md) § 4.1)
 
 | Aspect | With Earnie (actual) | Without Earnie (shadow plant) |
 |---|---|---|
@@ -197,7 +197,7 @@ Schema v3 adds to the existing v2 payload:
 - **Decision needed (privacy):** `usage-ping.md` § 2 excludes prices and costs from the payload. A lifetime euro aggregate is a new data category. It needs: an updated consent text and "Was wird gesendet?" preview, a note in `docs/einrichtung/betrieb.md` § Nutzungsstatistik, and a server-side schema bump (`earnie-server`, separate repo → tracker row).
 - Server KPI: Σ `savings_eur` and median per install, by `savings_v`; histogram of `savings_eur / savings_days`. Marketing wording always carries the counterfactual and the method version; the figure is as fakeable as the points.
 
-## 7. Flex re-timing (`savings_v: 2`, decided 2026-11-11, not implemented)
+## 7. Flex re-timing (`savings_v: 2`, decided and implemented 2026-11-11)
 
 v1 measures the battery benefit only, because the logged house load already contains the shifted flex energy. v2 changes the load of the shadow plant per SA-day. Steps and data format: [`savings-ledger-v2-plan.md`](savings-ledger-v2-plan.md).
 

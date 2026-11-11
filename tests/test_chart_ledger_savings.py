@@ -51,6 +51,7 @@ def _state(*slots: dict, soc_actual_end: float | None = 30.0, prev: float | None
         chain_start=_DAY_START,
         chain_start_reason=sl.CHAIN_FIRST_RUN,
         shadow_soc=20.0,
+        shadow_soc_day_start=20.0,
         day_start=_DAY_START,
         day_end=_DAY_END,
         last_slot_start=datetime.fromisoformat(slots[-1]["slot_start"]) if slots else None,

@@ -27,7 +27,7 @@ from optimizer.slot_duration import DEFAULT_DT_H, validate_dt_h
 from runtime_store.power_interval_sampler import MIN_SAMPLE_COUNT_FOR_MEAN
 from runtime_store.savings_ledger_flex import FlexDayInputs, retime_flex_day
 
-SAVINGS_V = 1
+SAVINGS_V = 2
 # First version with the day replay (flex re-timing, spec § 7); ``SAVINGS_V`` reaches it in Ledger P9d.
 SAVINGS_V_REPLAY = 2
 

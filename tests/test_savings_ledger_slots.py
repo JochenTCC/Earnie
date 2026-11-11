@@ -9,6 +9,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
+from ledger_flex_helpers import no_flex
 from runtime_store import savings_ledger as sl
 from runtime_store import savings_ledger_store as store
 
@@ -55,10 +56,10 @@ def _closed_day() -> tuple[dict, dict]:
     inputs.append(sl.LedgerInput(start + timedelta(minutes=105), _closed(1.0, 1.5), None, None))
     state = sl.start_chain(inputs[0], _day_bounds, reason=sl.CHAIN_FIRST_RUN)
     for inp in inputs:
-        state, _ = sl.advance(state, inp, BATTERY, _day_bounds, app_version="test")
+        state, _ = sl.advance(state, inp, BATTERY, _day_bounds, app_version="test", day_flex=no_flex)
     closing = state
     next_slot = sl.LedgerInput(start + timedelta(days=1), _closed(1.0, 1.5), 30.0, 8.0)
-    _, row = sl.advance(state, next_slot, BATTERY, _day_bounds, app_version="test")
+    _, row = sl.advance(state, next_slot, BATTERY, _day_bounds, app_version="test", day_flex=no_flex)
     return row, sl.day_slots_record(closing)
 
 
@@ -97,7 +98,7 @@ def test_error_slot_has_all_slot_file_fields():
 def test_slot_rows_of_an_older_state_without_house_energy_raise():
     start = datetime(2026, 11, 1, 7, 0, tzinfo=TZ)
     state = sl.start_chain(sl.LedgerInput(start, _closed(1.0, 1.5), 30.0, 8.0), _day_bounds, reason="first_run")
-    state, _ = sl.advance(state, sl.LedgerInput(start, _closed(1.0, 1.5), 30.0, 8.0), BATTERY, _day_bounds, app_version="t")
+    state, _ = sl.advance(state, sl.LedgerInput(start, _closed(1.0, 1.5), 30.0, 8.0), BATTERY, _day_bounds, app_version="t", day_flex=no_flex)
     old = {k: v for k, v in state.slots[0].items() if k != "house_kwh"}
 
     with pytest.raises(KeyError, match="house_kwh"):

@@ -24,7 +24,7 @@ _SLOT = datetime(2026, 11, 4, 8, 0, tzinfo=_TZ)
 _DAY_START = datetime(2026, 11, 4, 7, 9, tzinfo=_TZ)
 _DAY_END = datetime(2026, 11, 5, 7, 10, tzinfo=_TZ)
 _NOW = datetime(2026, 11, 4, 12, 0, tzinfo=_TZ)
-_TODAY_LINE = "Heute bisher: 0,20 € gespart · SoC-Korrektur: 0,00 € gutgeschrieben"
+_TODAY_LINE = "Heute bisher (vorläufig): 0,20 € gespart · SoC-Korrektur: 0,00 € gutgeschrieben"
 
 
 @pytest.fixture
@@ -43,6 +43,7 @@ def _write_state(runtime: Path, *, without_eur: float = 0.3) -> None:
         chain_start=_CHAIN,
         chain_start_reason=sl.CHAIN_FIRST_RUN,
         shadow_soc=20.0,
+        shadow_soc_day_start=20.0,
         day_start=_DAY_START,
         day_end=_DAY_END,
         last_slot_start=_SLOT,

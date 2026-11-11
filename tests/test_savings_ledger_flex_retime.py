@@ -7,6 +7,7 @@ import pandas as pd
 import pytest
 
 from data.profile_manager import FlexProfileReadError, load_flexible_consumer_slot_profiles_strict
+from ledger_flex_helpers import no_flex
 from runtime_store import savings_ledger as sl
 from runtime_store import savings_ledger_flex as slf
 
@@ -241,12 +242,12 @@ def test_slot_rows_carry_pv_and_sell_price():
 
     inp = sl.LedgerInput(start, _closed(2.0), k_act_cent=30.0, k_push_cent=8.0)
     state = sl.start_chain(inp, bounds, reason=sl.CHAIN_FIRST_RUN)
-    state, _ = sl.advance(state, inp, battery, bounds, app_version="t", dt_h=DT)
+    state, _ = sl.advance(state, inp, battery, bounds, app_version="t", dt_h=DT, day_flex=no_flex)
     counted = state.slots[-1]
     assert counted["pv_kwh"] == pytest.approx(0.5)
     assert counted["k_push_cent"] == 8.0
     no_price = sl.LedgerInput(start + timedelta(minutes=15), _closed(2.0), None, None)
-    state, _ = sl.advance(state, no_price, battery, bounds, app_version="t", dt_h=DT)
+    state, _ = sl.advance(state, no_price, battery, bounds, app_version="t", dt_h=DT, day_flex=no_flex)
     assert state.slots[-1]["pv_kwh"] == 0.0
     assert state.slots[-1]["k_push_cent"] is None
     state = sl.record_error_slot(state, start + timedelta(minutes=30))

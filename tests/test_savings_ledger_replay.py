@@ -156,7 +156,7 @@ def test_logged_timing_saving_equals_the_causal_day():
 
 
 def _run_v1(inputs):
-    state = sl.start_chain(inputs[0], day_bounds, reason=sl.CHAIN_FIRST_RUN)
+    state = sl.start_chain(inputs[0], day_bounds, reason=sl.CHAIN_FIRST_RUN, savings_v=1)
     rows = []
     for inp in inputs:
         state, row = sl.advance(state, inp, BATTERY, day_bounds, app_version="test")
@@ -253,7 +253,9 @@ def test_v2_day_close_needs_the_flex_inputs():
 
 def test_chain_without_battery_needs_v2():
     with pytest.raises(ValueError, match="savings_v"):
-        sl.start_chain(_closing_slot(DAY1), day_bounds, reason=sl.CHAIN_FIRST_RUN, with_battery=False)
+        sl.start_chain(
+            _closing_slot(DAY1), day_bounds, reason=sl.CHAIN_FIRST_RUN, savings_v=1, with_battery=False
+        )
 
 
 def test_state_round_trip_keeps_the_day_start_soc():

@@ -153,10 +153,12 @@ Die kompakten Buttons stehen in einer Zeile **ohne** Fließtext dazwischen (mobi
 
 | Bereich | Mit Earnie | Vergleich |
 |---------|------------|-----------|
-| Links von **Jetzt** | gebuchte Kosten aus dem Ersparnis-Buch („Mit Earnie (gebucht)“) | Vergleichsanlage des Buchs: gleicher Verbrauch, gleiche PV, Batterie im Herstellermodus, gleiche Preise („Ohne Earnie (gebucht)“) |
+| Links von **Jetzt** | gebuchte Kosten aus dem Ersparnis-Buch („Mit Earnie (gebucht)“) | Vergleichsanlage des Buchs: gleiche PV, gleiche Preise, je Gerät der gleiche Tagesverbrauch zur gewohnten Zeit, Batterie im Herstellermodus („Ohne Earnie (gebucht)“) |
 | Rechts von **Jetzt** | Plan („Optimiert (Plan)“, gestrichelt) | **BL Ziel** ab dem Speicherstand der Vergleichsbatterie („BL Ziel (Plan)“, gestrichelt) |
 
 Die Vergleichslinie ändert bei **Jetzt** also ihre Bedeutung: links die Vergleichsanlage des Buchs, rechts BL Ziel. Der **?**-Hilfetext sagt das ebenfalls.
+
+**Abgeschlossene Tage und laufender Tag.** Das Buch rechnet jeden Tag nach, wenn er abgeschlossen ist: Erst dann steht fest, wie viel Energie jedes Gerät an diesem Tag bekommen hat, und erst dann lässt sich diese Energie in die gewohnte Zeit legen. Für den laufenden Tag zählt bis dahin nur die Batterie; verschobene Geräte, E-Auto und Heizstab kommen beim Tagesabschluss dazu. Links von **Jetzt** kann sich die Vergleichslinie eines Tages deshalb mit seinem Abschluss noch ändern.
 
 **SoC am Ende.** Plan und BL Ziel starten bei **Jetzt** von verschiedenen Speicherständen. Der Abstand der Linien enthält deshalb auch den Wert der Energie, die der Plan zu Beginn mehr oder weniger im Speicher hat. Das Label „SoC am Ende“ nennt, wie sich der Wert dieses Speicherabstands bis zum Fensterende ändert, mit derselben Formel wie die SoC-Korrektur des Buchs. Es steckt wie diese in keinem Abstand: Erst „Erwartet“ und „SoC am Ende“ zusammen zeigen, was der Plan gegenüber BL Ziel bringt.
 
@@ -171,13 +173,21 @@ Die Fläche zwischen den Linien ist **grün**, wo gespart wurde, und **rot**, wo
 
 **Orange Slots** hat das Buch nicht gezählt (fehlende Messwerte, Buch nicht gelaufen, fehlende Log-Daten). Sie zählen auf beiden Seiten null. Die gerade laufende Viertelstunde erscheint erst, wenn sie gebucht ist. Läuft das Buch nicht oder ist es nicht lesbar, steht unter dem Chart ein kurzer Hinweis.
 
-**Verbrauchskontrolle.** Das kleine Panel darunter prüft nur, ob beide Seiten mit demselben Verbrauch gerechnet wurden; es ist kein zweites Ergebnis. Es zeigt Vergleich minus optimiert in kWh, **null am Horizontende** (auch wenn das sichtbare Fenster früher endet). Der Wert bei Jetzt ist der Energieunterschied des Plans über den restlichen Horizont. Rechts von Jetzt zeigt die Linie auch zeitlich verschobene Verbraucher: Sie verlässt null, solange eine Seite früher verbraucht, und kehrt zurück, wenn die andere aufholt. Links von Jetzt ist sie flach, weil beide Seiten denselben gemessenen Verbrauch nutzen. Unterscheidet sich die Energie bei Jetzt um mindestens 0,5 kWh und mindestens 2 % des geplanten Verbrauchs, nennt ein Hinweis unter dem Chart den Unterschied: „Erwartet“ enthält dann auch den Preis dieser Energie.
+**Verbrauchskontrolle.** Das kleine Panel darunter prüft nur, ob beide Seiten mit demselben Verbrauch gerechnet wurden; es ist kein zweites Ergebnis. Es zeigt Vergleich minus optimiert in kWh, **null am Horizontende** (auch wenn das sichtbare Fenster früher endet). Der Wert bei Jetzt ist der Energieunterschied des Plans über den restlichen Horizont. Rechts von Jetzt zeigt die Linie auch zeitlich verschobene Verbraucher: Sie verlässt null, solange eine Seite früher verbraucht, und kehrt zurück, wenn die andere aufholt. Links von Jetzt ist sie flach: Beide Seiten haben je Tag dieselbe Energie, das Buch verschiebt Geräte nur innerhalb eines Tages. Unterscheidet sich die Energie bei Jetzt um mindestens 0,5 kWh und mindestens 2 % des geplanten Verbrauchs, nennt ein Hinweis unter dem Chart den Unterschied: „Erwartet“ enthält dann auch den Preis dieser Energie.
 
 ### Kachel „Mit Earnie gespart“
 
-Über Chart 2 zeigt der Monitor das Ergebnis aller abgeschlossenen SA-Tage seit Beginn der Zählung, mit Datum und Anzahl der Tage. War Earnie insgesamt teurer, heißt die Kachel „Mit Earnie mehr ausgegeben“. **Heute bisher** nennt den laufenden Tag mit denselben Zahlen wie **Bisher** und **SoC** in Chart 2, beide stammen aus demselben Stand. Der Tag geht erst mit seinem Abschluss in die Summe ein, weil seine SoC-Korrektur bis dahin vorläufig ist. Die Zeile fehlt, solange der Tag keine gebuchte Viertelstunde hat oder Chart 2 noch keine Daten zeigt, und sobald der Tag zu Ende ist. Der **?**-Hilfetext nennt den Vergleich, seine Grenzen und die Anzahl der unvollständigen Tage ([Handbuch](../user-manual/Benutzer-Handbuch-Earnie.md#monitor)).
+Über Chart 2 zeigt der Monitor das Ergebnis aller abgeschlossenen SA-Tage seit Beginn der Zählung, mit Datum und Anzahl der Tage. War Earnie insgesamt teurer, heißt die Kachel „Mit Earnie mehr ausgegeben“. Verglichen wird mit einer Anlage ohne Earnie: gleiche PV, gleiche Preise und je Gerät der gleiche Tagesverbrauch, aber zur gewohnten Zeit: Geräte nach ihrem Profil oder in ihrem Zeitfenster, der Poolfilter in seinem eigenen Fenster, das E-Auto ab dem Einstecken mit voller Leistung, ein Heizstab neben Gas, Öl oder Pellets aus und seine Wärme aus dem Brennstoff; eine Hausbatterie im Herstellermodus (Eigenverbrauch).
 
-Die Kachel und ihre Zeile **Heute bisher** bleiben beim Blättern in frühere Tage gleich. Fehlt ein Ergebnis, steht dort kein Betrag, sondern der Grund: Das Buch läuft noch nicht, es gibt keine Hausbatterie, noch keinen abgeschlossenen Tag oder keine gebuchte Viertelstunde. Ein unlesbares Buch erscheint als Warnung.
+**Heute bisher (vorläufig)** nennt den laufenden Tag mit denselben Zahlen wie **Bisher** und **SoC** in Chart 2, beide stammen aus demselben Stand. Vorläufig heißt: Bis zum Tagesabschluss zählt nur die Batterie, verschobene Geräte, E-Auto und Heizstab kommen dann dazu. Der Tag geht erst mit seinem Abschluss in die Summe ein. Die Zeile fehlt, solange der Tag keine gebuchte Viertelstunde hat oder Chart 2 noch keine Daten zeigt, und sobald der Tag zu Ende ist.
+
+Der **?**-Hilfetext nennt den Vergleich, seine Grenzen und die Anzahl der unvollständigen Tage ([Handbuch](../user-manual/Benutzer-Handbuch-Earnie.md#monitor)). Er nennt auch die Geräte **ohne eigenen Zähler**: Ihr Verschieben ist nicht bewertet, sie zählen im Vergleich zur gemessenen Zeit. Auf Home Assistant zählt ein Gerät nur mit zugeordneter Leistung (`sens_power_act`, beim E-Auto die Ladeleistung der Wallbox) oder, bei Geräten ohne Leistungsvorgabe, mit Laufstatus (`sens_consumer_active`). Auf OpenEMS liest Earnie keine Leistung je Gerät; dort zählt nur die Batterie.
+
+**Ohne Hausbatterie** läuft das Buch auch: Die Vergleichsanlage hat dann ebenfalls keine Batterie, und eine SoC-Korrektur gibt es nicht.
+
+**Neue Zählung nach einem Update.** Ändert sich die Rechnung des Buchs, beginnt eine neue Zählung; die frühere Summe ist darin nicht enthalten. In der ersten Woche sagt das eine Zeile unter der Kachel. Wer die neue Zählung rückwirkend aus dem Verlauf füllen will, baut das Buch neu auf (Earnie vorher stoppen): `python -m scripts.build_savings_ledger --since <JJJJ-MM-TT> --rebuild`.
+
+Die Kachel und ihre Zeile **Heute bisher** bleiben beim Blättern in frühere Tage gleich. Fehlt ein Ergebnis, steht dort kein Betrag, sondern der Grund: Das Buch läuft noch nicht, es gibt noch keinen abgeschlossenen Tag oder keine gebuchte Viertelstunde. Ein unlesbares Buch erscheint als Warnung.
 
 ## Expander: Simulations-Details
 
