@@ -22,6 +22,7 @@ from .charging_context import (  # noqa: F401  (consumer_charging_eligible_indic
 from .generic_flex_run import continue_on_from_state, update_generic_flex_run_state
 from .filter_context import adjust_targets_for_native_filter, resolve_filter_contexts
 from .fixed_load import adjust_targets_for_continuous_load
+from .import_cap_report import first_slot_mark
 from .import_power_limit import ImportCaps
 from .milp import milp_horizon_schedule, milp_optimizer
 from .targets import (
@@ -122,7 +123,7 @@ def _simulate_single_hour_optimizer(
         len(remaining_matrix),
     )
     consumers_cfg = flexible_consumers or config.get_flexible_consumers(optimizer_only=True)
-    mode, target_power, target_soc, consumer_powers, consumer_pv_follow, _, _ = milp_optimizer(
+    mode, target_power, target_soc, consumer_powers, consumer_pv_follow, plan, _ = milp_optimizer(
         remaining_matrix,
         h,
         sim_soc,
@@ -142,7 +143,7 @@ def _simulate_single_hour_optimizer(
         soc_hold_percent=soc_hold_percent if rel_hold is not None else None,
         import_caps=import_caps,
     )
-    return _chart_row_from_controls(
+    result = _chart_row_from_controls(
         row,
         sim_soc,
         battery_params,
@@ -152,6 +153,10 @@ def _simulate_single_hour_optimizer(
         consumer_powers,
         consumer_pv_follow,
     )
+    mark = first_slot_mark(plan, import_caps) if import_caps is not None else None
+    if mark is not None:
+        result[1].update(mark)
+    return result
 
 
 

@@ -3,6 +3,10 @@
 The charge bills the highest quarter hour of each calendar month, so it differs per month and per
 result. It never enters ``sim_cost``: like the fixed fees it is added to the summary and the invoice.
 Prices, minimum and start date come from the grid area through Edibert.
+
+For a result planned with a cap, each booked slot over the cap gets a cause (P6c): the plan's own
+(``optimizer.import_cap_report``) when the plan went over its limit there, ``not_planned`` for a
+trivial window or Automatik, else one of the two SE causes below.
 """
 from __future__ import annotations
 
@@ -12,11 +16,23 @@ from datetime import date
 
 import pandas as pd
 
+from optimizer.import_cap_report import CAUSE_LABELS_DE, SLOT_CAUSE_KEY, SLOT_LIMIT_KEY
 from optimizer.slot_duration import DEFAULT_DT_H, validate_dt_h
 from simulation.booked_consumption import _unique_slots
 
 CAPACITY_KEY = "capacity_by_scenario"
 _OVER_CAP_TOLERANCE_KW = 1e-6
+
+# The plan held its limit, but an earlier peak of the month had lifted that limit above the cap.
+CAUSE_MONTH_PEAK = "month_peak"
+# The plan held its limit, the booked slot did not (forecast mode, or the control mapping).
+CAUSE_BOOKED_ABOVE_PLAN = "booked_above_plan"
+
+SE_CAUSE_LABELS_DE = {
+    **CAUSE_LABELS_DE,
+    CAUSE_MONTH_PEAK: "Monatsspitze schon höher, Grenze angehoben",
+    CAUSE_BOOKED_ABOVE_PLAN: "Gebucht über dem Plan",
+}
 
 
 @dataclass(frozen=True)
@@ -33,6 +49,8 @@ class CapacityMonth:
     # Only for a result planned with a cap. The booked rows can differ from the plan.
     import_cap_kw: float | None = None
     slots_over_cap: int = 0
+    days_over_cap: int = 0
+    causes_over_cap: dict[str, int] = field(default_factory=dict)  # main cause → booked slots
 
 
 @dataclass(frozen=True)
@@ -67,11 +85,10 @@ def _pricing_reference(params: dict | None) -> dict | None:
     return ref if isinstance(ref, dict) else None
 
 
-def _booked_import_kw(df: pd.DataFrame) -> pd.Series:
-    """Booked import power per slot; every slot counts once (last booking wins)."""
-    if "import_kwh" not in df.columns:
+def _booked_import_kw(unique: pd.DataFrame) -> pd.Series:
+    """Booked import power per slot of rows that hold every slot once."""
+    if "import_kwh" not in unique.columns:
         raise ValueError("Leistungspreis: Ergebnisreihe ohne Spalte import_kwh.")
-    unique, _duplicates = _unique_slots(df)
     return unique["import_kwh"].fillna(0.0).clip(lower=0.0) / validate_dt_h(DEFAULT_DT_H)
 
 
@@ -84,10 +101,47 @@ def _month_peaks(power_kw: pd.Series) -> dict[str, tuple[float, pd.Timestamp]]:
     return peaks
 
 
-def _slots_over_cap(power_kw: pd.Series, month: str, cap_kw: float | None) -> int:
+@dataclass(frozen=True)
+class _OverCap:
+    slots: int = 0
+    days: int = 0
+    causes: dict[str, int] = field(default_factory=dict)
+
+
+def _slot_cause(power_kw: float, limit_kw: float, plan_cause: object) -> str:
+    if isinstance(plan_cause, str) and plan_cause:
+        return plan_cause
+    if power_kw <= limit_kw + _OVER_CAP_TOLERANCE_KW:
+        return CAUSE_MONTH_PEAK
+    return CAUSE_BOOKED_ABOVE_PLAN
+
+
+def _over_cap(unique: pd.DataFrame, power_kw: pd.Series, month: str, cap_kw: float | None) -> _OverCap:
+    """Booked slots over the cap in ``month``: count, days touched and main causes."""
     if cap_kw is None:
-        return 0
-    return int((power_kw[power_kw.index.strftime("%Y-%m") == month] > cap_kw + _OVER_CAP_TOLERANCE_KW).sum())
+        return _OverCap()
+    in_month = power_kw.index.strftime("%Y-%m") == month
+    over = power_kw[in_month & (power_kw > cap_kw + _OVER_CAP_TOLERANCE_KW).to_numpy()]
+    if over.empty:
+        return _OverCap()
+    missing = [col for col in (SLOT_LIMIT_KEY, SLOT_CAUSE_KEY) if col not in unique.columns]
+    if missing:
+        raise ValueError(
+            f"Bezugsgrenze: Ergebnisreihe ohne Spalte {', '.join(missing)}, "
+            "obwohl mit Grenze geplant wurde."
+        )
+    causes: dict[str, int] = {}
+    for slot, kw in over.items():
+        limit = unique.at[slot, SLOT_LIMIT_KEY]
+        if pd.isna(limit):
+            raise ValueError(f"Bezugsgrenze: gebuchter Slot {slot} über der Grenze ohne Plan-Grenze.")
+        cause = _slot_cause(float(kw), float(limit), unique.at[slot, SLOT_CAUSE_KEY])
+        causes[cause] = causes.get(cause, 0) + 1
+    return _OverCap(
+        slots=len(over),
+        days=int(over.index.normalize().nunique()),
+        causes=dict(sorted(causes.items(), key=lambda item: (-item[1], item[0]))),
+    )
 
 
 def capacity_for_result(
@@ -116,13 +170,15 @@ def capacity_for_result(
     used: dict[str, object] = {}
     if fee.capacity and not df.empty:
         factor = 1.0 + float(tariff(ref, IMPORT).vat_percent) / 100.0
-        power_kw = _booked_import_kw(df)
+        unique, _duplicates = _unique_slots(df)
+        power_kw = _booked_import_kw(unique)
         for month, (peak_kw, slot) in sorted(_month_peaks(power_kw).items()):
             charge = capacity_charge_for_month(fee, date.fromisoformat(f"{month}-01"))
             if charge is None:
                 continue
             net = capacity_charge_net_eur(charge, peak_kw)
             used[charge.id] = charge
+            over = _over_cap(unique, power_kw, month, planned_cap_kw)
             months.append(
                 CapacityMonth(
                     month=month,
@@ -133,7 +189,9 @@ def capacity_for_result(
                     net_eur=net,
                     gross_eur=net * factor,
                     import_cap_kw=planned_cap_kw,
-                    slots_over_cap=_slots_over_cap(power_kw, month, planned_cap_kw),
+                    slots_over_cap=over.slots,
+                    days_over_cap=over.days,
+                    causes_over_cap=over.causes,
                 )
             )
     return CapacityResult(

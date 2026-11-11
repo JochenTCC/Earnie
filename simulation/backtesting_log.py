@@ -189,6 +189,8 @@ def _hourly_to_csv(results: dict[str, pd.DataFrame], labels: dict[str, str]) -> 
         "sim_soc",
         "batt_action_kw",
         "steuerbefehl",
+        "import_cap_limit",
+        "import_cap_cause",
     ]
     col_order = base_order + flex_cols + tail_order
     return out[[c for c in col_order if c in out.columns]]

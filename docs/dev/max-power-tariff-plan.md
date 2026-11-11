@@ -1,6 +1,6 @@
 # Max-power dependent tariff: implementation plan (Version 2.8)
 
-**Status:** P0–P5b, P6a and P6b on `main` (PR #96 merged 2026-11-08; P6a and P6b 2026-11-11). Open: P5c field test, P6c, P7.
+**Status:** P0–P5b and P6a–P6c on `main` (PR #96 merged 2026-11-08; P6a–P6c 2026-11-11). Open: P5c field test with the margin proposal, P7.
 **Backlog item:** **Implement max-power dependent tariff**, Version 2.8. Scope as decided on 2026-11-07: dev doc steps L2, L3 and L4, stage A of [`Capacity-Peak-Budget-Draft.md`](../../backlog/Capacity-Peak-Budget-Draft.md) with a cap the user chooses.
 **Regulation:** [`SNE-G-V-2027-Research.md`](../../backlog/SNE-G-V-2027-Research.md).
 
@@ -207,11 +207,35 @@ Split on 2026-11-11 (maintainer) into **P6a** report, **P6b** Monitor page and *
 - **Tests:** `tests/test_capacity_charge_panel.py` (billing, minimum, band limit, unknown month, planning limit, inactive, D5, report and measured filtering, Edibert gap, main cause), `tests/apptest/test_capacity_charge_panel_apptest.py` (shown, hidden, warning with details, unknown month, not planned, D5, inactive, error), Monitor smoke: hidden without cap and charge.
 - **Not checked:** the block in a running app with a real cap; covered by AppTest only.
 
-Open in P6c:
+**P6c built 2026-11-11.** The SE month report names days and causes; a HouseSim run at 1.5 kW and a first estimate of the margin's forecast part.
 
-- SE (P6c): slots and days per month where the cap did not hold, with the causes.
-- Set the proposal from D7 from the field test in P5 and a HouseSim run: forecast error plus measurement error (after the field test).
-- **Tests:** SE table (P6c).
+- **Cause per booked slot:** `milp_horizon_schedule` (the SE's open-loop path) gives each slot with a limit the limit and, where the plan goes over it, the main cause (`import_cap_report.plan_slot_marks`, the same reading as the Live report). A trivial window and a failed solve mark their slots `not_planned`. The slot-by-slot path (`commit_hours` 1, fixed_24h only) takes slot 0's cause from the report `milp_optimizer` puts into the plan (`first_slot_mark`). The chart rows carry both; a run planned with a cap adds the columns `import_cap_limit` and `import_cap_cause` to its result and the SE log CSV. They do not end in `_kw`, because every `*_kw` column of the log counts as a consumer. A run without a cap has neither, so plans and goldens stay as they were.
+- **Month report:** `CapacityMonth` gains `days_over_cap` (local calendar days with at least one booked slot over the cap) and `causes_over_cap` (main cause → booked slots, most first). A booked slot over the cap takes the plan's cause; without one the SE adds two causes of its own: **month peak** when the booked slot stayed within the plan's limit, so an earlier peak of the month had lifted the limit above the cap (the ratchet), and **booked above the plan** when it went over the plan's limit (forecast mode, or the control mapping in `derive_control_from_milp_plan`). A capped result without the columns, or a slot over the cap without a plan limit, is an error.
+- **Table:** "Tage über der Grenze" and "Hauptursachen" (German label: slots, most first) next to "Viertelstunden über der Grenze". Logs written before P6c show a dash. German docs: `docs/ui/betriebsmodi.md`.
+- **Tests:** `tests/test_se_import_cap_causes.py` (marks per slot, schedule, trivial window and failed solve, slot 0 of the per-slot path, chart rows of both paths, days and each SE cause, missing columns, a run where every slot over a 0.1 kW cap has a cause, a run without a cap has no columns, table and old logs).
+
+**HouseSim run at 1.5 kW (2026-11-11).** Same bench as P5c (HA 2025.7.0, archetype `earnie_pack`, Earnie built from the working tree in Docker), Live scenario with `import_cap_kw` 1.5 and margin 0.3, the placeholder charge on the user grid area. The bench's `capacity_peaks.json` held 18.07 kW from an earlier run (limit 17.77 kW, cap without effect), so it was moved aside; November then counted as unknown and the plan held the cap itself. Seen in four cycles (13:40 to 14:00):
+
+- **Report:** the plan cannot hold 1.2 kW in 44 to 46 quarter hours (highest planned import 4.3 to 5.2 kW: heat pump and swim spa with targets, plus base load). Main causes: battery empty or reserve in all slots but the first (battery at 56 % with the evening and night ahead); the first slot names the consumer with a target, once battery power. `runtime/import_cap_report.json`, the warning in `earnie.log` and `outputs.import_cap_report` in the cycle record agree.
+- **Measured:** the quarter hour 13:45 closed at 2.44 kW (mean of samples; the bench has no import counter), 0.94 kW over 1.5 kW, and was stored as a measured overshoot with the plan's cause `consumer_target`. The month peak became 2.44 kW. The cycle at 13:59:45 still planned with 1.2 kW, since it starts 15 s before the quarter hour closes; the next one plans with the raised limit.
+- **What the cause says here:** the measured 2.44 kW is the archetype's constant base load (2.5 kW) with the battery idle; the sim does not model the heat pump and swim spa the plan counted on, so measured import stayed below the planned 4.3 kW. E2 takes the plan's cause for a slot the plan already had over its limit, so the measured event names the consumer although base load set it. That follows E2 by design; whether the measured check should compare measured and planned import before it takes the plan's cause is a question for P7 or later.
+- **Replay:** with HiGHS in production mode, the cycle whose replay solved within the strict limit gave the same plan hash, slots and causes. Three replays hit the 5 s strict limit on the development machine, where Live had solved in 0.5–1.1 s; their gap-stage plans differ (same slots with other causes in two, 47 instead of 44 slots with three "none detected" in one). So a replayed report is only comparable when the replay solves at the same stage, as P4 found for SE plans cut at the wall-clock limit.
+- **Not exercised:** the import counter path of the measured check (bench without counter), a month change, and a cap in the SE on the bench.
+
+**Margin, forecast part (estimate 2026-11-11, for the proposal only).** Defaults unchanged; the placeholder 0.3 kW stays until the field test. Method: the Shadow's optimization history holds, per quarter-hour cycle, the plan inputs of slot 0 (base-load forecast `expected_p_act`, PV forecast), and the next cycle's closed quarter hour holds the measured house load, PV and the optimized consumers. Forecast error = measured net load (house − optimized consumers − PV) − forecast net load (base load − PV), per quarter hour. Battery and optimized consumers are left out on both sides, since Prod, not the Shadow, controls them. One house, 11 November days, 983 quarter hours, so a first figure, not a value to ship:
+
+| Quarter hours | n | Mean | P90 | P95 | P99 | Max |
+|---|---:|---:|---:|---:|---:|---:|
+| all | 983 | +0.25 | +1.1 | +1.5 | +2.1 | +3.2 |
+| forecast net load ≥ 1 kW | 117 | −0.6 | +0.3 | +0.4 | +0.7 | +0.8 |
+| measured net load in the top tenth | 99 | +0.8 | +2.0 | +2.2 | +3.1 | +3.2 |
+
+kW, positive = more import than planned. Read:
+
+- Where the plan already expects a high import, and the cap binds, the forecast part is about 0.4 kW at P95 and 0.7 kW at P99. The placeholder 0.3 kW covers about 90 % of those quarter hours.
+- The month's highest measured quarter hours come mostly from load the forecast did not see (cooking, appliances): +2.2 kW at P95. No margin of sensible size covers that; it is the case for control inside the quarter hour (L4b, Version 2.+1) and for the docs' "reliable plan, no guarantee".
+- Base load is under-forecast on average by 0.25 kW (0.14 kW without PV), so part of the margin is bias, not noise.
+- Proposal input once the field test adds the measurement error: forecast part 0.4 kW (P95 where the cap binds) plus the measured error at peak quarter hours.
 
 ### P7: Docs and close
 

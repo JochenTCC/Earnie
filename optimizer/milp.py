@@ -51,6 +51,8 @@ from .import_cap_report import (
     NOT_PLANNED_AUTOMATIK,
     NOT_PLANNED_TRIVIAL,
     not_planned_report,
+    not_planned_slot_marks,
+    plan_slot_marks,
     report_from_model,
 )
 from .milp_vendor_mode import add_vendor_mode_export_constraints, plan_vendor_mode_enabled
@@ -647,7 +649,10 @@ def milp_horizon_schedule(
         )
         is not None
     ):
-        return trivial_horizon_schedule(len(matrix))
+        schedule = trivial_horizon_schedule(len(matrix))
+        if import_caps is None:
+            return schedule
+        return _with_slot_marks(schedule, not_planned_slot_marks(import_caps, len(schedule)))
     fallback_k_push = k_push if k_push is not None else config.get_push_price_cent()
     solved = _solve_milp_to_model(
         matrix,
@@ -676,9 +681,22 @@ def milp_horizon_schedule(
         import_caps=import_caps,
     )
     if solved is None:
-        return [dict(_FALLBACK_SCHEDULE_SLOT)]
-    model, preset_by_slot, _, _, _, _ = solved
-    return extract_horizon_schedule(model, primary, preset_by_slot)
+        fallback = [dict(_FALLBACK_SCHEDULE_SLOT)]
+        if import_caps is None:
+            return fallback
+        return _with_slot_marks(fallback, not_planned_slot_marks(import_caps, 1))
+    model, preset_by_slot, remaining, _, _, _ = solved
+    schedule = extract_horizon_schedule(model, primary, preset_by_slot)
+    if import_caps is None:
+        return schedule
+    return _with_slot_marks(schedule, plan_slot_marks(model, matrix, import_caps, remaining))
+
+
+def _with_slot_marks(
+    schedule: list[dict[str, Any]], marks: list[dict[str, Any] | None]
+) -> list[dict[str, Any]]:
+    """Schedule slots with the import cap's limit and cause (SE log, P6c); slots without a limit stay."""
+    return [slot if mark is None else {**slot, **mark} for slot, mark in zip(schedule, marks)]
 
 
 # Re-Exports für Tests und interne Aufrufer (API-Stabilität).

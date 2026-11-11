@@ -11,6 +11,7 @@ import config
 from data import feed_in_prices
 from data.backtesting_prices import BacktestingPriceResources
 from house_config.import_cap import parse_import_cap
+from optimizer.import_cap_report import SLOT_CAUSE_KEY, SLOT_LIMIT_KEY
 from optimizer.slot_duration import wall_hours_from_slots
 from optimizer import (  # noqa: F401  (simulate_horizon: patch target of the anchor_step facade)
     _calculate_step_cost_parts_from_row,
@@ -457,6 +458,10 @@ def _finalize_simulation_result(
         index=pd.DatetimeIndex(all_timestamps),
     )
     df_res.index.name = "ts"
+    if any(SLOT_LIMIT_KEY in row for row in all_chart_rows):
+        # Planned with an import cap: the plan's limit and cause per booked slot (P6c).
+        df_res[SLOT_LIMIT_KEY] = [row.get(SLOT_LIMIT_KEY, float("nan")) for row in all_chart_rows]
+        df_res[SLOT_CAUSE_KEY] = [row.get(SLOT_CAUSE_KEY) for row in all_chart_rows]
     return df_res
 
 

@@ -172,20 +172,20 @@ def _slot_causes(
     return causes or [CAUSE_NONE], consumers
 
 
-def report_from_model(
+def _over_slots(
     model: MilpHorizonModel,
     matrix: Sequence[Mapping[str, Any]],
     caps: ImportCaps,
     consumer_remaining_kwh: Mapping[str, float] | None,
-) -> dict[str, Any]:
-    """The report of a solved model that was planned under ``caps``."""
+) -> list[tuple[int, dict[str, Any]]]:
+    """Slot index and report entry of every slot whose plan goes over its limit."""
     slack = model.import_cap_slack
     if slack is None:
         raise ValueError("Bezugsgrenzen-Bericht: das Modell hat keine Bezugsgrenze.")
     discharge, energy = _ess_lists(model)
     inverter_slots = _binding_inverter_slots(model)
     remaining = consumer_remaining_kwh or {}
-    slots: list[dict[str, Any]] = []
+    slots: list[tuple[int, dict[str, Any]]] = []
     for t in range(model.horizon):
         if slack[t] is None:
             continue
@@ -197,7 +197,7 @@ def report_from_model(
             model, t, limit_kw, discharge, energy, inverter_slots, remaining
         )
         slots.append(
-            {
+            (t, {
                 "slot": _slot_iso(matrix, t),
                 "month": caps.months[t],
                 "import_kw": round(_value(model.p_grid_buy[t]), 3),
@@ -206,9 +206,69 @@ def report_from_model(
                 "cause": causes[0],
                 "causes": causes,
                 "consumers_kw": {cid: round(kw, 3) for cid, kw in consumers.items()},
-            }
+            })
         )
+    return slots
+
+
+def report_from_model(
+    model: MilpHorizonModel,
+    matrix: Sequence[Mapping[str, Any]],
+    caps: ImportCaps,
+    consumer_remaining_kwh: Mapping[str, float] | None,
+) -> dict[str, Any]:
+    """The report of a solved model that was planned under ``caps``."""
+    slots = [entry for _t, entry in _over_slots(model, matrix, caps, consumer_remaining_kwh)]
     return _report(planned=True, reason=None, caps=caps, matrix=matrix, slots=slots)
+
+
+# --- marks per plan slot, for the Scenario Explorer log (P6c) ------------------------------
+
+SLOT_LIMIT_KEY = "import_cap_limit"
+SLOT_CAUSE_KEY = "import_cap_cause"
+
+
+def _mark(limit_kw: float, cause: str | None) -> dict[str, Any]:
+    return {SLOT_LIMIT_KEY: float(limit_kw), SLOT_CAUSE_KEY: cause}
+
+
+def plan_slot_marks(
+    model: MilpHorizonModel,
+    matrix: Sequence[Mapping[str, Any]],
+    caps: ImportCaps,
+    consumer_remaining_kwh: Mapping[str, float] | None,
+) -> list[dict[str, Any] | None]:
+    """Per slot: the limit and, if the plan goes over it, the main cause; ``None`` without a limit."""
+    causes = {t: entry["cause"] for t, entry in _over_slots(model, matrix, caps, consumer_remaining_kwh)}
+    return [
+        None if limit is None else _mark(limit, causes.get(t))
+        for t, limit in enumerate(caps.limits_kw[: model.horizon])
+    ]
+
+
+def not_planned_slot_marks(caps: ImportCaps, slots: int) -> list[dict[str, Any] | None]:
+    """Trivial window or Automatik: every slot with a limit is marked as not planned."""
+    return [
+        None if limit is None else _mark(limit, CAUSE_NOT_PLANNED)
+        for limit in caps.limits_kw[:slots]
+    ]
+
+
+def first_slot_mark(plan: Mapping[str, Any], caps: ImportCaps) -> dict[str, Any] | None:
+    """Mark of slot 0 from ``milp_optimizer``'s plan; used when the SE solves slot by slot."""
+    limit = caps.limits_kw[0] if caps.limits_kw else None
+    if limit is None:
+        return None
+    report = plan.get("import_cap_report")
+    if not isinstance(report, Mapping):
+        raise ValueError("Bezugsgrenzen-Bericht fehlt im Plan, obwohl eine Grenze gilt.")
+    if not report["planned"]:
+        return _mark(limit, CAUSE_NOT_PLANNED)
+    # Slot 0 comes first, so its entry, if any, is the first one; the slack says whether it has one.
+    over = float(plan.get("import_cap_slack_kw") or 0.0) > SLACK_TOLERANCE_KW
+    if over and not report["slots"]:
+        raise ValueError("Bezugsgrenzen-Bericht: Slot 0 über der Grenze, aber kein Eintrag.")
+    return _mark(limit, report["slots"][0]["cause"] if over else None)
 
 
 def not_planned_report(

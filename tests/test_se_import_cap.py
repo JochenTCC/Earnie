@@ -362,8 +362,15 @@ def _params_with_charge(tmp_path) -> dict:
     return {**_params(tmp_path, [_charge()]), **CAP}
 
 
+def _with_plan_marks(frame: pd.DataFrame) -> pd.DataFrame:
+    """The columns a capped run writes: the plan's limit (cap less margin) and no plan cause."""
+    return frame.assign(import_cap_limit=2.5, import_cap_cause=None)
+
+
 def test_report_counts_the_booked_slots_over_the_cap_per_month(tmp_path):
-    frame = _frame({datetime(2027, 1, 12, 18, 0): 5.0, datetime(2027, 2, 12, 18, 0): 2.0})
+    frame = _with_plan_marks(
+        _frame({datetime(2027, 1, 12, 18, 0): 5.0, datetime(2027, 2, 12, 18, 0): 2.0})
+    )
     months = capacity_for_result(frame, _params_with_charge(tmp_path), planned_cap_kw=3.0).months
     assert [(m.month, m.import_cap_kw, m.slots_over_cap) for m in months] == [
         ("2027-01", 3.0, 1),
@@ -378,7 +385,7 @@ def test_a_slot_exactly_at_the_cap_is_not_over_it(tmp_path):
 
 
 def test_a_reference_with_the_same_params_reports_no_cap(tmp_path):
-    frame = _frame({datetime(2027, 1, 12, 18, 0): 5.0})
+    frame = _with_plan_marks(_frame({datetime(2027, 1, 12, 18, 0): 5.0}))
     params = _params_with_charge(tmp_path)
     results = capacity_by_result(
         {"l3": frame, "ladder:l1": frame},
@@ -391,7 +398,7 @@ def test_a_reference_with_the_same_params_reports_no_cap(tmp_path):
 
 
 def test_the_cap_does_not_change_the_amount(tmp_path):
-    frame = _frame({datetime(2027, 1, 12, 18, 0): 5.0})
+    frame = _with_plan_marks(_frame({datetime(2027, 1, 12, 18, 0): 5.0}))
     params = _params_with_charge(tmp_path)
     assert (
         capacity_for_result(frame, params, planned_cap_kw=3.0).gross_eur

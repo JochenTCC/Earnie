@@ -215,7 +215,9 @@ def render_capacity_table(meta: dict) -> None:
             "Mindestleistung des Netzbereichs. Der Betrag ist brutto und in den Jahres- und "
             "Monatskosten enthalten, ein angebrochener Monat zählt voll. Die Monatswerte stehen "
             "in den Fake-Jahresrechnungen. Lastprofile aus Stundenwerten glätten kurze Spitzen, "
-            "die echte Spitze kann höher liegen."
+            "die echte Spitze kann höher liegen. Mit Bezugsgrenze zählen die Tage mit mindestens "
+            "einer Viertelstunde über der Grenze; die Hauptursachen nennen je solche Viertelstunde "
+            "eine Ursache aus dem Plan ihres Fensters."
         )
     if skipped:
         st.info(

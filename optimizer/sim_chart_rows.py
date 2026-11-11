@@ -6,6 +6,7 @@ from datetime import datetime
 from data.price_forecast_live import is_extrapolated_source
 from optimizer import battery as bat
 from optimizer.consumer_power import uses_pv_follow
+from optimizer.import_cap_report import SLOT_CAUSE_KEY, SLOT_LIMIT_KEY
 from optimizer.slot_duration import DEFAULT_DT_H
 from optimizer.targets import consumer_column_name, consumer_pv_follow_column_name
 
@@ -203,7 +204,7 @@ def _chart_row_from_schedule_slot(
         battery_params,
         dt_h=DEFAULT_DT_H,
     )
-    return _chart_row_from_controls(
+    result = _chart_row_from_controls(
         row,
         sim_soc,
         battery_params,
@@ -213,6 +214,10 @@ def _chart_row_from_schedule_slot(
         consumer_powers,
         consumer_pv_follow,
     )
+    if SLOT_LIMIT_KEY in slot:
+        result[1][SLOT_LIMIT_KEY] = slot[SLOT_LIMIT_KEY]
+        result[1][SLOT_CAUSE_KEY] = slot[SLOT_CAUSE_KEY]
+    return result
 
 
 def horizon_end_soc_from_chart_rows(chart_rows: list[dict]) -> float | None:

@@ -15,7 +15,7 @@ from simulation.engine import (
 )
 from optimizer.slot_duration import DEFAULT_DT_H
 from simulation.booked_consumption import BOOKED_CONSUMPTION_KEY
-from simulation.capacity_charge import CAPACITY_KEY
+from simulation.capacity_charge import CAPACITY_KEY, SE_CAUSE_LABELS_DE
 from simulation.reference_costs import LADDER_L2
 from simulation.jahres_verbrauch import jahres_standby_kwh, jahres_verbrauch_kwh
 from ui.consumption_validation_charts import cons_data_monthly_kwh
@@ -519,9 +519,28 @@ def build_capacity_rows(meta: dict) -> list[dict]:
                 "Viertelstunden über der Grenze": sum(
                     int(month.get("slots_over_cap", 0)) for month in months
                 ),
+                **_over_cap_cells(months),
             }
         )
     return rows
+
+
+def _over_cap_cells(months: list[dict]) -> dict[str, object]:
+    """Days and main causes over the cap; logs before P6c have neither and show a dash."""
+    if any(int(month.get("slots_over_cap", 0)) and "days_over_cap" not in month for month in months):
+        return {"Tage über der Grenze": _DASH, "Hauptursachen": _DASH}
+    causes: dict[str, int] = {}
+    for month in months:
+        for cause, slots in (month.get("causes_over_cap") or {}).items():
+            causes[cause] = causes.get(cause, 0) + int(slots)
+    ranked = sorted(causes.items(), key=lambda item: (-item[1], item[0]))
+    return {
+        "Tage über der Grenze": sum(int(month.get("days_over_cap", 0)) for month in months),
+        "Hauptursachen": (
+            "; ".join(f"{SE_CAUSE_LABELS_DE.get(cause, cause)}: {slots}" for cause, slots in ranked)
+            or _DASH
+        ),
+    }
 
 
 def capacity_skipped_text(meta: dict) -> str | None:
