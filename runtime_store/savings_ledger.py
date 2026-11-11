@@ -25,8 +25,11 @@ from optimizer.milp_horizon import (
 )
 from optimizer.slot_duration import DEFAULT_DT_H, validate_dt_h
 from runtime_store.power_interval_sampler import MIN_SAMPLE_COUNT_FOR_MEAN
+from runtime_store.savings_ledger_flex import FlexDayInputs, retime_flex_day
 
 SAVINGS_V = 1
+# First version with the day replay (flex re-timing, spec § 7); ``SAVINGS_V`` reaches it in Ledger P9d.
+SAVINGS_V_REPLAY = 2
 
 # Sources a slot may have per plant channel (spec § 4): energy counters exist for pv and grid only.
 _SOURCE_MEAN = "mean"
@@ -55,7 +58,7 @@ class LedgerSlot:
     skip_reason: str | None
     cost_with_eur: float
     cost_without_eur: float
-    shadow_soc_next: float
+    shadow_soc_next: float | None
     import_kwh_with: float
     import_kwh_without: float
     export_kwh_with: float
@@ -146,10 +149,33 @@ def _cost_eur(grid_kwh: float, k_act_cent: float, k_push_cent: float) -> float:
     return grid_kwh * k_push_cent / 100.0
 
 
+def _shadow_step(
+    pv_kw: float,
+    house_kw: float,
+    shadow_soc: float | None,
+    battery_params: dict | None,
+    dt: float,
+) -> tuple[float | None, float, float]:
+    """``(soc_next, battery_kw, grid_kwh)`` of the shadow plant in one slot.
+
+    With a battery: vendor mode on the load plus standby. Without one (v2, spec § 7):
+    ``grid = load - pv`` and no SoC. The causal step and the day replay share this
+    function, so a replay on the logged timing gives the causal slots to the bit.
+    """
+    if battery_params is None:
+        return None, 0.0, (house_kw - pv_kw) * dt
+    load_kw = house_kw + bat.standby_power_kw(battery_params)
+    soc_next, batt_kw = bat.vendor_mode_step(
+        float(shadow_soc), pv_kw - load_kw, battery_params, dt_h=dt
+    )
+    grid_shadow_kw = load_kw - pv_kw + batt_kw
+    return soc_next, batt_kw, grid_shadow_kw * dt
+
+
 def advance_slot(
     closed: dict[str, Any] | None,
-    shadow_soc: float,
-    battery_params: dict,
+    shadow_soc: float | None,
+    battery_params: dict | None,
     *,
     k_act_cent: float,
     k_push_cent: float,
@@ -157,7 +183,8 @@ def advance_slot(
 ) -> LedgerSlot:
     """Price one closed slot with and without Earnie and step the shadow battery.
 
-    ``battery_params`` is the shadow battery (``shadow_battery_params``).
+    ``battery_params`` is the shadow battery (``shadow_battery_params``); ``None`` (with
+    ``shadow_soc`` ``None``) is a house without battery, v2 only.
     ``k_act_cent`` / ``k_push_cent`` are the buy and sell prices of that slot's
     cycle. A slot that does not count (``slot_skip_reason``) is skipped on both
     sides: zero cost, shadow SoC unchanged, ``skip_reason`` set.
@@ -170,7 +197,7 @@ def advance_slot(
             skip_reason=reason,
             cost_with_eur=0.0,
             cost_without_eur=0.0,
-            shadow_soc_next=float(shadow_soc),
+            shadow_soc_next=shadow_soc,
             import_kwh_with=0.0,
             import_kwh_without=0.0,
             export_kwh_with=0.0,
@@ -181,13 +208,8 @@ def advance_slot(
     pv_kw = float(closed["pv_kw"])
     house_kw = ledger_house_kw(closed)
     grid_kw = float(closed["grid_kw"])
-    load_kw = house_kw + bat.standby_power_kw(battery_params)
-    soc_next, batt_kw = bat.vendor_mode_step(
-        float(shadow_soc), pv_kw - load_kw, battery_params, dt_h=dt
-    )
-    grid_shadow_kw = load_kw - pv_kw + batt_kw
+    soc_next, batt_kw, grid_shadow_kwh = _shadow_step(pv_kw, house_kw, shadow_soc, battery_params, dt)
     grid_kwh = grid_kw * dt
-    grid_shadow_kwh = grid_shadow_kw * dt
     k_act = float(k_act_cent)
     k_push = float(k_push_cent)
     return LedgerSlot(
@@ -211,6 +233,8 @@ INCOMPLETE_COVERAGE = 0.8
 P_REF_IMPORT_WEIGHTED = "import_weighted"
 P_REF_TIME_MEAN = "time_mean"
 P_REF_CARRIED = "carried"
+# v2 without house battery: no shadow SoC, no SoC correction (spec § 7).
+P_REF_NO_BATTERY = "no_battery"
 
 CHAIN_FIRST_RUN = "first_run"
 CHAIN_STATE_UNREADABLE = "state_unreadable"
@@ -218,6 +242,9 @@ CHAIN_SAVINGS_V_CHANGED = "savings_v_changed"
 CHAIN_BACKFILL = "backfill"
 
 DayBounds = Callable[[datetime], tuple[datetime, datetime]]
+# v2: consumers, profiles and windows of the day a state holds open (I/O lives with the caller,
+# ``savings_ledger_store.flex_day_provider``); called once per closed day.
+DayFlex = Callable[["LedgerState"], FlexDayInputs]
 
 
 @dataclass(frozen=True)
@@ -244,7 +271,7 @@ class LedgerState:
     savings_v: int
     chain_start: datetime
     chain_start_reason: str
-    shadow_soc: float
+    shadow_soc: float | None
     day_start: datetime
     day_end: datetime
     last_slot_start: datetime | None
@@ -255,9 +282,12 @@ class LedgerState:
     # Prices and slot-0 plan of the newest cycle, kept until its slot is closed
     # (the daemon hook; see ``savings_ledger_store.pending_slot_from_entry``).
     pending_slot: dict[str, Any] | None = None
+    # v2: chain SoC at the start of the open day, where its replay starts (plan § 4.1).
+    # ``shadow_soc`` runs on causally through the open day (D2). ``None`` without battery.
+    shadow_soc_day_start: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        raw = {
             "savings_v": self.savings_v,
             "chain_start": self.chain_start.isoformat(),
             "chain_start_reason": self.chain_start_reason,
@@ -271,6 +301,9 @@ class LedgerState:
             "days_closed": self.days_closed,
             "pending_slot": dict(self.pending_slot) if self.pending_slot else None,
         }
+        if self.savings_v >= SAVINGS_V_REPLAY:
+            raw["shadow_soc_day_start"] = self.shadow_soc_day_start
+        return raw
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> "LedgerState":
@@ -284,11 +317,22 @@ class LedgerState:
         pending = raw.get("pending_slot")
         if pending is not None and not isinstance(pending, dict):
             raise ValueError("savings ledger state: pending_slot must be an object")
+        savings_v = int(raw["savings_v"])
+        soc = raw["shadow_soc"]
+        day_start_soc = None
+        if savings_v >= SAVINGS_V_REPLAY:
+            day_start_soc = raw["shadow_soc_day_start"]
+            if (soc is None) != (day_start_soc is None):
+                raise ValueError(
+                    "savings ledger state: shadow_soc and shadow_soc_day_start disagree on the battery"
+                )
+        elif soc is None:
+            raise ValueError("savings ledger state: shadow_soc missing (a chain without battery needs v2)")
         return cls(
-            savings_v=int(raw["savings_v"]),
+            savings_v=savings_v,
             chain_start=_aware(raw["chain_start"]),
             chain_start_reason=str(raw["chain_start_reason"]),
-            shadow_soc=float(raw["shadow_soc"]),
+            shadow_soc=float(soc) if soc is not None else None,
             day_start=_aware(raw["day_start"]),
             day_end=_aware(raw["day_end"]),
             last_slot_start=_aware(last) if last is not None else None,
@@ -297,6 +341,7 @@ class LedgerState:
             slots=tuple(dict(s) for s in slots),
             days_closed=int(raw["days_closed"]),
             pending_slot=dict(pending) if pending else None,
+            shadow_soc_day_start=float(day_start_soc) if day_start_soc is not None else None,
         )
 
 
@@ -312,65 +357,116 @@ def start_chain(
     day_bounds: DayBounds,
     *,
     reason: str,
+    savings_v: int = SAVINGS_V,
+    with_battery: bool = True,
 ) -> LedgerState | None:
     """New shadow chain at the actual SoC of ``inp`` (its ``soc_start_percent``).
 
     Returns ``None`` when the slot has no SoC; the caller tries the next slot.
     The slot itself is not booked here; pass it to ``advance`` next.
+    ``with_battery=False`` starts a chain without shadow battery (v2 only, spec § 7).
     """
     if inp.slot_start.tzinfo is None:
         raise ValueError("savings ledger: slot_start must be timezone-aware")
-    soc = (inp.closed or {}).get("soc_start_percent")
-    if soc is None:
-        return None
+    if not with_battery and savings_v < SAVINGS_V_REPLAY:
+        raise ValueError(f"savings ledger: a chain without battery needs savings_v >= {SAVINGS_V_REPLAY}")
+    soc: float | None = None
+    if with_battery:
+        raw_soc = (inp.closed or {}).get("soc_start_percent")
+        if raw_soc is None:
+            return None
+        soc = float(raw_soc)
     day_start, day_end = day_bounds(inp.slot_start)
     return LedgerState(
-        savings_v=SAVINGS_V,
+        savings_v=savings_v,
         chain_start=inp.slot_start,
         chain_start_reason=reason,
-        shadow_soc=float(soc),
+        shadow_soc=soc,
         day_start=day_start,
         day_end=day_end,
         last_slot_start=None,
         soc_actual_end=None,
         prev_correction_eur=None,
         slots=(),
+        shadow_soc_day_start=soc if savings_v >= SAVINGS_V_REPLAY else None,
     )
+
+
+@dataclass(frozen=True)
+class DayClose:
+    """A closed SA-day: its ledger row and the state that held it.
+
+    ``closing`` is the state the slot file record comes from (``day_slots_record``): in v1
+    the state before the close, in v2 the replayed one (its slot rows carry the replay's
+    ``cost_without_eur`` and shadow SoC, so the slots add up to the row).
+    ``chain_soc`` is the shadow SoC the chain continues with.
+    """
+
+    row: dict[str, Any]
+    closing: "LedgerState"
+    chain_soc: float | None
 
 
 def advance(
     state: LedgerState,
     inp: LedgerInput,
-    battery_params: dict,
+    battery_params: dict | None,
     day_bounds: DayBounds,
     *,
     app_version: str,
     dt_h: float = DEFAULT_DT_H,
+    day_flex: DayFlex | None = None,
 ) -> tuple[LedgerState, dict[str, Any] | None]:
     """Book one closed slot; returns the new state and the row of a day this slot closed.
 
-    A slot at or after ``state.day_end`` first closes the open day (the row), then
-    opens the SA-day that contains the slot. Days without any slot get no row.
+    See ``advance_with_slots``, which also returns the closed day's slot source.
+    """
+    state, closed_day = advance_with_slots(
+        state, inp, battery_params, day_bounds, app_version=app_version, dt_h=dt_h, day_flex=day_flex
+    )
+    return state, closed_day.row if closed_day is not None else None
+
+
+def advance_with_slots(
+    state: LedgerState,
+    inp: LedgerInput,
+    battery_params: dict | None,
+    day_bounds: DayBounds,
+    *,
+    app_version: str,
+    dt_h: float = DEFAULT_DT_H,
+    day_flex: DayFlex | None = None,
+) -> tuple[LedgerState, DayClose | None]:
+    """Book one closed slot; returns the new state and the day this slot closed.
+
+    A slot at or after ``state.day_end`` first closes the open day (``close_open_day``),
+    then opens the SA-day that contains the slot. Days without any slot get no row.
     A slot at or before the last booked one is ignored (replay after a restart).
     ``day_bounds(moment)`` returns the sunrise-to-sunrise day that contains
     ``moment``; a slot belongs to the day its start lies in (as Chart 2 books it).
+    ``day_flex`` is needed when a v2 state closes a day (the replay); v1 never calls it.
     """
     if inp.slot_start.tzinfo is None:
         raise ValueError("savings ledger: slot_start must be timezone-aware")
     if state.last_slot_start is not None and inp.slot_start <= state.last_slot_start:
         return state, None
-    row = None
+    closed_day = None
     if inp.slot_start >= state.day_end:
-        row = close_day(state, battery_params, app_version=app_version, dt_h=dt_h)
+        closed_day = close_open_day(
+            state, battery_params, app_version=app_version, dt_h=dt_h, day_flex=day_flex
+        )
         day_start, day_end = day_bounds(inp.slot_start)
+        replay = state.savings_v >= SAVINGS_V_REPLAY
         state = replace(
             state,
             day_start=day_start,
             day_end=day_end,
             soc_actual_end=None,
-            prev_correction_eur=row["soc_correction_eur"],
+            prev_correction_eur=closed_day.row["soc_correction_eur"],
             slots=(),
             days_closed=state.days_closed + 1,
+            shadow_soc=closed_day.chain_soc,
+            shadow_soc_day_start=closed_day.chain_soc if replay else None,
         )
     if inp.k_act_cent is None or inp.k_push_cent is None:
         slot = LedgerSlot(
@@ -405,7 +501,7 @@ def advance(
         soc_actual_end=soc_actual_end,
         slots=state.slots + (_slot_row(inp, slot, dt_h),),
     )
-    return state, row
+    return state, closed_day
 
 
 def record_error_slot(state: LedgerState, slot_start: datetime) -> LedgerState:
@@ -515,7 +611,7 @@ def _sum_flex(rows: list[dict[str, Any]], key: str) -> dict[str, float]:
 
 def close_day(
     state: LedgerState,
-    battery_params: dict,
+    battery_params: dict | None,
     *,
     app_version: str,
     dt_h: float = DEFAULT_DT_H,
@@ -528,6 +624,10 @@ def close_day(
     slot or without an actual SoC carries the previous correction unchanged
     (``p_ref_basis: carried``): its correction terms cancel and the telescoping
     sum stays intact.
+
+    Rows are taken as they are: the causal slots (v1, and the open day's provisional
+    figures in v2), or the replayed slots (``close_open_day``). Without a house battery
+    (v2) there is no SoC correction (``p_ref_basis: no_battery``).
     """
     counted = [s for s in state.slots if s["counted"]]
     slots_total = _slots_in_day(state.day_start, state.day_end, dt_h)
@@ -542,7 +642,14 @@ def close_day(
     elif counted:
         p_ref = sum(s["k_act_cent"] for s in counted) / len(counted)
         basis = P_REF_TIME_MEAN
-    if p_ref is None or state.soc_actual_end is None:
+    if battery_params is None:
+        if state.savings_v < SAVINGS_V_REPLAY:
+            raise ValueError(f"savings ledger: a day without battery needs savings_v >= {SAVINGS_V_REPLAY}")
+        p_ref = None
+        correction = 0.0
+        prev = 0.0
+        basis = P_REF_NO_BATTERY
+    elif p_ref is None or state.soc_actual_end is None:
         correction = prev
         basis = P_REF_CARRIED
     else:
@@ -574,7 +681,7 @@ def close_day(
         "cost_without_eur": round(cost_without, 4),
         "saving_eur": round(saving, 4),
         "soc_actual_end_pct": state.soc_actual_end,
-        "soc_shadow_end_pct": round(state.shadow_soc, 2),
+        "soc_shadow_end_pct": round(state.shadow_soc, 2) if state.shadow_soc is not None else None,
         "p_ref_cent": round(p_ref, 3) if p_ref is not None else None,
         "p_ref_basis": basis,
         "soc_correction_eur": round(correction, 4),
@@ -591,6 +698,105 @@ def close_day(
     if state.days_closed == 0:
         row["chain_start_reason"] = state.chain_start_reason
     return row
+
+
+# --- Day replay (savings_v 2, Ledger P9c) -------------------------------------
+
+
+def _delivered_kw(row: dict[str, Any], dt_h: float) -> dict[str, float]:
+    return {cid: float(kwh) / dt_h for cid, kwh in (row.get("flex_delivered_kwh") or {}).items()}
+
+
+def replay_day(
+    slots: tuple[dict[str, Any], ...] | list[dict[str, Any]],
+    start_soc: float | None,
+    battery_params: dict | None,
+    flex_retimed_kw: list[dict[str, float]] | None,
+    *,
+    dt_h: float,
+) -> tuple[tuple[dict[str, Any], ...], float | None]:
+    """Shadow plant over one day's slot rows from ``start_soc``; returns the replayed rows and the end SoC.
+
+    ``flex_retimed_kw`` (one dict per row, kW per consumer) replaces each consumer's delivered
+    power: ``house_without = house + sum(retimed - delivered)`` per counted slot (plan § 1).
+    ``None`` keeps the logged timing, which gives the causal slots to the bit. Skipped rows stay
+    zero and keep the SoC. A counted row without ``house_kwh``, ``pv_kwh`` or the prices raises
+    ``KeyError`` (a row from before Ledger P9b; v2 starts a new chain, so none reaches here).
+    """
+    if flex_retimed_kw is not None and len(flex_retimed_kw) != len(slots):
+        raise ValueError(f"savings ledger replay: {len(flex_retimed_kw)} flex rows for {len(slots)} slots")
+    dt = validate_dt_h(dt_h)
+    soc = start_soc
+    out: list[dict[str, Any]] = []
+    for index, row in enumerate(slots):
+        replayed = dict(row)
+        if not row["counted"]:
+            replayed["shadow_soc_end"] = soc
+            out.append(replayed)
+            continue
+        house_kw = float(row["house_kwh"]) / dt
+        if flex_retimed_kw is not None:
+            delivered = _delivered_kw(row, dt)
+            retimed = flex_retimed_kw[index]
+            shift = sum(retimed.get(cid, 0.0) - delivered.get(cid, 0.0) for cid in set(retimed) | set(delivered))
+            house_kw += shift
+        soc, _batt_kw, grid_kwh = _shadow_step(float(row["pv_kwh"]) / dt, house_kw, soc, battery_params, dt)
+        k_act = float(row["k_act_cent"])
+        k_push = float(row["k_push_cent"])
+        replayed["cost_without_eur"] = _cost_eur(grid_kwh, k_act, k_push)
+        replayed["import_kwh_without"] = max(grid_kwh, 0.0)
+        replayed["export_kwh_without"] = max(-grid_kwh, 0.0)
+        replayed["shadow_soc_end"] = soc
+        out.append(replayed)
+    return tuple(out), soc
+
+
+def _flex_retimed_kwh(per_slot_kw: list[dict[str, float]], dt_h: float) -> dict[str, float]:
+    total: dict[str, float] = {}
+    for slot in per_slot_kw:
+        for cid, kw in slot.items():
+            total[cid] = total.get(cid, 0.0) + kw * dt_h
+    return {cid: round(kwh, 3) for cid, kwh in sorted(total.items()) if abs(kwh) >= 0.0005}
+
+
+def close_open_day(
+    state: LedgerState,
+    battery_params: dict | None,
+    *,
+    app_version: str,
+    dt_h: float = DEFAULT_DT_H,
+    day_flex: DayFlex | None = None,
+) -> DayClose:
+    """Close the open day of ``state``: v1 from the causal slots, v2 by replaying the day (plan § 4.1).
+
+    v2: the flex consumers are re-timed (``retime_flex_day``), the shadow plant runs over the
+    day from ``shadow_soc_day_start`` and the row, the slot record and the chain SoC come from
+    that replay. A second replay on the logged timing from the same start SoC gives
+    ``saving_logged_timing_eur`` (D4).
+    """
+    if state.savings_v < SAVINGS_V_REPLAY:
+        row = close_day(state, battery_params, app_version=app_version, dt_h=dt_h)
+        return DayClose(row, state, state.shadow_soc)
+    if day_flex is None:
+        raise ValueError("savings ledger: closing a v2 day needs the day's flex inputs (day_flex)")
+    if (battery_params is None) != (state.shadow_soc_day_start is None):
+        raise ValueError("savings ledger: battery parameters and the chain's shadow SoC disagree")
+    inputs = day_flex(state)
+    retiming = retime_flex_day(
+        state.slots, inputs.consumers, inputs.profiles_kw, inputs.windows, dt_h=dt_h
+    )
+    replayed, end_soc = replay_day(
+        state.slots, state.shadow_soc_day_start, battery_params, retiming.per_slot_kw, dt_h=dt_h
+    )
+    logged, _ = replay_day(state.slots, state.shadow_soc_day_start, battery_params, None, dt_h=dt_h)
+    closing = replace(state, slots=replayed, shadow_soc=end_soc)
+    row = close_day(closing, battery_params, app_version=app_version, dt_h=dt_h)
+    logged_saving = sum(s["cost_without_eur"] - s["cost_with_eur"] for s in logged if s["counted"])
+    row["flex_retimed_kwh"] = _flex_retimed_kwh(retiming.per_slot_kw, dt_h)
+    row["flex_timing"] = dict(sorted(retiming.timing.items()))
+    row["flex_logged_reasons"] = dict(sorted(retiming.logged_reasons.items()))
+    row["saving_logged_timing_eur"] = round(logged_saving, 4)
+    return DayClose(row, closing, end_soc)
 
 
 # --- Slot series of closed days (Account view P1) -----------------------------

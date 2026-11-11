@@ -15,6 +15,7 @@ import os
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Iterable
+from zoneinfo import ZoneInfo
 
 from data.planning_window import (
     align_to_planning_timezone,
@@ -27,6 +28,7 @@ from runtime_store.history_chart_rows import (
     _index_entries_by_slot,
 )
 from runtime_store.persist_paths_base import (
+    flexible_consumer_profiles_file,
     savings_ledger_file,
     savings_ledger_slots_file,
     savings_ledger_state_file,
@@ -41,6 +43,7 @@ from runtime_store.savings_ledger import (
     LedgerInput,
     LedgerState,
 )
+from runtime_store.savings_ledger_flex import FlexDayInputs, consumer_windows
 from runtime_store.slot_ist_powers import index_closed_intervals_by_start
 
 logger = logging.getLogger(__name__)
@@ -341,3 +344,59 @@ def ledger_inputs_from_entries(
         slot_start = quarter_hour_slot_start(align_to_planning_timezone(naive_start, timezone_name))
         inputs.append(ledger_input(slot_start, closed_by[naive_start], by_slot.get(slot_start)))
     return inputs
+
+
+# --- v2 day replay inputs (Ledger P9c) -----------------------------------------
+
+
+def flex_day_inputs(
+    state: LedgerState,
+    consumers: list[dict],
+    timezone_name: str,
+    profile_path: str,
+) -> FlexDayInputs:
+    """Profiles and windows of the flex consumers for the day ``state`` holds open (plan § 4.1).
+
+    Slot starts are converted to naive local times of ``timezone_name``: profiles and windows
+    are wall-clock hours. A profile file that cannot be read gives ``profiles_kw=None``: no
+    consumer is re-timed that day (``profile_read_error``), and a warning names the file.
+    """
+    from data.profile_manager import FlexProfileReadError, load_flexible_consumer_slot_profiles_strict
+
+    zone = ZoneInfo(timezone_name)
+    local = [
+        datetime.fromisoformat(str(slot["slot_start"])).astimezone(zone).replace(tzinfo=None)
+        for slot in state.slots
+    ]
+    try:
+        profiles: dict[str, list[float]] | None = load_flexible_consumer_slot_profiles_strict(
+            local, consumers, profile_path=profile_path
+        )
+    except FlexProfileReadError as exc:
+        logger.warning(
+            "savings ledger: flex profiles unreadable (%s); day %s keeps the logged timing.",
+            exc,
+            state.day_start.isoformat(),
+        )
+        profiles = None
+    windows = {str(c["id"]): consumer_windows(c, local) for c in consumers}
+    return FlexDayInputs(consumers=list(consumers), profiles_kw=profiles, windows=windows)
+
+
+def flex_day_provider(timezone_name: str) -> sl.DayFlex:
+    """``DayFlex`` from the current configuration: the consumers Earnie controls and their profile file.
+
+    Reads the configuration only when a v2 day closes; v1 never calls it.
+    """
+
+    def provide(state: LedgerState) -> FlexDayInputs:
+        import config
+
+        return flex_day_inputs(
+            state,
+            config.get_flexible_consumers(optimizer_only=True),
+            timezone_name,
+            flexible_consumer_profiles_file(),
+        )
+
+    return provide

@@ -59,6 +59,15 @@ One definition, versioned as `savings_v`. Any later change starts a new version;
 | Prices | `market_price_cent` (buy), `k_push_act` (sell) of the cycle | identical |
 | Flex timing | as logged | v1: as logged (see § 7 for v2 flex re-timing) |
 
+**`savings_v: 2`** (implemented behind `SAVINGS_V = 1` until Ledger P9d; [`savings-ledger-v2-plan.md`](savings-ledger-v2-plan.md) § 4.1)
+
+| Aspect | With Earnie (actual) | Without Earnie (shadow plant) |
+|---|---|---|
+| House load | as v1 | `house − Σ flex_delivered + Σ flex_retimed` per slot; `flex_retimed` = each consumer's delivered energy of the SA-day in its unshifted timing (§ 7) |
+| PV, prices | as v1 | identical |
+| Battery | as v1 | as v1, the chain SoC of the day start; **no battery**: `grid = load − pv`, no SoC correction |
+| Computed | per slot | per SA-day when it closes (day replay); the open day as v1 |
+
 Per closed quarter-hour slot:
 
 ```text
@@ -130,6 +139,8 @@ Rules:
 - A day with no counted slot (or no actual SoC) carries the previous day's SoC correction unchanged (`p_ref_basis: "carried"`), so its correction terms cancel and the telescoping sum stays intact. Calendar days without any closed slot get no row.
 - Lifetime total = Σ `saving_adjusted_eur` over all closed days of the chain. Shown together with its start date, the day count and the number of incomplete days.
 - **Backfill:** `optimization_history.jsonl` (and rotated files) already hold every `closed_interval` with prices; a one-off CLI (`python -m scripts.build_savings_ledger --since <date>`) can build the ledger retroactively. The dump's log reaches back to July. It replays every closed slot from `--since` as one chain (`chain_start_reason: backfill`), writes the rows and the state with the open day, and keeps the newest entry's prices as `pending_slot` so the daemon continues the chain. An existing ledger or state file is only replaced with `--rebuild` (no merge with live rows); `--dry-run` prints the day table only. The daemon must be stopped while it writes (it holds the state in memory); the CLI refuses when it finds the local daemon running.
+
+**v2 row fields** (in addition to the v1 row): `flex_retimed_kwh` (per consumer, equal to `flex_delivered_kwh` by construction), `flex_timing` (per consumer: `profile`, `native_window`, `enable_window`, `logged`, `logged_no_meter`, `no_energy`), `flex_logged_reasons` (per `logged` consumer: `no_shape_no_window`, `exceeds_eligible_slots`, `not_configured`, `ev_rule_missing`, `profile_read_error`), `saving_logged_timing_eur` (the day's saving with the logged timing from the same start SoC). Without battery: `p_ref_basis: "no_battery"`, corrections 0, `soc_shadow_end_pct` and `p_ref_cent` `null`. The state holds `shadow_soc_day_start` (v2 only). The slot file of a v2 day holds the replay's `cost_without_eur` per slot.
 
 **Slot file.** `savings_ledger_slots.jsonl` holds the slot series of closed days for the account view ([`chart2-account-view.md`](chart2-account-view.md) § 4), one JSON line per closed SA-day, append-only:
 

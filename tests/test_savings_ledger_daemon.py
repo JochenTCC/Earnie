@@ -188,12 +188,13 @@ def test_error_logs_a_warning_and_is_counted_in_the_day_row(ledger, monkeypatch,
     def boom(*_args, **_kwargs):
         raise RuntimeError("shadow step failed")
 
-    original = sl.advance
-    monkeypatch.setattr(sl, "advance", boom)
+    # the hook books through ``advance_with_slots`` (it also needs the closed day's slot source)
+    original = sl.advance_with_slots
+    monkeypatch.setattr(sl, "advance_with_slots", boom)
     with caplog.at_level(logging.WARNING):
         assert _cycle("2026-11-02T06:30:01", _closed("2026-11-02T06:15:00")) is None
     assert "cycle not booked" in caplog.text
-    monkeypatch.setattr(sl, "advance", original)
+    monkeypatch.setattr(sl, "advance_with_slots", original)
 
     row = _cycle("2026-11-02T07:15:01", _closed("2026-11-02T07:00:00"))
 

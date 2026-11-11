@@ -125,16 +125,19 @@ def build(
     state: sl.LedgerState | None = None
     rows: list[dict[str, Any]] = []
     slot_records: list[dict[str, Any]] = []
+    # Same day close as the daemon: a v2 chain replays each day with the current configuration.
+    day_flex = store.flex_day_provider(timezone_name)
     for inp in inputs:
         if state is None:
             state = sl.start_chain(inp, day_bounds, reason=sl.CHAIN_BACKFILL)
             if state is None:
                 continue
-        closing = state
-        state, row = sl.advance(state, inp, battery, day_bounds, app_version=__version__)
-        if row is not None:
-            rows.append(row)
-            slot_records.append(sl.day_slots_record(closing))
+        state, closed_day = sl.advance_with_slots(
+            state, inp, battery, day_bounds, app_version=__version__, day_flex=day_flex
+        )
+        if closed_day is not None:
+            rows.append(closed_day.row)
+            slot_records.append(sl.day_slots_record(closed_day.closing))
     if state is not None and entries:
         # The newest entry's own slot is not closed yet: keep its prices for the
         # daemon, as its hook does after every cycle.

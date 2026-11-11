@@ -115,6 +115,7 @@ def _planning_shadow_soc(closed_interval: dict[str, Any] | None) -> float | None
             timezone_name,
         ),
         app_version=__version__,
+        day_flex=store.flex_day_provider(timezone_name),
     )
     return advanced.shadow_soc
 
@@ -133,6 +134,8 @@ def _book_error_slot(closed_interval: dict[str, Any] | None) -> None:
 
 def _write_day_slots(closing: sl.LedgerState) -> None:
     """Append the slots of the day ``closing`` holds open; a failure must not stop the chain.
+
+    ``closing`` is ``DayClose.closing``: the replayed day in v2, so the slots match the row.
 
     The row is already written: raising here would close the day a second time on the
     next slot. The day stays without slots, the warning names the repair, and readers
@@ -187,12 +190,20 @@ def _on_cycle(
                     _state.chain_start_reason,
                 )
         if _state is not None:
-            advanced, row = sl.advance(_state, inp, battery, day_bounds, app_version=__version__)
-            if row is not None:
+            advanced, closed_day = sl.advance_with_slots(
+                _state,
+                inp,
+                battery,
+                day_bounds,
+                app_version=__version__,
+                day_flex=store.flex_day_provider(timezone_name),
+            )
+            if closed_day is not None:
+                row = closed_day.row
                 # Append before taking the new state: if the write fails, the next
                 # slot closes the same day again instead of losing the row.
                 store.append_row(row)
-                _write_day_slots(_state)
+                _write_day_slots(closed_day.closing)
                 logger.info(
                     "savings ledger: day %s closed, saving %.2f EUR (adjusted %.2f EUR, coverage %.2f).",
                     row["day_start"],

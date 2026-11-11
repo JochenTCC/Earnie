@@ -43,6 +43,9 @@ REASON_EXCEEDS_ELIGIBLE = "exceeds_eligible_slots"
 REASON_NOT_CONFIGURED = "not_configured"
 # The EV rule (from plug-in, plan § 4.3) is step Ledger P10a; until then an EV keeps its timing.
 REASON_EV_RULE_MISSING = "ev_rule_missing"
+# The profile file exists but cannot be read: which consumers had a profile is unknown, so no
+# consumer is re-timed that day (not the windows instead: that would hide the broken file).
+REASON_PROFILE_READ_ERROR = "profile_read_error"
 
 # Same tolerance as the builder's undelivered check (``sim_baseline._ENERGY_EPSILON_KWH``).
 _ENERGY_EPSILON_KWH = 1e-3
@@ -63,6 +66,18 @@ class ConsumerWindows:
 
     enable_slots: frozenset[int] | None
     native_slots: frozenset[int] | None
+
+
+@dataclass(frozen=True)
+class FlexDayInputs:
+    """What the day replay needs besides the slot rows (``retime_flex_day``).
+
+    ``profiles_kw`` ``None``: the profile file could not be read (``REASON_PROFILE_READ_ERROR``).
+    """
+
+    consumers: list[dict]
+    profiles_kw: dict[str, list[float]] | None
+    windows: dict[str, ConsumerWindows]
 
 
 @dataclass(frozen=True)
@@ -151,7 +166,7 @@ def _reference_shape(
 def retime_flex_day(
     slot_rows: list[dict[str, Any]] | tuple[dict[str, Any], ...],
     consumers: list[dict],
-    profiles_kw: dict[str, list[float]],
+    profiles_kw: dict[str, list[float]] | None,
     windows: dict[str, ConsumerWindows],
     *,
     dt_h: float,
@@ -163,6 +178,7 @@ def retime_flex_day(
     - no ``flex_delivered_kwh`` key in any counted slot: no own meter, ``logged_no_meter``;
     - an EV: logged timing (``ev_rule_missing``) until the plug-in rule exists (P10a);
     - no energy over the counted slots: ``no_energy``, logged timing (nothing to place);
+    - ``profiles_kw`` ``None`` (unreadable profile file): logged timing (``profile_read_error``);
     - profile with energy in the counted slots of its enable window: ``profile``;
     - filter native window with a counted slot: ``native_window`` (flat shape there, the rest
       of the day eligible);
@@ -197,7 +213,7 @@ def retime_flex_day(
         configured.add(cid)
         if cid not in windows:
             raise ValueError(f"savings ledger flex: no windows for consumer '{cid}'")
-        profile = profiles_kw.get(cid)
+        profile = profiles_kw.get(cid) if profiles_kw is not None else None
         if profile is not None and len(profile) != n:
             raise ValueError(
                 f"savings ledger flex: profile of '{cid}' has {len(profile)} values for {n} slot rows"
@@ -213,6 +229,9 @@ def retime_flex_day(
             continue
         if energy <= _ENERGY_EPSILON_KWH:
             keep_logged(cid, TIMING_NO_ENERGY)
+            continue
+        if profiles_kw is None:
+            keep_logged(cid, TIMING_LOGGED, REASON_PROFILE_READ_ERROR)
             continue
         reference = _reference_shape(n, counted, profile, windows[cid])
         if reference is None:
