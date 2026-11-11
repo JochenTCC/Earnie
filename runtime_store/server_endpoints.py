@@ -15,6 +15,7 @@ from urllib import request as urllib_request
 SERVER_BASE = "https://cloudserver.earnie-hems.com"
 PATH_PING = "/ping"
 PATH_REVIEW = "/review"
+PATH_DEMO_SESSION = "/demo-session"
 
 logger = logging.getLogger(__name__)
 

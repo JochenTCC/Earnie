@@ -8,6 +8,7 @@ from runtime_store.env_vars import is_truthy
 
 SESSION_ENV_KEY = "_earnie_cloud_env_root"
 SESSION_INTRO_DISMISSED_KEY = "_earnie_cloud_intro_dismissed"
+SESSION_COUNTED_KEY = "_earnie_cloud_session_counted"
 
 # Test hook when Streamlit session_state is unavailable.
 _test_session_env_root: str | None = None
@@ -53,6 +54,8 @@ def ensure_cloud_session_env() -> str | None:
     Create or reuse a temp env root for the current Streamlit session.
 
     No-op when cloud demo is off. Does not set process-wide EARNIE_ENV_PATH.
+    Counts the browser session once on earnie-server (anonymous, see
+    ``runtime_store.cloud_demo_session_ping``).
     """
     if not is_cloud_demo():
         return None
@@ -67,6 +70,11 @@ def ensure_cloud_session_env() -> str | None:
     import streamlit as st
 
     st.session_state[SESSION_ENV_KEY] = root
+    if not st.session_state.get(SESSION_COUNTED_KEY):
+        st.session_state[SESSION_COUNTED_KEY] = True
+        from runtime_store.cloud_demo_session_ping import spawn_demo_session_ping
+
+        spawn_demo_session_ping()
     return root
 
 
@@ -94,6 +102,8 @@ def render_cloud_demo_intro() -> None:
         "Im **Szenarien-Explorer** können Sie die Szenarien testen und optimieren.\n\n"
         "Ihre Eingaben gelten nur für **diese Browser-Sitzung** und werden nicht "
         "mit anderen Besuchern geteilt. Sie können die Daten mit **Konfiguration Speichern / laden** lokal sichern und zu einem späteren Zeitpunkt hier wieder verwenden.\n\n"
+        "Earnie zählt anonym, wie oft die Online-Demo geöffnet wird: eine Zahl pro Sitzung, "
+        "ohne Angaben zu Ihnen oder Ihrer Konfiguration.\n\n"
         f"Weitere Informationen erhalten Sie im "
         f"[Benutzer-Handbuch]({MANUAL_URL}). "
         "Der Link ist auch unter **Info** zu finden."

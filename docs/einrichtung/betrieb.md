@@ -328,7 +328,7 @@ Ab Version 2.7 kann Earnie optional und anonym melden, dass eine Installation ak
 - Unter **Was wird gesendet?** sehen Sie die exakte JSON-Vorschau.
 - Der Endpunkt ist fest in der App hinterlegt (`https://cloudserver.earnie-hems.com/ping`).
 - Ein fehlgeschlagener Ping hat **keinen Einfluss** auf die Optimierung.
-- In der Online-Demo auf Streamlit Community Cloud (`EARNIE_CLOUD_DEMO=1`) gibt es keinen Dialog und keine Nutzungsstatistik: Jede Browser-Sitzung hätte dort eine eigene Installations-ID und würde als neue Installation zählen.
+- In der Online-Demo auf Streamlit Community Cloud (`EARNIE_CLOUD_DEMO=1`) gibt es keinen Dialog und keine Nutzungsstatistik: Jede Browser-Sitzung hätte dort eine eigene Installations-ID und würde als neue Installation zählen. Stattdessen zählt die Demo anonym ihre Sitzungen: Pro Browser-Sitzung sendet der Streamlit-Server einmal `{"v": 1}` an den Earnie-Server (`/demo-session`), ohne ID, ohne Version und ohne Konfiguration. Die IP der Besucher:innen erreicht den Earnie-Server dabei nicht. `EARNIE_USAGE_PING=off` schaltet auch diese Zählung ab.
 
 **Was wird gesendet** (feste Feldliste, sonst nichts):
 

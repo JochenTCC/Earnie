@@ -39,7 +39,7 @@ Für die öffentliche Demo auf Streamlit Community Cloud kommt **`EARNIE_CLOUD_D
 - **Start:** Die Sitzung beginnt im **Hauskonfigurator** und zeigt einen kurzen Willkommenshinweis.
 - **Bewertung:** Wurde im Szenario-Explorer eine Berechnung gestartet, kann beim Verlassen der Seite einmalig pro Browser-Sitzung ein anonymer Bewertungsdialog mit Sternen erscheinen (der Zustand liegt im temporären Workspace der Sitzung). **Senden** überträgt die Bewertung an den fest hinterlegten Earnie-Server. **Abbrechen** beendet die Abfrage ebenfalls, ohne etwas zu senden.
 - **Kein Offline-Seed:** Der Offline-Demo-Seed der Live-Szenario-IDs entfällt.
-- **Keine Nutzungsstatistik:** Der Zustimmungsdialog erscheint nicht, und Earnie sendet keinen Installations-Ping (siehe [Nutzungsstatistik](betrieb.md#nutzungsstatistik)).
+- **Keine Nutzungsstatistik, nur ein Sitzungszähler:** Der Zustimmungsdialog erscheint nicht, und Earnie sendet keinen Installations-Ping. Jede neue Browser-Sitzung zählt einmal anonym beim Earnie-Server; der Willkommenshinweis sagt das (siehe [Nutzungsstatistik](betrieb.md#nutzungsstatistik)).
 
 Empfohlene Secrets: `EARNIE_CLOUD_DEMO=1`, `EARNIE_OFFLINE=1`, `EARNIE_UI_MODES=scenario_explorer`.
 

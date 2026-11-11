@@ -148,6 +148,10 @@ def test_ensure_cloud_session_env_creates_and_reuses(tmp_path, monkeypatch):
         return None
 
     monkeypatch.setattr(cloud_demo, "get_session_env_root", fake_get_root)
+    from runtime_store import cloud_demo_session_ping
+
+    counted: list[int] = []
+    monkeypatch.setattr(cloud_demo_session_ping, "spawn_demo_session_ping", lambda: counted.append(1))
 
     first = cloud_demo.ensure_cloud_session_env()
     assert first is not None
@@ -158,6 +162,15 @@ def test_ensure_cloud_session_env_creates_and_reuses(tmp_path, monkeypatch):
 
     second = cloud_demo.ensure_cloud_session_env()
     assert second == first
+    assert counted == [1]  # one count per browser session
+
+    # temp dir gone (container cleanup): new workspace, but no second count
+    import shutil
+
+    shutil.rmtree(first)
+    third = cloud_demo.ensure_cloud_session_env()
+    assert third != first
+    assert counted == [1]
 
 
 def test_ensure_cloud_session_env_noop_without_flag(monkeypatch):
