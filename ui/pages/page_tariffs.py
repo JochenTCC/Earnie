@@ -18,7 +18,10 @@ from ui.label_select import label_select_choices, resolve_label_select
 
 _HELP = (
     "Eigene Tarife (Benutzertarife) anlegen, bearbeiten, aus dem Katalog kopieren oder als "
-    "JSON importieren. Gespeichert wird in `user_tariffs.json` neben `tariffs.json`. "
+    "JSON importieren. Die **Übersicht** listet eigene Tarife, Katalogtarife und Vorlagen mit "
+    "ihren Parametern; dort wählst du Tarife aus, um sie zu öffnen, als Vorlage zu kopieren, "
+    "zu löschen oder zu vergleichen. **Bearbeiten** zeigt das Formular des offenen Tarifs. "
+    "Gespeichert wird in `user_tariffs.json` neben `tariffs.json`. "
     "Vorschau und Prüfungen rechnen mit Land, Region und Netzbereich des gewählten Hausprofils; "
     "diese Werte änderst du im Hauskonfigurator. Welcher Tarif in einem Szenario gilt, wählst du "
     "im Szenarienkonfigurator."

@@ -16,7 +16,7 @@ Not in this item: the automatic peak budget, the effective price in the MILP, co
 
 | Area | Finding | Where |
 |---|---|---|
-| Edibert | `v0.1.14` is pinned and has `capacity_charge_eur`, `capacity_ladder`, `charge_for_month`, `CapacityState`. `GridFee.capacity` holds the entries in effect. Default `include_status` is `verordnet` only. | `Edibert/src/edibert/capacity.py`, `gridfee.py:51` |
+| Edibert | `v0.1.15` is pinned (capacity module since `v0.1.14`) and has `capacity_charge_eur`, `capacity_ladder`, `charge_for_month`, `CapacityState`. `GridFee.capacity` holds the entries in effect. Default `include_status` is `verordnet` only. | `Edibert/src/edibert/capacity.py`, `gridfee.py:51` |
 | Prices | **No grid area in the shipped catalog has `capacity_charges`.** Earnie's user-area helper `flat_user_grid_area` does not write them, and the Edibert editor keeps them but does not edit them (Edibert backlog, open). Today they can only be typed into `user_grid_fees.json`. | `share/config/grid_fees.json`, `Edibert/src/edibert/editor/house.py:200` |
 | MILP | Per-slot export caps exist as a list and are the model for import caps. `p_grid_buy` is not limited. Added constraints run after the model is built (`add_vendor_mode_export_constraints`). | `optimizer/milp_horizon.py:392-398`, `optimizer/milp.py:372` |
 | Infeasible plan | `_solve_milp_to_model` returns `None`, Live falls back to Automatik. So a hard cap needs a slack variable. | `optimizer/milp.py:382-384` |
