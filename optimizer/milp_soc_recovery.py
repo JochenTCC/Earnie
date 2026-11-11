@@ -7,12 +7,18 @@ plan lost) when the battery's power did not cover the gap.
 Now the energy may stay where it starts and return when the prices suit. Until it is back
 inside the limits it only moves towards them (below ``min_soc`` no discharge, above ``max_soc``
 no charge), and once inside it stays inside.
+
+The virtual reserve of a powerstation is the exception: it raises ``min_soc`` to a floor above
+the configured value, and a SoC between the two means the reserve was used and has to be
+refilled at once (``powerstation_reserve``). That floor stays hard; only a SoC below the
+configured ``min_soc`` is led back.
 """
 from __future__ import annotations
 
 import pulp
 
 from .milp_horizon_types import _GridBatteryVars
+from .powerstation_reserve import VIRTUAL_RESERVE_BASE_MIN_SOC_KEY
 
 _ENERGY_TOLERANCE_KWH = 1e-9
 
@@ -86,6 +92,13 @@ def add_soc_recovery_constraints(
         e_start = float(e_init_by_ess[ess_id])
         slug = ess_id.replace("-", "_")
         if e_start < e_min - _ENERGY_TOLERANCE_KWH:
+            base_min_soc = params.get(VIRTUAL_RESERVE_BASE_MIN_SOC_KEY)
+            if (
+                base_min_soc is not None
+                and e_start >= float(base_min_soc) / 100.0 * capacity - _ENERGY_TOLERANCE_KWH
+            ):
+                # Used virtual reserve: the floor stays hard, slot 0 refills it.
+                continue
             _add_one_sided_recovery(
                 prob,
                 slug,
