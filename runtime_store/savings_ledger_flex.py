@@ -47,6 +47,10 @@ REASON_EV_RULE_MISSING = "ev_rule_missing"
 # consumer is re-timed that day (not the windows instead: that would hide the broken file).
 REASON_PROFILE_READ_ERROR = "profile_read_error"
 
+# Where a filter's native window came from (row field ``flex_native_window_source``).
+NATIVE_SOURCE_LOG = "log"
+NATIVE_SOURCE_CONFIG = "config"
+
 # Same tolerance as the builder's undelivered check (``sim_baseline._ENERGY_EPSILON_KWH``).
 _ENERGY_EPSILON_KWH = 1e-3
 _SHAPE_EPSILON = 1e-6
@@ -59,13 +63,15 @@ class ConsumerWindows:
     ``enable_slots``: the window the MILP keeps the consumer in (``thermal_flex_window`` of a
     thermal consumer or heating rod, ``generic_flex_window``). It bounds the reference and is
     its flat shape when there is no profile.
-    ``native_slots``: the filter's native run (``filter_schedule.config_fallback``). Flat shape
-    when there is no profile; it does not bound the reference, so energy beyond the native run
-    continues in the slots after it.
+    ``native_slots``: the filter's native run. Flat shape when there is no profile; it does not
+    bound the reference, so energy beyond the native run continues in the slots after it.
+    ``native_source``: where the native run came from, ``log`` (the window the cycles used) or
+    ``config`` (``filter_schedule.config_fallback``); ``None`` without native window.
     """
 
     enable_slots: frozenset[int] | None
     native_slots: frozenset[int] | None
+    native_source: str | None = None
 
 
 @dataclass(frozen=True)
@@ -96,12 +102,18 @@ class FlexRetiming:
     delivered_kwh: dict[str, float]
 
 
-def consumer_windows(consumer: dict, slot_starts_local: list[datetime]) -> ConsumerWindows:
-    """Windows of ``consumer`` over the slots, from its planning configuration (plan § 4.1).
+def consumer_windows(
+    consumer: dict,
+    slot_starts_local: list[datetime],
+    *,
+    logged_native: dict[str, float] | None,
+) -> ConsumerWindows:
+    """Windows of ``consumer`` over the slots (plan § 4.1).
 
     Thermal consumers and heating rods: ``thermal_flex_window``; any consumer with a
     ``generic_flex_window``: that window (the MILP's slot rules, hour of the slot inside the
-    window). Filter (``filter_schedule`` enabled): native start and duration from
+    window). Filter (``filter_schedule`` enabled): ``logged_native`` (``native_start_hour``,
+    ``native_duration_hours`` the cycles used), else start and duration from
     ``config_fallback``. ``slot_starts_local`` are naive local wall-clock times.
     """
     for moment in slot_starts_local:
@@ -118,10 +130,17 @@ def consumer_windows(consumer: dict, slot_starts_local: list[datetime]) -> Consu
         generic = set(consumer_generic_eligible_indices(pseudo, consumer, every))
         enable = generic if enable is None else enable & generic
     native: frozenset[int] | None = None
+    source: str | None = None
     if filter_schedule_enabled(consumer):
-        fallback = (consumer.get("filter_schedule") or {}).get("config_fallback") or {}
-        start = fallback.get("native_start_hour")
-        duration = fallback.get("native_duration_hours")
+        if logged_native is not None:
+            start = logged_native["native_start_hour"]
+            duration = logged_native["native_duration_hours"]
+            source = NATIVE_SOURCE_LOG
+        else:
+            fallback = (consumer.get("filter_schedule") or {}).get("config_fallback") or {}
+            start = fallback.get("native_start_hour")
+            duration = fallback.get("native_duration_hours")
+            source = NATIVE_SOURCE_CONFIG if start is not None and duration is not None else None
         if start is not None and duration is not None:
             native = frozenset(
                 i
@@ -131,6 +150,7 @@ def consumer_windows(consumer: dict, slot_starts_local: list[datetime]) -> Consu
     return ConsumerWindows(
         enable_slots=frozenset(enable) if enable is not None else None,
         native_slots=native,
+        native_source=source,
     )
 
 

@@ -167,7 +167,14 @@ def _run_v1(inputs):
 
 # --- no flex: v2 equals v1 to the cent --------------------------------------------
 
-_V2_ONLY = {"savings_v", "flex_retimed_kwh", "flex_timing", "flex_logged_reasons", "saving_logged_timing_eur"}
+_V2_ONLY = {
+    "savings_v",
+    "flex_retimed_kwh",
+    "flex_timing",
+    "flex_logged_reasons",
+    "flex_native_window_source",
+    "saving_logged_timing_eur",
+}
 
 
 @pytest.mark.parametrize("day_flex", [_no_flex, lambda s: replace(_evening_flex(s), profiles_kw={})])
@@ -301,3 +308,69 @@ def test_flex_day_inputs_follow_the_wall_clock_across_dst(tmp_path, utc_day, exp
     )
     inputs = store.flex_day_inputs(state, [HP], "Europe/Vienna", str(path))
     assert inputs.profiles_kw == {"wp": expected}
+
+
+# --- native filter window from the log -------------------------------------------
+
+POOL = {
+    "id": "pool",
+    "nominal_power_kw": 0.2,
+    "filter_schedule": {"enabled": True, "config_fallback": {"native_start_hour": 10, "native_duration_hours": 2}},
+}
+
+
+def test_logged_filter_window_flows_from_the_entry_into_the_row(tmp_path):
+    entry = {
+        "k_push_act": 8.0,
+        "market_price_cent": 30.0,
+        "filter_contexts": {
+            "pool": {"native_start_hour": 14, "native_duration_hours": 1, "source_label": "loxone"},
+            "half": {"native_start_hour": None, "native_duration_hours": 2, "source_label": "unbekannt"},
+        },
+    }
+    pending = store.pending_slot_from_entry(DAY1, entry)
+    assert pending["filter_native"] == {"pool": {"native_start_hour": 14.0, "native_duration_hours": 1.0}}
+
+    # pool ran 10:00–11:00 (Earnie); the logged native window is 14:00–15:00 = slots 28–31
+    inputs = []
+    for i in range(96):
+        closed = _closed(flex={"pool": 0.2 if 12 <= i < 16 else 0.0})
+        inp = store.ledger_input_from_pending(DAY1 + i * STEP, closed, {**pending, "slot_start": (DAY1 + i * STEP).isoformat()})
+        inputs.append(inp)
+    inputs.append(_closing_slot(DAY1 + timedelta(days=1)))
+
+    def from_config(state):
+        return store.flex_day_inputs(state, [POOL], "Europe/Vienna", str(tmp_path / "none.csv"))
+
+    state, closes = _run(inputs, None, from_config, savings_v=2, with_battery=False)
+    closed = closes[0]
+    assert closed.closing.slots[0]["filter_native"] == {"pool": {"native_start_hour": 14.0, "native_duration_hours": 1.0}}
+    assert closed.row["flex_timing"] == {"pool": slf.TIMING_NATIVE_WINDOW}
+    assert closed.row["flex_native_window_source"] == {"pool": slf.NATIVE_SOURCE_LOG}
+    replayed = closed.closing.slots
+    base_cost = 0.5 * 0.25 * 0.30
+    assert [round(replayed[i]["cost_without_eur"] - base_cost, 9) > 0 for i in range(96)] == [
+        28 <= i < 32 for i in range(96)
+    ]
+
+
+def test_day_without_logged_filter_window_uses_the_configured_one(tmp_path):
+    inputs = [
+        sl.LedgerInput(DAY1 + i * STEP, _closed(flex={"pool": 0.2 if 12 <= i < 16 else 0.0}), 30.0, 8.0)
+        for i in range(96)
+    ] + [_closing_slot(DAY1 + timedelta(days=1))]
+
+    def from_config(state):
+        return store.flex_day_inputs(state, [POOL], "Europe/Vienna", str(tmp_path / "none.csv"))
+
+    _, closes = _run(inputs, None, from_config, savings_v=2, with_battery=False)
+    assert closes[0].row["flex_native_window_source"] == {"pool": slf.NATIVE_SOURCE_CONFIG}
+    assert "filter_native" not in closes[0].closing.slots[0]
+
+
+def test_backfill_keeps_the_logged_filter_window():
+    from scripts import build_savings_ledger as cli
+
+    entry = {"completed_at": "2026-11-01T07:00:00", "filter_contexts": {"pool": {"native_start_hour": 14}}, "noise": 1}
+    assert cli._slim(entry)["filter_contexts"] == {"pool": {"native_start_hour": 14}}
+    assert "noise" not in cli._slim(entry)

@@ -279,6 +279,20 @@ def _planned_flex_kw(entry: dict[str, Any]) -> dict[str, float]:
     return planned
 
 
+def _filter_native_windows(entry: dict[str, Any]) -> dict[str, dict[str, float]]:
+    """Native filter window per consumer the entry's cycle used (``filter_contexts``), when complete."""
+    windows: dict[str, dict[str, float]] = {}
+    for cid, ctx in (entry.get("filter_contexts") or {}).items():
+        if not isinstance(ctx, dict):
+            continue
+        start = ctx.get("native_start_hour")
+        duration = ctx.get("native_duration_hours")
+        if start is None or duration is None or float(duration) <= 0.0:
+            continue
+        windows[str(cid)] = {"native_start_hour": float(start), "native_duration_hours": float(duration)}
+    return windows
+
+
 def pending_slot_from_entry(
     slot_start: datetime,
     slot_entry: dict[str, Any] | None,
@@ -294,6 +308,7 @@ def pending_slot_from_entry(
         "k_act_cent": _import_price_cent_from_entry(slot_entry, slot_start=naive),
         "k_push_cent": float(slot_entry["k_push_act"]),
         "planned_flex_kw": _planned_flex_kw(slot_entry),
+        "filter_native": _filter_native_windows(slot_entry),
     }
 
 
@@ -311,6 +326,7 @@ def ledger_input_from_pending(
         k_act_cent=float(pending["k_act_cent"]),
         k_push_cent=float(pending["k_push_cent"]),
         planned_flex_kw=dict(pending.get("planned_flex_kw") or {}),
+        filter_native=dict(pending.get("filter_native") or {}),
     )
 
 
@@ -358,7 +374,8 @@ def flex_day_inputs(
     """Profiles and windows of the flex consumers for the day ``state`` holds open (plan § 4.1).
 
     Slot starts are converted to naive local times of ``timezone_name``: profiles and windows
-    are wall-clock hours. A profile file that cannot be read gives ``profiles_kw=None``: no
+    are wall-clock hours. A filter's native window is the one its cycles logged (first counted
+    slot of the day), else its configured ``config_fallback``; the row records which. A profile file that cannot be read gives ``profiles_kw=None``: no
     consumer is re-timed that day (``profile_read_error``), and a warning names the file.
     """
     from data.profile_manager import FlexProfileReadError, load_flexible_consumer_slot_profiles_strict
@@ -379,8 +396,19 @@ def flex_day_inputs(
             state.day_start.isoformat(),
         )
         profiles = None
-    windows = {str(c["id"]): consumer_windows(c, local) for c in consumers}
+    windows = {
+        str(c["id"]): consumer_windows(c, local, logged_native=_logged_native_window(state, str(c["id"])))
+        for c in consumers
+    }
     return FlexDayInputs(consumers=list(consumers), profiles_kw=profiles, windows=windows)
+
+
+def _logged_native_window(state: LedgerState, cid: str) -> dict[str, float] | None:
+    """Native filter window of ``cid`` from the first counted slot of the day that logged one."""
+    for slot in state.slots:
+        if slot["counted"] and cid in (slot.get("filter_native") or {}):
+            return dict(slot["filter_native"][cid])
+    return None
 
 
 def flex_day_provider(timezone_name: str) -> sl.DayFlex:

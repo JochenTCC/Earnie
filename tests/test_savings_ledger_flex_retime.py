@@ -117,8 +117,9 @@ def test_filter_without_profile_uses_native_window_and_spills_after_it():
         "nominal_power_kw": 0.2,
         "filter_schedule": {"enabled": True, "config_fallback": {"native_start_hour": 10, "native_duration_hours": 2}},
     }
-    windows = {"pool": slf.consumer_windows(flt, _starts())}
+    windows = {"pool": slf.consumer_windows(flt, _starts(), logged_native=None)}
     assert windows["pool"].native_slots == frozenset(range(16, 24))  # 10:00–12:00
+    assert windows["pool"].native_source == slf.NATIVE_SOURCE_CONFIG
     # 0.6 kWh: the native window holds 8 · 0.25 · 0.2 = 0.4 kWh, the rest follows from 12:00.
     rows = _rows({"pool": {i: 0.2 for i in range(60, 72)}})
     result = slf.retime_flex_day(rows, [flt], {}, windows, dt_h=DT)
@@ -149,7 +150,7 @@ def test_energy_beyond_eligible_slots_keeps_logged_timing_with_reason():
 def test_consumer_without_meter_keeps_logged_timing():
     dryer = {"id": "trockner", "nominal_power_kw": 2.0, "generic_flex_window": {"start_hour": 10, "duration_h": 2}}
     rows = _rows({"wp": {i: 2.0 for i in range(24, 32)}})
-    windows = _no_windows("wp") | {"trockner": slf.consumer_windows(dryer, _starts())}
+    windows = _no_windows("wp") | {"trockner": slf.consumer_windows(dryer, _starts(), logged_native=None)}
     result = slf.retime_flex_day(rows, [HP, dryer], {"wp": _evening_profile(), "trockner": [1.0] * N}, windows, dt_h=DT)
     assert result.timing == {"wp": slf.TIMING_PROFILE, "trockner": slf.TIMING_LOGGED_NO_METER}
     assert "trockner" not in result.logged_reasons
@@ -183,15 +184,28 @@ def test_missing_windows_or_wrong_profile_length_raise():
 
 def test_consumer_windows_thermal_and_generic():
     hp = HP | {"thermal_flex_window": {"start_hour": 22, "duration_h": 4}}
-    windows = slf.consumer_windows(hp, _starts())
+    windows = slf.consumer_windows(hp, _starts(), logged_native=None)
     # 22:00 + 4 h: the MILP's window rule keeps the run inside the calendar day
     # (``generic_allowed_slot_hours``), so only 22:00–24:00 = slots 64–71 of a day from 06:00.
     assert windows.enable_slots == frozenset(range(64, 72))
     assert windows.native_slots is None
     generic = {"id": "spuel", "nominal_power_kw": 2.0, "generic_flex_window": {"start_hour": 12, "start_shift_h": 1, "duration_h": 1}}
-    assert slf.consumer_windows(generic, _starts()).enable_slots == frozenset(range(20, 32))
+    assert slf.consumer_windows(generic, _starts(), logged_native=None).enable_slots == frozenset(range(20, 32))
     with pytest.raises(ValueError, match="naive"):
-        slf.consumer_windows(generic, [DAY_LOCAL.replace(tzinfo=timezone.utc)])
+        slf.consumer_windows(generic, [DAY_LOCAL.replace(tzinfo=timezone.utc)], logged_native=None)
+
+
+def test_logged_native_window_wins_over_the_configured_one():
+    flt = {
+        "id": "pool",
+        "nominal_power_kw": 0.2,
+        "filter_schedule": {"enabled": True, "config_fallback": {"native_start_hour": 10, "native_duration_hours": 2}},
+    }
+    logged = {"native_start_hour": 14.0, "native_duration_hours": 1.0}
+    windows = slf.consumer_windows(flt, _starts(), logged_native=logged)
+    assert windows.native_slots == frozenset(range(32, 36))  # 14:00–15:00
+    assert windows.native_source == slf.NATIVE_SOURCE_LOG
+    assert slf.consumer_windows(HP, _starts(), logged_native=None).native_source is None
 
 
 # --- slot rows carry pv_kwh and k_push_cent ----------------------------------

@@ -254,7 +254,10 @@ class LedgerInput:
     ``slot_start`` is timezone-aware. ``k_act_cent`` / ``k_push_cent`` are the
     buy and sell prices of that slot's own log entry; ``None`` when the entry is
     missing (the slot is then skipped with ``no_price``). ``planned_flex_kw`` is
-    the slot-0 plan of that entry per consumer.
+    the slot-0 plan of that entry per consumer. ``filter_native`` is the native filter
+    window the cycle used per consumer (``native_start_hour``, ``native_duration_hours``
+    from the entry's ``filter_contexts``); the v2 day replay takes it as the filter's
+    unshifted timing.
     """
 
     slot_start: datetime
@@ -262,6 +265,7 @@ class LedgerInput:
     k_act_cent: float | None
     k_push_cent: float | None
     planned_flex_kw: dict[str, float] = field(default_factory=dict)
+    filter_native: dict[str, dict[str, float]] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -562,6 +566,8 @@ def _slot_row(inp: LedgerInput, slot: LedgerSlot, dt_h: float) -> dict[str, Any]
         row["flex_delivered_kwh"] = {
             str(cid): float(kw or 0.0) * dt_h for cid, kw in (closed.get("flex_kw") or {}).items()
         }
+        if inp.filter_native:
+            row["filter_native"] = {str(cid): dict(window) for cid, window in inp.filter_native.items()}
     return row
 
 
@@ -796,6 +802,11 @@ def close_open_day(
     row["flex_timing"] = dict(sorted(retiming.timing.items()))
     row["flex_logged_reasons"] = dict(sorted(retiming.logged_reasons.items()))
     row["saving_logged_timing_eur"] = round(logged_saving, 4)
+    row["flex_native_window_source"] = {
+        cid: window.native_source
+        for cid, window in sorted(inputs.windows.items())
+        if window.native_source is not None
+    }
     return DayClose(row, closing, end_soc)
 
 

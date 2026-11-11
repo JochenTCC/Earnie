@@ -54,6 +54,8 @@ _KEPT_FIELDS = (
     "market_price_cent",
     "epex_price_cent",
     "k_push_act",
+    # native filter window per cycle: the v2 day replay's filter timing
+    "filter_contexts",
 )
 
 
