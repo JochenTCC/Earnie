@@ -93,13 +93,51 @@ When the first slot after SA₂ closes the day (`advance` → `close_day`), v2 c
 3. `house_without` per slot, then `vendor_mode_step` over the day from the chain's SoC at the day start. Costs with the slot's own prices.
 4. The row, the slot file record and the new chain SoC come from this replay. The SoC correction of § 3 of the spec is unchanged and uses the replay's end SoC.
 
+**Proposals for P9c (2026-11-11, from P9b; not decided):**
+
+1. **Native filter window from the log.** Every cycle logs `filter_contexts` (`native_start_hour`, `native_duration_hours`, `source_label`; `main.py`), the schedule the device runs without Earnie. The daemon stores it in the slot row (as P10a does with `plugged_in`), the backfill CLI keeps `filter_contexts` in `_KEPT_FIELDS`; per day the window of the first counted slot applies. A day without a logged window takes the configured `config_fallback`, recorded in the row (`native_window_source: "log" | "config"`). If that is too much for P9c: the configured value for 2.8 and a sentence in the method note.
+2. **Open day without `pv_kwh` / `k_push_cent`: no special path.** With `SAVINGS_V = 2` (P9d) the store drops a v1 state and starts a new chain (`savings_v_changed`, `savings_ledger_store.py`), so no v1 day is ever replayed as v2, and the replay does not run in production before P9d. The replay reads the fields strictly (`KeyError`); a test pins that a v1 state starts a new chain after the bump.
+3. **Unreadable profile file.** `retime_flex_day` takes `profiles_kw=None` as "not readable": the no-meter, EV and no-energy rules stay, every other consumer keeps its logged timing with reason `profile_read_error`, and a warning names the file. Not the windows instead (silent fallback) and not a raise in the day close (it would close the day twice). The day counts the battery part only, as in v1, and the row says why.
+4. **Time zone.** The replay takes `tz: ZoneInfo` as a required argument (no default); daemon and CLI pass `config.get_planning_timezone()`, so `close_day` stays pure. DST fall-back: the repeated hour 02 gets the same hourly profile value on its eight slots (same lookup as the planning read), energy parity holds; spring-forward: 92 slots. One test each.
+
+Side note: windows across midnight end at midnight in the ledger as in the MILP, so reference and plan share their windows. Whether that MILP behaviour is intended is a separate backlog question.
+
 The causal step per cycle stays for the open day (D2). Its SoC is kept apart from the chain SoC at the day start (`shadow_soc_day_start` in the state), so the replay does not depend on it.
 
-A consumer whose energy cannot be placed (no shape and no window, or more energy than its eligible slots hold at nominal power) keeps its logged timing for that day and is named in the row. This is a recorded rule per consumer and day, not a silent fallback. The builder raises in the second case today; the ledger catches exactly that case.
+A consumer whose energy cannot be placed (no shape and no window, or more energy than its eligible slots hold at nominal power) keeps its logged timing for that day and is named in the row. This is a recorded rule per consumer and day, not a silent fallback. The builder raises in the second case; the ledger checks the capacity before it calls the builder (same 1 Wh tolerance), so a raise from the builder stays a bug.
+
+**Timing function (Ledger P9b, `runtime_store/savings_ledger_flex.py`).** `retime_flex_day(slot_rows, consumers, profiles_kw, windows, dt_h)` is pure and returns `flex_retimed` kW per slot row, `flex_timing` per consumer, the reason for each `logged` consumer and the delivered kWh. Rules per configured consumer, in this order:
+
+| Case | `flex_timing` | Reference |
+|---|---|---|
+| no `flex_delivered_kwh` key in any counted slot of the day (D6) | `logged_no_meter` | logged (zero) |
+| EV | `logged`, reason `ev_rule_missing` | logged; P10a replaces this with the plug-in rule |
+| ≤ 1 Wh delivered | `no_energy` | logged |
+| profile with energy in the counted slots of the enable window | `profile` | profile shape over the enable window (whole day without one) |
+| filter with a counted slot in its native window | `native_window` | flat over the native window; the whole day is eligible, so energy beyond the native run continues right after it (capped at nominal power) |
+| enable window with a counted slot | `enable_window` | flat over the enable window |
+| none of the above | `logged`, reason `no_shape_no_window` | logged |
+| more energy than the eligible counted slots hold at nominal power | `logged`, reason `exceeds_eligible_slots` | logged |
+| key in `flex_delivered_kwh` but not configured | `logged`, reason `not_configured` | logged |
+
+Heating rods are ordinary consumers in P9b; the rod rule (§ 4.4) comes with its own step.
+
+**Window source per consumer type** (`consumer_windows(consumer, slot_starts_local)`, decided in P9b). All windows come from the planning consumer of the current configuration, like the profile, so the backfill CLI can compute them for past days. They use the MILP's own slot rules (hour of the slot's local wall-clock time):
+
+| Consumer type | Enable window (bounds the reference, flat shape without profile) | Native window (flat shape without profile, does not bound) |
+|---|---|---|
+| thermal (`daily_target_source: thermal_annual`) and heating rod (`heating_rod`) | `thermal_flex_window` (`consumer_thermal_eligible_indices`); none configured → whole day, no flat fallback | — |
+| any consumer with `generic_flex_window` (planning generic consumers) | `generic_flex_window` (`consumer_generic_eligible_indices`) | — |
+| filter (`filter_schedule.enabled`) | — | `filter_schedule.config_fallback.native_start_hour` / `native_duration_hours` (`slot_in_native_window`); incomplete fallback → no native window |
+| thermal RC (`thermal`), EV, others | — | — |
+
+Two consequences of using the MILP's rules: a `thermal_flex_window` or `generic_flex_window` that crosses midnight ends at midnight (`generic_allowed_slot_hours` keeps the run in the calendar day), as in the plan; and the filter's native window is the configured fallback, not the Loxone value the live cycle read (`filter_contexts` in the log). P9c decides whether to carry the logged native window instead (proposal below).
+
+Profiles: `data/profile_manager.py::load_flexible_consumer_slot_profiles_strict(slot_datetimes, consumers, profile_path=...)` looks up (month, weekday, hour) of each slot's naive local time, so the hourly value is repeated over the four slots of the hour; a missing key takes the mean of that hour over the file, as the planning read does. A missing file or column means no profile. A file that cannot be read, lacks the key columns, repeats a key row, holds an empty or non-numeric value, or has no row for an hour raises `FlexProfileReadError`; P9c books the day's consumers as `logged` with that reason.
 
 ### 4.2 Data format
 
-Slot row in the state, new: `pv_kwh`, `k_push_cent`, later `plugged_in` per EV (P10).
+Slot row in the state, new: `pv_kwh`, `k_push_cent` (P9b: `pv_kwh` 0.0 and `k_push_cent` `None` in a skipped or error slot, like `house_kwh` and `k_act_cent`), later `plugged_in` per EV (P10). A state written before P9b loads unchanged; its open day has no `pv_kwh` / `k_push_cent`, so the replay of that one day must handle it (P9c).
 
 Ledger row, new:
 
@@ -139,7 +177,7 @@ One chat session each; branch `feat/ledger-v2`, merged after the last step. `SAV
 | Step | Content | Done when |
 |---|---|---|
 | **Ledger P9a** | Decisions D1–D6 (done 2026-11-11, spec § 7 and § 9 items 7–12). Checks of § 2 done 2026-11-11. Checks and D7 done 2026-11-11. Open: spec § 3 and § 4 get the v2 table and row format once P9c fixes the field names. | Done except for that spec part. |
-| **Ledger P9b** | Timing function, pure: day slot rows + consumers → `flex_retimed` per slot and `flex_timing` per consumer (profile, native window, flat over the enable window). Slot rows carry `pv_kwh` and `k_push_cent`. | Tests: energy parity per day and consumer with full and partial coverage; cap at nominal power; consumer without shape; consumer that cannot be placed is recorded. |
+| **Ledger P9b** (done 2026-11-11) | Timing function, pure: day slot rows + consumers → `flex_retimed` per slot and `flex_timing` per consumer (profile, native window, flat over the enable window). Slot rows carry `pv_kwh` and `k_push_cent`. | Tests: energy parity per day and consumer with full and partial coverage; cap at nominal power; consumer without shape; consumer that cannot be placed is recorded. |
 | **Ledger P9c** | Day replay in `close_day`, state with `shadow_soc_day_start`, shadow plant without battery (D3), row and slot file from the replay, `saving_logged_timing_eur` (D4). Backfill CLI uses the same replay. Still behind `SAVINGS_V = 1` in production (the replay is called with an explicit version in tests). | Tests: synthetic 2-day log where a consumer is moved from an expensive to a cheap slot gives the hand-computed saving; a day without flex equals the v1 row to the cent; slots add up to the row; no battery → row without SoC correction. |
 | **Heating rod** (backlog item) | Rod rule and fuel in the replay (§ 4.4). | Tests: rod beside gas → `fuel_saved_eur` and rod electricity only on the "with" side; rod beside an electric source unchanged; price equals the MILP credit. |
 | **Ledger P10a** | `plugged_in` in the slot row; EV rule (§ 4.3, D5). | Tests: car plugged in at 18:00, charged 02:00–05:00 → reference charges from 18:00; session across SA; day without plug state is recorded. |

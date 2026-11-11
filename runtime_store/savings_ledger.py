@@ -429,8 +429,10 @@ def record_error_slot(state: LedgerState, slot_start: datetime) -> LedgerState:
         "export_kwh_with": 0.0,
         "export_kwh_without": 0.0,
         "k_act_cent": None,
+        "k_push_cent": None,
         "shadow_soc_end": state.shadow_soc,
         "house_kwh": 0.0,
+        "pv_kwh": 0.0,
     }
     return replace(state, last_slot_start=slot_start, slots=state.slots + (row,))
 
@@ -447,13 +449,17 @@ def _slot_row(inp: LedgerInput, slot: LedgerSlot, dt_h: float) -> dict[str, Any]
         "export_kwh_with": slot.export_kwh_with,
         "export_kwh_without": slot.export_kwh_without,
         "k_act_cent": inp.k_act_cent,
+        # Sell price and PV of the slot: the v2 day replay steps the shadow plant again from the rows.
+        "k_push_cent": inp.k_push_cent,
         "shadow_soc_end": slot.shadow_soc_next,
         # A skipped slot counts as zero, like its costs; a counted one has its load (``slot_skip_reason``).
         "house_kwh": 0.0,
+        "pv_kwh": 0.0,
     }
     if slot.counted:
         closed = inp.closed or {}
         row["house_kwh"] = ledger_house_kw(closed) * dt_h
+        row["pv_kwh"] = float(closed["pv_kw"]) * dt_h
         row["flex_planned_kwh"] = {
             str(cid): float(kw) * dt_h for cid, kw in (inp.planned_flex_kw or {}).items()
         }
