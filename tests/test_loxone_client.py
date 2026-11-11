@@ -577,6 +577,25 @@ class TestSharedMeterSubtraction:
             live = lc.resolve_consumer_nominal_power_kw(consumer)
         assert live == pytest.approx(11.04)
 
+    def test_resolve_nominal_current_wallbox_qualified_binding_as_amperes(self):
+        """Fixed pair view (DM6): the wallbox's charger binding arrives qualified
+        (``evcs.<Wallbox>.get_evcs_nominal_current``); the live 16 A must be converted
+        with the pair's 220 V / 1 phase, never taken as 16 kW."""
+        consumer = {
+            "id": "e_auto",
+            "type": "ev",
+            "nominal_power_kw": 3.5,
+            "ehal_bindings": {"evcs.e_auto.get_evcs_nominal_current": ""},
+            "charging_schedule": {
+                "nominal_power_voltage_v": 220.0,
+                "nominal_power_phases": 1,
+            },
+        }
+        with patch.object(lc, "fetch_loxone_generic_value", return_value=16.0) as gen:
+            live = lc.resolve_consumer_nominal_power_kw(consumer)
+        assert live == pytest.approx(3.52)
+        gen.assert_called_once_with("evcs.e_auto.get_evcs_nominal_current")
+
     def test_resolve_nominal_power_ignores_legacy_charging_nest(self):
         """Nest-only ``nominal_power_kw_name`` is no longer resolved (entity-scoped only)."""
         consumer = {

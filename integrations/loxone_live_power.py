@@ -45,13 +45,13 @@ def fetch_filter_native_start_hour(io_name: str):
 
 
 def resolve_consumer_nominal_power_kw(consumer: dict) -> float:
-    """Nennleistung (kW) aus live ``get_evcs_nominal_current`` (A) via push inbox."""
+    """Nennleistung (kW) aus live ``get_evcs_nominal_current`` (A) via push inbox.
+
+    The marker resolves only the nominal *current* fields (bare or qualified, e.g.
+    ``evcs.<Wallbox>.get_evcs_nominal_current`` on a fixed pair's view), so the value is
+    always in amperes and is converted with the pair's voltage and phases.
+    """
     fallback = float(consumer.get("nominal_power_kw", 0.0) or 0.0)
-    bindings = ehal_bindings(consumer)
-    amp_binding = (
-        "get_evcs_nominal_current" in bindings
-        or "sens_evcs_nominal_current" in bindings
-    )
     io_name = marker_get_evcs_nominal_current(consumer)
     if not io_name:
         return fallback
@@ -66,11 +66,8 @@ def resolve_consumer_nominal_power_kw(consumer: dict) -> float:
         )
         return fallback
 
-    if amp_binding:
-        voltage_v, phases = ev_nominal_power_conversion(consumer)
-        live = ampere_to_kw(float(value), voltage_v=voltage_v, phases=phases)
-    else:
-        live = float(value)
+    voltage_v, phases = ev_nominal_power_conversion(consumer)
+    live = ampere_to_kw(float(value), voltage_v=voltage_v, phases=phases)
 
     if live <= 0:
         logger.warning(
