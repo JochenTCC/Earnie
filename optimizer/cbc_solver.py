@@ -82,6 +82,7 @@ def stopped_at_limit(prob: pulp.LpProblem) -> bool:
 
 # Strict-stage status of a solve stopped at its time limit (PuLP calls it ``Optimal``).
 STRICT_STATUS_TIME_LIMIT = "TimeLimit"
+STATUS_INFEASIBLE = pulp.LpStatus[pulp.LpStatusInfeasible]
 
 
 def _objective_value(prob: pulp.LpProblem) -> float | None:
@@ -306,6 +307,9 @@ def solve_with_strict_fallback(
     used; it ends on the gap, so the plan is reproducible unless the gap stage itself reaches
     ``GAP_STAGE_TIME_LIMIT_SEC`` (``gap_time_limit_hit`` in the solve log). Without any solution
     within that limit the status is not ``Optimal``.
+
+    A strict stage that proves the model ``Infeasible`` ends the solve: the gap stage could not
+    find a solution either.
     """
     backend = resolve_milp_solver()
     label = "HiGHS" if backend == "highs" else "CBC"
@@ -346,6 +350,11 @@ def solve_with_strict_fallback(
             strict_status=status,
             strict_time_limit_hit=limit_hit,
         )
+        if status == STATUS_INFEASIBLE:
+            # Proven: a wider gap cannot make the model feasible, a second solve only costs time.
+            record.update(stage="strict", final_status=status, objective=None)
+            _append_solve_record(record)
+            return status
         maybe_record_strict_timing(
             strict_limit_sec=strict_limit,
             strict_elapsed_sec=elapsed,
