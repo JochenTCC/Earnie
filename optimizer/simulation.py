@@ -89,6 +89,13 @@ from optimizer.sim_horizon_chart_soc import (  # noqa: F401  (re-exported)
 logger = logging.getLogger(__name__)
 
 
+def _consumers_or_configured(flexible_consumers: list | None) -> list:
+    """The given consumers, an empty list included; the configured ones only for ``None``."""
+    if flexible_consumers is not None:
+        return flexible_consumers
+    return config.get_flexible_consumers(optimizer_only=True)
+
+
 def _simulate_single_hour_optimizer(
     remaining_matrix: list,
     row: dict,
@@ -122,7 +129,7 @@ def _simulate_single_hour_optimizer(
         matrix_hour_index,
         len(remaining_matrix),
     )
-    consumers_cfg = flexible_consumers or config.get_flexible_consumers(optimizer_only=True)
+    consumers_cfg = _consumers_or_configured(flexible_consumers)
     mode, target_power, target_soc, consumer_powers, consumer_pv_follow, plan, _ = milp_optimizer(
         remaining_matrix,
         h,
@@ -212,7 +219,7 @@ def _prepare_horizon_state(
     current_soc_by_id: dict[str, float] | None = None,
 ) -> _HorizonSetup:
     """Bereitet Matrix, Lade-/Filterkontexte, Flex-Horizontgrenzen und Terminal-SoC auf."""
-    consumers_cfg = flexible_consumers or config.get_flexible_consumers(optimizer_only=True)
+    consumers_cfg = _consumers_or_configured(flexible_consumers)
     optimization_matrix, charging_contexts, consumer_daily_targets_kwh = (
         _matrix_and_charging_contexts(
             optimization_matrix,

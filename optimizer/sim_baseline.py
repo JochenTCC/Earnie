@@ -19,6 +19,7 @@ from optimizer.milp_horizon import (
 from optimizer.rod_store import RodStoreBalance, next_level_kwh
 from optimizer.slot_duration import DEFAULT_DT_H
 from optimizer.sim_chart_rows import (
+    COL_VERBRAUCH_PROGNOSE,
     _chart_price_fields,
     _chart_row_slot_field,
     _finalize_chart_rows_for_display,
@@ -607,13 +608,15 @@ def _simulate_single_hour_baseline(
     battery_params: dict,
     flex_kw_override: dict[str, float] | None = None,
     steuerbefehl: str = "Baseline",
-    baseload_kw_override: float | None = None,
+    consumption_kw_override: float | None = None,
     *,
     consumers: list[dict] | None = None,
 ) -> tuple[float, dict]:
     """Simuliert eine einzelne Stunde im Baseline-Pfad.
 
     ``consumers`` names the flex columns of the chart row (default: the live scenario's).
+    ``consumption_kw_override``: consumption without flex, battery standby included (as in
+    the chart column), so no standby is added to it.
     """
     pv = row["expected_p_pv"]
     flex_kw = flex_kw_override if flex_kw_override is not None else (row.get("expected_flex_kw") or {})
@@ -624,8 +627,8 @@ def _simulate_single_hour_baseline(
         con = con + bat.standby_power_kw(battery_params)
         total_flex_power = 0.0
         flex_kw = {}
-    elif baseload_kw_override is not None:
-        con = float(baseload_kw_override) + bat.standby_power_kw(battery_params)
+    elif consumption_kw_override is not None:
+        con = float(consumption_kw_override)
         total_flex_power = sum(float(v or 0.0) for v in flex_kw.values())
     else:
         con = bat.effective_p_act(row, battery_params)
@@ -695,6 +698,19 @@ def _flex_kw_from_chart_row(
     }
 
 
+def _consumption_kw_of_optimized_row(
+    optimized_row: dict, row: dict, battery_params: dict
+) -> float:
+    """Consumption without flex of the optimized run, battery standby included.
+
+    The chart column already holds the standby; a row without the column gets the matrix
+    load plus standby.
+    """
+    if COL_VERBRAUCH_PROGNOSE in optimized_row:
+        return float(optimized_row[COL_VERBRAUCH_PROGNOSE] or 0.0)
+    return bat.effective_p_act(row, battery_params)
+
+
 def simulate_baseline_with_optimized_flex(
     optimization_matrix: list,
     optimized_rows: list,
@@ -717,8 +733,8 @@ def simulate_baseline_with_optimized_flex(
             battery_params,
             flex_kw_override=_flex_kw_from_chart_row(optimized_row, consumers),
             steuerbefehl="Baseline (Ziel)",
-            baseload_kw_override=float(
-                optimized_row.get("Verbrauch-Prognose (kW)", row["expected_p_act"]) or 0.0
+            consumption_kw_override=_consumption_kw_of_optimized_row(
+                optimized_row, row, battery_params
             ),
             consumers=consumers,
         )

@@ -49,8 +49,10 @@ def delivered_flex_kwh_from_rows(
     """Summiert die gelieferte Flex-Energie je Verbraucher über alle Simulationsslots."""
     dt_h = validate_dt_h(dt_h)
     totals: dict[str, float] = {}
-    consumers_cfg = flexible_consumers or config.get_flexible_consumers(
-        optimizer_only=True
+    consumers_cfg = (
+        flexible_consumers
+        if flexible_consumers is not None
+        else config.get_flexible_consumers(optimizer_only=True)
     )
     for consumer in consumers_cfg:
         col = consumer_column_name(consumer)
@@ -332,12 +334,13 @@ def _run_savings_horizons(
         )
     with record_phase("savings_baseline"):
         baseline_rows = simulate_baseline_horizon(
-            matrix, baseline_soc, charging_contexts=charging_contexts
+            matrix, baseline_soc, charging_contexts=charging_contexts, consumers=consumers
         )
     matched_targets = resolve_matched_baseline_horizon_targets(
         matrix,
         targets,
         charging_contexts,
+        consumers=consumers,
     )
     with record_phase("savings_matched"):
         matched_baseline_rows = simulate_matched_baseline_horizon(
@@ -345,10 +348,11 @@ def _run_savings_horizons(
             baseline_soc,
             matched_targets,
             charging_contexts,
+            consumers=consumers,
         )
     # Same base as resolve_matched_baseline_horizon_targets, without the profile fallback.
     costed_targets = apply_horizon_charging_limits(
-        resolve_horizon_consumer_targets_kwh(matrix, targets),
+        resolve_horizon_consumer_targets_kwh(matrix, targets, flexible_consumers=consumers),
         charging_contexts or {},
     )
     fallback_kwh = _profile_fallback_kwh(matched_targets, costed_targets)
@@ -359,6 +363,7 @@ def _run_savings_horizons(
                 baseline_soc,
                 costed_targets,
                 charging_contexts,
+                consumers=consumers,
             )
     else:
         matched_costed_rows = matched_baseline_rows
@@ -509,6 +514,7 @@ def _assemble_savings_dict(
         matrix,
         rows.optimized,
         baseline_soc,
+        consumers=consumers,
     )
     return {
         **costs,
