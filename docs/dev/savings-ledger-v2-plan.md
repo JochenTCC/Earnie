@@ -1,0 +1,165 @@
+# Savings ledger `savings_v: 2`: implementation plan (Version 2.8)
+
+**Status:** plan, 2026-11-11. No code yet. Decisions D1–D6 (§ 3) taken 2026-11-11 (maintainer) and written into the spec (§ 7, § 9 items 7–12). The four checks of § 2 are done; they raised D7 (no per-consumer power on network backends), decided 2026-11-11: step Ledger P9e for HA is part of 2.8.
+**Backlog items (Version 2.8):** **Ledger P9**, **Ledger P10**, **Heating rod in Live: count saved fuel in the savings ledger**.
+**Spec:** [`savings-ledger.md`](savings-ledger.md) § 3, § 4, § 7. Related: [`rule-based-reference.md`](rule-based-reference.md) (reference ladder L0–L3 of the Scenario Explorer).
+
+## 1. Goal
+
+The Monitor tile "Mit Earnie gespart" also counts what Earnie saves by moving consumers, and the fuel a heating rod saves. Today (`savings_v: 1`) it counts the battery strategy only: the logged house load already holds the shifted flex energy, and the shadow plant runs on the same load.
+
+`savings_v: 2` changes the load of the shadow plant:
+
+```text
+house_without = baseload_actual + Σ flex_retimed          (per slot)
+baseload_actual = house_actual − Σ flex_delivered
+```
+
+- **Profile and window consumers (P9):** the energy delivered in the SA-day, in the shape the consumer has without control (its profile, or its native window).
+- **EV (P10):** the energy delivered in the SA-day, charged at nominal power from plug-in.
+- **Heating rod beside a fuel source:** 0 kWh in the shadow plant; the heat it delivered is bought as fuel there (`cost_without += rod_kwh · fuel price`).
+
+All three change the definition "ohne Earnie", so they ship as **one** version bump. `SAVINGS_V` becomes 2 in the last step only (§ 5). A second bump later would restart the chain and the lifetime total once more.
+
+**Why in 2.8:** the ledger ships for the first time with 2.8. If v2 is in that release, no released install ever holds a v1 chain, and no user sees the total restart.
+
+## 2. What the code allows today
+
+Read on `main`, 2026-11-11.
+
+| Fact | Where | Consequence |
+|---|---|---|
+| The shadow chain steps once per closed slot, O(1), and never looks ahead. | `runtime_store/savings_ledger.py::advance_slot`, `savings_ledger_daemon.py::_on_cycle` | The re-timed shape needs the day's delivered energy, known only at the day close, and may put energy earlier than Earnie did. **v2 cannot be computed slot by slot.** The day is replayed when it closes (§ 4.1). |
+| The open day's slot rows hold costs, import and export, `k_act_cent`, `shadow_soc_end`, `house_kwh`, `flex_delivered_kwh` per consumer. | `_slot_row` | A replay also needs `pv_kwh` and `k_push_cent` per slot. Both are known when the slot is booked. |
+| A pure builder gives the reference timing of one window: real shape scaled to a target, capped at nominal power, zero outside the eligible slots, with the list of consumers without a shape. | `optimizer/sim_baseline.py::build_shaped_flex_kw_per_slot` (the SE's L1) | Reuse it. The spec names `build_matched_flex_kw_per_hour`; the SE replaced that with this builder (RuleRef). |
+| The profile of a flex consumer can be loaded for any list of hours. | `data/profile_manager.py::_load_flexible_consumer_hourly_profiles` | The shape of a closed day comes from the configuration and the date, not from the cycle log. So the backfill CLI can compute it for past days too. |
+| Slot 0 of the live matrix carries the meter reading, not the profile (`consumption_mode: live_snapshot`). | `optimizer/sim_baseline.py::_matched_baseline_profile_kw` | The shape must not be taken from the logged matrix row. |
+| Without a house battery the ledger is inactive. | `_on_cycle` ("ledger inactive") | With v2 a house without a battery has a saving too (heat pump, EV, rod). The ledger must run without a battery. |
+| The MILP already values rod heat with `fuel_credit_cent_per_kwh`; the SE books fuel per day. | `optimizer/milp_horizon_extras.py::_heating_rod_fuel_credit`, `simulation/heat_fuel.py` | One fuel price for plan, SE and ledger. |
+| `lifetime_summary` counts rows of the current chain and the current `SAVINGS_V` only. | `savings_ledger.py::lifetime_summary` | After the bump the tile starts at 0 unless the chain is rebuilt from the log (`--rebuild`). |
+| The plan's baselines and Chart 1 "SoC BL Ziel" start from the shadow SoC of the open day. | `savings_ledger_daemon.py::planning_shadow_soc` (Ledger P11) | The open day needs a running shadow SoC between two day closes (D2). |
+
+Checked 2026-11-11 (Ledger P9a), by reading the code; no log of an install was read:
+
+1. **Profile for a past day:** `_load_flexible_consumer_hourly_profiles(target_hours)` only reads `flexible_consumer_profiles.csv` and looks up (month, weekday, hour) per consumer of the current configuration; it has no side effects and works for any date. Three things the ledger must handle: the values are **hourly** (the replay repeats them over the four slots); a missing (month, weekday, hour) key takes the mean of that hour, a missing file or column gives zeros, which the builder then treats as "no shape" (nominal power from the first eligible slot); a read error prints a message and returns zeros. The last one is a silent fallback, so the ledger needs a strict read that raises and books the day's consumers as `logged` with the reason.
+2. **Windows and plug state:** every log entry holds the cycle's `charging_contexts` (`main.py`, `optimizer/charging_resolve.py::serialize_charging_contexts`), with `plugged_in`, `deadline` and `available_from` per consumer. So the plug state of past days is in the log. The backfill CLI drops it today (`scripts/build_savings_ledger.py::_KEPT_FIELDS`); P10a adds the field there. Windows of the other consumers come from the configuration (`thermal_flex_window`, `generic_flex_window`, the filter's native start and duration); P9b fixes the source per consumer type.
+3. **Consumer without its own meter:** `closed_interval.flex_kw` holds measured consumers only (`integrations/loxone_live_power.py::_build_chart_kw`, plus the native filter run that is inferred). A consumer without a meter has **no key**. Detection for D6 is therefore: a flex consumer of the configuration that has no key in any counted slot of the day.
+4. **Fuel price:** `house_config/heat_source.py::heating_rod_fuel_credit_cent_per_kwh` = fuel price per kWh ÷ the source's efficiency, per rod kWh. The planning consumer carries it as `fuel_credit_cent_per_kwh` only beside a non-electric heat source (`house_config/planning_flex_converters.py`). The ledger reads that field, so plan and ledger use one value.
+
+**Found in check 3:** on a network backend (HA / evcc, OpenEMS) the power sampler reads no per-consumer power at all (`runtime_store/power_interval_sampler.py`: `flex_kw` stays empty when `is_ehal_network_backend()` and no reader is passed; nothing passes one in production). There every consumer falls under D6, and v2 adds the battery-free houses (D3) but no flex part and no rod fuel. v2 as planned is complete on Loxone only. See D7.
+
+## 3. Decisions (taken 2026-11-11, maintainer: the proposals as written)
+
+| # | Question | Options | Decided |
+|---|---|---|---|
+| D1 | Which counterfactual for flex? | **(a)** unshifted timing, spec § 7 (the SE's L1). **(b)** standard rules on actuals (the SE's L2: surplus charging, price lock, cheapest hours), so the tile and the study share one reference. | (a) for 2.8. The day replay of § 4.1 takes the timing from one function, so (b) can replace it later. (b) needs per-slot inputs the ledger does not keep yet (published prices at decision time, rule parameters) and costs about two more sessions. Open point: the SE headline is L2 − L3, the tile would be L1-based and reads higher. The method note must say so. |
+| D2 | What does the open day show ("Heute bisher", Chart 2 "Bisher", Chart 1 "SoC BL Ziel")? | **(a)** as today: shadow on the logged timing, battery only, replaced by the replay at the day close. **(b)** provisional re-timing with the plan's day targets. | (a). "Heute bisher" already reads as provisional. The text says that moved consumers are added when the day closes. At sunrise both chains usually sit at min SoC, so the line rarely jumps; the replay's end SoC is the chain value from then on. |
+| D3 | Houses without a battery | ledger active with a shadow plant without battery (`grid = load − pv`, no SoC correction), or still inactive | active. |
+| D4 | Show the flex part apart from the battery part? | **(a)** one figure. **(b)** the row also stores the day's saving with the logged timing from the same start SoC, and the tile help names "davon durch verschobene Verbraucher". | (b) in the row (one more replay per day, cheap), (a) on the tile at first. The split is approximate, because the two runs end at different SoC. |
+| D5 | EV session across the SA-day boundary | re-time per SA-day (energy delivered on day N+1 starts at the day start if the car was already plugged in), or per session with a carry across days | per SA-day. Keeps the day's energy equal on both sides and understates slightly. |
+| D6 | Consumer without its own meter | keeps its logged timing and is named in the row, or re-timed from the plan | logged timing, recorded per consumer (`flex_timing: "logged_no_meter"`). No estimate from setpoints. |
+| D7 | Network backends log no per-consumer power (§ 2, check 3; found 2026-11-11). | **(a)** ship v2 as planned; on HA and OpenEMS the tile stays battery only. **(b)** step **Ledger P9e** before P9d: the slot log gets per-consumer power on HA (§ 3.1). | (b) for HA, decided 2026-11-11 (maintainer). OpenEMS wallboxes are not part of 2.8; there the tile stays battery only and the help says so. |
+
+### 3.1 D7: scope and estimate of Ledger P9e (2026-11-11, from the code)
+
+What exists on HA:
+
+- The push contract already carries every bound `sens_*` field of a consumer: `integrations/ha_push_read.py::binding_entries` lists all consumer `ehal_bindings`, and `ehal/loxone_push_source.py::is_pushable_kind` accepts `sens_*`. So `flex.<id>.sens_power_act` and `flex.<id>.sens_consumer_active` arrive in the push inbox once the user has bound them.
+- `read_push_ehal_value` reads such a value in EHAL units with the sign rule; `integrations/ha_units.py` knows `flex.sens_power_act` as a power.
+
+What is missing is the read into the log: `main.py` sets the per-consumer power to 0 for every consumer on a network backend, and the sampler leaves `flex_kw` empty. Both date from the first OpenEMS adapter (2.4.b, `ef2c75c8`) and are a placeholder; no rule or doc was found that excludes consumer power on purpose.
+
+**Ledger P9e — per-consumer power in the slot log on HA** (1 session):
+
+- A reader for network backends that returns measured consumers only: `sens_power_act` when bound, else `sens_consumer_active` × nominal power for binary consumers, the wallbox's `sens_evcs_active_power` for an EV. A value that is missing or stale gives no key, never 0 (D6 then applies to that consumer and day).
+- Wired into the sampler (`read_flex_chart`), so `closed_interval.flex_kw` holds slot means as on Loxone.
+- Scope limit: the log and Chart 1 "Ist" per consumer only. `main.py` also feeds live consumer power into the planning matrix (baseload split of slot 0) and into the delivery check; switching those on for HA changes planning and is not part of this step. It needs its own item and a HouseSim run.
+- Tests: reader with bound, unbound and stale values; a slot mean in `closed_interval.flex_kw`; HA contract testbed check case with one consumer power entity.
+
+**OpenEMS** (half a session, not in 2.8): the adapter reads the power per charger component already (`_evcs_power_w`) and sums it to `sens_evcs_active_power`; per-charger values can go into `flex_kw`. Other consumers have no channel binding on OpenEMS, so there is nothing to read for them.
+
+Not estimated, because it depends on the installs and not on the code: how many HA houses have a power entity bound per consumer. Without the binding P9e changes nothing for that consumer.
+
+The plan grows from 7 to 8 sessions. P9e is independent of P9b and P9c and can run at any point before P9d.
+
+## 4. Design
+
+### 4.1 Day replay
+
+When the first slot after SA₂ closes the day (`advance` → `close_day`), v2 computes the day from the slot rows the state holds:
+
+1. `flex_delivered_kwh[cid]` = Σ over the counted slots.
+2. Reference timing per consumer over the **counted slots only**, scaled to that energy (`build_shaped_flex_kw_per_slot`; targets = delivered energy, shapes = profile, eligible = counted slots inside the consumer's window). A skipped slot stays zero on both sides, as in v1, so the day's energy is equal on both sides whatever the coverage.
+3. `house_without` per slot, then `vendor_mode_step` over the day from the chain's SoC at the day start. Costs with the slot's own prices.
+4. The row, the slot file record and the new chain SoC come from this replay. The SoC correction of § 3 of the spec is unchanged and uses the replay's end SoC.
+
+The causal step per cycle stays for the open day (D2). Its SoC is kept apart from the chain SoC at the day start (`shadow_soc_day_start` in the state), so the replay does not depend on it.
+
+A consumer whose energy cannot be placed (no shape and no window, or more energy than its eligible slots hold at nominal power) keeps its logged timing for that day and is named in the row. This is a recorded rule per consumer and day, not a silent fallback. The builder raises in the second case today; the ledger catches exactly that case.
+
+### 4.2 Data format
+
+Slot row in the state, new: `pv_kwh`, `k_push_cent`, later `plugged_in` per EV (P10).
+
+Ledger row, new:
+
+```json
+{
+  "savings_v": 2,
+  "flex_retimed_kwh": {"waermepumpe": 3.86, "pool_swimspa": 0.7},
+  "flex_timing": {"waermepumpe": "profile", "pool_swimspa": "native_window", "wallbox": "plug_in", "trockner": "logged_no_meter"},
+  "saving_logged_timing_eur": 0.33,
+  "fuel_saved_kwh": 2.1,
+  "fuel_saved_eur": 0.25
+}
+```
+
+`cost_without_eur` holds electricity and fuel of the shadow plant; `fuel_saved_eur` names the fuel part. Slot file: `cost_without_eur` per slot from the replay, fuel in the slot the rod ran in, so the slots still add up to the row (`check_day_slots`). A state file of v1 starts a new chain (`savings_v_changed`), as the store already does.
+
+### 4.3 EV (P10)
+
+The reference charges the energy delivered in the SA-day at nominal power from the first plugged-in slot of the day (D5). The daemon stores `plugged_in` per EV in the slot row, from the cycle's charging context. A day without that field for a slot the car charged in keeps the logged timing for the EV (`flex_timing: "logged_no_plug_state"`).
+
+### 4.4 Heating rod
+
+Rule in the timing function: a consumer with `daily_target_source: heating_rod` beside a fuel source gets 0 kWh in the shadow plant; `fuel_saved_kwh` = delivered rod kWh ÷ the source's efficiency, priced like the MILP's fuel credit. Beside an electric heat source the rod is an ordinary consumer. A rod without its own meter: D6.
+
+### 4.5 UI and docs
+
+- Tile help and method note (German): "ohne Earnie" = gleiche PV, gleicher Tagesverbrauch je Gerät zur gewohnten Zeit, Auto lädt ab dem Einstecken, Heizstab aus und Wärme aus dem Brennstoff, Batterie im Herstellermodus, gleiche Preise.
+- The chain switch is visible: the tile's start date, and a one-time note after the update.
+- "Heute bisher": text per D2.
+- Chart 2 account view and Chart 1 "SoC BL Ziel": check that closed days read the replay and the open day the running chain; no new drawing.
+- `docs/ui/charts.md`, user manual, spec § 3 / § 4 / § 7, release note draft for 2.8.
+
+## 5. Steps
+
+One chat session each; branch `feat/ledger-v2`, merged after the last step. `SAVINGS_V` stays 1 until P9d.
+
+| Step | Content | Done when |
+|---|---|---|
+| **Ledger P9a** | Decisions D1–D6 (done 2026-11-11, spec § 7 and § 9 items 7–12). Checks of § 2 done 2026-11-11. Checks and D7 done 2026-11-11. Open: spec § 3 and § 4 get the v2 table and row format once P9c fixes the field names. | Done except for that spec part. |
+| **Ledger P9b** | Timing function, pure: day slot rows + consumers → `flex_retimed` per slot and `flex_timing` per consumer (profile, native window, flat over the enable window). Slot rows carry `pv_kwh` and `k_push_cent`. | Tests: energy parity per day and consumer with full and partial coverage; cap at nominal power; consumer without shape; consumer that cannot be placed is recorded. |
+| **Ledger P9c** | Day replay in `close_day`, state with `shadow_soc_day_start`, shadow plant without battery (D3), row and slot file from the replay, `saving_logged_timing_eur` (D4). Backfill CLI uses the same replay. Still behind `SAVINGS_V = 1` in production (the replay is called with an explicit version in tests). | Tests: synthetic 2-day log where a consumer is moved from an expensive to a cheap slot gives the hand-computed saving; a day without flex equals the v1 row to the cent; slots add up to the row; no battery → row without SoC correction. |
+| **Heating rod** (backlog item) | Rod rule and fuel in the replay (§ 4.4). | Tests: rod beside gas → `fuel_saved_eur` and rod electricity only on the "with" side; rod beside an electric source unchanged; price equals the MILP credit. |
+| **Ledger P10a** | `plugged_in` in the slot row; EV rule (§ 4.3, D5). | Tests: car plugged in at 18:00, charged 02:00–05:00 → reference charges from 18:00; session across SA; day without plug state is recorded. |
+| **Ledger P10b** | Consumers without their own meter (D6): detected, logged timing, named in the row and in the tile help. | Tests: such a consumer changes nothing against v1 and appears in `flex_timing`. |
+| **Ledger P9e** | Per-consumer power in the slot log on HA (§ 3.1): reader for measured consumers, wired into the sampler; log and Chart 1 "Ist" only, planning unchanged. | Tests: bound, unbound and stale values; slot mean in `closed_interval.flex_kw`; HA testbed check case with one consumer power entity. |
+| **Ledger P9d** | `SAVINGS_V = 2`; tile, method note, chain-switch note, user docs, release note draft (§ 4.5). Backfill `--rebuild --dry-run` on the maintainer's log; one day checked by hand against the log. | UI tests for tile and help; the hand check is written into the backlog item; live check on the maintainer's install is a tracker row. |
+
+Order: P9a → P9b → P9c, then Heating rod, P10a and P10b in any order, P9e at any point, P9d last. Estimate: 8 sessions (the backlog said 1 each for P9 and P10; the day replay was not in that estimate).
+
+## 6. Not in this plan
+
+- Standard rules (L2) as the live reference (D1 option b).
+- Per-charger power on OpenEMS (§ 3.1), and live consumer power in the planning matrix and the delivery check on network backends.
+- **Ledger P12** (settlement points) and the usage-ping figure ("Simple Savings KPI"); both read the row and work with v2 unchanged.
+- **Battery efficiency calibration from the log**: same shadow battery, own item.
+- Thermal effects of moving a heat pump (another COP at another hour): the reference keeps the day's electrical energy, as the SE does.
+
+## 7. Risks
+
+- **The reference shape is a profile, not what the user would have done that day.** A consumer the user starts by hand at varying times gets a saving or a loss from the difference between profile and habit. Mitigation: only consumers Earnie controls are re-timed; the method note says "zur gewohnten Zeit".
+- **Negative flex saving on single days** (Earnie moved a consumer into PV that then did not come). This is a real result and stays in the figure.
+- **Backfill of old days** uses today's profiles and has no plug state. Rows built that way name it in `flex_timing`.
+- **Size of P9c.** `close_day` and the state are used by the daemon, the CLI, Chart 1, Chart 2 and the tile. The replay must leave the v1 path byte-identical until P9d (test: v1 rows of the existing fixtures unchanged).

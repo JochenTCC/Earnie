@@ -1,6 +1,7 @@
 # Savings ledger — realised savings from logged actuals
 
 **Status:** implemented (v1), 2026-11-04. Flex re-timing (`savings_v: 2`, § 7) and the usage ping (§ 6) are open. Language: English (docs/dev).
+**Decided 2026-11-11 (Ledger P9a):** the definition of `savings_v: 2` (§ 7, § 9 items 7–13); planned for 2.8, steps in [`savings-ledger-v2-plan.md`](savings-ledger-v2-plan.md). Not implemented.
 **Fixed 2026-11-02:** D2 (Ledger P1) and D3 (Ledger P2); D1 is replaced by the ledger.
 **Implemented 2026-11-02:** slot engine and day close `runtime_store/savings_ledger.py` (Ledger P3, P4), files `runtime_store/savings_ledger_store.py` (P4), daemon hook `runtime_store/savings_ledger_daemon.py` (P5), backfill CLI `scripts/build_savings_ledger.py` (P6).
 **Decision 2026-11-02 (Ledger P0):** `p_ref`, partial days and powerstations are decided (§ 3, § 4, § 9).
@@ -185,17 +186,26 @@ Schema v3 adds to the existing v2 payload:
 - **Decision needed (privacy):** `usage-ping.md` § 2 excludes prices and costs from the payload. A lifetime euro aggregate is a new data category. It needs: an updated consent text and "Was wird gesendet?" preview, a note in `docs/einrichtung/betrieb.md` § Nutzungsstatistik, and a server-side schema bump (`earnie-server`, separate repo → tracker row).
 - Server KPI: Σ `savings_eur` and median per install, by `savings_v`; histogram of `savings_eur / savings_days`. Marketing wording always carries the counterfactual and the method version; the figure is as fakeable as the points.
 
-## 7. Flex re-timing (`savings_v: 2`, later)
+## 7. Flex re-timing (`savings_v: 2`, decided 2026-11-11, not implemented)
 
-v1 measures the battery benefit only, because the logged house load already contains the shifted flex energy. v2 re-times flex per SA-day:
+v1 measures the battery benefit only, because the logged house load already contains the shifted flex energy. v2 changes the load of the shadow plant per SA-day. Steps and data format: [`savings-ledger-v2-plan.md`](savings-ledger-v2-plan.md).
 
-- `flex_delivered_kwh[cid]` from the logged `flex_kw` per slot.
-- Counterfactual shape = the matched-baseline profile of that consumer (`build_matched_flex_kw_per_hour` shape), scaled to the delivered energy; thermal consumers with no profile use their native window (filter: `native_start_hour`/`duration`; others: flat over the enable window).
-- `house_without = baseload_actual + Σ flex_retimed`, shadow battery runs on that.
+```text
+house_without   = baseload_actual + Σ flex_retimed        (per slot)
+baseload_actual = house_actual − Σ flex_delivered
+```
 
-Same day energy, different timing — the Scenario Explorer's energy-parity principle. The plan-vs-actual reconciliation (`flex_planned_kwh` vs `flex_delivered_kwh`) is already in the v1 row and becomes the input for v2.
+- **Reference timing** *(§ 9 item 7)*: the consumer's unshifted timing, which is L1 of the Scenario Explorer ([`rule-based-reference.md`](rule-based-reference.md)): its profile shape scaled to the energy delivered in the SA-day and capped at nominal power (`optimizer/sim_baseline.py::build_shaped_flex_kw_per_slot`); thermal consumers with no profile use their native window (filter: `native_start_hour`/`duration`; others: flat over the enable window). Not the standard rules (L2): the tile therefore reads higher than the SE headline L2 − L3, and the method note says so.
+- **Day replay**: the shape needs the day's delivered energy and may place energy earlier than Earnie did, so v2 is computed when the SA-day closes, from the slot rows of the day, over the counted slots only. Same day energy on both sides, whatever the coverage — the Scenario Explorer's energy-parity principle. The row, the slot file and the chain SoC come from the replay.
+- **Open day** *(§ 9 item 8)*: as in v1, the shadow runs on the logged timing (battery only) and is replaced by the replay at the day close. "Heute bisher" says that moved consumers are added then.
+- **No house battery** *(§ 9 item 9)*: the ledger is active; the shadow plant is `grid = load − pv`, without SoC correction.
+- **Flex part** *(§ 9 item 10)*: the row also stores the day's saving with the logged timing from the same start SoC (`saving_logged_timing_eur`); the tile shows one figure at first. The split is approximate, since the two runs end at different SoC.
+- **EV** *(§ 9 item 11)*: the energy delivered in the SA-day, charged at nominal power from the first plugged-in slot of that day. A session across the day boundary is re-timed per SA-day (energy of day N+1 starts at the day start), which understates slightly.
+- **Consumer without its own meter** *(§ 9 item 12)*: keeps its logged timing and is named in the row (`flex_timing`). No estimate from setpoints. The same holds, per consumer and day, for energy that cannot be placed (no shape and no window, or more than the eligible slots hold) and for an EV day without plug state.
+- **Network backends** *(§ 9 item 13)*: today only Loxone logs per-consumer power. Ledger P9e adds it on HA for consumers with a bound power or run-state entity; on OpenEMS every consumer keeps its logged timing, so the tile stays battery only there.
+- **Heating rod beside a fuel source**: 0 kWh in the shadow plant; the heat it delivered is bought as fuel there, priced like the MILP's fuel credit (`fuel_saved_eur` in the row). Beside an electric heat source the rod is an ordinary consumer.
 
-Open: EV sessions (deadline-bound; counterfactual = "charge immediately on plug-in" is the natural vendor default) and consumers whose Ist comes from `live_snapshot` without a per-consumer meter.
+The plan-vs-actual reconciliation (`flex_planned_kwh` vs `flex_delivered_kwh`) is already in the v1 row and is the input for v2.
 
 ## 8. Work packages
 
@@ -210,7 +220,7 @@ Open: EV sessions (deadline-bound; counterfactual = "charge immediately on plug-
 | 7 | `earnie-server` receiver v3 + KPI panel — other repo, tracker row | S (there) |
 | 8 | `savings_v: 2` flex re-timing | M |
 
-WP 1–2 are independent bug fixes and can ship on `release/2.7`. WP 3–5 are one feature; WP 6–7 wait for the privacy decision; WP 8 is optional.
+WP 1–2 are independent bug fixes and can ship on `release/2.7`. WP 3–5 are one feature; WP 6–7 wait for the privacy decision; WP 8 is planned for 2.8 since 2026-11-11 ([`savings-ledger-v2-plan.md`](savings-ledger-v2-plan.md)).
 
 **Backlog phases:** `backlog/Backlog.md` Version 2.8 splits these into epic **Ledger** P0–P11, one chat session each: P0 decisions (§ 9 items 1–3, done 2026-11-02), P1 = WP 1, P2 = WP 2, P3–P5 = WP 3 (slot engine, day close + files, daemon hook), P6 = WP 4, P7–P8 = WP 5 (chart, cockpit KPI), P9–P10 = WP 8, P11 = Chart 1 baseline from the shadow chain (no WP, found later). WP 6–7 stay under Version 2.+1 "Simple Savings KPI".
 
@@ -222,3 +232,10 @@ WP 1–2 are independent bug fixes and can ship on `release/2.7`. WP 3–5 are o
 4. Privacy: ship `savings_eur` in the ping at all; if yes, rounding granularity (0.1 € vs 1 €) and whether `savings_days` is needed.
 5. Does D1's "Ersparnis bisher" disappear before the ledger exists (hide the trace), or stay with a warning label until WP 5 lands? Proposal: hide; a wrong number is worse than none.
 6. ~~Energy counters~~ **Decided 2026-11-04 (Ledger P8):** with the plant energy counters configured (Loxone and HA), pv and grid of a slot come from the counters (`ist_power_source` = `counter`) while battery and house stay means, so `house = pv + grid + battery` no longer holds exactly. Booking the logged `house_kw` would give the shadow plant another load than the real one and show a saving that does not exist. Counter slots therefore count with the house load from the balance (§ 4). All-mean slots are unchanged to the cent, so this stays `savings_v: 1` and no chain restarts. The result only differs on plants with counters, whose slots were all skipped before; 2.8 is not released, so no released ledger changes. A ledger built before this change does not replay with `--slots-only` if it holds counter slots (the CLI refuses); `--rebuild` then applies.
+7. **Decided 2026-11-11 (Ledger P9a):** `savings_v: 2` re-times flex to the unshifted timing (L1), not to the standard rules (L2); the day replay takes the timing from one function, so L2 can replace it in a later version (§ 7).
+8. **Decided 2026-11-11 (Ledger P9a):** the open day shows the battery part only; the flex part is added at the day close (§ 7).
+9. **Decided 2026-11-11 (Ledger P9a):** with v2 the ledger runs without a house battery too (§ 7).
+10. **Decided 2026-11-11 (Ledger P9a):** the row stores the saving with the logged timing beside the total; the tile shows one figure at first (§ 7).
+11. **Decided 2026-11-11 (Ledger P9a):** an EV is re-timed per SA-day from plug-in, not per session across days (§ 7).
+12. **Decided 2026-11-11 (Ledger P9a):** a consumer without its own meter keeps its logged timing and is named in the row (§ 7).
+13. **Decided 2026-11-11 (Ledger P9a):** v2 in 2.8 includes per-consumer power in the slot log on HA (Ledger P9e); OpenEMS is left out (§ 7).
