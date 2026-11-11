@@ -30,7 +30,7 @@ def merge_consumption_logs():
     df_hist_formatted['value'] = df_hist['Leistung Verbrauch [kW]'].round(3)
     
     # Ungültige Datumszeilen löschen (falls vorhanden)
-    df_hist_formatted.dropna(subset=['timestamp'], inplace=True)
+    df_hist_formatted = df_hist_formatted.dropna(subset=['timestamp'])
 
     # 2. Fast neuen Log einlesen (3 Spalten, bereits im richtigen Format)
     print(f"📖 Lese neuen Logger-Stand ein ({NEW_LOGGER_FILE})...")
@@ -41,7 +41,7 @@ def merge_consumption_logs():
     combined = pd.concat([df_hist_formatted, df_new], ignore_index=True)
     
     # Zeilen ohne echten Messwert filtern
-    combined.dropna(subset=['value'], inplace=True)
+    combined = combined.dropna(subset=['value'])
     
     # Über Hilfsspalte chronologisch sortieren
     combined['sort_dt'] = pd.to_datetime(combined['timestamp'])
