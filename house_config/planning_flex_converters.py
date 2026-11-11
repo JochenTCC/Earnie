@@ -230,21 +230,29 @@ def planning_ev_to_milp(consumer: dict) -> dict:
 
 
 def _attach_wallbox_fields(result: dict, consumer: dict) -> None:
-    """Car currents, assignment and wallboxes of a dynamic EV (multi-EV M3).
+    """Charger of a fixed pair; car currents, assignment and wallboxes of a dynamic EV.
 
-    The daemon's live assignment builds the pair of a dynamic EV from these
-    (``runtime_store.ev_assignments``). Fixed pairs keep the shape they had.
+    A fixed pair carries its wallbox as ``charger_id`` (multi-EV M4): the live adapters
+    address ``evcs.<Wallbox>.*`` through it (``ehal.qualified_ids.charger_id_of_ev``).
+    The daemon's live assignment builds the pair of a dynamic EV from the dynamic fields
+    (``runtime_store.ev_assignments``, multi-EV M3).
     """
     from house_config.wallboxes import (
+        ASSIGNMENT_FIXED,
         EV_MAX_CURRENT_KEY,
         EV_MIN_CURRENT_KEY,
         EV_PHASES_KEY,
+        VIEW_CHARGER_ID_KEY,
         VIEW_DYNAMIC_KEY,
         WALLBOX_ASSIGNMENT_KEY,
         is_dynamic_ev,
     )
 
     if not is_dynamic_ev(consumer):
+        assignment = consumer.get(WALLBOX_ASSIGNMENT_KEY)
+        if isinstance(assignment, dict) and assignment.get("mode") == ASSIGNMENT_FIXED:
+            # The loader's pair view (resolve_ev_pair) always sets it; missing fails loud.
+            result[VIEW_CHARGER_ID_KEY] = consumer[VIEW_CHARGER_ID_KEY]
         return
     for key in (EV_PHASES_KEY, EV_MIN_CURRENT_KEY, EV_MAX_CURRENT_KEY):
         result[key] = consumer[key]

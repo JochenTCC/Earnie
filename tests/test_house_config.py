@@ -1972,6 +1972,33 @@ def test_save_main_config_roundtrip_strips_triggers_and_blocks(tmp_path, monkeyp
     assert "loxone_blocks" not in reloaded
 
 
+def test_fixed_pair_keeps_its_wallbox_as_charger_on_the_live_path(monkeypatch):
+    """Multi-EV M4: the MILP shape of a fixed pair names its wallbox (evcs.<Wallbox>.*).
+
+    Regression: the live consumers (``config.get_flexible_consumers``) lost ``charger_id``,
+    so every Loxone adapter build failed with "keine Wallbox zugeordnet".
+    """
+    from ehal.qualified_ids import charger_id_of_ev
+    from house_config.planning_flex_converters import planning_ev_to_milp
+    from house_config.profiles_store import normalize_house_profiles_document
+    from integrations import ev_assignment_live
+    from integrations.ehal_live_adapters import ev_charger_markers
+    from tests.fixtures.ev_wallbox import ev_fields, wallbox_catalog, wallbox_entry
+
+    doc = _ev_profile_doc(**ev_fields("garage", min_current_a=6.0, max_current_a=16.0))
+    consumer = doc["profiles"][0]["consumers"][0]
+    for key in ("nominal_power_kw", "min_power_kw"):
+        consumer.pop(key)
+    box = wallbox_entry("garage", ehal_bindings={"set_evcs_max_current": ""})
+    loaded = normalize_house_profiles_document(doc, wallboxes=wallbox_catalog(box))
+    milp = planning_ev_to_milp(loaded["profiles"]["ev_profile"]["consumers"][0])
+    assert charger_id_of_ev(milp) == "garage"
+
+    monkeypatch.setattr("integrations.ehal_live.config.get_flexible_consumers", lambda **_: [milp])
+    monkeypatch.setattr(ev_assignment_live, "dynamic_charger_consumers", lambda: [])
+    assert [marker[0] for marker in ev_charger_markers()] == ["garage"]
+
+
 def test_dynamic_ev_loads_with_a_view_and_keeps_its_wallboxes_for_the_live_overlay():
     """Multi-EV M3: a dynamic EV loads; the MILP shape carries what the overlay needs."""
     from house_config.planning_flex_converters import planning_ev_to_milp
