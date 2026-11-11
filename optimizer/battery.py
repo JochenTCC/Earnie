@@ -78,6 +78,13 @@ def apply_soc_change(
     *,
     dt_h: float,
 ) -> tuple[float, float]:
+    """SoC after one slot of ``batt_action`` (kW, charging positive) and the power that fits.
+
+    The SoC limits cut the action, they never add to it: the returned power has the sign of
+    ``batt_action`` and at most its size. A start outside the limits (measured SoC below
+    ``min_soc`` or above ``max_soc``) stays where it is until an action moves it back in; it
+    does not jump to the limit, and an action that would move it further out is dropped.
+    """
     if battery_capacity_kwh <= 0.0:
         return old_soc, 0.0
     if batt_action >= 0:
@@ -86,23 +93,17 @@ def apply_soc_change(
         energy_change = batt_action / efficiency * dt_h
     soc_change = (energy_change / battery_capacity_kwh) * 100
     new_soc = old_soc + soc_change
-    if new_soc > max_soc_limit:
-        new_soc = max_soc_limit
-        actual_energy = ((max_soc_limit - old_soc) / 100) * battery_capacity_kwh
+    upper = max(max_soc_limit, old_soc)
+    lower = min(min_soc_limit, old_soc)
+    if new_soc > upper:
+        new_soc = upper
+        charged_kwh = ((upper - old_soc) / 100) * battery_capacity_kwh
         # Reverse: energy = p * η * dt_h  →  p = energy / (η * dt_h)
-        batt_action = (
-            actual_energy / (efficiency * dt_h)
-            if actual_energy >= 0
-            else actual_energy * efficiency / dt_h
-        )
-    elif new_soc < min_soc_limit:
-        new_soc = min_soc_limit
-        actual_energy = ((min_soc_limit - old_soc) / 100) * battery_capacity_kwh
-        batt_action = (
-            actual_energy * efficiency / dt_h
-            if actual_energy < 0
-            else actual_energy / (efficiency * dt_h)
-        )
+        batt_action = charged_kwh / (efficiency * dt_h)
+    elif new_soc < lower:
+        new_soc = lower
+        discharged_kwh = ((lower - old_soc) / 100) * battery_capacity_kwh
+        batt_action = discharged_kwh * efficiency / dt_h
     return new_soc, batt_action
 
 
