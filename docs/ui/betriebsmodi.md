@@ -59,6 +59,14 @@ Chart- und Panel-Details: [Charts & Panels](charts.md).
 
 **Abwesenheitsmodus:** Ist der wirksame Live-Abwesenheitsmodus aktiv, zeigt die Seite unter dem Titel den Hinweis „Abwesenheitsmodus aktiv“, optional mit der Quelle Earnie, Smarthome oder beide. Auslöser ist der Schalter im Hausprofil **oder** das Anlagen-Feld `sens_absent_mode` am aktiven Backend (Loxone-Merker, HA-Entity oder OpenEMS `component/Channel`). Konfiguration: [Flexible Verbraucher](../konfiguration/flexible-verbraucher.md#abwesenheitsmodus-live).
 
+**Leistungspreis:** Hat das Live-Szenario eine **Bezugsgrenze** oder der Netzbereich im laufenden Monat einen **Leistungspreis**, zeigt die Seite unter dem Titel den Abschnitt „Leistungspreis“:
+
+- **Monatsspitze** (höchste gemessene Viertelstunde des Netzbezugs), **Abgerechnet** (Spitze, mindestens die Mindestleistung des Netzbereichs), **Bisher (brutto)** (Betrag des Monats mit der USt des Bezugstarifs) und **Nächstes kW** (was ein kW mehr Spitze diesen Monat kostet). Darunter stehen Messbeginn, Zeitpunkt der Spitze und fehlende Viertelstunden. Ist im Monat noch keine Viertelstunde gemessen, steht „unbekannt“ statt 0 und beim Betrag der Mindestbetrag. Earnie misst selbst; maßgeblich ist die Abrechnung des Netzbetreibers.
+- Mit Bezugsgrenze: Grenze, Reserve und bis wohin geplant wird. Liegt die Spitze schon darüber, plant Earnie bis zur Spitze.
+- **Warnung**, wenn der letzte Plan die Grenze in Viertelstunden nicht halten kann: Anzahl, erste Viertelstunde und häufigste Ursache (Grundlast, Batterie oder Wechselrichter an der Leistungsgrenze, Batterie leer oder Reserve, Verbraucher muss sein Ziel erreichen, keine Ursache erkannt). Gemessene Viertelstunden über der Grenze nennt eine Zeile darunter, mit „Lastprognose“, wenn der Plan die Grenze hielt. Einzelheiten stehen im aufklappbaren Bereich „Details zur Bezugsgrenze“.
+- **Hinweise:** Grenze unter der Mindestleistung des Netzbereichs (Earnie plant trotzdem mit der eingegebenen Grenze), Grenze inaktiv bis zum Beginn des Leistungspreises, oder der letzte Zyklus hat die Grenze nicht eingeplant (Automatikbetrieb oder Fenster ohne Optimierung).
+- Lässt sich der Abschnitt nicht berechnen, etwa weil dem Netzbereich für den Monat ein Leistungspreis fehlt, zeigt er den Fehler; der Rest der Seite bleibt bedienbar.
+
 Eine **Nachrechnung** beliebiger Kalendertage bietet der Monitor nicht.
 
 ### Sonnenaufgang-Anker SA₀, SA₁, SA₂

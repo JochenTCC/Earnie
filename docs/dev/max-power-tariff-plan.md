@@ -1,6 +1,6 @@
 # Max-power dependent tariff: implementation plan (Version 2.8)
 
-**Status:** P0–P5b and P6a on `main` (PR #96 merged 2026-11-08; P6a 2026-11-11). Open: P5c field test, P6b, P6c, P7.
+**Status:** P0–P5b, P6a and P6b on `main` (PR #96 merged 2026-11-08; P6a and P6b 2026-11-11). Open: P5c field test, P6c, P7.
 **Backlog item:** **Implement max-power dependent tariff**, Version 2.8. Scope as decided on 2026-11-07: dev doc steps L2, L3 and L4, stage A of [`Capacity-Peak-Budget-Draft.md`](../../backlog/Capacity-Peak-Budget-Draft.md) with a cap the user chooses.
 **Regulation:** [`SNE-G-V-2027-Research.md`](../../backlog/SNE-G-V-2027-Research.md).
 
@@ -197,12 +197,21 @@ Split on 2026-11-11 (maintainer) into **P6a** report, **P6b** Monitor page and *
 - **Not covered:** an SoC pinned by an equality (SE SA₁ carry-in) is not read as a reserve. "None detected" stays possible and is reported as such.
 - **Tests:** `tests/test_import_cap_report.py` (each cause, inverter limit, report in the plan, trivial and Automatik, cycle record, store, measured check, Live hooks).
 
-Open in P6b and P6c:
+**P6b built 2026-11-11.** `ui/capacity_charge_panel.py` puts a "Leistungspreis" block on the Monitor page (`ui/pages/page_cockpit.py`, under the absent-mode notice), only when the resolved Live scenario has a cap or the grid area a capacity charge in the current month (host clock, as the peak store keeps months).
 
-- UI (P6b): Monitor page shows month peak, cap, billed power and the amount so far, plus what the next kW costs this month, and the report's warning.
+- Figures: month peak from `capacity_peak_store.month_peak` with measured-since, peak slot and missing quarter hours; billed power = max(peak, charge minimum); amount so far and the next kW (`capacity_charge_eur(billed + 1) − capacity_charge_eur(billed)`), both gross with the import tariff's VAT as in `simulation/capacity_charge.py`. A month without entry shows "unbekannt" and the minimum amount ("mind. …"), never 0, and no next-kW price.
+- Cap: cap, margin and the planning limit `max(cap, peak) − margin`; a peak above the cap is named.
+- Report (`import_cap_report_store.load()`): warning with count, first slot and main cause (most frequent `cause` over the slots, the earliest on a tie), a line for this month's measured overshoots, both as tables in an expander; info when the last cycle did not plan the cap (trivial window, Automatik); a caption when no report exists yet or the plan holds. The report has no timestamp of its own, so the block shows the plan's first slot.
+- Notices from `check_import_cap`: below the grid area's minimum (D5 at runtime: warning, cap used as entered), inactive until the charge starts, no released charge. A cap without grid area is an error.
+- Errors (Edibert gap `CAPACITY_CHARGE_MISSING`, unreadable store or report, unknown cause key) are shown as an error in the block; the rest of the Monitor still renders. During onboarding (`is_runtime_params_deferred`) the block is not shown.
+- **Tests:** `tests/test_capacity_charge_panel.py` (billing, minimum, band limit, unknown month, planning limit, inactive, D5, report and measured filtering, Edibert gap, main cause), `tests/apptest/test_capacity_charge_panel_apptest.py` (shown, hidden, warning with details, unknown month, not planned, D5, inactive, error), Monitor smoke: hidden without cap and charge.
+- **Not checked:** the block in a running app with a real cap; covered by AppTest only.
+
+Open in P6c:
+
 - SE (P6c): slots and days per month where the cap did not hold, with the causes.
 - Set the proposal from D7 from the field test in P5 and a HouseSim run: forecast error plus measurement error (after the field test).
-- **Tests:** AppTest (P6b), SE table (P6c).
+- **Tests:** SE table (P6c).
 
 ### P7: Docs and close
 

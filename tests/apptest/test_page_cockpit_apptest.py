@@ -24,6 +24,11 @@ def test_title_present():
     assert at.title[0].value == "🔋 Monitor"
 
 
+def test_capacity_block_stays_hidden_without_cap_and_charge():
+    at = AppTest.from_file(str(_SCRIPT)).run()
+    assert "Leistungspreis" not in [item.value for item in at.subheader]
+
+
 def test_savings_tile_is_wired_into_the_monitor():
     at = AppTest.from_file(str(_SCRIPT)).run()
     texts = [item.value for item in at.caption] + [item.label for item in at.metric]
