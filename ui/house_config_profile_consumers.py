@@ -297,7 +297,7 @@ def _render_internal_gain_factor(
     )
     return float(
         labeled_number_input(
-            "Interner Gewinnanteil (0–1)",
+            "Interner Gewinn (Wärme)",
             min_value=0.0,
             max_value=1.0,
             value=value,
@@ -305,8 +305,8 @@ def _render_internal_gain_factor(
             # Type in the key: a type switch starts from the new type's default.
             key=_scoped_key(session_scope, f"hc_gain_{c_type}_{index}"),
             help=(
-                "Anteil der elektrischen Energie, der als Wärme im beheizten Haus landet und den "
-                "Heizbedarf senkt. Haushaltsgeräte 0,8; E-Auto, Pool und Geräte außen 0."
+                "Anteil (0–1) der elektrischen Energie, der als Wärme im beheizten Haus landet "
+                "und den Heizbedarf senkt. Haushaltsgeräte 0,8; E-Auto, Pool und Geräte außen 0."
             ),
         )
     )
@@ -354,10 +354,6 @@ def _render_consumer_form_body(
                 "„Gebäude / Wärmebedarf“."
             ),
         )
-    if c_type != "thermal_annual":
-        item[INTERNAL_GAIN_FACTOR_KEY] = _render_internal_gain_factor(
-            consumer, c_type, index, session_scope=session_scope
-        )
     provisional = str(consumer.get(ID_PROVISIONAL_LABEL_KEY) or "").strip()
     has_id = bool(str(consumer.get("id") or "").strip())
     if provisional and (not has_id or not is_id_locked(consumer)):
@@ -388,6 +384,11 @@ def _render_consumer_form_body(
             nominal_power_kw=_form_power_kw(item),
         )
     )
+    # Last field of every consumer form (all types except „Haus Wärme“).
+    if c_type != "thermal_annual":
+        item[INTERNAL_GAIN_FACTOR_KEY] = _render_internal_gain_factor(
+            consumer, c_type, index, session_scope=session_scope
+        )
     return item
 
 

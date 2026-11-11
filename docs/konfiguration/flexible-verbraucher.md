@@ -100,7 +100,7 @@ Fehlende Felder bekommen die Standardwerte aus `house_profiles.schema.json`. Ein
 | Quelle | Feld | Standard |
 | ------ | ---- | -------- |
 | Grundlast (Jahresverbrauch minus modellierte Verbraucher) | `baseload_internal_gain_factor` am Hausprofil; im Hauskonfigurator **Grundlast als Wärme im Haus** | 0,8 |
-| Geräte (Typ `generic`) | `internal_gain_factor` am Verbraucher; im Hauskonfigurator **Interner Gewinnanteil** | 0,8 |
+| Geräte (Typ `generic`) | `internal_gain_factor` am Verbraucher; im Hauskonfigurator **Interner Gewinn (Wärme)**, letztes Feld des Verbrauchers | 0,8 |
 | E-Auto (`ev`), Pool (`thermal_rc`), Poolfilter (`pool_filter`) | `internal_gain_factor` | 0 (außen) |
 | Haus Wärme (`thermal_annual`), Heizstab | `internal_gain_factor` | immer 0: ihre Wärme ist das Hausmodell selbst |
 
