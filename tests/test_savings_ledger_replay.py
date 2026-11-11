@@ -174,6 +174,8 @@ _V2_ONLY = {
     "flex_logged_reasons",
     "flex_native_window_source",
     "saving_logged_timing_eur",
+    "fuel_saved_kwh",
+    "fuel_saved_eur",
 }
 
 
@@ -192,6 +194,7 @@ def test_day_without_retimed_flex_equals_the_v1_row(day_flex):
         v2_row = {k: v for k, v in closed.row.items() if k not in _V2_ONLY}
         assert v2_row == {k: v for k, v in v1_row.items() if k != "savings_v"}
         assert closed.row["saving_logged_timing_eur"] == v1_row["saving_eur"]
+        assert closed.row["fuel_saved_kwh"] == closed.row["fuel_saved_eur"] == 0.0
         v1_slots = sl.day_slots_record(v1_closed.closing)["slots"]
         assert sl.day_slots_record(closed.closing)["slots"] == v1_slots
     assert v2_state.shadow_soc == v1_state.shadow_soc

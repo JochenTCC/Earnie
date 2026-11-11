@@ -720,17 +720,22 @@ def replay_day(
     flex_retimed_kw: list[dict[str, float]] | None,
     *,
     dt_h: float,
+    fuel_eur_per_slot: list[float] | None = None,
 ) -> tuple[tuple[dict[str, Any], ...], float | None]:
     """Shadow plant over one day's slot rows from ``start_soc``; returns the replayed rows and the end SoC.
 
     ``flex_retimed_kw`` (one dict per row, kW per consumer) replaces each consumer's delivered
     power: ``house_without = house + sum(retimed - delivered)`` per counted slot (plan § 1).
-    ``None`` keeps the logged timing, which gives the causal slots to the bit. Skipped rows stay
+    ``None`` keeps the logged timing, which gives the causal slots to the bit.
+    ``fuel_eur_per_slot`` adds the fuel the shadow plant buys for a rod's heat to that slot's
+    ``cost_without_eur`` (plan § 4.4), so the slots still add up to the row. Skipped rows stay
     zero and keep the SoC. A counted row without ``house_kwh``, ``pv_kwh`` or the prices raises
     ``KeyError`` (a row from before Ledger P9b; v2 starts a new chain, so none reaches here).
     """
     if flex_retimed_kw is not None and len(flex_retimed_kw) != len(slots):
         raise ValueError(f"savings ledger replay: {len(flex_retimed_kw)} flex rows for {len(slots)} slots")
+    if fuel_eur_per_slot is not None and len(fuel_eur_per_slot) != len(slots):
+        raise ValueError(f"savings ledger replay: {len(fuel_eur_per_slot)} fuel values for {len(slots)} slots")
     dt = validate_dt_h(dt_h)
     soc = start_soc
     out: list[dict[str, Any]] = []
@@ -750,6 +755,8 @@ def replay_day(
         k_act = float(row["k_act_cent"])
         k_push = float(row["k_push_cent"])
         replayed["cost_without_eur"] = _cost_eur(grid_kwh, k_act, k_push)
+        if fuel_eur_per_slot is not None:
+            replayed["cost_without_eur"] += fuel_eur_per_slot[index]
         replayed["import_kwh_without"] = max(grid_kwh, 0.0)
         replayed["export_kwh_without"] = max(-grid_kwh, 0.0)
         replayed["shadow_soc_end"] = soc
@@ -778,7 +785,9 @@ def close_open_day(
     v2: the flex consumers are re-timed (``retime_flex_day``), the shadow plant runs over the
     day from ``shadow_soc_day_start`` and the row, the slot record and the chain SoC come from
     that replay. A second replay on the logged timing from the same start SoC gives
-    ``saving_logged_timing_eur`` (D4).
+    ``saving_logged_timing_eur`` (D4); it has no rod fuel rule, so the rod's fuel saving
+    counts in the flex part. ``cost_without_eur`` includes the fuel for rods beside a fuel
+    source (``fuel_saved_eur``).
     """
     if state.savings_v < SAVINGS_V_REPLAY:
         row = close_day(state, battery_params, app_version=app_version, dt_h=dt_h)
@@ -792,7 +801,12 @@ def close_open_day(
         state.slots, inputs.consumers, inputs.profiles_kw, inputs.windows, dt_h=dt_h
     )
     replayed, end_soc = replay_day(
-        state.slots, state.shadow_soc_day_start, battery_params, retiming.per_slot_kw, dt_h=dt_h
+        state.slots,
+        state.shadow_soc_day_start,
+        battery_params,
+        retiming.per_slot_kw,
+        dt_h=dt_h,
+        fuel_eur_per_slot=retiming.fuel_eur_per_slot,
     )
     logged, _ = replay_day(state.slots, state.shadow_soc_day_start, battery_params, None, dt_h=dt_h)
     closing = replace(state, slots=replayed, shadow_soc=end_soc)
@@ -802,6 +816,9 @@ def close_open_day(
     row["flex_timing"] = dict(sorted(retiming.timing.items()))
     row["flex_logged_reasons"] = dict(sorted(retiming.logged_reasons.items()))
     row["saving_logged_timing_eur"] = round(logged_saving, 4)
+    # Heating rod beside a fuel source (plan § 4.4): the fuel is in ``cost_without_eur``.
+    row["fuel_saved_kwh"] = round(retiming.fuel_kwh, 3)
+    row["fuel_saved_eur"] = round(sum(retiming.fuel_eur_per_slot), 4)
     row["flex_native_window_source"] = {
         cid: window.native_source
         for cid, window in sorted(inputs.windows.items())

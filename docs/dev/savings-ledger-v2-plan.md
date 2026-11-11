@@ -109,7 +109,7 @@ Side note: windows across midnight end at midnight in the ledger as in the MILP,
 - `day_flex` is a callable from the state to `FlexDayInputs` (consumers, profiles or `None`, windows). Daemon and CLI pass `savings_ledger_store.flex_day_provider(timezone_name)`: the consumers Earnie controls (`get_flexible_consumers(optimizer_only=True)`), the profile file, local wall-clock times. It is called once per closed v2 day and never in v1. A v2 close without it raises.
 - State: `shadow_soc_day_start` (written and required for `savings_v >= 2` only, so v1 state files are unchanged); after a v2 close both `shadow_soc` and `shadow_soc_day_start` are the replay's end SoC.
 - No battery (D3): `start_chain(..., savings_v=2, with_battery=False)`, `shadow_soc` `None`, `grid = load − pv`; the row has `p_ref_basis: "no_battery"`, both corrections 0 and `soc_shadow_end_pct` / `p_ref_cent` `None`. v1 refuses a chain or a day without battery.
-- New row fields (v2): `flex_retimed_kwh`, `flex_timing`, `flex_logged_reasons`, `flex_native_window_source`, `saving_logged_timing_eur`.
+- New row fields (v2): `flex_retimed_kwh`, `flex_timing`, `flex_logged_reasons`, `flex_native_window_source`, `saving_logged_timing_eur`, `fuel_saved_kwh`, `fuel_saved_eur` (heating rod step).
 - Left for P9d: the daemon still stops without a house battery (`ledger inactive`), the CLI still refuses without one, and Chart 1's shadow SoC series reads `float(shadow_soc_end)`, which is `None` without battery.
 
 The causal step per cycle stays for the open day (D2). Its SoC is kept apart from the chain SoC at the day start (`shadow_soc_day_start` in the state), so the replay does not depend on it.
@@ -123,6 +123,8 @@ A consumer whose energy cannot be placed (no shape and no window, or more energy
 | no `flex_delivered_kwh` key in any counted slot of the day (D6) | `logged_no_meter` | logged (zero) |
 | EV | `logged`, reason `ev_rule_missing` | logged; P10a replaces this with the plug-in rule |
 | ≤ 1 Wh delivered | `no_energy` | logged |
+| heating rod beside a fuel source (`parent_heat_electric` false) with `fuel_credit_cent_per_kwh` | `fuel` | 0 kWh; its delivered kWh bought as fuel in the slot it ran in (§ 4.4) |
+| same, without a fuel price (no `fuel_credit_cent_per_kwh`) | `logged`, reason `no_fuel_price` | logged |
 | profile with energy in the counted slots of the enable window | `profile` | profile shape over the enable window (whole day without one) |
 | filter with a counted slot in its native window | `native_window` | flat over the native window; the whole day is eligible, so energy beyond the native run continues right after it (capped at nominal power) |
 | enable window with a counted slot | `enable_window` | flat over the enable window |
@@ -130,7 +132,7 @@ A consumer whose energy cannot be placed (no shape and no window, or more energy
 | more energy than the eligible counted slots hold at nominal power | `logged`, reason `exceeds_eligible_slots` | logged |
 | key in `flex_delivered_kwh` but not configured | `logged`, reason `not_configured` | logged |
 
-Heating rods are ordinary consumers in P9b; the rod rule (§ 4.4) comes with its own step.
+A heating rod beside an electric heat source is an ordinary consumer (rows below). The rod rule above came with the heating rod step (§ 4.4); a rod without its own meter is `logged_no_meter` like any consumer.
 
 **Window source per consumer type** (`consumer_windows(consumer, slot_starts_local)`, decided in P9b). All windows come from the planning consumer of the current configuration, like the profile, so the backfill CLI can compute them for past days. They use the MILP's own slot rules (hour of the slot's local wall-clock time):
 
@@ -172,6 +174,8 @@ The reference charges the energy delivered in the SA-day at nominal power from t
 
 Rule in the timing function: a consumer with `daily_target_source: heating_rod` beside a fuel source gets 0 kWh in the shadow plant; `fuel_saved_kwh` = delivered rod kWh ÷ the source's efficiency, priced like the MILP's fuel credit. Beside an electric heat source the rod is an ordinary consumer. A rod without its own meter: D6.
 
+*Implemented 2026-11-11 (heating rod step):* `retime_flex_day` reads the planning consumer's `parent_heat_electric`, `parent_heat_efficiency` and `fuel_credit_cent_per_kwh` (the field the MILP's `_heating_rod_fuel_credit` uses, `heating_rod_fuel_credit_cent_per_kwh` = fuel €/kWh ÷ efficiency). Per slot the shadow plant buys rod kWh · credit as fuel (`FlexRetiming.fuel_eur_per_slot`); `replay_day` adds it to that slot's `cost_without_eur`, so the slot file still adds up to the row. Row: `fuel_saved_kwh` (Σ rod kWh ÷ efficiency), `fuel_saved_eur` (the fuel part of `cost_without_eur`). A rod beside a fuel source without a fuel price has no credit in the MILP either; the ledger keeps its logged timing (`no_fuel_price`) instead of buying fuel at 0 €. The logged-timing replay of D4 has no fuel rule, so the rod's saving counts in the flex part.
+
 ### 4.5 UI and docs
 
 - Tile help and method note (German): "ohne Earnie" = gleiche PV, gleicher Tagesverbrauch je Gerät zur gewohnten Zeit, Auto lädt ab dem Einstecken, Heizstab aus und Wärme aus dem Brennstoff, Batterie im Herstellermodus, gleiche Preise.
@@ -189,7 +193,7 @@ One chat session each; branch `feat/ledger-v2`, merged after the last step. `SAV
 | **Ledger P9a** | Decisions D1–D6 (done 2026-11-11, spec § 7 and § 9 items 7–12). Checks of § 2 done 2026-11-11. Checks and D7 done 2026-11-11. Spec § 3 and § 4 got the v2 table and row fields with P9c (2026-11-11). | Done. |
 | **Ledger P9b** (done 2026-11-11) | Timing function, pure: day slot rows + consumers → `flex_retimed` per slot and `flex_timing` per consumer (profile, native window, flat over the enable window). Slot rows carry `pv_kwh` and `k_push_cent`. | Tests: energy parity per day and consumer with full and partial coverage; cap at nominal power; consumer without shape; consumer that cannot be placed is recorded. |
 | **Ledger P9c** (done 2026-11-11) | Day replay in `close_day`, state with `shadow_soc_day_start`, shadow plant without battery (D3), row and slot file from the replay, `saving_logged_timing_eur` (D4). Backfill CLI uses the same replay. Still behind `SAVINGS_V = 1` in production (the replay is called with an explicit version in tests). | Tests: synthetic 2-day log where a consumer is moved from an expensive to a cheap slot gives the hand-computed saving; a day without flex equals the v1 row to the cent; slots add up to the row; no battery → row without SoC correction. |
-| **Heating rod** (backlog item) | Rod rule and fuel in the replay (§ 4.4). | Tests: rod beside gas → `fuel_saved_eur` and rod electricity only on the "with" side; rod beside an electric source unchanged; price equals the MILP credit. |
+| **Heating rod** (backlog item, done 2026-11-11) | Rod rule and fuel in the replay (§ 4.4). | Tests: rod beside gas → `fuel_saved_eur` and rod electricity only on the "with" side; rod beside an electric source unchanged; price equals the MILP credit. |
 | **Ledger P10a** | `plugged_in` in the slot row; EV rule (§ 4.3, D5). | Tests: car plugged in at 18:00, charged 02:00–05:00 → reference charges from 18:00; session across SA; day without plug state is recorded. |
 | **Ledger P10b** | Consumers without their own meter (D6): detected, logged timing, named in the row and in the tile help. | Tests: such a consumer changes nothing against v1 and appears in `flex_timing`. |
 | **Ledger P9e** | Per-consumer power in the slot log on HA (§ 3.1): reader for measured consumers, wired into the sampler; log and Chart 1 "Ist" only, planning unchanged. | Tests: bound, unbound and stale values; slot mean in `closed_interval.flex_kw`; HA testbed check case with one consumer power entity. |

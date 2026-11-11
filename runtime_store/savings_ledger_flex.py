@@ -36,6 +36,8 @@ TIMING_ENABLE_WINDOW = "enable_window"
 TIMING_LOGGED = "logged"
 TIMING_LOGGED_NO_METER = "logged_no_meter"
 TIMING_NO_ENERGY = "no_energy"
+# Heating rod beside a fuel heat source: 0 kWh in the shadow plant, its heat bought as fuel (plan § 4.4).
+TIMING_FUEL = "fuel"
 
 # Why a consumer with a meter and energy keeps its logged timing (``FlexRetiming.logged_reasons``).
 REASON_NO_SHAPE_NO_WINDOW = "no_shape_no_window"
@@ -46,6 +48,9 @@ REASON_EV_RULE_MISSING = "ev_rule_missing"
 # The profile file exists but cannot be read: which consumers had a profile is unknown, so no
 # consumer is re-timed that day (not the windows instead: that would hide the broken file).
 REASON_PROFILE_READ_ERROR = "profile_read_error"
+# Heating rod beside a fuel source without a fuel price (no ``fuel_credit_cent_per_kwh``): the
+# shadow plant cannot buy its heat, so the rod keeps its logged timing (the MILP gives no credit either).
+REASON_NO_FUEL_PRICE = "no_fuel_price"
 
 # Where a filter's native window came from (row field ``flex_native_window_source``).
 NATIVE_SOURCE_LOG = "log"
@@ -93,13 +98,19 @@ class FlexRetiming:
     ``per_slot_kw``: kW per consumer for every slot row (zero in skipped slots), the
     ``flex_retimed`` of the shadow plant. ``timing``: ``flex_timing`` per consumer.
     ``logged_reasons``: consumers with timing ``logged`` and why. ``delivered_kwh``: energy per
-    consumer over the counted slots, equal to the sum of ``per_slot_kw`` · dt.
+    consumer over the counted slots, equal to the sum of ``per_slot_kw`` · dt except for a rod on
+    fuel (timing ``fuel``), which is zero in ``per_slot_kw``.
+    ``fuel_eur_per_slot``: fuel the shadow plant buys per slot row for the heat of those rods
+    (rod kWh · ``fuel_credit_cent_per_kwh``, the MILP's credit). ``fuel_kwh``: that fuel in kWh
+    (rod kWh ÷ the heat source's efficiency).
     """
 
     per_slot_kw: list[dict[str, float]]
     timing: dict[str, str]
     logged_reasons: dict[str, str]
     delivered_kwh: dict[str, float]
+    fuel_eur_per_slot: list[float]
+    fuel_kwh: float
 
 
 def consumer_windows(
@@ -198,6 +209,9 @@ def retime_flex_day(
     - no ``flex_delivered_kwh`` key in any counted slot: no own meter, ``logged_no_meter``;
     - an EV: logged timing (``ev_rule_missing``) until the plug-in rule exists (P10a);
     - no energy over the counted slots: ``no_energy``, logged timing (nothing to place);
+    - heating rod beside a fuel heat source (``parent_heat_electric`` false): ``fuel``, zero in the
+      shadow plant and its delivered kWh bought as fuel in the slot it ran in; without a fuel
+      price logged timing (``no_fuel_price``). Beside an electric source the rod is ordinary;
     - ``profiles_kw`` ``None`` (unreadable profile file): logged timing (``profile_read_error``);
     - profile with energy in the counted slots of its enable window: ``profile``;
     - filter native window with a counted slot: ``native_window`` (flat shape there, the rest
@@ -219,6 +233,8 @@ def retime_flex_day(
     timing: dict[str, str] = {}
     reasons: dict[str, str] = {}
     delivered: dict[str, float] = {}
+    fuel_eur = [0.0] * n
+    fuel_kwh = 0.0
 
     def keep_logged(cid: str, label: str, reason: str | None = None) -> None:
         for i, kw in enumerate(_logged_kw(rows, cid, dt_h)):
@@ -250,6 +266,19 @@ def retime_flex_day(
         if energy <= _ENERGY_EPSILON_KWH:
             keep_logged(cid, TIMING_NO_ENERGY)
             continue
+        if is_heating_rod_consumer(consumer) and not consumer["parent_heat_electric"]:
+            credit = consumer.get("fuel_credit_cent_per_kwh")
+            if credit is None:
+                keep_logged(cid, TIMING_LOGGED, REASON_NO_FUEL_PRICE)
+                continue
+            efficiency = float(consumer["parent_heat_efficiency"])
+            for i in range(n):
+                per_slot[i][cid] = 0.0
+                rod_kwh = float((rows[i].get("flex_delivered_kwh") or {}).get(cid, 0.0)) if rows[i]["counted"] else 0.0
+                fuel_eur[i] += rod_kwh * float(credit) / 100.0
+                fuel_kwh += rod_kwh / efficiency
+            timing[cid] = TIMING_FUEL
+            continue
         if profiles_kw is None:
             keep_logged(cid, TIMING_LOGGED, REASON_PROFILE_READ_ERROR)
             continue
@@ -275,4 +304,4 @@ def retime_flex_day(
     for cid in extra:
         delivered[cid] = sum(float(rows[i]["flex_delivered_kwh"].get(cid, 0.0)) for i in counted)
         keep_logged(cid, TIMING_LOGGED, REASON_NOT_CONFIGURED)
-    return FlexRetiming(per_slot, timing, reasons, delivered)
+    return FlexRetiming(per_slot, timing, reasons, delivered, fuel_eur, fuel_kwh)
