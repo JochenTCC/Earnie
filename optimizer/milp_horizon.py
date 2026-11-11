@@ -22,6 +22,7 @@ from .milp_inverter import (
     house_balance_pv_kw,
     add_inverter_slot_constraints,
 )
+from .milp_soc_recovery import add_soc_recovery_constraints
 from .slot_duration import DEFAULT_DT_H, validate_dt_h
 from optimizer.milp_horizon_extras import (  # noqa: F401  (re-exported)
     _add_milp_objective,
@@ -414,8 +415,12 @@ def _add_power_balance_and_soc_dynamics(
     current_soc_by_id: dict[str, float] | None = None,
     inverter_params: dict | list[dict] | None = None,
     pv_systems: list[dict] | None = None,
-) -> None:
-    """Energiebilanz, Netz-/Batterie-Exklusivität und SOC-Rekursion je Slot."""
+) -> dict[str, tuple[float, float]]:
+    """Energiebilanz, Netz-/Batterie-Exklusivität und SOC-Rekursion je Slot.
+
+    Returns the widened SoC range of batteries that start outside their limits
+    (``add_soc_recovery_constraints``).
+    """
     inverters = coerce_inverter_params_list(inverter_params)
     batteries = filter_house_balance_batteries(
         coerce_battery_params_list(battery_params), inverters
@@ -437,6 +442,7 @@ def _add_power_balance_and_soc_dynamics(
             soc = 0.0
         capacity = float(bat.get("battery_capacity_kwh") or 0.0)
         e_init_by_ess[eid] = (soc / 100.0) * capacity
+    relaxed_soc_bounds = add_soc_recovery_constraints(prob, grid_vars, e_init_by_ess)
     for t in range(horizon):
         cap = None
         if export_caps_kw is not None and t < len(export_caps_kw):
@@ -456,6 +462,7 @@ def _add_power_balance_and_soc_dynamics(
             inverter_params=inverter_params,
             pv_systems=pv_systems,
         )
+    return relaxed_soc_bounds
 
 
 def _add_control_slot_constraints(
@@ -571,7 +578,7 @@ def _build_milp_model(
         ev_milp_params_by_id,
         consumer_continue_on,
     )
-    _add_power_balance_and_soc_dynamics(
+    relaxed_soc_bounds = _add_power_balance_and_soc_dynamics(
         prob,
         matrix,
         battery_params,
@@ -608,6 +615,7 @@ def _build_milp_model(
         e_batt_by_ess=dict(grid_vars.e_batt_by_ess),
         battery_params_by_id=dict(grid_vars.battery_params_by_id),
         p_pv_curtail=list(grid_vars.p_pv_curtail),
+        relaxed_soc_bounds_percent=relaxed_soc_bounds or None,
     )
 
 

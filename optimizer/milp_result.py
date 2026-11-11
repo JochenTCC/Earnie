@@ -80,6 +80,23 @@ def _normalize_preset_by_slot(
     }
 
 
+def _soc_clamp_percent(
+    model: MilpHorizonModel, ess_id: str | None, min_soc: float, max_soc: float
+) -> tuple[float, float]:
+    """SoC range of a plan: the limits, widened for a battery that starts outside them.
+
+    ``ess_id`` ``None`` is the primary battery.
+    """
+    relaxed = model.relaxed_soc_bounds_percent
+    if not isinstance(relaxed, dict) or not relaxed:
+        return min_soc, max_soc
+    key = model.ess_ids[0] if ess_id is None else ess_id
+    if key not in relaxed:
+        return min_soc, max_soc
+    low, high = relaxed[key]
+    return min(min_soc, low), max(max_soc, high)
+
+
 def _planned_soc_by_ess_at(model: MilpHorizonModel, hour_index: int) -> dict[str, float]:
     """End-of-slot SoC (%) per ESS from ``e_batt_by_ess`` (empty when single/legacy)."""
     ess_ids = getattr(model, "ess_ids", None) or []
@@ -97,6 +114,7 @@ def _planned_soc_by_ess_at(model: MilpHorizonModel, hour_index: int) -> dict[str
         capacity = float(bat_params.get("battery_capacity_kwh") or 0.0)
         min_soc = float(bat_params.get("min_soc") or 0.0)
         max_soc = float(bat_params.get("max_soc") or 100.0)
+        min_soc, max_soc = _soc_clamp_percent(model, ess_id, min_soc, max_soc)
         out[str(ess_id)] = bat.planned_soc_percent_from_energy(
             float(e_val) if e_val is not None else 0.0,
             capacity,
@@ -119,6 +137,7 @@ def extract_horizon_schedule(
     """
     min_soc = float(battery_params["min_soc"])
     max_soc = float(battery_params["max_soc"])
+    min_soc, max_soc = _soc_clamp_percent(model, None, min_soc, max_soc)
     capacity = float(battery_params["battery_capacity_kwh"])
     presets_by_slot = _normalize_preset_by_slot(preset_powers_t0_or_by_slot)
     slots: list[dict[str, Any]] = []

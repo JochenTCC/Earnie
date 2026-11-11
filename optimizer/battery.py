@@ -209,7 +209,14 @@ def _milp_full_control_setpoint(
     dt_h: float,
     threshold: float,
 ) -> tuple[int, float, float]:
-    """Pick forced charge / discharge / Entladesperre for ``control=full``."""
+    """Pick forced charge / discharge / Entladesperre for ``control=full``.
+
+    The setpoint follows the plan's SoC also while the battery is outside its limits
+    (``milp_soc_recovery``): the limits are widened to the current SoC, so the power is the
+    plan's and not what would reach the limit within this slot.
+    """
+    soc_floor = min(min_soc, current_soc)
+    soc_ceiling = max(max_soc, current_soc)
     if opt_charge > threshold and opt_grid_buy > threshold:
         target_soc = round(max(current_soc, planned_soc), 1)
         target_power = charge_kw_for_hourly_soc(
@@ -218,8 +225,8 @@ def _milp_full_control_setpoint(
             battery_capacity,
             efficiency,
             max_power,
-            min_soc,
-            max_soc,
+            soc_floor,
+            soc_ceiling,
             dt_h=dt_h,
         )
         return MODE_ZWANGS_LADEN, target_power, target_soc
@@ -232,8 +239,8 @@ def _milp_full_control_setpoint(
             battery_capacity,
             efficiency,
             max_power,
-            min_soc,
-            max_soc,
+            soc_floor,
+            soc_ceiling,
             dt_h=dt_h,
         )
         automatik_power = automatik_discharge_kw(net_pv_surplus, max_power)
@@ -390,8 +397,8 @@ def _derive_control_from_milp(
     planned_soc = planned_soc_percent_from_energy(
         float(e_val) if e_val is not None else 0.0,
         battery_capacity,
-        min_soc,
-        max_soc,
+        min(min_soc, current_soc),
+        max(max_soc, current_soc),
     )
     return derive_control_from_milp_plan(
         milp_plan,
