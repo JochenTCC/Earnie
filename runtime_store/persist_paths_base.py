@@ -234,6 +234,10 @@ def capacity_peak_store_file() -> str:
     return runtime_path("capacity_peaks.json")
 
 
+def import_cap_report_file() -> str:
+    return runtime_path("import_cap_report.json")
+
+
 def savings_ledger_file() -> str:
     return runtime_path("savings_ledger.jsonl")
 

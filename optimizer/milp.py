@@ -47,6 +47,12 @@ from .milp_horizon import (
 from .import_power_limit import ImportCaps
 from .milp_ev_pool import add_ev_pool_constraints
 from .milp_import_cap import add_import_cap_constraints
+from .import_cap_report import (
+    NOT_PLANNED_AUTOMATIK,
+    NOT_PLANNED_TRIVIAL,
+    not_planned_report,
+    report_from_model,
+)
 from .milp_vendor_mode import add_vendor_mode_export_constraints, plan_vendor_mode_enabled
 from .milp_result import (
     _extract_milp_plan,
@@ -454,6 +460,17 @@ def _warn_import_cap_not_planned(import_caps: ImportCaps | None, reason: str) ->
     logger.warning("MILP: Bezugsgrenze (%.2f kW) nicht eingeplant: %s.", limit, reason)
 
 
+def _with_not_planned_report(
+    result: tuple, import_caps: ImportCaps | None, matrix: list[dict[str, Any]], reason: str
+) -> tuple:
+    """Automatik or trivial result; with a cap its plan says the cap was not planned."""
+    if import_caps is None:
+        return result
+    plan = dict(result[5])
+    plan["import_cap_report"] = not_planned_report(import_caps, matrix, reason)
+    return result[:5] + (plan,) + result[6:]
+
+
 def _trivial_optimizer_result(current_soc: float) -> (
     tuple[int, float, float, dict[str, float], dict[str, int], dict[str, float], dict[str, dict]]
 ):
@@ -515,7 +532,9 @@ def milp_optimizer(
     )
     if trivial is not None:
         _warn_import_cap_not_planned(import_caps, "trivial window, no solve")
-        return _trivial_optimizer_result(current_soc)
+        return _with_not_planned_report(
+            _trivial_optimizer_result(current_soc), import_caps, matrix, NOT_PLANNED_TRIVIAL
+        )
     fallback_k_push = k_push if k_push is not None else config.get_push_price_cent()
     solved = _solve_milp_to_model(
         matrix,
@@ -545,12 +564,18 @@ def milp_optimizer(
     )
     if solved is None:
         _warn_import_cap_not_planned(import_caps, "no optimal solve, Automatik")
-        return _AUTOMATIK_FALLBACK
+        return _with_not_planned_report(
+            _AUTOMATIK_FALLBACK, import_caps, matrix, NOT_PLANNED_AUTOMATIK
+        )
 
     model, preset_by_slot, remaining, schedule_indices, contexts, filters = solved
     controls = _extract_optimizer_controls_from_model(
         model, matrix, preset_by_slot, current_soc, primary
     )
+    if import_caps is not None:
+        controls.milp_plan["import_cap_report"] = report_from_model(
+            model, matrix, import_caps, remaining
+        )
     urgent_observability = _collect_urgent_rule_observability(
         model, matrix, remaining, schedule_indices, contexts, filters
     )

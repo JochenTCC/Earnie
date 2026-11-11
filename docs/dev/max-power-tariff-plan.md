@@ -1,6 +1,6 @@
 # Max-power dependent tariff: implementation plan (Version 2.8)
 
-**Status:** plan (2026-11-07), nothing implemented. Branch `feat/max-power-tariff`, based on `main` at `b2275bbd`.
+**Status:** P0–P5b and P6a on `main` (PR #96 merged 2026-11-08; P6a 2026-11-11). Open: P5c field test, P6b, P6c, P7.
 **Backlog item:** **Implement max-power dependent tariff**, Version 2.8. Scope as decided on 2026-11-07: dev doc steps L2, L3 and L4, stage A of [`Capacity-Peak-Budget-Draft.md`](../../backlog/Capacity-Peak-Budget-Draft.md) with a cap the user chooses.
 **Regulation:** [`SNE-G-V-2027-Research.md`](../../backlog/SNE-G-V-2027-Research.md).
 
@@ -184,11 +184,25 @@ Planned:
 
 ### P6: Warning and display (L4)
 
-- `optimizer/import_cap_report.py`: from `s[t]` per slot, with a cause: inverter power, battery empty or reserve, flex deadline, load forecast.
-- UI: state in `ui/truth_banner.py`; Cockpit shows month peak, cap, billed power and the amount so far from `capacity_ladder`, plus what the next kW costs this month.
-- SE: slots and days per month where the cap did not hold.
-- Set the proposal from D7 from the field test in P5 and a HouseSim run: forecast error plus measurement error.
-- **Tests:** each cause, truth banner, AppTest.
+Split on 2026-11-11 (maintainer) into **P6a** report, **P6b** Monitor page and **P6c** SE and testbed, built before the field test; only the margin's proposal waits for it. Decisions of that day:
+
+- **E1, causes:** in this order, the first that applies is the main cause, all that apply are kept: base load (load − PV without the planned flex stays above the limit even with full battery power), battery or inverter power, battery empty or reserve, consumer with a target, none detected (said as such).
+- **E2, measured overshoot:** Live checks each closed quarter hour; above the cap and the month peak before it, the cause is the plan's own if the plan had that slot over its limit, else "Lastprognose" (the plan held, the meter did not), "nicht eingeplant" (trivial window, Automatik) or none detected (plan of that slot not known).
+- **E3:** the display goes to the Monitor page (`ui/pages/page_cockpit.py`). `ui/truth_banner.py` is the attribution banner, not a status banner.
+- **E4:** each step commits to `main` with green tests.
+
+**P6a built 2026-11-11.** `optimizer/import_cap_report.py` builds the report from the solved model: per slot with slack the planned import, the limit, the overshoot, the causes and the consumers with a target that run. `milp_optimizer` puts it into the plan (`milp_plan["import_cap_report"]`), the trivial window and Automatik get a report that says the cap was not planned and why. Live had only slot 0's slack before (`_extract_milp_plan`), so the report is built from the model, not from the plan output. `main.py` stores the latest report in `runtime/import_cap_report.json` (only while a cap is set; removing the cap clears it), logs the first slot over the limit, and records the report in the cycle record (`outputs.import_cap_report`); replay builds it again (`ReplayResult.import_cap_report`). After each closed quarter hour `main.py` checks the measured import against the cap and the month peak before it (`runtime_store/import_cap_report_store.record_measured`), keeps the events of the current and the previous month in the same file and logs them. The file is in the debug dump.
+
+- How the causes are read: battery power from the discharge against the batteries' upper bounds, inverter limits from the binding `inv_ac_dis_*` / `inv_ac_clip_*` constraints, battery energy from a charge in the slot (reserve refill) or the batteries reaching their floor before they charge again, base load from the slot's balance. A house without battery power gets no battery cause.
+- **Not covered:** an SoC pinned by an equality (SE SA₁ carry-in) is not read as a reserve. "None detected" stays possible and is reported as such.
+- **Tests:** `tests/test_import_cap_report.py` (each cause, inverter limit, report in the plan, trivial and Automatik, cycle record, store, measured check, Live hooks).
+
+Open in P6b and P6c:
+
+- UI (P6b): Monitor page shows month peak, cap, billed power and the amount so far, plus what the next kW costs this month, and the report's warning.
+- SE (P6c): slots and days per month where the cap did not hold, with the causes.
+- Set the proposal from D7 from the field test in P5 and a HouseSim run: forecast error plus measurement error (after the field test).
+- **Tests:** AppTest (P6b), SE table (P6c).
 
 ### P7: Docs and close
 

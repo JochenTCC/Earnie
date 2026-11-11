@@ -76,7 +76,7 @@ def _iso(moment: datetime) -> str:
     return moment.isoformat(timespec="seconds")
 
 
-def _measured_kw(closed: dict[str, Any]) -> float | None:
+def measured_import_kw(closed: dict[str, Any]) -> float | None:
     """Import of the slot, or ``None`` when a sample mean covers too little of it to count.
 
     A mean needs at least ``MIN_SAMPLE_COUNT_FOR_MEAN`` samples over ``MIN_IMPORT_WINDOW_SEC``,
@@ -104,7 +104,7 @@ def record_closed_interval(closed: dict[str, Any], *, path: str | None = None) -
     """
     target = _path(path)
     slot = _slot(closed["interval_start"])
-    kw = _measured_kw(closed)
+    kw = measured_import_kw(closed)
     month = slot.strftime("%Y-%m")
     months = _load(target)
     entry = months.get(month)

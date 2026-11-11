@@ -70,6 +70,8 @@ class ReplayResult:
     config_hash: str | None = None
     # One record per MILP solve of the replay (``optimizer.cbc_solver.take_solve_log``).
     solver: list[dict[str, Any]] = field(default_factory=list)
+    # Import cap report of the replayed plan (``optimizer.import_cap_report``); None without a cap.
+    import_cap_report: dict[str, Any] | None = None
 
     @property
     def time_limit_hit(self) -> bool:
@@ -594,15 +596,25 @@ def _run_milp_replay(
             sunrise_soc_min_index=sunrise_soc_min_index,
         )
 
-    model, preset_by_slot, _rem, _idx, _c, _f = solved
+    model, preset_by_slot, remaining, _idx, _c, _f = solved
     controls = _extract_optimizer_controls_from_model(
         model, ctx.prepared, preset_by_slot, ctx.soc, primary
     )
-    return _milp_replay_result(ctx, model, controls, primary)
+    report = None
+    if ctx.import_caps is not None:
+        from optimizer.import_cap_report import report_from_model
+
+        report = report_from_model(model, ctx.prepared, ctx.import_caps, remaining)
+    return _milp_replay_result(ctx, model, controls, primary, import_cap_report=report)
 
 
 def _milp_replay_result(
-    ctx: _PreparedReplay, model, controls, primary: dict
+    ctx: _PreparedReplay,
+    model,
+    controls,
+    primary: dict,
+    *,
+    import_cap_report: dict[str, Any] | None = None,
 ) -> ReplayResult:
     """Replay result (plan hash, cost, controls) from the solved MILP model."""
     import pulp
@@ -638,6 +650,7 @@ def _milp_replay_result(
         target_power_kw=float(controls.target_power),
         battery_plan_kw=float(battery_plan) if battery_plan is not None else None,
         consumer_powers_kw={k: float(v) for k, v in controls.consumer_powers.items()},
+        import_cap_report=import_cap_report,
     )
 
 
@@ -651,7 +664,7 @@ def _replay_from_optimizer_fallback(
     from optimizer import battery_plan_kw_from_control, milp_optimizer
     from runtime_store.cycle_recorder import compute_plan_hash
 
-    mode, target_power, _ts, consumer_powers, _pf, _plan, _obs = milp_optimizer(
+    mode, target_power, _ts, consumer_powers, _pf, plan, _obs = milp_optimizer(
         ctx.prepared,
         ctx.current_hour,
         ctx.soc,
@@ -694,6 +707,7 @@ def _replay_from_optimizer_fallback(
         target_power_kw=float(target_power),
         battery_plan_kw=float(battery_plan) if battery_plan is not None else None,
         consumer_powers_kw={k: float(v) for k, v in consumer_powers.items()},
+        import_cap_report=(plan or {}).get("import_cap_report"),
     )
 
 

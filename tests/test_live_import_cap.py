@@ -103,7 +103,7 @@ def test_a_plan_that_cannot_hold_the_cap_says_so(monkeypatch, caplog, trivial, r
     monkeypatch.setattr(milp, "_solve_milp_to_model", lambda *_a, **_k: None)
     with caplog.at_level(logging.WARNING):
         milp.milp_optimizer(
-            [{}], 18, 50.0, battery_params={"max_power_kw": 5.0},
+            [{"slot_datetime": datetime(2027, 4, 1, 18)}], 18, 50.0, battery_params={"max_power_kw": 5.0},
             import_caps=ImportCaps((4.7,), ("2027-04",)),
         )
     assert "Bezugsgrenze (4.70 kW) nicht eingeplant" in caplog.text

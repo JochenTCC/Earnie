@@ -119,13 +119,38 @@ def _finalize_previous_interval() -> dict | None:
 
 
 def _record_month_peak(closed: dict) -> None:
-    """Month peak for the capacity charge; a failure is logged and never stops the cycle."""
-    from runtime_store import capacity_peak_store
+    """Month peak for the capacity charge and the measured cap check (P6a).
+
+    A failure is logged and never stops the cycle.
+    """
+    from runtime_store import capacity_peak_store, import_cap_report_store
 
     try:
+        slot = datetime.fromisoformat(str(closed["interval_start"]))
+        before = capacity_peak_store.month_peak(f"{slot:%Y-%m}")
         capacity_peak_store.record_closed_interval(closed)
     except Exception as exc:  # noqa: BLE001 — the cycle must still plan and write
         logger.warning("capacity_peak_store: %s not recorded: %s", closed.get("interval_start"), exc)
+        return
+    try:
+        event = import_cap_report_store.record_measured(
+            closed["interval_start"],
+            capacity_peak_store.measured_import_kw(closed),
+            params=config.get_resolved_runtime_settings(),
+            peak_before_kw=None if before is None else before.peak_kw,
+        )
+    except Exception as exc:  # noqa: BLE001 — the cycle must still plan and write
+        logger.warning("import_cap_report: %s not checked: %s", closed.get("interval_start"), exc)
+        return
+    if event is not None:
+        logger.warning(
+            "Bezugsgrenze: Viertelstunde %s gemessen %.2f kW, %.2f kW über %.2f kW (Ursache %s).",
+            event["slot"],
+            event["import_kw"],
+            event["over_kw"],
+            event["threshold_kw"],
+            event["cause"],
+        )
 
 
 def _daemon_wait_poll() -> None:
@@ -235,6 +260,27 @@ def _read_pv_delta(out_of_band: bool) -> float:
         "PV-Energie-Delta (Integral letztes Intervall): %.3f kWh", pv_delta
     )
     return pv_delta
+
+
+def _save_import_cap_report(report: dict | None) -> None:
+    """Latest plan's cap report for the Monitor page; a failure is logged, never fatal."""
+    from runtime_store import import_cap_report_store
+
+    try:
+        import_cap_report_store.save_plan_report(report)
+    except Exception as exc:  # noqa: BLE001 — the cycle has already written its setpoints
+        logger.warning("import_cap_report: plan report not saved: %s", exc)
+        return
+    if report and report.get("slots"):
+        first = report["slots"][0]
+        logger.warning(
+            "Bezugsgrenze: Plan hält %d Viertelstunde(n) nicht, erste %s %.2f kW über %.2f kW (Ursache %s).",
+            len(report["slots"]),
+            first["slot"],
+            first["over_kw"],
+            first["limit_kw"],
+            first["cause"],
+        )
 
 
 def _main_cycle(
@@ -1067,6 +1113,8 @@ def _main_cycle(
         except Exception as e:
             logger.warning("run_state: Zustand konnte nicht gespeichert werden: %s", e)
 
+        cap_report = milp_plan.get("import_cap_report") if isinstance(milp_plan, dict) else None
+        _save_import_cap_report(cap_report)
         try:
             immediate = any(
                 bool((ctx or {}).get("immediate_charge"))
@@ -1087,6 +1135,7 @@ def _main_cycle(
                     "manual_intervention": False,
                 },
                 solver=solve_log,
+                import_cap_report=cap_report,
             )
         except Exception as exc:  # noqa: BLE001 — never abort live run
             logger.warning("cycle_recorder: finish_cycle failed: %s", exc)

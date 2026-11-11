@@ -527,6 +527,7 @@ def _build_cycle_entry(
     battery_plan_kw: Any,
     consumer_powers_kw: Any,
     solver: list[dict[str, Any]] | None = None,
+    import_cap_report: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     resolved_hash = plan_hash or compute_plan_hash(
         mode=mode,
@@ -548,6 +549,8 @@ def _build_cycle_entry(
     if solver is not None:
         # One record per MILP solve of the cycle (stage, elapsed, time limit hit, objective).
         outputs["solver"] = _json_safe(solver)
+    if import_cap_report is not None:
+        outputs["import_cap_report"] = _json_safe(import_cap_report)
     return {
         "schema": RECORDER_SCHEMA,
         "timestamp": token.timestamp,
@@ -578,6 +581,7 @@ def finish_cycle(
     battery_plan_kw: Any = None,
     consumer_powers_kw: Any = None,
     solver: list[dict[str, Any]] | None = None,
+    import_cap_report: dict[str, Any] | None = None,
 ) -> bool:
     """Append one cycle line with outputs. Soft-fails; never raises to caller."""
     if token is None:
@@ -599,6 +603,7 @@ def finish_cycle(
             battery_plan_kw=battery_plan_kw,
             consumer_powers_kw=consumer_powers_kw,
             solver=solver,
+            import_cap_report=import_cap_report,
         )
         _append_cycle_line(entry, day=_segment_day_from_timestamp(token.timestamp))
         prune_old_segments()
