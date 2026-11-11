@@ -333,7 +333,7 @@ def _render_scenario_import_cap(ctx: dict, picks: dict) -> tuple[str, ...]:
         step=0.1,
         format="%.2f",
         value=None,
-        placeholder="keine",
+        placeholder="∞ (keine Grenze)",
         key=scoped_widget_key(session_scope, "scenario_import_cap"),
         help=(
             "Für den Leistungspreis: Der Plan hält den Netzbezug je Viertelstunde unter dieser "
