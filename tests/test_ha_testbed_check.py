@@ -140,6 +140,16 @@ class World:
         elif domain == "automation":
             (self.automations_off.add if service == "turn_off" else self.automations_off.discard)(data["entity_id"])
 
+    def power_samples(self):
+        """The sampler books every consumer power read the inbox holds (kW) — Ledger P9e."""
+        flex = {
+            ehal_id: float(row["value"])
+            for ehal_id, row in self.rows.items()
+            if field_kind(ehal_id) in ("sens_power_act", "sens_evcs_active_power")
+            and ehal_id not in self.silent
+        }
+        return [{"ts": "2026-01-01T00:00:00", "flex_kw": flex}]
+
     def bench(self, *, with_ha=True, timeout_s=60.0):
         return chk.Bench(
             archetype=self.arch,
@@ -153,6 +163,7 @@ class World:
             sleep=self.sleep,
             monotonic=self.monotonic,
             now=self.now,
+            load_power_samples=self.power_samples,
         )
 
 
@@ -460,3 +471,24 @@ def test_main_reports_missing_archetype(tmp_path, capsys):
 def test_archetype_load_splits_reads_and_writes(archetype):
     assert all(not field_kind(i).startswith("set_") for i in archetype.reads())
     assert SETPOINT in archetype.writes()
+
+
+# --- consumer power in the power sampler (Ledger P9e) ---------------------------------
+
+POWER_CHECK = "consumer power reaches the power sampler (flex_kw)"
+
+
+def test_consumer_power_missing_from_the_samples_fails(archetype):
+    world = World(archetype)
+    world.power_samples = lambda: [{"ts": "2026-01-01T00:00:00", "flex_kw": {}}]
+    result = _by_name(chk.run_checks(world.bench(timeout_s=20.0), negative=False))[POWER_CHECK]
+    assert result.status == chk.FAIL
+    assert "flex_kw {}" in result.detail
+
+
+def test_consumer_power_check_skips_without_samples(archetype):
+    world = World(archetype)
+    world.power_samples = lambda: []
+    result = _by_name(chk.run_checks(world.bench(), negative=False))[POWER_CHECK]
+    assert result.status == chk.SKIP
+    assert "not sampling" in result.detail
