@@ -78,3 +78,21 @@ def test_no_recharge_when_anchor_is_min_soc():
         horizon_anchor_soc=10.0,
     )
     assert recharged == 10.0
+
+
+def test_end_soc_is_the_last_rows_start_soc_plus_its_action():
+    params = _battery_params()
+    last = _chart_row(40.0, 1.0)
+    # 1 kW for a quarter hour at 95 % into 5 kWh: +4.75 %
+    expected = 40.0 + 1.0 * 0.95 * 0.25 / 5.0 * 100.0
+
+    assert horizon_end_soc_percent([last], 12.0, params) == pytest.approx(expected, abs=0.05)
+    # earlier rows and the start SoC of the run do not change the end
+    earlier = [_chart_row(80.0, -2.5), _chart_row(15.0, 2.5)]
+    assert horizon_end_soc_percent([*earlier, last], 99.0, params) == pytest.approx(
+        expected, abs=0.05
+    )
+
+
+def test_end_soc_without_rows_is_the_start_soc():
+    assert horizon_end_soc_percent([], 42.04, _battery_params()) == 42.0
