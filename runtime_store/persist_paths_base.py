@@ -238,6 +238,11 @@ def import_cap_report_file() -> str:
     return runtime_path("import_cap_report.json")
 
 
+def capacity_observe_peak_file() -> str:
+    """Hypothetical month peak of the import cap's observe mode (max-power plan P6d)."""
+    return runtime_path("capacity_peaks_observe.json")
+
+
 def savings_ledger_file() -> str:
     return runtime_path("savings_ledger.jsonl")
 

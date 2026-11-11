@@ -143,6 +143,11 @@
               "minimum": 0,
               "description": "Sicherheitsmarge in kW: Der Plan zielt auf import_cap_kw minus diese Marge. Kleiner als import_cap_kw."
             },
+            "import_cap_mode": {
+              "type": "string",
+              "enum": ["observe", "optimize"],
+              "description": "Nur Live: optimize = Earnie plant unter der Bezugsgrenze; observe = Earnie plant ohne sie und zeigt nur, wo und wie er eingegriffen hätte. Pflicht im Live-Szenario, sobald import_cap_kw gesetzt ist; die Szenario-Simulation plant immer mit der Grenze."
+            },
             "pv_tilt": {
               "type": "number"
             },

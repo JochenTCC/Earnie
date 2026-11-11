@@ -174,7 +174,7 @@ def test_the_cycle_record_keeps_the_report():
 # --- Live store ----------------------------------------------------------------------------
 
 SLOT = datetime(2027, 3, 2, 18, 0)
-CAP = {"import_cap_kw": 5.0, "import_cap_margin_kw": 0.3}
+CAP = {"import_cap_kw": 5.0, "import_cap_margin_kw": 0.3, "import_cap_mode": "optimize"}
 
 
 @pytest.fixture

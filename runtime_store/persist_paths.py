@@ -30,6 +30,7 @@ from runtime_store.persist_paths_base import (  # noqa: F401  (re-exported)
     default_config_dir,
     env_root,
     flexible_consumer_profiles_file,
+    capacity_observe_peak_file,
     capacity_peak_store_file,
     import_cap_report_file,
     log_file,

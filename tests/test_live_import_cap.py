@@ -17,7 +17,7 @@ from runtime_store.capacity_peak_store import MonthPeak
 from tests.main_run_harness import patch_main_run
 from tests.test_capacity_charge import _charge, _params
 
-CAP = {"import_cap_kw": 5.0, "import_cap_margin_kw": 0.3}
+CAP = {"import_cap_kw": 5.0, "import_cap_margin_kw": 0.3, "import_cap_mode": "optimize"}
 
 
 def _matrix(start: datetime, slots: int) -> list[dict]:
@@ -40,7 +40,7 @@ def test_without_a_cap_the_peak_store_is_not_read(tmp_path):
         params=_params(tmp_path, [_charge()]),
         read_peak=lambda _m: pytest.fail("no cap, no peak needed"),
     )
-    assert ctx == {"import_caps": None, "peak_by_month": {}, "unknown_months": []}
+    assert ctx == {"import_caps": None, "mode": None, "peak_by_month": {}, "unknown_months": []}
 
 
 def test_the_month_peak_lifts_the_limit(capped):
@@ -69,11 +69,18 @@ def test_the_cycle_record_replays_the_limits_it_planned_with():
     token = cycle_recorder.CycleToken.__new__(cycle_recorder.CycleToken)
     token.start_state = {}
     cycle_recorder.record_import_caps(
-        token, {"import_caps": caps, "peak_by_month": {"2027-03": 6.2}, "unknown_months": ["2027-04"]}
+        token,
+        {
+            "import_caps": caps,
+            "mode": "optimize",
+            "peak_by_month": {"2027-03": 6.2},
+            "unknown_months": ["2027-04"],
+        },
     )
     assert token.start_state["import_caps"] == {
         "limits_kw": [4.7, None],
         "months": ["2027-04", None],
+        "mode": "optimize",
         "peak_by_month": {"2027-03": 6.2},
         "unknown_months": ["2027-04"],
     }
@@ -123,7 +130,9 @@ def test_the_live_cycle_plans_and_records_with_the_limits(monkeypatch):
     monkeypatch.setattr(main_module.optimizer, "milp_optimizer", fake_milp)
     monkeypatch.setattr(
         "optimizer.live_import_cap.resolve_live_import_caps",
-        lambda _matrix: {"import_caps": caps, "peak_by_month": {}, "unknown_months": ["2027-04"]},
+        lambda _matrix: {
+            "import_caps": caps, "mode": "optimize", "peak_by_month": {}, "unknown_months": ["2027-04"]
+        },
     )
     monkeypatch.setattr(
         main_module.cycle_recorder, "record_import_caps", lambda _token, ctx: recorded.append(ctx)

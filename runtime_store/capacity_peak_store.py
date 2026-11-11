@@ -4,6 +4,10 @@ One entry per calendar month in the house's local time (the host clock, as the s
 the highest quarter-hour import, its slot and source, and how much of the month was measured.
 A month without an entry is unknown, never 0. The value is Earnie's own measurement and can be
 lower than the meter's (window offset, clock, missing quarter hours).
+
+The import cap's observe mode (plan P6d, decision O3) keeps a second file of the same shape with
+the hypothetical peak (``capacity_peaks_observe.json``): measured import plus what the plan with
+the cap would have changed, recorded through ``record_slot``.
 """
 from __future__ import annotations
 
@@ -16,7 +20,7 @@ from typing import Any
 
 from optimizer.schedule import QUARTER_HOUR_MINUTES
 from runtime_store.file_metadata import stamp_payload, strip_metadata
-from runtime_store.persist_paths import capacity_peak_store_file
+from runtime_store.persist_paths import capacity_observe_peak_file, capacity_peak_store_file
 from runtime_store.power_interval_sampler import (
     GRID_IMPORT_SOURCE_MEAN,
     MIN_IMPORT_WINDOW_SEC,
@@ -102,9 +106,29 @@ def record_closed_interval(closed: dict[str, Any], *, path: str | None = None) -
     A slot that was not measured well enough counts as missing. A slot at or before the last
     one stored is ignored (logged), so a clock step backwards cannot rewrite a month.
     """
+    return record_slot(
+        closed["interval_start"],
+        measured_import_kw(closed),
+        str(closed["grid_import_source"]),
+        path=path,
+    )
+
+
+def observe_path() -> str:
+    """The observe mode's file of hypothetical month peaks."""
+    return capacity_observe_peak_file()
+
+
+def record_slot(
+    interval_start: Any, kw: float | None, source: str, *, path: str | None = None
+) -> MonthPeak | None:
+    """Add one quarter hour with its import ``kw`` (``None``: missing) from ``source``.
+
+    Same rules as ``record_closed_interval``; the observe mode records its hypothetical import
+    through here with ``path=observe_path()``.
+    """
     target = _path(path)
-    slot = _slot(closed["interval_start"])
-    kw = measured_import_kw(closed)
+    slot = _slot(interval_start)
     month = slot.strftime("%Y-%m")
     months = _load(target)
     entry = months.get(month)
@@ -121,7 +145,7 @@ def record_closed_interval(closed: dict[str, Any], *, path: str | None = None) -
         entry = {
             "peak_kw": kw,
             "peak_slot": _iso(slot),
-            "peak_source": str(closed["grid_import_source"]),
+            "peak_source": source,
             "first_slot": _iso(slot),
             "last_slot": _iso(slot),
             "slots_logged": 1,
@@ -139,7 +163,7 @@ def record_closed_interval(closed: dict[str, Any], *, path: str | None = None) -
             entry.update(
                 peak_kw=kw,
                 peak_slot=_iso(slot),
-                peak_source=str(closed["grid_import_source"]),
+                peak_source=source,
             )
     months[month] = entry
     _save(target, months)

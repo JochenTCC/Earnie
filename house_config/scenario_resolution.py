@@ -151,8 +151,9 @@ def resolve_scenario_settings(
 def _check_import_cap(out: dict) -> None:
     """A cap needs a grid area: only there is it known in which months it counts (plan D3)."""
     from data.edibert_slot_prices import EDIBERT_PRICING_KEY
-    from house_config.import_cap import parse_import_cap
+    from house_config.import_cap import parse_import_cap, parse_import_cap_mode
 
+    parse_import_cap_mode(out, required=False)
     if parse_import_cap(out) is None:
         return
     if (out.get(EDIBERT_PRICING_KEY) or {}).get("netznutzung") is None:

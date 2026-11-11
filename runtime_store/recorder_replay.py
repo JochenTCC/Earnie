@@ -411,6 +411,8 @@ class _PreparedReplay:
     hk_max_export_kw: float | None = None
     inbound_export_limit_kw: float | None = None
     import_caps: Any = None
+    # Observe mode of the cap (P6d): the executed plan had no cap, the report came from a second plan.
+    import_cap_observe: bool = False
 
 
 def _prepare_replay_inputs(entry: dict[str, Any], config_module: Any) -> _PreparedReplay:
@@ -478,6 +480,7 @@ def _prepare_replay_inputs(entry: dict[str, Any], config_module: Any) -> _Prepar
         k_push=_require_push_price_cent(config_module),
         **_recorded_export_limits(start_state),
         import_caps=_recorded_import_caps(start_state),
+        import_cap_observe=_recorded_import_cap_observe(start_state),
     )
 
 
@@ -561,31 +564,34 @@ def _run_milp_replay(
         _extract_optimizer_controls_from_model,
         _primary_battery_params,
         _solve_milp_to_model,
+        shadow_import_cap_report,
     )
 
     _apply_recorded_standby_relief(ctx)
+    solve_args: dict[str, Any] = {
+        "matrix": ctx.prepared,
+        "current_soc": ctx.soc,
+        "battery_params": ctx.battery_params,
+        "k_push": ctx.k_push,
+        "verbose": verbose,
+        "consumers": ctx.consumers,
+        "consumer_remaining_kwh": ctx.remaining,
+        "spa_remaining_kwh": None,
+        "flex_indices": None,
+        "charging_contexts": ctx.contexts,
+        "filter_contexts": ctx.filter_contexts,
+        "terminal_soc_percent": None,
+        "sunrise_soc_min_index": sunrise_soc_min_index,
+        "consumer_continue_on": ctx.continue_on,
+        "thermal_flex_contexts": None,
+        "hk_max_export_kw": ctx.hk_max_export_kw,
+        "inbound_export_limit_kw": ctx.inbound_export_limit_kw,
+        "current_soc_by_id": ctx.soc_by_id,
+        "inverter_params": ctx.inverter_params,
+        "pv_systems": ctx.pv_systems,
+    }
     solved = _solve_milp_to_model(
-        ctx.prepared,
-        ctx.soc,
-        ctx.battery_params,
-        ctx.k_push,
-        verbose,
-        ctx.consumers,
-        ctx.remaining,
-        None,
-        None,
-        ctx.contexts,
-        ctx.filter_contexts,
-        None,
-        sunrise_soc_min_index,
-        ctx.continue_on,
-        None,
-        hk_max_export_kw=ctx.hk_max_export_kw,
-        inbound_export_limit_kw=ctx.inbound_export_limit_kw,
-        current_soc_by_id=ctx.soc_by_id,
-        inverter_params=ctx.inverter_params,
-        pv_systems=ctx.pv_systems,
-        import_caps=ctx.import_caps,
+        **solve_args, import_caps=None if ctx.import_cap_observe else ctx.import_caps
     )
     primary = _primary_battery_params(ctx.battery_params)
     if solved is None:
@@ -601,7 +607,11 @@ def _run_milp_replay(
         model, ctx.prepared, preset_by_slot, ctx.soc, primary
     )
     report = None
-    if ctx.import_caps is not None:
+    if ctx.import_caps is not None and ctx.import_cap_observe:
+        report = shadow_import_cap_report(
+            model, ctx.prepared, ctx.import_caps, solve_args, ctx.k_push
+        )
+    elif ctx.import_caps is not None:
         from optimizer.import_cap_report import report_from_model
 
         report = report_from_model(model, ctx.prepared, ctx.import_caps, remaining)
@@ -680,6 +690,7 @@ def _replay_from_optimizer_fallback(
         verbose=verbose,
         current_soc_by_id=ctx.soc_by_id,
         import_caps=ctx.import_caps,
+        import_cap_observe=ctx.import_cap_observe,
     )
     battery_plan = battery_plan_kw_from_control(
         mode,
@@ -835,6 +846,23 @@ def _recorded_import_caps(start_state: dict[str, Any]) -> Any:
         tuple(None if value is None else float(value) for value in limits),
         tuple(None if value is None else str(value) for value in months),
     )
+
+
+def _recorded_import_cap_observe(start_state: dict[str, Any]) -> bool:
+    """Whether the live cycle ran the cap in observe mode (P6d).
+
+    ``mode`` is recorded since P6d; a cycle recorded before had only ``optimize``, so a record
+    with limits and no ``mode`` replays as planned under the cap.
+    """
+    from house_config.import_cap import IMPORT_CAP_MODES, MODE_OBSERVE
+
+    recorded = start_state.get("import_caps")
+    if not isinstance(recorded, dict) or "mode" not in recorded:
+        return False
+    mode = recorded["mode"]
+    if mode is not None and mode not in IMPORT_CAP_MODES:
+        raise ValueError(f"start_state.import_caps: unknown mode {mode!r}")
+    return mode == MODE_OBSERVE
 
 
 def _inverter_params_from_config(config_module: Any) -> list[dict] | None:

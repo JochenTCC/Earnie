@@ -492,6 +492,8 @@ def record_import_caps(
 
     ``limits_kw`` / ``months`` are kept as planned, so replay needs neither the scenario nor the
     peak store of that time. ``None`` limits when the scenario has no cap or no active month.
+    ``mode``: ``observe`` or ``optimize`` (P6d), ``None`` without a cap; in observe mode the
+    limits are those of the shadow plan.
     """
     if token is None:
         return
@@ -500,6 +502,7 @@ def record_import_caps(
         token.start_state["import_caps"] = {
             "limits_kw": None if caps is None else [_json_safe(v) for v in caps.limits_kw],
             "months": None if caps is None else list(caps.months),
+            "mode": import_ctx["mode"],
             "peak_by_month": {k: _json_safe(v) for k, v in import_ctx["peak_by_month"].items()},
             "unknown_months": list(import_ctx["unknown_months"]),
         }

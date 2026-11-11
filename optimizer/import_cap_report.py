@@ -16,16 +16,22 @@ Causes, checked in this order; the first that applies is the main cause, all tha
 
 Live adds two causes outside the plan: ``forecast`` (the plan held, the measured quarter hour did
 not) and ``not_planned`` (trivial window or Automatik, no plan held the cap).
+
+Every report names its ``mode`` (plan P6d, decision O1). In ``observe`` mode Live executes a plan
+without the cap and the report comes from a second, never executed plan with it (decision O2); its
+``observe`` block compares slot 0 of both plans and the extra energy cost of holding the cap.
 """
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from house_config.import_cap import IMPORT_CAP_MODES, MODE_OBSERVE, MODE_OPTIMIZE
+
 from .import_power_limit import ImportCaps
 from .milp_horizon_types import MilpHorizonModel
 
-REPORT_SCHEMA = 1
+REPORT_SCHEMA = 2  # 2: ``mode`` and, in observe mode, ``observe`` (P6d)
 
 CAUSE_BASE_LOAD = "base_load"
 CAUSE_BATTERY_POWER = "battery_power"
@@ -54,6 +60,8 @@ CAUSE_LABELS_DE = {
 
 NOT_PLANNED_TRIVIAL = "trivial_window"
 NOT_PLANNED_AUTOMATIK = "automatik"
+NOT_PLANNED_SHADOW = "shadow_failed"  # observe mode: the plan with the cap did not solve
+NOT_PLANNED_REASONS = (NOT_PLANNED_TRIVIAL, NOT_PLANNED_AUTOMATIK, NOT_PLANNED_SHADOW)
 
 SLACK_TOLERANCE_KW = 0.01
 _POWER_TOLERANCE_KW = 0.01
@@ -216,10 +224,101 @@ def report_from_model(
     matrix: Sequence[Mapping[str, Any]],
     caps: ImportCaps,
     consumer_remaining_kwh: Mapping[str, float] | None,
+    *,
+    mode: str = MODE_OPTIMIZE,
 ) -> dict[str, Any]:
-    """The report of a solved model that was planned under ``caps``."""
+    """The report of a solved model that was planned under ``caps``.
+
+    ``mode`` ``observe``: ``model`` is the shadow plan; ``observe_report`` adds the comparison.
+    """
     slots = [entry for _t, entry in _over_slots(model, matrix, caps, consumer_remaining_kwh)]
-    return _report(planned=True, reason=None, caps=caps, matrix=matrix, slots=slots)
+    return _report(planned=True, reason=None, caps=caps, matrix=matrix, slots=slots, mode=mode)
+
+
+# --- observe mode (P6d) --------------------------------------------------------------------
+
+
+def _slot0_of(model: MilpHorizonModel) -> dict[str, Any]:
+    """What a plan does in slot 0: grid import, battery (discharge − charge) and consumers."""
+    from .milp_consumer_vars import _consumer_powers_at
+
+    powers, _total = _consumer_powers_at(model, 0)
+    return {
+        "import_kw": round(_value(model.p_grid_buy[0]), 3),
+        "battery_kw": round(_value(model.p_discharge[0]) - _value(model.p_charge[0]), 3),
+        "consumers_kw": {cid: round(kw, 3) for cid, kw in powers.items()},
+    }
+
+
+def plan_energy_cost_cent(
+    model: MilpHorizonModel, matrix: Sequence[Mapping[str, Any]], fallback_k_push: float
+) -> float:
+    """Grid cash flow of a solved plan over its horizon, as the objective prices it, in cent.
+
+    Without wear, curtail, credits and the cap penalty, so two plans of one matrix compare on
+    energy alone.
+    """
+    from data.feed_in_prices import k_push_act_for_matrix_row
+
+    return sum(
+        (
+            _value(model.p_grid_buy[t]) * float(matrix[t]["k_act"])
+            - _value(model.p_grid_sell[t])
+            * k_push_act_for_matrix_row(dict(matrix[t]), fallback_k_push)
+        )
+        * float(model.dt_h)
+        for t in range(model.horizon)
+    )
+
+
+def _observe_block(
+    matrix: Sequence[Mapping[str, Any]],
+    *,
+    delta_import_kw: float | None,
+    executed: dict[str, Any] | None,
+    shadow: dict[str, Any] | None,
+    energy_cost_extra_eur: float | None,
+) -> dict[str, Any]:
+    return {
+        "slot": _slot_iso(matrix, 0),
+        "delta_import_kw": None if delta_import_kw is None else round(float(delta_import_kw), 3),
+        "executed": executed,
+        "shadow": shadow,
+        "energy_cost_extra_eur": energy_cost_extra_eur,
+    }
+
+
+def observe_report(
+    shadow_model: MilpHorizonModel,
+    executed_model: MilpHorizonModel,
+    matrix: Sequence[Mapping[str, Any]],
+    caps: ImportCaps,
+    consumer_remaining_kwh: Mapping[str, float] | None,
+    fallback_k_push: float,
+) -> dict[str, Any]:
+    """Observe mode: the shadow plan's report plus slot 0 of both plans.
+
+    ``delta_import_kw`` = slot-0 import of the shadow plan − that of the executed plan; Live adds
+    it to the measured quarter hour for the hypothetical month peak (decision O3). The extra energy
+    cost is over the whole horizon, never slot 0 alone: a plan that discharges more now pays for
+    it with a recharge later (decision O4).
+    """
+    report = report_from_model(
+        shadow_model, matrix, caps, consumer_remaining_kwh, mode=MODE_OBSERVE
+    )
+    executed = _slot0_of(executed_model)
+    shadow = _slot0_of(shadow_model)
+    extra_cent = plan_energy_cost_cent(shadow_model, matrix, fallback_k_push) - plan_energy_cost_cent(
+        executed_model, matrix, fallback_k_push
+    )
+    report["observe"] = _observe_block(
+        matrix,
+        delta_import_kw=shadow["import_kw"] - executed["import_kw"],
+        executed=executed,
+        shadow=shadow,
+        energy_cost_extra_eur=round(extra_cent / 100.0, 4),
+    )
+    return report
 
 
 # --- marks per plan slot, for the Scenario Explorer log (P6c) ------------------------------
@@ -272,12 +371,33 @@ def first_slot_mark(plan: Mapping[str, Any], caps: ImportCaps) -> dict[str, Any]
 
 
 def not_planned_report(
-    caps: ImportCaps, matrix: Sequence[Mapping[str, Any]], reason: str
+    caps: ImportCaps,
+    matrix: Sequence[Mapping[str, Any]],
+    reason: str,
+    *,
+    mode: str = MODE_OPTIMIZE,
 ) -> dict[str, Any]:
-    """Trivial window or Automatik: a cap applies, but no plan holds it."""
-    if reason not in (NOT_PLANNED_TRIVIAL, NOT_PLANNED_AUTOMATIK):
+    """Trivial window, Automatik or (observe mode) a failed shadow solve: no plan holds the cap.
+
+    In observe mode the ``observe`` block says what is known of slot 0: the trivial window has
+    nothing to steer, so a plan with the cap would import the same (delta 0); after Automatik or a
+    failed shadow solve the delta is unknown (``None``) and the quarter hour counts as missing.
+    """
+    if reason not in NOT_PLANNED_REASONS:
         raise ValueError(f"Bezugsgrenzen-Bericht: unbekannter Grund {reason!r}.")
-    return _report(planned=False, reason=reason, caps=caps, matrix=matrix, slots=[])
+    if reason == NOT_PLANNED_SHADOW and mode != MODE_OBSERVE:
+        raise ValueError("Bezugsgrenzen-Bericht: shadow_failed gibt es nur im Beobachtungsmodus.")
+    report = _report(planned=False, reason=reason, caps=caps, matrix=matrix, slots=[], mode=mode)
+    if mode == MODE_OBSERVE:
+        trivial = reason == NOT_PLANNED_TRIVIAL
+        report["observe"] = _observe_block(
+            matrix,
+            delta_import_kw=0.0 if trivial else None,
+            executed=None,
+            shadow=None,
+            energy_cost_extra_eur=0.0 if trivial else None,
+        )
+    return report
 
 
 def _report(
@@ -287,7 +407,10 @@ def _report(
     caps: ImportCaps,
     matrix: Sequence[Mapping[str, Any]],
     slots: list[dict[str, Any]],
+    mode: str,
 ) -> dict[str, Any]:
+    if mode not in IMPORT_CAP_MODES:
+        raise ValueError(f"Bezugsgrenzen-Bericht: unbekannter Modus {mode!r}.")
     indices = [t for t, limit in enumerate(caps.limits_kw) if limit is not None and t < len(matrix)]
     months: dict[str, dict[str, Any]] = {}
     for entry in slots:
@@ -296,6 +419,7 @@ def _report(
         month["max_over_kw"] = max(month["max_over_kw"], entry["over_kw"])
     return {
         "schema": REPORT_SCHEMA,
+        "mode": mode,
         "planned": planned,
         "reason": reason,
         "first_slot": _slot_iso(matrix, indices[0]) if indices else None,

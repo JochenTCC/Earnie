@@ -3,6 +3,10 @@
 Two optional settings on a scenario. Both absent means no cap, so existing files stay valid. The
 cap counts only in months with a capacity charge (plan decision D3); which months those are comes
 from the grid area through Edibert.
+
+A third setting, ``import_cap_mode``, says what Live does with the cap (plan P6d, decision O1):
+``optimize`` plans under it, ``observe`` plans without it and only reports what a plan with it
+would have done. Live needs it once a cap is set; the SE always plans with the cap and ignores it.
 """
 from __future__ import annotations
 
@@ -13,6 +17,10 @@ from typing import Any
 IMPORT_CAP_KEY = "import_cap_kw"
 IMPORT_CAP_MARGIN_KEY = "import_cap_margin_kw"
 MARGIN_PROPOSAL_KW = 0.3  # placeholder until the field test of the max-power plan (P5) sets it
+IMPORT_CAP_MODE_KEY = "import_cap_mode"
+MODE_OBSERVE = "observe"
+MODE_OPTIMIZE = "optimize"
+IMPORT_CAP_MODES = (MODE_OBSERVE, MODE_OPTIMIZE)
 
 
 @dataclass(frozen=True)
@@ -58,6 +66,31 @@ def parse_import_cap(settings: dict | None) -> ImportCap | None:
     if margin >= cap:
         raise ValueError(f"{IMPORT_CAP_MARGIN_KEY} muss kleiner als {IMPORT_CAP_KEY} sein.")
     return ImportCap(cap, margin)
+
+
+def parse_import_cap_mode(settings: dict | None, *, required: bool) -> str | None:
+    """``observe`` or ``optimize``; ``None`` without a cap.
+
+    ``required``: Live, where a cap without a mode is an error. The SE passes ``False``: there a
+    missing mode is fine, but a mode without a cap or an unknown value is still an error.
+    """
+    data = settings or {}
+    mode = data.get(IMPORT_CAP_MODE_KEY)
+    cap = parse_import_cap(data)
+    if cap is None:
+        if mode is not None:
+            raise ValueError(f"{IMPORT_CAP_MODE_KEY} ohne {IMPORT_CAP_KEY}.")
+        return None
+    if mode is None:
+        if required:
+            raise ValueError(
+                f"{IMPORT_CAP_MODE_KEY} fehlt: mit einer Bezugsgrenze muss das Live-Szenario "
+                f"{MODE_OBSERVE!r} (nur beobachten) oder {MODE_OPTIMIZE!r} (danach planen) festlegen."
+            )
+        return None
+    if mode not in IMPORT_CAP_MODES:
+        raise ValueError(f"{IMPORT_CAP_MODE_KEY} ungültig: {mode!r} (erlaubt: {', '.join(IMPORT_CAP_MODES)}).")
+    return str(mode)
 
 
 def check_import_cap(cap: ImportCap, fee: Any | None, today: date) -> ImportCapCheck:

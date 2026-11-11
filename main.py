@@ -121,8 +121,11 @@ def _finalize_previous_interval() -> dict | None:
 def _record_month_peak(closed: dict) -> None:
     """Month peak for the capacity charge and the measured cap check (P6a).
 
-    A failure is logged and never stops the cycle.
+    In the cap's observe mode (P6d) the check runs on the hypothetical quarter hour, measured
+    import plus what the plan with the cap would have changed. A failure is logged and never
+    stops the cycle.
     """
+    from house_config.import_cap import MODE_OBSERVE, parse_import_cap_mode
     from runtime_store import capacity_peak_store, import_cap_report_store
 
     try:
@@ -133,16 +136,34 @@ def _record_month_peak(closed: dict) -> None:
         logger.warning("capacity_peak_store: %s not recorded: %s", closed.get("interval_start"), exc)
         return
     try:
-        event = import_cap_report_store.record_measured(
-            closed["interval_start"],
-            capacity_peak_store.measured_import_kw(closed),
-            params=config.get_resolved_runtime_settings(),
-            peak_before_kw=None if before is None else before.peak_kw,
-        )
+        params = config.get_resolved_runtime_settings()
+        measured_kw = capacity_peak_store.measured_import_kw(closed)
+        if parse_import_cap_mode(params, required=True) == MODE_OBSERVE:
+            event = import_cap_report_store.record_observed(
+                closed["interval_start"], measured_kw, params=params
+            )
+        else:
+            event = import_cap_report_store.record_measured(
+                closed["interval_start"],
+                measured_kw,
+                params=params,
+                peak_before_kw=None if before is None else before.peak_kw,
+            )
     except Exception as exc:  # noqa: BLE001 — the cycle must still plan and write
         logger.warning("import_cap_report: %s not checked: %s", closed.get("interval_start"), exc)
         return
-    if event is not None:
+    if event is not None and event.get("hypothetical"):
+        logger.warning(
+            "Bezugsgrenze (Beobachtung): Viertelstunde %s mit Earnie geschätzt %.2f kW "
+            "(gemessen %.2f kW), %.2f kW über %.2f kW (Ursache %s).",
+            event["slot"],
+            event["import_kw"],
+            event["measured_kw"],
+            event["over_kw"],
+            event["threshold_kw"],
+            event["cause"],
+        )
+    elif event is not None:
         logger.warning(
             "Bezugsgrenze: Viertelstunde %s gemessen %.2f kW, %.2f kW über %.2f kW (Ursache %s).",
             event["slot"],
@@ -271,10 +292,23 @@ def _save_import_cap_report(report: dict | None) -> None:
     except Exception as exc:  # noqa: BLE001 — the cycle has already written its setpoints
         logger.warning("import_cap_report: plan report not saved: %s", exc)
         return
+    observe = bool(report) and report.get("mode") == "observe"
+    if observe and report.get("observe"):
+        block = report["observe"]
+        if block["delta_import_kw"] is not None and abs(block["delta_import_kw"]) > 0.01:
+            logger.info(
+                "Bezugsgrenze (Beobachtung): mit Grenze würde Earnie ab %s %.2f kW statt %.2f kW "
+                "beziehen (Mehrkosten Energie im Plan %.2f €).",
+                block["slot"],
+                block["shadow"]["import_kw"],
+                block["executed"]["import_kw"],
+                block["energy_cost_extra_eur"],
+            )
     if report and report.get("slots"):
         first = report["slots"][0]
         logger.warning(
-            "Bezugsgrenze: Plan hält %d Viertelstunde(n) nicht, erste %s %.2f kW über %.2f kW (Ursache %s).",
+            "Bezugsgrenze%s: Plan hält %d Viertelstunde(n) nicht, erste %s %.2f kW über %.2f kW (Ursache %s).",
+            " (Beobachtung)" if observe else "",
             len(report["slots"]),
             first["slot"],
             first["over_kw"],
@@ -717,6 +751,7 @@ def _main_cycle(
             inbound_export_limit_kw=export_ctx["inbound_export_limit_kw"],
             current_soc_by_id=current_soc_by_id or None,
             import_caps=import_ctx["import_caps"],
+            import_cap_observe=import_ctx["mode"] == "observe",
         )
     solve_log = take_solve_log()
     cycle_duration_stats.mark_ready()
