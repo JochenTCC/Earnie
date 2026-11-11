@@ -178,3 +178,42 @@ def test_calculate_optimization_savings_uses_open_loop_commit():
             calculate_optimization_savings(matrix, 50.0)
 
     assert mock_horizon.call_args.kwargs["commit_hours"] == len(matrix)
+
+
+def _two_house_batteries() -> list[dict]:
+    return [{**_BATTERY, "id": "haus_1"}, {**_BATTERY, "id": "haus_2"}]
+
+
+def test_slot_resolve_rejects_several_house_batteries():
+    """commit_hours=1 would plan one battery with the first one's capacity and the power of both."""
+    with pytest.raises(ValueError, match="haus_1, haus_2"):
+        simulate_horizon(
+            _small_matrix(2),
+            50.0,
+            battery_params=_two_house_batteries(),
+            verbose=False,
+            flexible_consumers=[],
+            commit_hours=1,
+        )
+
+
+def test_open_loop_and_single_battery_slot_resolve_still_run():
+    matrix = _small_matrix(2)
+    open_loop = simulate_horizon(
+        matrix,
+        50.0,
+        battery_params=_two_house_batteries(),
+        verbose=False,
+        flexible_consumers=[],
+        commit_hours=len(matrix),
+        current_soc_by_id={"haus_1": 50.0, "haus_2": 50.0},
+    )
+    single = simulate_horizon(
+        matrix,
+        50.0,
+        battery_params=[{**_BATTERY, "id": "haus_1"}],
+        verbose=False,
+        flexible_consumers=[],
+        commit_hours=1,
+    )
+    assert len(open_loop) == len(single) == len(matrix)
