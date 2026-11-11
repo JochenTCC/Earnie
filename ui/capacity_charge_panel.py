@@ -4,6 +4,11 @@ Shown only when the Live scenario has an import cap or the grid area has a capac
 current month. The month is the host clock's, as the peak store keeps it. A month without a stored
 peak is unknown, never 0. The warning comes from ``runtime/import_cap_report.json``, which the
 optimizer service writes each cycle (P6a, ``optimizer.import_cap_report``).
+
+Observe mode (P6d-2, decision O4): the figures stay the real ones; a second row puts the
+hypothetical month peak (``capacity_peaks_observe.json``) and its charge beside them, with the
+estimated saving and the extra energy cost of the latest plan with the cap, and the details list
+the quarter hours where that plan would have acted differently.
 """
 from __future__ import annotations
 
@@ -16,10 +21,17 @@ from typing import Any
 import pandas as pd
 import streamlit as st
 
-from house_config.import_cap import ImportCap, check_import_cap, parse_import_cap
+from house_config.import_cap import (
+    MODE_OBSERVE,
+    ImportCap,
+    check_import_cap,
+    parse_import_cap,
+    parse_import_cap_mode,
+)
 from optimizer.import_cap_report import (
     CAUSE_LABELS_DE,
     NOT_PLANNED_AUTOMATIK,
+    NOT_PLANNED_SHADOW,
     NOT_PLANNED_TRIVIAL,
 )
 from runtime_store.capacity_peak_store import MonthPeak
@@ -28,6 +40,7 @@ from ui.number_format import format_decimal, format_euro
 NOT_PLANNED_LABELS_DE = {
     NOT_PLANNED_TRIVIAL: "Fenster ohne Optimierung (keine Batterie und keine flexiblen Verbraucher)",
     NOT_PLANNED_AUTOMATIK: "Automatikbetrieb, weil Earnie nicht planen konnte",
+    NOT_PLANNED_SHADOW: "Der Vergleichsplan mit Grenze war nicht lösbar",
 }
 
 
@@ -49,6 +62,16 @@ class CapacityPanel:
     planning_limit_kw: float | None
     plan_report: dict[str, Any] | None
     measured: tuple[dict[str, Any], ...]
+    # Observe mode (P6d): ``mode`` of the Live scenario, ``None`` without a cap.
+    mode: str | None = None
+    observe_peak: MonthPeak | None = None
+    observe_gross_eur: float | None = None
+    saving_gross_eur: float | None = None
+    interventions: tuple[dict[str, Any], ...] = ()
+
+    @property
+    def observe(self) -> bool:
+        return self.mode == MODE_OBSERVE
 
 
 def build_capacity_panel(
@@ -57,11 +80,13 @@ def build_capacity_panel(
     *,
     read_peak: Callable[[str], MonthPeak | None],
     report: Mapping[str, Any],
+    read_observe_peak: Callable[[str], MonthPeak | None] | None = None,
 ) -> CapacityPanel | None:
     """The block for the resolved Live scenario ``params``; ``None`` when there is nothing to show.
 
-    ``report``: ``import_cap_report_store.load()``. Edibert errors (gap in the grid area's charges,
-    unreadable files) are raised, not hidden.
+    ``report``: ``import_cap_report_store.load()``. ``read_observe_peak``: the hypothetical month
+    peak, needed in observe mode. Edibert errors (gap in the grid area's charges, unreadable
+    files) and a cap without mode are raised, not hidden.
     """
     from data.edibert_slot_prices import EDIBERT_PRICING_KEY, grid_fee, tariff
     from house_config.edibert_tariffs import (
@@ -71,6 +96,10 @@ def build_capacity_panel(
     )
 
     cap = parse_import_cap(params)
+    mode = parse_import_cap_mode(params, required=True)
+    observe = mode == MODE_OBSERVE
+    if observe and read_observe_peak is None:
+        raise ValueError("Beobachtungsmodus: geschätzte Monatsspitze nicht übergeben.")
     ref = params.get(EDIBERT_PRICING_KEY) if isinstance(params, dict) else None
     fee = grid_fee(ref) if isinstance(ref, dict) else None
     first_day = now.date().replace(day=1)
@@ -80,7 +109,8 @@ def build_capacity_panel(
     month = f"{first_day:%Y-%m}"
     check = check_import_cap(cap, fee, first_day) if cap is not None else None
     peak = read_peak(month) if charge is not None else None
-    billed_kw = gross = minimum = next_kw = limit = None
+    observe_peak = read_observe_peak(month) if observe and charge is not None else None
+    billed_kw = gross = minimum = next_kw = limit = observe_gross = saving = None
     if charge is not None:
         assert isinstance(ref, dict)  # a charge needs a grid area, which needs the reference
         factor = 1.0 + float(tariff(ref, IMPORT).vat_percent) / 100.0
@@ -93,10 +123,28 @@ def build_capacity_panel(
                 capacity_charge_net_eur(charge, billed_kw + 1.0)
                 - capacity_charge_net_eur(charge, billed_kw)
             ) * factor
+        if observe_peak is not None:
+            observe_gross = capacity_charge_net_eur(charge, float(observe_peak.peak_kw)) * factor
+            if gross is not None:
+                saving = gross - observe_gross
         if cap is not None:
-            peak_kw = float(peak.peak_kw) if peak is not None else 0.0
+            # The plan's ratchet: in observe mode the shadow plan runs on the hypothetical peak.
+            ratchet = observe_peak if observe else peak
+            peak_kw = float(ratchet.peak_kw) if ratchet is not None else 0.0
             limit = max(cap.cap_kw, peak_kw) - cap.margin_kw
-    measured = tuple(report.get("measured", {}).get(month) or ()) if cap is not None else ()
+    # Events of the other mode (the mode was switched this month) are not this mode's checks.
+    measured = (
+        tuple(
+            event
+            for event in report.get("measured", {}).get(month) or ()
+            if bool(event.get("hypothetical")) == observe
+        )
+        if cap is not None
+        else ()
+    )
+    interventions = (
+        tuple(report.get("interventions", {}).get(month) or ()) if observe else ()
+    )
     return CapacityPanel(
         month=month,
         cap=cap,
@@ -112,6 +160,11 @@ def build_capacity_panel(
         planning_limit_kw=limit,
         plan_report=report.get("plan") if cap is not None and charge is not None else None,
         measured=measured,
+        mode=mode,
+        observe_peak=observe_peak,
+        observe_gross_eur=observe_gross,
+        saving_gross_eur=saving,
+        interventions=interventions,
     )
 
 
@@ -166,6 +219,55 @@ def _measured_rows(events: tuple[dict[str, Any], ...]) -> pd.DataFrame:
     )
 
 
+def _hypothetical_rows(events: tuple[dict[str, Any], ...]) -> pd.DataFrame:
+    return pd.DataFrame(
+        [
+            {
+                "Viertelstunde": _slot(event["slot"]),
+                "Bezug gemessen (kW)": event["measured_kw"],
+                "Mit Earnie geschätzt (kW)": event["import_kw"],
+                "Schwelle (kW)": event["threshold_kw"],
+                "Darüber (kW)": event["over_kw"],
+                "Ursache": CAUSE_LABELS_DE[event["cause"]],
+            }
+            for event in events
+        ]
+    )
+
+
+def _consumer_changes(entry: dict[str, Any]) -> str:
+    executed = (entry.get("executed") or {}).get("consumers_kw") or {}
+    shadow = (entry.get("shadow") or {}).get("consumers_kw") or {}
+    changes = []
+    for cid in sorted(set(executed) | set(shadow)):
+        before, after = float(executed.get(cid, 0.0)), float(shadow.get(cid, 0.0))
+        if abs(after - before) > 0.01:
+            changes.append(f"{cid} {format_decimal(before, 2)} → {format_decimal(after, 2)} kW")
+    return ", ".join(changes)
+
+
+def _intervention_rows(entries: tuple[dict[str, Any], ...]) -> pd.DataFrame:
+    return pd.DataFrame(
+        [
+            {
+                "Viertelstunde": _slot(entry["slot"]),
+                "Bezug gemessen (kW)": entry["measured_kw"],
+                "Mit Earnie geschätzt (kW)": entry["hypothetical_kw"],
+                "Änderung (kW)": entry["delta_kw"],
+                "Batterie ohne → mit Grenze (kW)": (
+                    f"{format_decimal(entry['executed']['battery_kw'], 2)} → "
+                    f"{format_decimal(entry['shadow']['battery_kw'], 2)}"
+                ),
+                "Verbraucher": _consumer_changes(entry),
+                "Ursache, falls über der Grenze": (
+                    CAUSE_LABELS_DE[entry["cause"]] if entry.get("cause") else ""
+                ),
+            }
+            for entry in entries
+        ]
+    )
+
+
 def _render_figures(panel: CapacityPanel) -> None:
     charge = panel.charge
     peak = panel.peak
@@ -214,9 +316,68 @@ def _render_figures(panel: CapacityPanel) -> None:
     st.caption(" ".join(parts))
 
 
+def _render_observe_figures(panel: CapacityPanel) -> None:
+    """Second row in observe mode: what the month would cost with Earnie holding the cap."""
+    observed = panel.observe_peak
+    report = panel.plan_report or {}
+    block = report.get("observe") if report.get("mode") == MODE_OBSERVE else None
+    extra = block.get("energy_cost_extra_eur") if block else None
+    cols = st.columns(4)
+    cols[0].metric(
+        "Spitze mit Earnie",
+        _kw(observed.peak_kw) if observed is not None else "unbekannt",
+        help=(
+            "Geschätzt: je Viertelstunde der gemessene Bezug plus die Änderung, die der Plan mit "
+            "Grenze in dieser Viertelstunde vorgesehen hätte."
+        ),
+    )
+    cols[1].metric(
+        "Leistungspreis mit Earnie",
+        format_euro(panel.observe_gross_eur) if panel.observe_gross_eur is not None else "unbekannt",
+        help="Leistungspreis des Monats bei der geschätzten Spitze (brutto).",
+    )
+    cols[2].metric(
+        "Ersparnis (geschätzt)",
+        format_euro(panel.saving_gross_eur) if panel.saving_gross_eur is not None else "unbekannt",
+        help="Leistungspreis bisher minus Leistungspreis mit Earnie.",
+    )
+    cols[3].metric(
+        "Mehrkosten Energie",
+        format_euro(extra) if extra is not None else "unbekannt",
+        help=(
+            "Was das Einhalten der Grenze im aktuellen Plan an Strom mehr kostet, über den ganzen "
+            "Planungshorizont. Schätzung; keine Monatssumme."
+        ),
+    )
+    parts = []
+    if observed is None:
+        parts.append(
+            f"Für {_month_label(panel.month)} liegt noch keine geschätzte Viertelstunde vor."
+        )
+    else:
+        parts.append(f"Geschätzt seit {_slot(observed.first_slot)}.")
+        if observed.slots_missing:
+            parts.append(f"{observed.slots_missing} Viertelstunden ohne Vergleich.")
+        if panel.peak is not None and observed.first_slot > panel.peak.first_slot:
+            parts.append(
+                "Die gemessene Spitze umfasst auch Viertelstunden vor Beginn der Beobachtung."
+            )
+    parts.append(
+        "Jeder Vergleichsplan startet vom tatsächlichen Zustand (Batterie, Verbraucher); "
+        "die Werte sind eine Schätzung."
+    )
+    st.caption(" ".join(parts))
+
+
 def _render_cap(panel: CapacityPanel) -> None:
     cap = panel.cap
     assert cap is not None
+    if panel.observe:
+        st.info(
+            "Beobachtungsmodus: Earnie plant und steuert ohne die Bezugsgrenze und zeigt hier, "
+            "wo und wie er eingegriffen hätte. Umstellen im Szenario-Editor beim Live-Szenario "
+            "(„Im Live-Betrieb“: Danach planen)."
+        )
     for error in panel.cap_errors:
         if panel.has_grid_area:
             st.warning(f"{error} Earnie plant mit der Grenze wie eingegeben.")
@@ -227,17 +388,28 @@ def _render_cap(panel: CapacityPanel) -> None:
     if panel.planning_limit_kw is None:
         st.caption(f"Bezugsgrenze {_kw(cap.cap_kw)}, Reserve {_kw(cap.margin_kw)}.")
         return
+    planned = "der Vergleichsplan rechnet" if panel.observe else "geplant wird"
     text = (
         f"Bezugsgrenze {_kw(cap.cap_kw)}, Reserve {_kw(cap.margin_kw)}: "
-        f"geplant wird bis {_kw(panel.planning_limit_kw)}."
+        f"{planned} bis {_kw(panel.planning_limit_kw)}."
     )
-    if panel.peak is not None and float(panel.peak.peak_kw) > cap.cap_kw:
-        text += " Die Monatsspitze liegt schon über der Grenze; bis zu ihr plant Earnie frei, sie ist ohnehin bezahlt."
+    ratchet = panel.observe_peak if panel.observe else panel.peak
+    if ratchet is not None and float(ratchet.peak_kw) > cap.cap_kw:
+        text += (
+            " Die geschätzte Monatsspitze liegt schon über der Grenze; bis zu ihr hätte Earnie "
+            "frei geplant."
+            if panel.observe
+            else " Die Monatsspitze liegt schon über der Grenze; bis zu ihr plant Earnie frei, sie ist ohnehin bezahlt."
+        )
     st.caption(text)
 
 
 def _render_report(panel: CapacityPanel) -> None:
     report = panel.plan_report
+    if report is not None and (report.get("mode") == MODE_OBSERVE) != panel.observe:
+        # The mode was just switched; the next cycle writes a report of the new mode.
+        report = None
+    plan_name = "Der Vergleichsplan mit Grenze" if panel.observe else "Der Plan"
     if report is None:
         st.caption("Noch kein Bericht des Optimierer-Dienstes zur Bezugsgrenze.")
     elif not report["planned"]:
@@ -249,26 +421,41 @@ def _render_report(panel: CapacityPanel) -> None:
         slots = report["slots"]
         first = slots[0]
         st.warning(
-            f"Der Plan hält die Bezugsgrenze in {len(slots)} Viertelstunde(n) nicht. "
+            f"{plan_name} hält die Bezugsgrenze in {len(slots)} Viertelstunde(n) nicht. "
             f"Erste: {_slot(first['slot'])}, {_kw(first['over_kw'])} über {_kw(first['limit_kw'])}. "
             f"Hauptursache: {CAUSE_LABELS_DE[main_cause(slots)]}."
         )
     else:
-        st.caption(f"Der Plan ab {_slot(report['first_slot'])} hält die Bezugsgrenze.")
+        st.caption(f"{plan_name} ab {_slot(report['first_slot'])} hält die Bezugsgrenze.")
+    if panel.interventions:
+        last = panel.interventions[-1]
+        st.caption(
+            f"Eingegriffen hätte Earnie in {_month_label(panel.month)} in "
+            f"{len(panel.interventions)} Viertelstunde(n), zuletzt {_slot(last['slot'])}."
+        )
     if panel.measured:
         last = panel.measured[-1]
+        what = "Mit Earnie geschätzt" if panel.observe else "Gemessen"
         st.caption(
-            f"Gemessen über der Grenze in {_month_label(panel.month)}: {len(panel.measured)} "
+            f"{what} über der Grenze in {_month_label(panel.month)}: {len(panel.measured)} "
             f"Viertelstunde(n), zuletzt {_slot(last['slot'])} ({CAUSE_LABELS_DE[last['cause']]})."
         )
     plan_slots = (report or {}).get("slots") or []
-    if not plan_slots and not panel.measured:
+    if not plan_slots and not panel.measured and not panel.interventions:
         return
     with st.expander("Details zur Bezugsgrenze"):
+        if panel.interventions:
+            st.markdown("**Wo Earnie eingegriffen hätte**")
+            st.dataframe(
+                _intervention_rows(panel.interventions), hide_index=True, width="stretch"
+            )
         if plan_slots:
-            st.markdown(f"**Plan ab {_slot(report['first_slot'])}**")
+            st.markdown(f"**{plan_name} ab {_slot(report['first_slot'])}**")
             st.dataframe(_plan_rows(plan_slots), hide_index=True, width="stretch")
-        if panel.measured:
+        if panel.measured and panel.observe:
+            st.markdown("**Mit Earnie geschätzt über der Grenze**")
+            st.dataframe(_hypothetical_rows(panel.measured), hide_index=True, width="stretch")
+        elif panel.measured:
             st.markdown("**Gemessen**")
             st.dataframe(_measured_rows(panel.measured), hide_index=True, width="stretch")
 
@@ -277,6 +464,8 @@ def render_capacity_panel(panel: CapacityPanel) -> None:
     st.subheader("Leistungspreis")
     if panel.charge is not None:
         _render_figures(panel)
+        if panel.observe:
+            _render_observe_figures(panel)
     if panel.cap is not None:
         _render_cap(panel)
         if panel.charge is not None:
@@ -287,15 +476,17 @@ def load_capacity_panel(now: datetime | None = None) -> CapacityPanel | None:
     """The block for the current Live configuration; ``None`` during onboarding or without both."""
     import config
     from runtime_store import import_cap_report_store
-    from runtime_store.capacity_peak_store import month_peak
+    from runtime_store.capacity_peak_store import month_peak, observe_path
 
     if config.is_runtime_params_deferred():
         return None
+    observe_file = observe_path()
     return build_capacity_panel(
         config.get_resolved_runtime_settings(),
         now or datetime.now(),
         read_peak=month_peak,
         report=import_cap_report_store.load(),
+        read_observe_peak=lambda month: month_peak(month, path=observe_file),
     )
 
 

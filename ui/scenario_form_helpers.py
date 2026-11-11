@@ -328,8 +328,9 @@ def build_scenario_settings(
     heating_system_ids: dict[str, str] | None = None,
     import_cap_kw: float | None = None,
     import_cap_margin_kw: float | None = None,
+    import_cap_mode: str | None = None,
 ) -> dict:
-    from house_config.import_cap import IMPORT_CAP_KEY, IMPORT_CAP_MARGIN_KEY
+    from house_config.import_cap import IMPORT_CAP_KEY, IMPORT_CAP_MARGIN_KEY, IMPORT_CAP_MODE_KEY
     from house_config.tariffs_store import (
         USER_EXPORT_CENT_KEY,
         USER_IMPORT_CENT_KEY,
@@ -370,11 +371,13 @@ def build_scenario_settings(
         settings["use_imported_pv"] = True
     if heating_system_ids:
         settings["heating_system_ids"] = dict(sorted(heating_system_ids.items()))
-    # The margin field keeps its proposal while the cap is empty; only a set cap stores either.
+    # Margin and mode fields keep their proposal while the cap is empty; only a set cap stores them.
     if import_cap_kw is not None:
         settings[IMPORT_CAP_KEY] = float(import_cap_kw)
         if import_cap_margin_kw is not None:
             settings[IMPORT_CAP_MARGIN_KEY] = float(import_cap_margin_kw)
+        if import_cap_mode is not None:
+            settings[IMPORT_CAP_MODE_KEY] = str(import_cap_mode)
     return settings
 
 
@@ -389,7 +392,7 @@ def normalize_scenario_form_snapshot(scenario: dict) -> dict:
         normalize_battery_ids,
         normalize_pv_system_ids,
     )
-    from house_config.import_cap import IMPORT_CAP_KEY, IMPORT_CAP_MARGIN_KEY
+    from house_config.import_cap import IMPORT_CAP_KEY, IMPORT_CAP_MARGIN_KEY, IMPORT_CAP_MODE_KEY
     from house_config.tariffs_store import USER_EXPORT_CENT_KEY, USER_IMPORT_CENT_KEY
 
     raw_settings = scenario.get("settings", {}) or {}
@@ -410,6 +413,7 @@ def normalize_scenario_form_snapshot(scenario: dict) -> dict:
         heating_system_ids=raw_settings.get("heating_system_ids") or None,
         import_cap_kw=_optional_user_cent(raw_settings, IMPORT_CAP_KEY),
         import_cap_margin_kw=_optional_user_cent(raw_settings, IMPORT_CAP_MARGIN_KEY),
+        import_cap_mode=raw_settings.get(IMPORT_CAP_MODE_KEY),
     )
     out = {
         "label": str(scenario.get("label", "") or "").strip(),
@@ -522,6 +526,7 @@ def _scenario_settings_from_session(
         import_cap_margin_kw=session_state.get(
             scoped_widget_key(session_scope, "scenario_import_cap_margin")
         ),
+        import_cap_mode=session_state.get(scoped_widget_key(session_scope, "scenario_import_cap_mode")),
     )
 
 

@@ -1,6 +1,6 @@
 # Max-power dependent tariff: implementation plan (Version 2.8)
 
-**Status:** P0–P5b and P6a–P6c on `main` (PR #96 merged 2026-11-08; P6a–P6c 2026-11-11). P6d-1 2026-11-11. Open: P6d-2 (observe mode UI and docs), P5c field test with the margin proposal, P7.
+**Status:** P0–P5b and P6a–P6c on `main` (PR #96 merged 2026-11-08; P6a–P6c 2026-11-11). P6d 2026-11-11. Open: P5c field test with the margin proposal, P7.
 **Backlog item:** **Implement max-power dependent tariff**, Version 2.8. Scope as decided on 2026-11-07: dev doc steps L2, L3 and L4, stage A of [`Capacity-Peak-Budget-Draft.md`](../../backlog/Capacity-Peak-Budget-Draft.md) with a cap the user chooses.
 **Regulation:** [`SNE-G-V-2027-Research.md`](../../backlog/SNE-G-V-2027-Research.md).
 
@@ -262,6 +262,14 @@ Steps, each committed to `main` with green tests (E4):
 - **Solve time (development machine, synthetic 165-slot horizon, battery and EV, cap that binds):** without cap 0.3 s, `optimize` 5.7 s, `observe` 5.9 s. Observe mode costs one uncapped solve more than `optimize`; the capped solve dominates and is bounded by the solver's limits. **Not measured on the NAS**: that needs a build there.
 - **Tests:** `tests/test_import_cap_observe.py` (mode rules, executed plan equals the free plan, shadow report and delta, `optimize` unchanged, failed shadow solve, trivial and Automatik, Live caps from the hypothetical peak, delta per quarter hour, missing quarter hours, threshold from the hypothetical peak, Live hooks and log, cycle record, replay hash). The Live tests with a cap now set `import_cap_mode`.
 - **Not covered:** a run in the app or on the HA bench; the Monitor block still shows an observe report like an `optimize` one until P6d-2; a month sum of the extra energy cost (open, see O4).
+
+**P6d-2 built 2026-11-11.** Form, Monitor block and German docs.
+
+- **Form:** radio "Im Live-Betrieb" (Beobachten / Danach planen) under cap and margin, disabled without a cap, seeded with the stored mode or the proposal `MODE_PROPOSAL` (observe). Stored only with a cap, like the margin; clearing the cap removes it. The help text says it acts only for the Live scenario. A scenario with a cap and no mode gets the proposal when it is opened in the form and is then saved with it.
+- **Monitor:** in observe mode the block says so, keeps the measured figures and adds a second row: "Spitze mit Earnie" (from `capacity_peaks_observe.json`), "Leistungspreis mit Earnie", "Ersparnis (geschätzt)" (amount so far − amount with Earnie) and "Mehrkosten Energie" (the latest report's `energy_cost_extra_eur`, current plan, no month sum). Captions: estimated since, quarter hours without comparison, a measured peak that covers quarter hours before observing began, and that each comparison plan starts from the real state. The planning limit, warning and the line over the cap refer to the comparison plan and the hypothetical events; the details add "Wo Earnie eingegriffen hätte" (measured, estimated, delta, battery without → with the cap, changed consumers, cause). Events of the other mode in the same month are left out, and a report of the other mode (mode just switched) counts as no report yet. A cap without a mode is shown as an error in the block.
+- **Docs:** `docs/ui/betriebsmodi.md`, `docs/user-manual/Benutzer-Handbuch-Earnie.md` (scenario field and Monitor), `docs/konfiguration/overview.md`, `docs/konfiguration/preise.md`.
+- **Tests:** `tests/test_capacity_charge_panel_observe.py` (charge with the hypothetical peak and saving, unknown hypothetical month, optimize mode filters, missing mode or store, AppTest of the observe block with tables, failed comparison plan, report of the other mode), `tests/apptest/test_scenario_import_cap_apptest.py` (mode proposed, switched and stored, cleared with the cap).
+- **Not checked:** the block and the form in a running app with a real cap; AppTest only, as for P6b. Observe mode has not run on the HA bench or the NAS.
 
 ### P7: Docs and close
 

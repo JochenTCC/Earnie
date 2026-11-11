@@ -21,6 +21,8 @@ IMPORT_CAP_MODE_KEY = "import_cap_mode"
 MODE_OBSERVE = "observe"
 MODE_OPTIMIZE = "optimize"
 IMPORT_CAP_MODES = (MODE_OBSERVE, MODE_OPTIMIZE)
+MODE_PROPOSAL = MODE_OBSERVE  # what the form proposes for a new cap (plan P6d, O1)
+IMPORT_CAP_MODE_LABELS_DE = {MODE_OBSERVE: "Beobachten", MODE_OPTIMIZE: "Danach planen"}
 
 
 @dataclass(frozen=True)

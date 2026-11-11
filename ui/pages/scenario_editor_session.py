@@ -248,11 +248,16 @@ def _seed_scenario_widget_state(
     seed_heating_picks(session_scope, settings, profiles)
 
 def _seed_import_cap_widgets(session_scope: str, settings: dict) -> None:
-    """An empty cap field means no cap; the margin field holds the proposal until one is stored."""
+    """An empty cap field means no cap; margin and mode hold the proposal until one is stored.
+
+    The mode's proposal is observe (max-power plan P6d, decision O1): a new cap is watched first.
+    """
     from house_config.import_cap import (
         IMPORT_CAP_KEY,
         IMPORT_CAP_MARGIN_KEY,
+        IMPORT_CAP_MODE_KEY,
         MARGIN_PROPOSAL_KW,
+        MODE_PROPOSAL,
     )
 
     saved_cap = settings.get(IMPORT_CAP_KEY)
@@ -262,6 +267,10 @@ def _seed_import_cap_widgets(session_scope: str, settings: dict) -> None:
     )
     st.session_state[scoped_widget_key(session_scope, "scenario_import_cap_margin")] = (
         float(saved_margin) if saved_margin is not None else MARGIN_PROPOSAL_KW
+    )
+    saved_mode = settings.get(IMPORT_CAP_MODE_KEY)
+    st.session_state[scoped_widget_key(session_scope, "scenario_import_cap_mode")] = (
+        str(saved_mode) if saved_mode is not None else MODE_PROPOSAL
     )
 
 def _seed_own_reference_widget(session_scope: str, scenario: dict) -> None:

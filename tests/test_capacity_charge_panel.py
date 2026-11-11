@@ -16,7 +16,7 @@ from tests.test_capacity_charge import VAT_FACTOR, _charge, _params
 from ui.capacity_charge_panel import build_capacity_panel, main_cause
 
 NOW = datetime(2027, 3, 15, 12, 0)
-CAP = {"import_cap_kw": 5.0, "import_cap_margin_kw": 0.3}
+CAP = {"import_cap_kw": 5.0, "import_cap_margin_kw": 0.3, "import_cap_mode": "optimize"}
 EMPTY_REPORT = {"plan": None, "measured": {}}
 
 

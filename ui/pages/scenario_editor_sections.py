@@ -319,6 +319,8 @@ def _render_scenario_import_cap(ctx: dict, picks: dict) -> tuple[str, ...]:
     from house_config.import_cap import (
         IMPORT_CAP_KEY,
         IMPORT_CAP_MARGIN_KEY,
+        IMPORT_CAP_MODE_LABELS_DE,
+        IMPORT_CAP_MODES,
         check_import_cap,
         parse_import_cap,
     )
@@ -348,6 +350,20 @@ def _render_scenario_import_cap(ctx: dict, picks: dict) -> tuple[str, ...]:
         key=scoped_widget_key(session_scope, "scenario_import_cap_margin"),
         disabled=cap_kw is None,
         help="Der Plan zielt auf die Bezugsgrenze minus diese Marge, wegen Prognose- und Messfehlern.",
+    )
+    st.radio(
+        "Im Live-Betrieb",
+        options=list(IMPORT_CAP_MODES),
+        format_func=IMPORT_CAP_MODE_LABELS_DE.__getitem__,
+        horizontal=True,
+        key=scoped_widget_key(session_scope, "scenario_import_cap_mode"),
+        disabled=cap_kw is None,
+        help=(
+            "Beobachten: Earnie plant und steuert wie ohne Grenze und zeigt auf dem Monitor, wo und "
+            "wie er eingegriffen hätte und was das gespart hätte. Danach planen: Earnie hält die "
+            "Grenze ein. Gilt nur, wenn dieses Szenario das Live-Szenario ist; die Szenario-"
+            "Simulation plant immer mit der Grenze."
+        ),
     )
     if cap_kw is None:
         return ()
@@ -416,6 +432,9 @@ def _scenario_persist_payload(
         import_cap_kw=st.session_state.get(scoped_widget_key(session_scope, "scenario_import_cap")),
         import_cap_margin_kw=st.session_state.get(
             scoped_widget_key(session_scope, "scenario_import_cap_margin")
+        ),
+        import_cap_mode=st.session_state.get(
+            scoped_widget_key(session_scope, "scenario_import_cap_mode")
         ),
     )
     payload = {

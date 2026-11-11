@@ -13,6 +13,7 @@ _SCRIPT = Path(__file__).parent / "scripts" / "run_page_scenario_editor.py"
 _TIMEOUT_S = 60.0
 _CAP = f"{SCENARIO_ID}__scenario_import_cap"
 _MARGIN = f"{SCENARIO_ID}__scenario_import_cap_margin"
+_MODE = f"{SCENARIO_ID}__scenario_import_cap_mode"
 _PROFILE = f"{SCENARIO_ID}__scenario_profile"
 
 
@@ -134,3 +135,26 @@ def test_stored_cap_does_not_mark_the_form_as_edited():
     at.radio(key="scenario_select").set_value(other).run()
     assert not at.exception
     assert not [button for button in at.button if button.key == "scenario_switch_cancel"]
+
+
+def test_a_new_cap_is_stored_as_observed_and_the_mode_can_be_switched():
+    at = _session()
+    assert at.radio(key=_MODE).disabled
+    assert at.radio(key=_MODE).value == "observe"
+    at.number_input(key=_CAP).set_value(5.0).run()
+    assert not at.exception
+    assert not at.radio(key=_MODE).disabled
+    assert _stored()["import_cap_mode"] == "observe"
+    at.radio(key=_MODE).set_value("optimize").run()
+    assert not at.exception
+    assert _stored()["import_cap_mode"] == "optimize"
+    again = _session()
+    assert again.radio(key=_MODE).value == "optimize"
+
+
+def test_clearing_the_cap_removes_the_mode():
+    at = _session()
+    at.number_input(key=_CAP).set_value(5.0).run()
+    at.number_input(key=_CAP).set_value(None).run()
+    assert not at.exception
+    assert "import_cap_mode" not in _stored()
