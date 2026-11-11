@@ -2,8 +2,8 @@
 
 Spec ``docs/dev/savings-ledger.md`` § 7, plan ``docs/dev/savings-ledger-v2-plan.md`` § 4.1.
 Pure functions, no file I/O and no config reads: the caller passes the day's slot rows
-(``LedgerState.slots``), the planning consumers, their profile kW per slot
-(``data.profile_manager.load_flexible_consumer_slot_profiles_strict``) and their windows
+(``LedgerState.slots``), the planning consumers, their reference shape per slot (the house
+profile's model, ``savings_ledger_store.flex_day_inputs``, D8) and their windows
 (``consumer_windows``).
 
 ``retime_flex_day`` places the energy each consumer delivered in the counted slots of the
@@ -21,6 +21,8 @@ from optimizer.consumer_power import power_limits_kw
 from optimizer.filter_context import filter_schedule_enabled, slot_in_native_window
 from optimizer.generic_flex_context import consumer_generic_eligible_indices, generic_flex_window
 from optimizer.sim_baseline import _is_ev_consumer, build_shaped_flex_kw_per_slot
+
+is_ev_consumer = _is_ev_consumer
 from optimizer.slot_duration import DEFAULT_DT_H
 from optimizer.thermal_flex_context import (
     consumer_thermal_eligible_indices,
@@ -47,9 +49,9 @@ TIMING_LOGGED_NO_PLUG_STATE = "logged_no_plug_state"
 REASON_NO_SHAPE_NO_WINDOW = "no_shape_no_window"
 REASON_EXCEEDS_ELIGIBLE = "exceeds_eligible_slots"
 REASON_NOT_CONFIGURED = "not_configured"
-# The profile file exists but cannot be read: which consumers had a profile is unknown, so no
-# consumer is re-timed that day (not the windows instead: that would hide the broken file).
-REASON_PROFILE_READ_ERROR = "profile_read_error"
+# No house profile, or a consumer model failed: no consumer is re-timed that day (not the
+# windows instead: that would hide the broken configuration).
+REASON_PROFILE_ERROR = "profile_error"
 # Heating rod beside a fuel source without a fuel price (no ``fuel_credit_cent_per_kwh``): the
 # shadow plant cannot buy its heat, so the rod keeps its logged timing (the MILP gives no credit either).
 REASON_NO_FUEL_PRICE = "no_fuel_price"
@@ -85,7 +87,8 @@ class ConsumerWindows:
 class FlexDayInputs:
     """What the day replay needs besides the slot rows (``retime_flex_day``).
 
-    ``profiles_kw`` ``None``: the profile file could not be read (``REASON_PROFILE_READ_ERROR``).
+    ``profiles_kw``: the house profile's model per consumer and slot row (D8); ``None`` when there
+    is no house profile or a model failed (``REASON_PROFILE_ERROR``).
     """
 
     consumers: list[dict]
@@ -185,11 +188,11 @@ def _reference_shape(
         bound = [i for i in counted if i in windows.enable_slots]
     else:
         bound = list(counted)
-    if profile_kw is not None and sum(max(0.0, profile_kw[i]) for i in bound) > _SHAPE_EPSILON:
-        return TIMING_PROFILE, bound, list(profile_kw)
     native = windows.native_slots
     if native is not None and any(i in native for i in bound):
         return TIMING_NATIVE_WINDOW, bound, [1.0 if i in native else 0.0 for i in range(n)]
+    if profile_kw is not None and sum(max(0.0, profile_kw[i]) for i in bound) > _SHAPE_EPSILON:
+        return TIMING_PROFILE, bound, list(profile_kw)
     if windows.enable_slots is not None and bound:
         enabled = set(bound)
         return TIMING_ENABLE_WINDOW, bound, [1.0 if i in enabled else 0.0 for i in range(n)]
@@ -231,10 +234,10 @@ def retime_flex_day(
     - heating rod beside a fuel heat source (``parent_heat_electric`` false): ``fuel``, zero in the
       shadow plant and its delivered kWh bought as fuel in the slot it ran in; without a fuel
       price logged timing (``no_fuel_price``). Beside an electric source the rod is ordinary;
-    - ``profiles_kw`` ``None`` (unreadable profile file): logged timing (``profile_read_error``);
-    - profile with energy in the counted slots of its enable window: ``profile``;
+    - ``profiles_kw`` ``None`` (no house profile or a failed model): logged timing (``profile_error``);
     - filter native window with a counted slot: ``native_window`` (flat shape there, the rest
-      of the day eligible);
+      of the day eligible): the device's own schedule comes before its model;
+    - model with energy in the counted slots of its enable window: ``profile``;
     - enable window with a counted slot: ``enable_window`` (flat over it);
     - else logged timing (``no_shape_no_window``). Energy above what the eligible slots hold at
       nominal power also keeps the logged timing (``exceeds_eligible_slots``).
@@ -312,7 +315,7 @@ def retime_flex_day(
             timing[cid] = TIMING_FUEL
             continue
         if profiles_kw is None:
-            keep_logged(cid, TIMING_LOGGED, REASON_PROFILE_READ_ERROR)
+            keep_logged(cid, TIMING_LOGGED, REASON_PROFILE_ERROR)
             continue
         reference = _reference_shape(n, counted, profile, windows[cid])
         if reference is None:

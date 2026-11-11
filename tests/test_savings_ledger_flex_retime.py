@@ -6,7 +6,6 @@ from datetime import datetime, timedelta, timezone
 import pandas as pd
 import pytest
 
-from data.profile_manager import FlexProfileReadError, load_flexible_consumer_slot_profiles_strict
 from ledger_flex_helpers import no_flex
 from runtime_store import savings_ledger as sl
 from runtime_store import savings_ledger_flex as slf
@@ -128,6 +127,22 @@ def test_filter_without_profile_uses_native_window_and_spills_after_it():
     assert _energy(result, "pool") == pytest.approx(0.6)
     assert all(result.per_slot_kw[i]["pool"] == pytest.approx(0.2) for i in range(16, 28))
     assert result.per_slot_kw[28]["pool"] == pytest.approx(0.0, abs=1e-9)
+
+
+def test_filter_native_window_comes_before_its_model():
+    """D8: the filter's own schedule is its usual timing; the model only without a native window."""
+    flt = {
+        "id": "pool",
+        "nominal_power_kw": 0.2,
+        "filter_schedule": {"enabled": True, "config_fallback": {"native_start_hour": 10, "native_duration_hours": 2}},
+    }
+    windows = {"pool": slf.consumer_windows(flt, _starts(), logged_native=None)}
+    rows = _rows({"pool": {i: 0.2 for i in range(60, 64)}})
+    model = [1.0 if 40 <= i < 44 else 0.0 for i in range(N)]
+    result = slf.retime_flex_day(rows, [flt], {"pool": model}, windows, dt_h=DT)
+    assert result.timing["pool"] == slf.TIMING_NATIVE_WINDOW
+    assert result.per_slot_kw[16]["pool"] == pytest.approx(0.1)  # 0.2 kWh flat over 10:00–12:00
+    assert result.per_slot_kw[40]["pool"] == 0.0
 
 
 def test_no_shape_and_no_window_keeps_logged_timing_with_reason():
@@ -288,51 +303,3 @@ def test_state_without_new_slot_fields_still_loads():
     state = sl.LedgerState.from_dict(raw)
     assert "pv_kwh" not in state.slots[0]
     assert sl.day_slots_record(state)["slots"][0]["house_kwh"] == 0.3
-
-
-# --- strict profile read -------------------------------------------------------
-
-
-def test_strict_profile_read_repeats_hour_over_its_slots(tmp_path):
-    path = tmp_path / "flexible_consumer_profiles.csv"
-    pd.DataFrame({"Month": [7, 7], "Weekday": [1, 1], "Hour": [10, 11], "wp": [0.5, 1.5]}).to_csv(
-        path, sep=";", index=False
-    )
-    slots = [datetime(2026, 7, 14, 10, 0) + timedelta(minutes=15 * i) for i in range(8)]
-    profiles = load_flexible_consumer_slot_profiles_strict(
-        slots, [{"id": "wp"}, {"id": "ohne"}], profile_path=str(path)
-    )
-    assert profiles == {"wp": [0.5] * 4 + [1.5] * 4}
-
-
-def test_strict_profile_read_missing_file_means_no_profiles(tmp_path):
-    profiles = load_flexible_consumer_slot_profiles_strict(
-        [datetime(2026, 7, 14, 10, 0)], [{"id": "wp"}], profile_path=str(tmp_path / "missing.csv")
-    )
-    assert profiles == {}
-
-
-@pytest.mark.parametrize(
-    "content",
-    [
-        "Month;Weekday;Hour;wp\n7;1;10;abc\n",  # non-numeric
-        "Month;Weekday;wp\n7;1;0.5\n",  # no Hour column
-        "Month;Weekday;Hour;wp\n7;1;10;\n",  # empty value
-        "Month;Weekday;Hour;wp\n7;1;10;0.5\n7;1;10;0.6\n",  # repeated key row
-        "Month;Weekday;Hour;wp\n7;1;9;0.5\n",  # no row for hour 10
-    ],
-)
-def test_strict_profile_read_raises_on_broken_file(tmp_path, content):
-    path = tmp_path / "flexible_consumer_profiles.csv"
-    path.write_text(content, encoding="utf-8")
-    with pytest.raises(FlexProfileReadError):
-        load_flexible_consumer_slot_profiles_strict(
-            [datetime(2026, 7, 14, 10, 0)], [{"id": "wp"}], profile_path=str(path)
-        )
-
-
-def test_strict_profile_read_rejects_aware_times(tmp_path):
-    with pytest.raises(ValueError, match="naive"):
-        load_flexible_consumer_slot_profiles_strict(
-            [datetime(2026, 7, 14, 10, 0, tzinfo=timezone.utc)], [{"id": "wp"}], profile_path=str(tmp_path / "x.csv")
-        )

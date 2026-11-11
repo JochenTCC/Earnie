@@ -32,6 +32,10 @@ def _day_bounds(moment: datetime) -> tuple[datetime, datetime]:
 
 @pytest.fixture
 def env(monkeypatch):
+    # The v2 day close models the house profile's heat pump from the weather archive (D8).
+    from tests.fixtures.open_meteo_mock import install_open_meteo_climate_mock
+
+    install_open_meteo_climate_mock(monkeypatch)
     monkeypatch.setattr("config.get_planning_timezone", lambda: "Europe/Vienna")
     monkeypatch.setattr("config.get_battery_params_list", lambda: [dict(BATTERY)])
     monkeypatch.setattr(store, "sunrise_day_bounds", lambda *_a: _day_bounds)

@@ -200,33 +200,49 @@ def test_day_without_retimed_flex_equals_the_v1_row(day_flex):
     assert v2_state.shadow_soc == v1_state.shadow_soc
 
 
-def test_unreadable_profile_keeps_the_logged_timing(tmp_path):
-    path = tmp_path / "flexible_consumer_profiles.csv"
-    path.write_text("Month;Weekday;Hour;wp\n11;6;18;abc\n", encoding="utf-8")
-
-    def broken(state):
-        return store.flex_day_inputs(state, [HP], "Europe/Vienna", str(path))
+@pytest.mark.parametrize(
+    "house_consumers",
+    [
+        None,  # no active house profile
+        [{"id": "wp", "type": "generic", "nominal_power_kw": 1.0, "schedule": {"start_hour": "x", "duration_h": 1}}],
+    ],
+)
+def test_missing_house_profile_or_broken_model_keeps_the_logged_timing(house_consumers):
+    def day_flex(state):
+        return store.flex_day_inputs(state, [HP], house_consumers, "Europe/Vienna")
 
     inputs = _shifted_day(DAY1) + [_closing_slot(DAY1 + timedelta(days=1))]
-    _, closes = _run(inputs, None, broken, savings_v=2, with_battery=False)
+    _, closes = _run(inputs, None, day_flex, savings_v=2, with_battery=False)
     row = closes[0].row
     assert row["flex_timing"] == {"wp": slf.TIMING_LOGGED}
-    assert row["flex_logged_reasons"] == {"wp": slf.REASON_PROFILE_READ_ERROR}
+    assert row["flex_logged_reasons"] == {"wp": slf.REASON_PROFILE_ERROR}
     assert row["saving_eur"] == 0.0
 
 
 # --- inputs and state --------------------------------------------------------------
 
 
-def test_flex_day_inputs_read_profiles_and_windows_in_local_time(tmp_path):
-    path = tmp_path / "flexible_consumer_profiles.csv"
-    # 2026-11-01 is a Sunday (weekday 6); 18:00 Vienna = 17:00 UTC
-    path.write_text("Month;Weekday;Hour;wp\n11;6;18;1.5\n11;6;17;0.0\n", encoding="utf-8")
+def _house_generic(cid: str, start_hour: int, nominal_kw: float) -> dict:
+    """A house-profile consumer whose model runs once a week at ``start_hour`` (1 h)."""
+    return {
+        "id": cid,
+        "type": "generic",
+        "nominal_power_kw": nominal_kw,
+        "schedule": {"start_hour": start_hour, "duration_h": 1.0, "runs_per_week": 1},
+    }
+
+
+def test_flex_day_inputs_take_the_house_model_in_local_time():
+    """D8: the shape is the house profile's model, at the configured start on every day.
+
+    2026-11-01 is a Sunday; with one run a week the model has no run that day, but the
+    reference only needs the timing. 18:00 Vienna = 17:00 UTC.
+    """
     utc = timezone.utc
-    slots = [
+    slots = (
         {"slot_start": datetime(2026, 11, 1, 16, 45, tzinfo=utc).isoformat(), "counted": True},
         {"slot_start": datetime(2026, 11, 1, 17, 0, tzinfo=utc).isoformat(), "counted": True},
-    ]
+    )
     state = sl.LedgerState(
         savings_v=2,
         chain_start=DAY1,
@@ -237,12 +253,32 @@ def test_flex_day_inputs_read_profiles_and_windows_in_local_time(tmp_path):
         last_slot_start=None,
         soc_actual_end=None,
         prev_correction_eur=None,
-        slots=tuple(slots),
+        slots=slots,
     )
     hp = HP | {"thermal_flex_window": {"start_hour": 18, "duration_h": 2}}
-    inputs = store.flex_day_inputs(state, [hp], "Europe/Vienna", str(path))
+    inputs = store.flex_day_inputs(state, [hp], [_house_generic("wp", 18, 1.5)], "Europe/Vienna")
     assert inputs.profiles_kw == {"wp": [0.0, 1.5]}
     assert inputs.windows["wp"].enable_slots == frozenset({1})
+
+
+def test_flex_day_inputs_skip_evs_and_consumers_without_a_model():
+    ev = {"id": "auto", "type": "ev", "nominal_power_kw": 11.0}
+    slots = ({"slot_start": DAY1.isoformat(), "counted": True},)
+    state = sl.LedgerState(
+        savings_v=2,
+        chain_start=DAY1,
+        chain_start_reason=sl.CHAIN_FIRST_RUN,
+        shadow_soc=None,
+        day_start=DAY1,
+        day_end=DAY1 + timedelta(days=1),
+        last_slot_start=None,
+        soc_actual_end=None,
+        prev_correction_eur=None,
+        slots=slots,
+    )
+    house = [_house_generic("auto", 7, 11.0)]
+    inputs = store.flex_day_inputs(state, [HP, ev], house, "Europe/Vienna")
+    assert inputs.profiles_kw == {}
 
 
 def test_v2_day_close_needs_the_flex_inputs():
@@ -284,18 +320,15 @@ def test_open_day_figures_stay_causal_in_v2():
 
 
 @pytest.mark.parametrize(
-    ("utc_day", "expected"),
+    ("utc_day", "start_hour", "expected"),
     [
         # 2026-10-25, end of summer time: 00:00–01:45 UTC are 02:00 CEST and 02:00 CET again
-        (datetime(2026, 10, 25, tzinfo=timezone.utc), [2.0] * 8),
+        (datetime(2026, 10, 25, tzinfo=timezone.utc), 2, [2.0] * 8),
         # 2027-03-28, start of summer time: 00:00–00:45 UTC = 01:00 CET, 01:00–01:45 UTC = 03:00 CEST
-        (datetime(2027, 3, 28, tzinfo=timezone.utc), [1.0] * 4 + [3.0] * 4),
+        (datetime(2027, 3, 28, tzinfo=timezone.utc), 3, [0.0] * 4 + [2.0] * 4),
     ],
 )
-def test_flex_day_inputs_follow_the_wall_clock_across_dst(tmp_path, utc_day, expected):
-    path = tmp_path / "flexible_consumer_profiles.csv"
-    rows = "".join(f"{m};6;{h};{float(h)}\n" for m in (3, 10) for h in range(24))
-    path.write_text("Month;Weekday;Hour;wp\n" + rows, encoding="utf-8")
+def test_flex_day_inputs_follow_the_wall_clock_across_dst(utc_day, start_hour, expected):
     slots = tuple(
         {"slot_start": (utc_day + i * STEP).isoformat(), "counted": True} for i in range(8)
     )
@@ -311,7 +344,7 @@ def test_flex_day_inputs_follow_the_wall_clock_across_dst(tmp_path, utc_day, exp
         prev_correction_eur=None,
         slots=slots,
     )
-    inputs = store.flex_day_inputs(state, [HP], "Europe/Vienna", str(path))
+    inputs = store.flex_day_inputs(state, [HP], [_house_generic("wp", start_hour, 2.0)], "Europe/Vienna")
     assert inputs.profiles_kw == {"wp": expected}
 
 
@@ -345,7 +378,7 @@ def test_logged_filter_window_flows_from_the_entry_into_the_row(tmp_path):
     inputs.append(_closing_slot(DAY1 + timedelta(days=1)))
 
     def from_config(state):
-        return store.flex_day_inputs(state, [POOL], "Europe/Vienna", str(tmp_path / "none.csv"))
+        return store.flex_day_inputs(state, [POOL], [], "Europe/Vienna")
 
     state, closes = _run(inputs, None, from_config, savings_v=2, with_battery=False)
     closed = closes[0]
@@ -366,7 +399,7 @@ def test_day_without_logged_filter_window_uses_the_configured_one(tmp_path):
     ] + [_closing_slot(DAY1 + timedelta(days=1))]
 
     def from_config(state):
-        return store.flex_day_inputs(state, [POOL], "Europe/Vienna", str(tmp_path / "none.csv"))
+        return store.flex_day_inputs(state, [POOL], [], "Europe/Vienna")
 
     _, closes = _run(inputs, None, from_config, savings_v=2, with_battery=False)
     assert closes[0].row["flex_native_window_source"] == {"pool": slf.NATIVE_SOURCE_CONFIG}

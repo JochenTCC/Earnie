@@ -33,6 +33,10 @@ def _day_bounds(moment: datetime) -> tuple[datetime, datetime]:
 
 @pytest.fixture
 def ledger(tmp_path, monkeypatch):
+    # The v2 day close models the house profile's heat pump from the weather archive (D8).
+    from tests.fixtures.open_meteo_mock import install_open_meteo_climate_mock
+
+    install_open_meteo_climate_mock(monkeypatch)
     state_path = tmp_path / "savings_ledger_state.json"
     rows_path = tmp_path / "savings_ledger.jsonl"
     monkeypatch.setattr(store, "savings_ledger_state_file", lambda: str(state_path))
