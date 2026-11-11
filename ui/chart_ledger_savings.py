@@ -105,6 +105,7 @@ def _slot_shadow_soc(
     by_start = {
         datetime.fromisoformat(slot["slot_start"]): float(slot["shadow_soc_end"])
         for slot in state.slots
+        if slot["shadow_soc_end"] is not None  # no house battery: no shadow SoC
     }
     values: list[float | None] = [None] * len(slot_starts)
     for index in range(min(history_slot_count, len(slot_starts))):
@@ -112,7 +113,7 @@ def _slot_shadow_soc(
     return values
 
 
-def open_day_figures(state: sl.LedgerState, battery_params: dict) -> tuple[float, float]:
+def open_day_figures(state: sl.LedgerState, battery_params: dict | None) -> tuple[float, float]:
     """Saving of the open SA-day so far and its SoC correction, as if the day closed now."""
     row = sl.close_day(state, battery_params, app_version="")
     saving = float(row["saving_eur"])
@@ -123,7 +124,7 @@ def build_ledger_chart_savings(
     slot_starts: Sequence[datetime],
     history_slot_count: int,
     state: sl.LedgerState,
-    battery_params: dict,
+    battery_params: dict | None,
     rows: Sequence[dict[str, Any]],
     *,
     window_start: datetime,
@@ -191,8 +192,6 @@ def load_ledger_chart_savings(
     if loaded.state is None:
         return _no_ledger(count, history_slot_count, HINT_NOT_RUNNING)
     batteries = config.get_battery_params_list()
-    if not batteries:
-        return _no_ledger(count, history_slot_count, HINT_NOT_RUNNING)
     try:
         rows = store.read_rows()
         closed_slots, hint = _closed_slots_in_window(
@@ -202,7 +201,7 @@ def load_ledger_chart_savings(
             slot_starts,
             history_slot_count,
             loaded.state,
-            sl.shadow_battery_params(batteries),
+            sl.shadow_battery_params(batteries) if batteries else None,
             rows,
             window_start=window_start,
             window_end=window_end,

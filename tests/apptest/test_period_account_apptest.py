@@ -42,6 +42,7 @@ def _run(tmp_path, monkeypatch) -> AppTest:
         chain_start=datetime(2026, 11, 4, 7, 9, tzinfo=_TZ),
         chain_start_reason=sl.CHAIN_FIRST_RUN,
         shadow_soc=20.0,
+        shadow_soc_day_start=20.0,
         day_start=datetime(2026, 11, 4, 7, 9, tzinfo=_TZ),
         day_end=datetime(2026, 11, 5, 7, 10, tzinfo=_TZ),
         last_slot_start=datetime.fromisoformat(slots[-1]["slot_start"]),

@@ -33,6 +33,10 @@ def _day_bounds(moment: datetime) -> tuple[datetime, datetime]:
 
 @pytest.fixture
 def ledger(tmp_path, monkeypatch):
+    # The v2 day close models the house profile's heat pump from the weather archive (D8).
+    from tests.fixtures.open_meteo_mock import install_open_meteo_climate_mock
+
+    install_open_meteo_climate_mock(monkeypatch)
     state_path = tmp_path / "savings_ledger_state.json"
     rows_path = tmp_path / "savings_ledger.jsonl"
     monkeypatch.setattr(store, "savings_ledger_state_file", lambda: str(state_path))
@@ -188,12 +192,13 @@ def test_error_logs_a_warning_and_is_counted_in_the_day_row(ledger, monkeypatch,
     def boom(*_args, **_kwargs):
         raise RuntimeError("shadow step failed")
 
-    original = sl.advance
-    monkeypatch.setattr(sl, "advance", boom)
+    # the hook books through ``advance_with_slots`` (it also needs the closed day's slot source)
+    original = sl.advance_with_slots
+    monkeypatch.setattr(sl, "advance_with_slots", boom)
     with caplog.at_level(logging.WARNING):
         assert _cycle("2026-11-02T06:30:01", _closed("2026-11-02T06:15:00")) is None
     assert "cycle not booked" in caplog.text
-    monkeypatch.setattr(sl, "advance", original)
+    monkeypatch.setattr(sl, "advance_with_slots", original)
 
     row = _cycle("2026-11-02T07:15:01", _closed("2026-11-02T07:00:00"))
 
@@ -214,16 +219,24 @@ def test_broken_state_starts_a_new_chain_with_its_reason(ledger, caplog):
     assert list(state_path.parent.glob("savings_ledger_state.json.broken-*"))
 
 
-def test_without_house_battery_the_ledger_stays_inactive(ledger, monkeypatch, caplog):
+def test_without_house_battery_the_ledger_runs_without_shadow_battery(ledger, monkeypatch, caplog):
+    """D3 (savings_v 2): no house battery → shadow plant without battery, no SoC correction."""
     state_path, rows_path = ledger
     monkeypatch.setattr("config.get_battery_params_list", lambda: [])
 
     with caplog.at_level(logging.INFO):
         assert _cycle("2026-11-02T06:45:01", _closed("2026-11-02T06:30:00")) is None
         assert _cycle("2026-11-02T07:00:01", _closed("2026-11-02T06:45:00")) is None
+        row = _cycle("2026-11-02T07:15:01", _closed("2026-11-02T07:00:00"))
 
-    assert caplog.text.count("no house battery") == 1
-    assert not state_path.exists() and not rows_path.exists()
+    assert "no house battery" in caplog.text
+    state = store.load_state().state
+    assert state.shadow_soc is None and state.shadow_soc_day_start is None
+    assert row["p_ref_basis"] == sl.P_REF_NO_BATTERY
+    assert row["soc_correction_eur"] == 0.0
+    # grid = load − pv on both sides: no battery, no saving
+    assert row["saving_eur"] == 0.0
+    assert rows_path.exists()
 
 
 def test_out_of_band_cycle_only_updates_the_prices(ledger):

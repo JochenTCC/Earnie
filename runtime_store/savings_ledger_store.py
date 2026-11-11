@@ -15,6 +15,7 @@ import os
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Iterable
+from zoneinfo import ZoneInfo
 
 from data.planning_window import (
     align_to_planning_timezone,
@@ -41,6 +42,7 @@ from runtime_store.savings_ledger import (
     LedgerInput,
     LedgerState,
 )
+from runtime_store.savings_ledger_flex import FlexDayInputs, consumer_windows
 from runtime_store.slot_ist_powers import index_closed_intervals_by_start
 
 logger = logging.getLogger(__name__)
@@ -276,6 +278,29 @@ def _planned_flex_kw(entry: dict[str, Any]) -> dict[str, float]:
     return planned
 
 
+def _filter_native_windows(entry: dict[str, Any]) -> dict[str, dict[str, float]]:
+    """Native filter window per consumer the entry's cycle used (``filter_contexts``), when complete."""
+    windows: dict[str, dict[str, float]] = {}
+    for cid, ctx in (entry.get("filter_contexts") or {}).items():
+        if not isinstance(ctx, dict):
+            continue
+        start = ctx.get("native_start_hour")
+        duration = ctx.get("native_duration_hours")
+        if start is None or duration is None or float(duration) <= 0.0:
+            continue
+        windows[str(cid)] = {"native_start_hour": float(start), "native_duration_hours": float(duration)}
+    return windows
+
+
+def _plugged_in_by_consumer(entry: dict[str, Any]) -> dict[str, bool]:
+    """Plug state per EV the entry's cycle read (``charging_contexts``), where it is a boolean."""
+    states: dict[str, bool] = {}
+    for cid, ctx in (entry.get("charging_contexts") or {}).items():
+        if isinstance(ctx, dict) and isinstance(ctx.get("plugged_in"), bool):
+            states[str(cid)] = ctx["plugged_in"]
+    return states
+
+
 def pending_slot_from_entry(
     slot_start: datetime,
     slot_entry: dict[str, Any] | None,
@@ -291,6 +316,8 @@ def pending_slot_from_entry(
         "k_act_cent": _import_price_cent_from_entry(slot_entry, slot_start=naive),
         "k_push_cent": float(slot_entry["k_push_act"]),
         "planned_flex_kw": _planned_flex_kw(slot_entry),
+        "filter_native": _filter_native_windows(slot_entry),
+        "plugged_in": _plugged_in_by_consumer(slot_entry),
     }
 
 
@@ -308,6 +335,8 @@ def ledger_input_from_pending(
         k_act_cent=float(pending["k_act_cent"]),
         k_push_cent=float(pending["k_push_cent"]),
         planned_flex_kw=dict(pending.get("planned_flex_kw") or {}),
+        filter_native=dict(pending.get("filter_native") or {}),
+        plugged_in=dict(pending.get("plugged_in") or {}),
     )
 
 
@@ -341,3 +370,109 @@ def ledger_inputs_from_entries(
         slot_start = quarter_hour_slot_start(align_to_planning_timezone(naive_start, timezone_name))
         inputs.append(ledger_input(slot_start, closed_by[naive_start], by_slot.get(slot_start)))
     return inputs
+
+
+# --- v2 day replay inputs (Ledger P9c) -----------------------------------------
+
+
+def _model_shape_kw(house_consumer: dict, slot_starts_local: list[datetime]) -> list[float]:
+    """kW per slot of the consumer's modeled usual timing (house profile, D8).
+
+    The Scenario Explorer's L1 shape (``modeled_consumer_kw_for_slots``, no climate context: the
+    year model). Only the timing matters, the replay scales it to the delivered energy, so a
+    generic consumer gets one run at its configured start on every day, whatever its runs per week.
+    """
+    from data.consumption_profiles import modeled_consumer_kw_for_slots
+
+    consumer = house_consumer
+    schedule = consumer.get("schedule")
+    if consumer.get("type") == "generic" and isinstance(schedule, dict):
+        consumer = {**consumer, "schedule": {**schedule, "runs_per_week": 7}}
+    return [float(v) for v in modeled_consumer_kw_for_slots(consumer, slot_starts_local, climate=None)]
+
+
+def flex_day_inputs(
+    state: LedgerState,
+    consumers: list[dict],
+    house_consumers: list[dict] | None,
+    timezone_name: str,
+) -> FlexDayInputs:
+    """Reference shapes and windows of the flex consumers for the day ``state`` holds open (plan § 4.1).
+
+    Shapes come from the house profile's model of each consumer (D8, the Scenario Explorer's
+    L1), not from measured profiles: those were learned while Earnie already shifted the
+    consumers. ``house_consumers`` are the consumers of the active house profile, matched by
+    id; a planning consumer without one (e.g. a heating rod part) has no shape. EVs need none
+    (plug-in rule). Slot starts are converted to naive local times of ``timezone_name``.
+
+    A filter's native window is the one its cycles logged (first counted slot of the day),
+    else its configured ``config_fallback``; the row records which.
+
+    No house profile (``None``) or a model that fails gives ``profiles_kw=None``: no consumer is
+    re-timed that day (``profile_error``), and a warning names the cause.
+    """
+    from runtime_store.savings_ledger_flex import is_ev_consumer
+
+    zone = ZoneInfo(timezone_name)
+    local = [
+        datetime.fromisoformat(str(slot["slot_start"])).astimezone(zone).replace(tzinfo=None)
+        for slot in state.slots
+    ]
+    profiles: dict[str, list[float]] | None
+    if house_consumers is None:
+        logger.warning(
+            "savings ledger: no active house profile; day %s keeps the logged timing.",
+            state.day_start.isoformat(),
+        )
+        profiles = None
+    else:
+        by_id = {str(c["id"]): c for c in house_consumers if c.get("id")}
+        try:
+            profiles = {
+                str(c["id"]): _model_shape_kw(by_id[str(c["id"])], local)
+                for c in consumers
+                if str(c["id"]) in by_id and not is_ev_consumer(c)
+            }
+        except (ValueError, KeyError, TypeError, OSError, RuntimeError) as exc:
+            # A broken configuration or an unreachable weather archive must not stop the day
+            # close (it would close the day again on every slot): recorded as profile_error.
+            logger.warning(
+                "savings ledger: consumer model failed (%r); day %s keeps the logged timing.",
+                exc,
+                state.day_start.isoformat(),
+            )
+            profiles = None
+    windows = {
+        str(c["id"]): consumer_windows(c, local, logged_native=_logged_native_window(state, str(c["id"])))
+        for c in consumers
+    }
+    return FlexDayInputs(consumers=list(consumers), profiles_kw=profiles, windows=windows)
+
+
+def _logged_native_window(state: LedgerState, cid: str) -> dict[str, float] | None:
+    """Native filter window of ``cid`` from the first counted slot of the day that logged one."""
+    for slot in state.slots:
+        if slot["counted"] and cid in (slot.get("filter_native") or {}):
+            return dict(slot["filter_native"][cid])
+    return None
+
+
+def flex_day_provider(timezone_name: str) -> sl.DayFlex:
+    """``DayFlex`` from the current configuration: the consumers Earnie controls and the house profile.
+
+    Reads the configuration only when a v2 day closes; v1 never calls it.
+    """
+
+    def provide(state: LedgerState) -> FlexDayInputs:
+        import config
+        from data.cons_data_house_profile import resolve_runtime_house_profile
+
+        profile = resolve_runtime_house_profile()
+        return flex_day_inputs(
+            state,
+            config.get_flexible_consumers(optimizer_only=True),
+            list(profile.get("consumers", [])) if profile is not None else None,
+            timezone_name,
+        )
+
+    return provide

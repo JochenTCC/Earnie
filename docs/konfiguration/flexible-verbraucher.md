@@ -311,7 +311,7 @@ Die Signale ordnest du in der EHAL-Zuordnung der eigenen Zeile des Heizstabs zu.
 - **Wie viel:** Höchstens die freie Wärme des Speichers bis zum Sollwert, abzüglich der Wärme, die die Hauptquelle ohnehin liefern muss. Ist der Speicher voll, bleibt der Heizstab aus. Reicht die freie Wärme nicht für eine Viertelstunde Heizstab, bleibt er ebenfalls aus.
 - **Wann:** Nur am laufenden Kalendertag, höchstens vier Einschaltungen je Tag. Billige Nachtstunden nach Mitternacht plant Earnie erst nach dem Tageswechsel ein.
 - **Neben einer Wärmepumpe:** Sie liefert dieselbe Wärme mit weniger Strom, der Heizstab läuft deshalb selten, z. B. bei negativen Preisen. Beide zusammen können den Speicher dann über die freie Wärme hinaus laden, bis die nächste Messung den Heizstab abschaltet.
-- **Neben einem Brennstoff:** Die Kachel „Mit Earnie gespart“ rechnet den Heizstab-Strom als Kosten, die gesparte Brennstoffmenge rechnet sie nicht gegen.
+- **Neben einem Brennstoff:** Die Kachel „Mit Earnie gespart“ vergleicht mit einer Anlage, in der der Heizstab aus bleibt und seine Wärme aus dem Brennstoff kommt, zum selben Brennstoffpreis wie in der Planung. Der Heizstab-Strom zählt als Kosten mit Earnie, der gesparte Brennstoff als Ersparnis. Ohne Brennstoffpreis zählt der Heizstab im Vergleich zur gemessenen Zeit.
 
 **Sicherheit liegt beim Smarthome:** Earnie gibt den Heizstab nur frei. Den Übertemperaturschutz und das Verhalten beim Ausfall von Earnie muss die Anlage selbst sicherstellen, z. B. über den Sicherheitsthermostat und ein Abschalten, wenn die Freigabe nicht mehr aktualisiert wird. Eine einmal gesetzte Freigabe bleibt sonst stehen, bis Earnie wieder schreibt.
 

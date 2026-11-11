@@ -32,6 +32,10 @@ def _day_bounds(moment: datetime) -> tuple[datetime, datetime]:
 
 @pytest.fixture
 def env(monkeypatch):
+    # The v2 day close models the house profile's heat pump from the weather archive (D8).
+    from tests.fixtures.open_meteo_mock import install_open_meteo_climate_mock
+
+    install_open_meteo_climate_mock(monkeypatch)
     monkeypatch.setattr("config.get_planning_timezone", lambda: "Europe/Vienna")
     monkeypatch.setattr("config.get_battery_params_list", lambda: [dict(BATTERY)])
     monkeypatch.setattr(store, "sunrise_day_bounds", lambda *_a: _day_bounds)
@@ -311,11 +315,12 @@ def test_malformed_log_line_is_reported(env, tmp_path, capsys):
     assert f"{ARCHIVE}:" in captured.err
 
 
-def test_without_history_or_battery_the_cli_fails(env, tmp_path, monkeypatch, capsys):
+def test_without_history_the_cli_fails_and_without_battery_it_runs(env, tmp_path, monkeypatch, capsys):
     assert _run(tmp_path, "--dry-run") == 1
     assert "No optimization_history.jsonl" in capsys.readouterr().err
 
+    # D3 (savings_v 2): a house without battery has a ledger too
     _write_history(tmp_path, datetime(2026, 10, 30, 12, 0), datetime(2026, 11, 2, 9, 0))
     monkeypatch.setattr("config.get_battery_params_list", lambda: [])
-    assert _run(tmp_path, "--dry-run") == 1
-    assert "No house battery" in capsys.readouterr().err
+    assert _run(tmp_path, "--dry-run") == 0
+    assert "no house battery" in capsys.readouterr().out

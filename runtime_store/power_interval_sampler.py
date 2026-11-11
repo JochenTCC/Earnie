@@ -247,6 +247,11 @@ def _read_live_sample(
     flex_kw: dict[str, float] = {}
     if read_flex_chart is not None:
         flex_kw = dict(read_flex_chart())
+    elif ehal_live.is_ha_backend():
+        # Measured consumers from the push inbox (Ledger P9e); OpenEMS logs none.
+        from integrations.ha_flex_power import read_ha_flex_chart_kw_live
+
+        flex_kw = dict(read_ha_flex_chart_kw_live())
     elif not ehal_live.is_ehal_network_backend():
         flex_kw = dict(
             ehal_live.resolve_flexible_consumers_live_power(fallbacks={}).chart_kw

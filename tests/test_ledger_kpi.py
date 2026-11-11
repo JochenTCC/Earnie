@@ -45,6 +45,7 @@ def _state(*slots: dict, prev_correction: float = 0.0, soc_actual: float | None 
         chain_start=CHAIN,
         chain_start_reason=sl.CHAIN_BACKFILL,
         shadow_soc=20.0,
+        shadow_soc_day_start=20.0,
         day_start=DAY_START,
         day_end=DAY_END,
         last_slot_start=datetime.fromisoformat(slots[-1]["slot_start"]) if slots else None,
@@ -92,11 +93,19 @@ def test_colour_follows_the_shown_cents():
     assert euro_amount(-0.004) == "0,00 €"
 
 
+def _kpi(state, rows, *, names=None, openems=False):
+    return build_ledger_kpi(state, rows, consumer_names=names or {}, openems=openems)
+
+
+def _help_kpi(incomplete: int, *, reason=sl.CHAIN_FIRST_RUN, days=45, no_meter=(), openems=False):
+    return LedgerKpi(CHAIN, days, incomplete, 1.0, reason, tuple(no_meter), openems)
+
+
 def test_total_counts_closed_days_of_the_current_chain_only():
     other_chain = CHAIN - timedelta(days=30)
     rows = [_row(1.0), _row(0.5, incomplete=True), _row(99.0, chain=other_chain)]
 
-    kpi = build_ledger_kpi(_state(), rows)
+    kpi = _kpi(_state(), rows)
 
     assert kpi.total_euro == pytest.approx(1.5)
     assert kpi.days == 2
@@ -123,7 +132,7 @@ def _two_slot_state() -> sl.LedgerState:
 def test_running_day_stays_out_of_the_total():
     state = _state(_slot(DAY_START + timedelta(minutes=6), with_eur=0.1, without_eur=0.3))
 
-    assert build_ledger_kpi(state, [_row(1.0)]).total_euro == pytest.approx(1.0)
+    assert _kpi(state, [_row(1.0)]).total_euro == pytest.approx(1.0)
 
 
 def test_tile_and_chart2_read_the_same_figures_of_the_current_sa_day():
@@ -141,7 +150,7 @@ def test_tile_and_chart2_read_the_same_figures_of_the_current_sa_day():
 
     assert chart_saving == pytest.approx(ledger["saving_euro"])
     assert today_text(ledger, NOW) == (
-        f"Heute bisher: {saving_text(chart_saving)} · "
+        f"Heute bisher (vorläufig): {saving_text(chart_saving)} · "
         f"SoC-Korrektur: {soc_correction_text(ledger['soc_correction_euro'])}"
     )
 
@@ -195,29 +204,57 @@ def test_today_text_uses_the_words_of_chart2():
     }
 
     assert today_text(ledger, NOW) == (
-        "Heute bisher: 0,97 € mehr ausgegeben · SoC-Korrektur: 0,78 € gutgeschrieben"
+        "Heute bisher (vorläufig): 0,97 € mehr ausgegeben · SoC-Korrektur: 0,78 € gutgeschrieben"
     )
 
 
 def test_no_result_when_no_slot_was_ever_counted():
     rows = [_row(0.0, slots_present=0, incomplete=True)]
 
-    assert build_ledger_kpi(_state(), rows).total_euro is None
+    assert _kpi(_state(), rows).total_euro is None
 
 
 def test_help_states_the_counterfactual_limits_and_incomplete_days():
-    text = tile_help(LedgerKpi(CHAIN, 45, 3, 1.0))
+    text = tile_help(_help_kpi(3))
 
-    for part in ("gleicher Verbrauch", "gleiche PV", "Herstellermodus", "gleiche Preise",
-                 "Powerstations", "Wirkungsgrad", "Unvollständige Tage: 3"):
+    for part in ("gleiche PV", "gleiche Preise", "gleiche Tagesverbrauch", "gewohnten Zeit",
+                 "ab dem Einstecken", "Brennstoff", "Herstellermodus", "vorläufig",
+                 "Szenario-Analyse", "Powerstations", "Wirkungsgrad", "Unvollständige Tage: 3"):
         assert part in text
-    assert "Unvollständige Tage: keine" in tile_help(LedgerKpi(CHAIN, 45, 0, 1.0))
+    assert "Unvollständige Tage: keine" in tile_help(_help_kpi(0))
+    assert "Ohne eigenen Zähler" not in text and "OpenEMS" not in text
 
 
-def test_load_names_a_missing_battery(monkeypatch):
+def test_help_names_consumers_without_their_own_meter():
+    """P10b: the newest closed day's ``logged_no_meter`` consumers, by their configured name."""
+    rows = [
+        {**_row(1.0), "flex_timing": {"trockner": "logged_no_meter", "wp": "profile"}},
+        {**_row(0.5), "flex_timing": {"trockner": "logged_no_meter", "alt": "logged_no_meter", "wp": "profile"}},
+    ]
+    kpi = _kpi(_state(), rows, names={"trockner": "Trockner"})
+
+    assert kpi.no_meter_names == ("alt", "Trockner")
+    assert "**Ohne eigenen Zähler:** alt, Trockner." in tile_help(kpi)
+
+
+def test_help_says_openems_counts_the_battery_only():
+    assert "Gezählt ist nur die Batterie" in tile_help(_help_kpi(0, openems=True))
+
+
+def test_chain_switch_note_shows_in_the_first_week_of_a_new_version():
+    assert kpi_mod.chain_switch_text(_help_kpi(0, reason=sl.CHAIN_SAVINGS_V_CHANGED, days=2)).startswith(
+        "Neue Zählung seit "
+    )
+    assert kpi_mod.chain_switch_text(_help_kpi(0, reason=sl.CHAIN_SAVINGS_V_CHANGED, days=7)) is None
+    assert kpi_mod.chain_switch_text(_help_kpi(0, reason=sl.CHAIN_FIRST_RUN, days=2)) is None
+
+
+def test_without_a_battery_the_tile_is_not_a_notice(tmp_path, monkeypatch):
+    """D3: the ledger runs without a house battery; no "ruht" notice any more."""
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path))
     monkeypatch.setattr("config.get_battery_params_list", lambda: [])
 
-    assert load_ledger_kpi() == LedgerKpiNotice(kpi_mod.NOTICE_NO_BATTERY)
+    assert load_ledger_kpi() == LedgerKpiNotice(kpi_mod.NOTICE_NOT_RUNNING)
 
 
 def test_load_names_a_ledger_that_is_not_running(tmp_path, monkeypatch):

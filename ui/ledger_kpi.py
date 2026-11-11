@@ -24,19 +24,31 @@ from ui.saving_text import euro_amount, saving_is_loss, saving_text, soc_correct
 logger = logging.getLogger(__name__)
 
 NOTICE_NOT_RUNNING = "Mit Earnie gespart: Das Ersparnis-Buch läuft noch nicht."
-NOTICE_NO_BATTERY = "Mit Earnie gespart: Ohne Hausbatterie gibt es keinen Vergleich, das Ersparnis-Buch ruht."
 NOTICE_UNREADABLE = "Mit Earnie gespart: Das Ersparnis-Buch ist nicht lesbar, Details stehen im Log."
 
+# Method note of savings_v 2 (spec docs/dev/savings-ledger.md § 3, § 7).
 _METHOD_HELP = (
-    "**Vergleich:** gleicher Verbrauch, gleiche PV, Batterie im Herstellermodus "
-    "(Eigenverbrauch), gleiche Preise. Gezählt sind die abgeschlossenen Tage von "
-    "Sonnenaufgang zu Sonnenaufgang, jeweils mit der SoC-Korrektur.\n\n"
-    "**Grenzen:** Verbraucher laufen im Vergleich zur selben Zeit wie gemessen, das "
-    "Verschieben von Verbrauch ist also nicht bewertet. Was Powerstations aus ihrem "
-    "Speicher liefern, ist nicht bewertet; ihr Laden zählt zur tatsächlichen Zeit. "
-    "Das Ergebnis hängt vom eingestellten Batterie-Wirkungsgrad ab und ist keine "
-    "Stromrechnung."
+    "**Vergleich „ohne Earnie“:** gleiche PV, gleiche Preise und je Gerät der gleiche "
+    "Tagesverbrauch, aber zur gewohnten Zeit: Geräte laufen, wie das Hausprofil sie beschreibt "
+    "(eingestellte Startzeit, Wärmemodell), der Poolfilter in seinem eigenen Fenster, das E-Auto lädt ab dem Einstecken "
+    "mit voller Leistung, ein Heizstab neben Gas, Öl oder Pellets bleibt aus und die Wärme "
+    "kommt aus dem Brennstoff. Eine Hausbatterie läuft im Herstellermodus (Eigenverbrauch). "
+    "Gezählt sind die abgeschlossenen Tage von Sonnenaufgang zu Sonnenaufgang, jeweils mit "
+    "der SoC-Korrektur.\n\n"
+    "**Heute bisher** ist vorläufig: Es zählt nur die Batterie. Verschobene Geräte, E-Auto "
+    "und Heizstab kommen beim Tagesabschluss dazu.\n\n"
+    "**Grenzen:** Die gewohnte Zeit ist das Modell aus dem Hausprofil, nicht der tatsächliche "
+    "Tagesablauf. Die "
+    "Szenario-Analyse vergleicht strenger, mit Standard-Regeln wie Laden bei PV-Überschuss; "
+    "ihre Ersparnis ist deshalb meist kleiner. Was Powerstations aus ihrem Speicher liefern, "
+    "ist nicht bewertet; ihr Laden zählt zur tatsächlichen Zeit. Das Ergebnis hängt vom "
+    "eingestellten Batterie-Wirkungsgrad ab und ist keine Stromrechnung."
 )
+_OPENEMS_HELP = (
+    "**OpenEMS:** Earnie liest hier keine Leistung je Gerät. Gezählt ist nur die Batterie."
+)
+# The chain-switch note stays this many closed days after a new chain for a new version.
+CHAIN_SWITCH_NOTE_DAYS = 7
 
 
 @dataclass(frozen=True)
@@ -47,6 +59,10 @@ class LedgerKpi:
     days: int
     incomplete_days: int
     total_euro: float | None
+    chain_start_reason: str
+    # Consumers of the newest closed day without their own meter (``flex_timing: logged_no_meter``).
+    no_meter_names: tuple[str, ...]
+    openems: bool
 
 
 @dataclass(frozen=True)
@@ -57,28 +73,68 @@ class LedgerKpiNotice:
     is_warning: bool = False
 
 
-def build_ledger_kpi(state: sl.LedgerState, rows: Sequence[dict[str, Any]]) -> LedgerKpi:
-    """Lifetime figures of the state's chain. Pure."""
+def build_ledger_kpi(
+    state: sl.LedgerState,
+    rows: Sequence[dict[str, Any]],
+    *,
+    consumer_names: dict[str, str],
+    openems: bool,
+) -> LedgerKpi:
+    """Lifetime figures of the state's chain. Pure.
+
+    ``consumer_names`` maps consumer ids to the names the help shows; an id without a
+    name (a consumer no longer configured) is shown as its id.
+    """
     summary = sl.lifetime_summary(list(rows), state.chain_start)
+    chain = [
+        r
+        for r in rows
+        if r.get("chain_start") == state.chain_start.isoformat() and r.get("savings_v") == sl.SAVINGS_V
+    ]
+    no_meter: tuple[str, ...] = ()
+    if chain:
+        timing = chain[-1].get("flex_timing") or {}
+        no_meter = tuple(
+            consumer_names.get(cid, cid)
+            for cid, label in sorted(timing.items())
+            if label == "logged_no_meter"
+        )
     return LedgerKpi(
         chain_start=state.chain_start,
         days=summary["days"],
         incomplete_days=summary["incomplete_days"],
         total_euro=summary["saving_adjusted_eur"] if summary["slots_present"] else None,
+        chain_start_reason=state.chain_start_reason,
+        no_meter_names=no_meter,
+        openems=openems,
     )
+
+
+def _consumer_names() -> dict[str, str]:
+    names: dict[str, str] = {}
+    for consumer in config.get_flexible_consumers():
+        name = str(consumer.get("name") or "").strip()
+        if name:
+            names[str(consumer["id"])] = name
+    return names
 
 
 def load_ledger_kpi() -> LedgerKpi | LedgerKpiNotice:
     """Figures from the runtime files, or the notice why there are none."""
-    if not config.get_battery_params_list():
-        return LedgerKpiNotice(NOTICE_NO_BATTERY)
+    from integrations import ehal_live
+
     loaded = store.peek_state()
     if loaded.restart_reason == sl.CHAIN_STATE_UNREADABLE:
         return LedgerKpiNotice(NOTICE_UNREADABLE, is_warning=True)
     if loaded.state is None:
         return LedgerKpiNotice(NOTICE_NOT_RUNNING)
     try:
-        return build_ledger_kpi(loaded.state, store.read_rows())
+        return build_ledger_kpi(
+            loaded.state,
+            store.read_rows(),
+            consumer_names=_consumer_names(),
+            openems=ehal_live.is_openems_backend(),
+        )
     except (ValueError, KeyError, TypeError) as exc:
         logger.warning("savings ledger: the Monitor tile cannot read the ledger (%s).", exc)
         return LedgerKpiNotice(NOTICE_UNREADABLE, is_warning=True)
@@ -97,8 +153,35 @@ def _incomplete_text(incomplete_days: int) -> str:
     )
 
 
+def _no_meter_text(names: tuple[str, ...]) -> str | None:
+    if not names:
+        return None
+    return (
+        f"**Ohne eigenen Zähler:** {', '.join(names)}. Diese Geräte zählen im Vergleich zur "
+        "gemessenen Zeit, ihr Verschieben ist nicht bewertet."
+    )
+
+
 def tile_help(kpi: LedgerKpi) -> str:
-    return f"{_METHOD_HELP}\n\n{_incomplete_text(kpi.incomplete_days)}"
+    parts = [_METHOD_HELP]
+    if kpi.openems:
+        parts.append(_OPENEMS_HELP)
+    no_meter = _no_meter_text(kpi.no_meter_names)
+    if no_meter:
+        parts.append(no_meter)
+    parts.append(_incomplete_text(kpi.incomplete_days))
+    return "\n\n".join(parts)
+
+
+def chain_switch_text(kpi: LedgerKpi) -> str | None:
+    """One-time note after a new calculation version started a new count (first week)."""
+    if kpi.chain_start_reason != sl.CHAIN_SAVINGS_V_CHANGED or kpi.days >= CHAIN_SWITCH_NOTE_DAYS:
+        return None
+    return (
+        f"Neue Zählung seit {_since_text(kpi)}: Die Ersparnis zählt jetzt auch verschobene "
+        "Geräte, das E-Auto ab dem Einstecken und den Heizstab. Die frühere Summe ist darin "
+        "nicht enthalten."
+    )
 
 
 def today_text(ledger: dict[str, Any] | None, now: datetime) -> str | None:
@@ -113,7 +196,7 @@ def today_text(ledger: dict[str, Any] | None, now: datetime) -> str | None:
     if not day_start <= now < day_end:
         return None
     return (
-        f"Heute bisher: {saving_text(ledger['saving_euro'])} · "
+        f"Heute bisher (vorläufig): {saving_text(ledger['saving_euro'])} · "
         f"SoC-Korrektur: {soc_correction_text(ledger['soc_correction_euro'])}"
     )
 
@@ -146,6 +229,9 @@ def render_ledger_kpi(now: datetime, ledger: dict[str, Any] | None) -> None:
             st.caption(kpi.text)
         return
     _render_figures(kpi)
+    switch = chain_switch_text(kpi)
+    if switch:
+        st.caption(switch)
     today = today_text(ledger, now)
     if today:
         st.caption(today)

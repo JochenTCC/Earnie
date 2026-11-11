@@ -121,7 +121,9 @@ def account_slots(savings_view: dict, *, history_slot_count: int, slot_count: in
             with_eur[index] = ledger_with[index]
             without_eur[index] = ledger_without[index]
             states[index] = ledger_states[index]
-            # Both sides use the logged load left of Jetzt (savings_v 1), so the control is flat.
+            # Left of Jetzt both sides have the same energy per SA-day (savings_v 2 re-times flex
+            # within the day only); the ledger keeps no per-slot load of the shadow side, so the
+            # control stays flat here.
             base_kwh[index] = 0.0
             opt_kwh[index] = 0.0
     return AccountSlots(

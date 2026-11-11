@@ -33,14 +33,12 @@ _loaded_path: str | None = None
 _restart_reason: str | None = None
 # Prices of the newest cycle while no chain exists yet (first slot without SoC).
 _pending_without_chain: dict[str, Any] | None = None
-_no_battery_logged = False
 
 
 def reset() -> None:
     """Forget the in-memory state (tests; the next call reads the state file again)."""
-    global _state, _loaded_path, _restart_reason, _pending_without_chain, _no_battery_logged
+    global _state, _loaded_path, _restart_reason, _pending_without_chain
     _state = None
-    _no_battery_logged = False
     _loaded_path = None
     _restart_reason = None
     _pending_without_chain = None
@@ -115,6 +113,7 @@ def _planning_shadow_soc(closed_interval: dict[str, Any] | None) -> float | None
             timezone_name,
         ),
         app_version=__version__,
+        day_flex=store.flex_day_provider(timezone_name),
     )
     return advanced.shadow_soc
 
@@ -133,6 +132,8 @@ def _book_error_slot(closed_interval: dict[str, Any] | None) -> None:
 
 def _write_day_slots(closing: sl.LedgerState) -> None:
     """Append the slots of the day ``closing`` holds open; a failure must not stop the chain.
+
+    ``closing`` is ``DayClose.closing``: the replayed day in v2, so the slots match the row.
 
     The row is already written: raising here would close the day a second time on the
     next slot. The day stays without slots, the warning names the repair, and readers
@@ -156,14 +157,8 @@ def _on_cycle(
     *,
     now: datetime | None,
 ) -> dict[str, Any] | None:
-    global _state, _pending_without_chain, _no_battery_logged
+    global _state, _pending_without_chain
     batteries = config.get_battery_params_list()
-    if not batteries:
-        # v1 compares the battery strategy only; without a house battery there is nothing to book.
-        if not _no_battery_logged:
-            logger.info("savings ledger: no house battery configured — ledger inactive.")
-            _no_battery_logged = True
-        return None
     _ensure_loaded()
     timezone_name = config.get_planning_timezone()
     day_bounds = store.sunrise_day_bounds(
@@ -171,28 +166,42 @@ def _on_cycle(
         config.get("LONGITUDE", cast=float),
         timezone_name,
     )
-    battery = sl.shadow_battery_params(batteries)
+    # Without a house battery the shadow plant has none either (v2, spec § 7): grid = load − pv.
+    battery = sl.shadow_battery_params(batteries) if batteries else None
     pending = _state.pending_slot if _state is not None else _pending_without_chain
     row = None
     if isinstance(closed_interval, dict) and closed_interval.get("interval_start"):
         slot_start = _closed_slot_start(closed_interval, timezone_name)
         inp = store.ledger_input_from_pending(slot_start, closed_interval, pending)
         if _state is None:
-            _state = sl.start_chain(inp, day_bounds, reason=_restart_reason or sl.CHAIN_FIRST_RUN)
+            _state = sl.start_chain(
+                inp,
+                day_bounds,
+                reason=_restart_reason or sl.CHAIN_FIRST_RUN,
+                with_battery=battery is not None,
+            )
             if _state is not None:
                 logger.info(
-                    "savings ledger: chain started %s at SoC %.1f %% (%s).",
+                    "savings ledger: chain started %s (%s, %s).",
                     _state.chain_start.isoformat(),
-                    _state.shadow_soc,
                     _state.chain_start_reason,
+                    f"shadow SoC {_state.shadow_soc:.1f} %" if battery is not None else "no house battery",
                 )
         if _state is not None:
-            advanced, row = sl.advance(_state, inp, battery, day_bounds, app_version=__version__)
-            if row is not None:
+            advanced, closed_day = sl.advance_with_slots(
+                _state,
+                inp,
+                battery,
+                day_bounds,
+                app_version=__version__,
+                day_flex=store.flex_day_provider(timezone_name),
+            )
+            if closed_day is not None:
+                row = closed_day.row
                 # Append before taking the new state: if the write fails, the next
                 # slot closes the same day again instead of losing the row.
                 store.append_row(row)
-                _write_day_slots(_state)
+                _write_day_slots(closed_day.closing)
                 logger.info(
                     "savings ledger: day %s closed, saving %.2f EUR (adjusted %.2f EUR, coverage %.2f).",
                     row["day_start"],

@@ -147,6 +147,8 @@ class Bench:
     monotonic: Callable[[], float] = time.monotonic
     now: Callable[[], datetime] = field(default=lambda: datetime.now(timezone.utc))
     log: Callable[[str], None] = field(default=lambda msg: None)
+    # Samples of Earnie's power sampler (``power_interval_sampler`` state), newest last.
+    load_power_samples: Callable[[], list[dict[str, Any]]] = field(default=lambda: [])
 
     def wait_until(self, predicate: Callable[[], bool], timeout_s: float | None = None) -> bool:
         deadline = self.monotonic() + (self.timeout_s if timeout_s is None else timeout_s)
@@ -550,6 +552,38 @@ def _request_failure(exc: OSError) -> str:
     return f"request failed: {exc}"
 
 
+# --- consumer power in the slot log (Ledger P9e) ------------------------------
+
+_CONSUMER_POWER_KINDS = ("sens_power_act", "sens_evcs_active_power")
+
+
+def check_consumer_power_sampled(bench: Bench) -> list[Result]:
+    """A consumer power entity reaches the power sampler's ``flex_kw`` (the savings ledger's slot log).
+
+    The newest sample must hold a consumer value equal to the pushed one (kW, 0.01 tolerance).
+    The sample is keyed by consumer, the push by its EHAL ID, so the check matches by value.
+    """
+    name = "consumer power reaches the power sampler (flex_kw)"
+    reads = [i for i in bench.archetype.reads() if field_kind(i) in _CONSUMER_POWER_KINDS]
+    if not reads:
+        return [Result(name, SKIP, "archetype has no consumer power entity")]
+    if not bench.load_power_samples():
+        return [Result(name, SKIP, "no power samples: the Earnie daemon is not sampling")]
+    ehal_id = _prefer_nonzero(bench.load_inbox(), reads)
+
+    def sampled() -> bool:
+        pushed = _last_value(bench.load_inbox().get(ehal_id))
+        samples = bench.load_power_samples()
+        flex = (samples[-1].get("flex_kw") or {}) if samples else {}
+        return pushed is not None and any(abs(float(v) - pushed) <= 0.01 for v in flex.values())
+
+    if bench.wait_until(sampled):
+        return [Result(name, PASS, ehal_id)]
+    flex = (bench.load_power_samples()[-1].get("flex_kw") or {})
+    pushed = _last_value(bench.load_inbox().get(ehal_id))
+    return [Result(name, FAIL, f"{ehal_id} pushed {pushed}, newest sample flex_kw {flex}")]
+
+
 def _guarded(name: str, check: Callable[[Bench], list[Result]], bench: Bench) -> list[Result]:
     """A failing HA / Earnie request is a FAIL of that check, not a crash of the run."""
     try:
@@ -563,6 +597,7 @@ def run_checks(bench: Bench, *, negative: bool = True) -> list[Result]:
         ("HA reachable, sim entities exist with expected units", check_ha_entities),
         ("Earnie inbox", check_inbox),
         ("setpoint round trip", check_setpoint_roundtrip),
+        ("consumer power reaches the power sampler (flex_kw)", check_consumer_power_sampled),
     ]
     if negative:
         checks += [
@@ -615,7 +650,15 @@ def _make_bench(args: argparse.Namespace, archetype: Archetype) -> Bench:
         publish=publish,
         published_value=lambda qid: ehal_write.load_published().get(qid),
         log=lambda msg: print(f"  .. {msg}", file=sys.stderr),
+        load_power_samples=_power_samples,
     )
+
+
+def _power_samples() -> list[dict[str, Any]]:
+    from runtime_store import power_interval_sampler
+
+    state = power_interval_sampler._load_state(power_interval_sampler._state_path())
+    return list(state.get("samples") or [])
 
 
 def main(argv: list[str] | None = None) -> int:

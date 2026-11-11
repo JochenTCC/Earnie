@@ -60,6 +60,7 @@ def _state(slots: list[dict], *, shadow_soc: float = 40.0, pending: dict | None 
         chain_start=_DAY_START,
         chain_start_reason=sl.CHAIN_FIRST_RUN,
         shadow_soc=shadow_soc,
+        shadow_soc_day_start=shadow_soc,
         day_start=_DAY_START,
         day_end=_DAY_END,
         last_slot_start=datetime.fromisoformat(slots[-1]["slot_start"]) if slots else None,
