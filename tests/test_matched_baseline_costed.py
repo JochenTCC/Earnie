@@ -33,8 +33,20 @@ def _matrix() -> list[dict]:
 
 
 CONSUMERS = [
-    {"id": "swimspa", "name": "Swimspa", "daily_target_source": "config", "daily_target_kwh": 4.0},
-    {"id": "waschmaschine", "name": "Waschmaschine", "daily_target_source": "config", "daily_target_kwh": 0.0},
+    {
+        "id": "swimspa",
+        "name": "Swimspa",
+        "nominal_power_kw": 2.8,
+        "daily_target_source": "config",
+        "daily_target_kwh": 4.0,
+    },
+    {
+        "id": "waschmaschine",
+        "name": "Waschmaschine",
+        "nominal_power_kw": 2.2,
+        "daily_target_source": "config",
+        "daily_target_kwh": 0.0,
+    },
 ]
 
 
