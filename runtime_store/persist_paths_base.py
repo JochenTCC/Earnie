@@ -243,6 +243,11 @@ def capacity_observe_peak_file() -> str:
     return runtime_path("capacity_peaks_observe.json")
 
 
+def capacity_observe_baseline_file() -> str:
+    """Measured month peak over the same quarter hours as the hypothetical one (P6d)."""
+    return runtime_path("capacity_peaks_observe_measured.json")
+
+
 def savings_ledger_file() -> str:
     return runtime_path("savings_ledger.jsonl")
 

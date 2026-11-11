@@ -9,7 +9,8 @@ previous month are kept.
 
 Observe mode (plan P6d, decision O3): ``record_observed`` turns each closed quarter hour into a
 hypothetical one, measured import plus ``delta_import_kw`` of the report whose slot 0 it was,
-records that in the hypothetical peak store, keeps the quarter hours where the plan with the cap
+records that in the hypothetical peak store (and the measured import of the same quarter hour in
+the baseline store, so the saving compares one period), keeps the quarter hours where the plan with the cap
 would have acted differently under ``interventions``, and checks the hypothetical import like a
 measured one (event with ``hypothetical: true`` and the measured value beside it).
 """
@@ -33,6 +34,7 @@ from runtime_store.persist_paths import import_cap_report_file
 
 _KEEP_MONTHS = 2
 OBSERVE_PEAK_SOURCE = "measured_plus_plan_delta"
+OBSERVE_BASELINE_SOURCE = "measured_while_observed"
 
 
 def _path(path: str | None) -> str:
@@ -184,14 +186,16 @@ def record_observed(
     params: dict | None,
     path: str | None = None,
     peak_path: str | None = None,
+    baseline_path: str | None = None,
 ) -> dict[str, Any] | None:
     """Observe mode: one closed quarter hour in the world where Earnie had held the cap.
 
     Hypothetical import = max(0, ``measured_kw`` + delta), delta = slot-0 import of the shadow
     plan − that of the executed plan, from the latest report when its slot 0 was this quarter
     hour. Without that report (mode just switched, Automatik, failed shadow solve) or without a
-    measurement the quarter hour counts as missing in the hypothetical store. Returns the
-    overshoot event of the hypothetical import, ``None`` when within.
+    measurement the quarter hour counts as missing in the hypothetical store. The baseline store
+    gets the measured import of the same quarter hours, missing where the hypothetical one is.
+    Returns the overshoot event of the hypothetical import, ``None`` when within.
     """
     from runtime_store import capacity_peak_store
 
@@ -200,6 +204,7 @@ def record_observed(
     month = f"{slot:%Y-%m}"
     target = _path(path)
     peak_file = peak_path or capacity_peak_store.observe_path()
+    baseline_file = baseline_path or capacity_peak_store.observe_baseline_path()
     data = load(target)
     block = _observe_block_of(data["plan"], slot_iso)
     delta = None if block is None else block["delta_import_kw"]
@@ -208,6 +213,12 @@ def record_observed(
     )
     before = capacity_peak_store.month_peak(month, path=peak_file)
     capacity_peak_store.record_slot(slot, hypothetical, OBSERVE_PEAK_SOURCE, path=peak_file)
+    capacity_peak_store.record_slot(
+        slot,
+        None if hypothetical is None else float(measured_kw),
+        OBSERVE_BASELINE_SOURCE,
+        path=baseline_file,
+    )
     if delta is not None and abs(float(delta)) > SLACK_TOLERANCE_KW:
         cause = next(
             (e["cause"] for e in data["plan"].get("slots") or [] if e.get("slot") == slot_iso), None

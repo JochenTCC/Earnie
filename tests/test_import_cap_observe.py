@@ -202,9 +202,14 @@ def _observe_plan(slot: datetime, delta: float | None, *, slots=()) -> dict:
 
 
 @pytest.fixture
-def observed(tmp_path):
+def observed(tmp_path, monkeypatch):
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path / "runtime"))
     params = {**_params(tmp_path, [_charge()]), **OBSERVE}
     return params, str(tmp_path / "report.json"), str(tmp_path / "observe_peaks.json")
+
+
+def _baseline(month: str = "2027-03"):
+    return capacity_peak_store.month_peak(month, path=capacity_peak_store.observe_baseline_path())
 
 
 def test_the_quarter_hour_gets_the_plan_delta(observed):
@@ -219,6 +224,7 @@ def test_the_quarter_hour_gets_the_plan_delta(observed):
     peak = capacity_peak_store.month_peak("2027-03", path=peaks)
     assert peak.peak_kw == pytest.approx(5.5)
     assert peak.peak_source == store.OBSERVE_PEAK_SOURCE
+    assert (_baseline().peak_kw, _baseline().peak_source) == (7.0, store.OBSERVE_BASELINE_SOURCE)
     [step] = store.load(path)["interventions"]["2027-03"]
     assert step["delta_kw"] == -1.5
     assert step["hypothetical_kw"] == pytest.approx(5.5)
@@ -249,6 +255,8 @@ def test_without_the_plan_of_that_quarter_hour_it_is_missing(observed):
     assert store.record_observed(last.isoformat(), 9.0, params=params, path=path, peak_path=peaks) is None
     peak = capacity_peak_store.month_peak("2027-03", path=peaks)
     assert (peak.peak_kw, peak.slots_logged, peak.slots_missing) == (pytest.approx(3.0), 1, 2)
+    baseline = _baseline()
+    assert (baseline.peak_kw, baseline.slots_logged, baseline.slots_missing) == (4.0, 1, 2)
     assert [e["slot"] for e in store.load(path)["interventions"]["2027-03"]] == ["2027-03-02T18:00"]
 
 

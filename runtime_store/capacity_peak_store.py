@@ -7,7 +7,9 @@ lower than the meter's (window offset, clock, missing quarter hours).
 
 The import cap's observe mode (plan P6d, decision O3) keeps a second file of the same shape with
 the hypothetical peak (``capacity_peaks_observe.json``): measured import plus what the plan with
-the cap would have changed, recorded through ``record_slot``.
+the cap would have changed, recorded through ``record_slot``. A third file
+(``capacity_peaks_observe_measured.json``) keeps the measured import of exactly those quarter
+hours, so the saving compares two peaks of one period.
 """
 from __future__ import annotations
 
@@ -20,7 +22,11 @@ from typing import Any
 
 from optimizer.schedule import QUARTER_HOUR_MINUTES
 from runtime_store.file_metadata import stamp_payload, strip_metadata
-from runtime_store.persist_paths import capacity_observe_peak_file, capacity_peak_store_file
+from runtime_store.persist_paths import (
+    capacity_observe_baseline_file,
+    capacity_observe_peak_file,
+    capacity_peak_store_file,
+)
 from runtime_store.power_interval_sampler import (
     GRID_IMPORT_SOURCE_MEAN,
     MIN_IMPORT_WINDOW_SEC,
@@ -117,6 +123,11 @@ def record_closed_interval(closed: dict[str, Any], *, path: str | None = None) -
 def observe_path() -> str:
     """The observe mode's file of hypothetical month peaks."""
     return capacity_observe_peak_file()
+
+
+def observe_baseline_path() -> str:
+    """The observe mode's file of measured month peaks over the same quarter hours."""
+    return capacity_observe_baseline_file()
 
 
 def record_slot(

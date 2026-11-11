@@ -30,6 +30,7 @@ _OPTIONAL_RUNTIME = (
     "powerstation_reserves.json",
     "capacity_peaks.json",
     "capacity_peaks_observe.json",
+    "capacity_peaks_observe_measured.json",
     "import_cap_report.json",
 )
 
