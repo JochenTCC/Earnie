@@ -2,6 +2,13 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Live: fixed EV/wallbox pair without charger (2026-11-11)
+
+- [x] **Bugfix — fixed EV/wallbox pair loses its charger on the live path** *(found 2026-11-11 on the NAS shadow after the 2.8.0-dev.14 deploy, fixed the same day on `main`, `c114f45c`; regression from multi-EV M4, `cae71778`)*: every 30 s the log showed `EHAL live power read failed: E-Auto 'e_auto': keine Wallbox zugeordnet — kein Ladepunkt (evcs.<Wallbox>.*) zum Lesen oder Schreiben.`, so the live power read returned nothing. The pack was migrated correctly (`dm6.wallboxes`: wallbox `e_auto` in `components.json`, `wallbox_assignment: fixed` on the EV), and the loader's pair view (`resolve_ev_pair`) carried `charger_id`.
+  - **Cause:** since M4, `ehal/qualified_ids.py::charger_id_of_ev` needs the view's `charger_id` (before, a fixed pair fell back to the EV's Kennung). `house_config/planning_flex_converters.py::planning_ev_to_milp` copied the wallbox fields of dynamic EVs only, so the live consumers (`config.get_flexible_consumers`) of a fixed pair had no charger. Building the Loxone adapter (`ev_charger_markers`) then failed on every EHAL read; the EVCS write (`write_evcs_max_current_from_consumers`) would have failed the same way. Tests did not load a fixed pair through the live path.
+  - **Fix:** `_attach_wallbox_fields` copies `charger_id` for a fixed pair; a missing one fails loud. Test: `tests/test_house_config.py::test_fixed_pair_keeps_its_wallbox_as_charger_on_the_live_path` (wallbox Kennung differs from the EV's; red without the fix). Full suite 6648 passed, 19 skipped.
+  - **Checked live (2026-11-11, NAS shadow on 2.8.0-dev.15, `86e66233`):** no `keine Wallbox zugeordnet` and no `[ERROR]` line after the start; the cycle addresses `evcs.e_auto.set_evcs_max_current` / `set_evcs_mode` and ends ok.
+
 ### Edibert tariff overview — pin bump (2026-11-11)
 
 - [x] **Edibert tariff overview — pin bump** `[dev]` *(2026-11-11; taken into 2.8 by the maintainer the same day; Edibert `0.1.c2`, tag `v0.1.15`)*: the embedded editor on the Tarife page gets an overview with two tabs (import, export) listing own, catalog and template tariffs with their parameters, row selection with actions (open, copy as template, delete, compare) and a comparison chart; the "my tariffs" button list, the delete button in the form and the catalog copy expander are gone. Earnie needs no code for it (`render_editor` is unchanged), only the pin and what follows from the removed controls.
