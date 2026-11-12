@@ -92,6 +92,41 @@ def test_gap_stage_runs_with_its_own_time_limit(monkeypatch):
     assert limits == [DEFAULT_CBC_STRICT_TIME_LIMIT_SEC, 15.0]
 
 
+def _infeasible_problem() -> pulp.LpProblem:
+    prob = pulp.LpProblem("infeasible", pulp.LpMinimize)
+    x = pulp.LpVariable("x", lowBound=0, upBound=1)
+    prob += x
+    prob += x >= 2
+    return prob
+
+
+@pytest.mark.parametrize("backend", ["highs", "cbc"])
+def test_proven_infeasible_strict_stage_skips_the_gap_stage(monkeypatch, backend):
+    stages = []
+    real_cmd = cbc_solver._build_solver_cmd
+
+    def counting_cmd(**kwargs):
+        stages.append("strict" if kwargs.get("strict") else "gap")
+        return real_cmd(**kwargs)
+
+    monkeypatch.setattr(cbc_solver, "_build_solver_cmd", counting_cmd)
+    token = cbc_solver.set_milp_solver_override(backend)
+    cbc_solver.begin_solve_log()
+    try:
+        status = solve_with_strict_fallback(_infeasible_problem(), msg=False)
+    finally:
+        cbc_solver.reset_milp_solver_override(token)
+    log = cbc_solver.take_solve_log()
+
+    assert status == "Infeasible"
+    assert stages == ["strict"]
+    assert len(log) == 1
+    assert log[0]["stage"] == "strict"
+    assert log[0]["strict_status"] == "Infeasible"
+    assert log[0]["final_status"] == "Infeasible"
+    assert "gap_elapsed_sec" not in log[0]
+
+
 def test_no_solution_within_both_limits_is_not_optimal(monkeypatch):
     """The real solver: ``milp`` takes anything but ``Optimal`` to its Automatik path."""
     rng = random.Random(1)

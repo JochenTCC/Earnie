@@ -265,6 +265,8 @@ SOC_READING_RESOLUTION_PCT = 1.0
 
 _FLOOR_SOC_KEY = "_virtual_reserve_floor_soc"
 _BASE_MIN_SOC_KEY = "_virtual_reserve_base_min_soc"
+# Read by the MILP: the configured min_soc below the virtual reserve floor.
+VIRTUAL_RESERVE_BASE_MIN_SOC_KEY = _BASE_MIN_SOC_KEY
 _FLOOR_RELAXED_KEY = "_virtual_reserve_floor_relaxed_to"
 
 

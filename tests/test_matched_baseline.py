@@ -36,14 +36,15 @@ def test_build_matched_flex_scales_to_target():
     from optimizer.slot_duration import energy_kwh_from_kw
 
     matrix = _sample_matrix()
-    targets = {"swimspa": 6.0, "eauto": 12.0, "waermepumpe": 0.0}
+    # deliverable at nominal power: the E-Auto has 7 eligible slots at 3.5 kW (6.1 kWh)
+    targets = {"swimspa": 6.0, "eauto": 5.0, "waermepumpe": 0.0}
     per_hour = build_matched_flex_kw_per_hour(matrix, targets)
 
     assert len(per_hour) == 24
     swimspa_sum = energy_kwh_from_kw(hour["swimspa"] for hour in per_hour)
     eauto_sum = energy_kwh_from_kw(hour["eauto"] for hour in per_hour)
     assert abs(swimspa_sum - 6.0) < 0.01
-    assert abs(eauto_sum - 12.0) < 0.01
+    assert abs(eauto_sum - 5.0) < 0.01
     assert all(hour["swimspa"] == 0.0 for hour in per_hour[12:])
 
 
@@ -53,7 +54,7 @@ def test_matched_flex_ignores_live_snapshot_profile_shape(monkeypatch):
 
     from optimizer.slot_duration import DEFAULT_DT_H, energy_kwh_from_kw
 
-    target_kwh = 30.8
+    target_kwh = 8.0  # 16 slots: 2.0 kW flat, below the 2.8 kW nominal power
     matrix = [
         {
             "hour": 19,
@@ -112,8 +113,8 @@ def test_build_matched_flex_reads_canonical_matrix_keys():
     ]
     targets = {"swimspa": 6.0, "ev": 12.0}
     consumers = [
-        {"id": "swimspa", "name": "SwimSpa"},
-        {"id": "ev", "name": "Smart"},
+        {"id": "swimspa", "name": "SwimSpa", "nominal_power_kw": 2.8},
+        {"id": "ev", "name": "Smart", "nominal_power_kw": 11.0},
     ]
     with patch(
         "optimizer.simulation.config.get_flexible_consumers",
@@ -128,6 +129,56 @@ def test_build_matched_flex_reads_canonical_matrix_keys():
     # Profile shape preserved (not uniform fallback): first half non-zero.
     assert all(hour["ev"] > 0.0 for hour in per_hour[:12])
     assert all(hour["ev"] == 0.0 for hour in per_hour[12:])
+
+
+def _capped_case(monkeypatch, target_kwh: float) -> list[float]:
+    """Wallbox with 3.5 kW: logged energy in slots 2 and 3 only, eight eligible slots."""
+    matrix = [
+        {
+            "hour": 0,
+            "consumption_mode": "logged_day",
+            "expected_p_pv": 0.0,
+            "expected_p_act": 0.5,
+            "k_act": 20.0,
+            "expected_flex_kw": {"wallbox": 3.5 if t in (2, 3) else 0.0},
+        }
+        for t in range(8)
+    ]
+    consumers = [{"id": "wallbox", "name": "Wallbox", "nominal_power_kw": 3.5}]
+    monkeypatch.setattr(
+        "optimizer.simulation.consumer_charging_eligible_indices",
+        lambda rows, consumer, schedule_indices, context=None: list(schedule_indices),
+    )
+    per_slot = build_matched_flex_kw_per_hour(
+        matrix, {"wallbox": target_kwh}, consumers=consumers
+    )
+    return [slot["wallbox"] for slot in per_slot]
+
+
+def test_matched_flex_never_exceeds_nominal_power(monkeypatch):
+    """A profile in two slots scaled to 5 kWh asks for 10 kW per slot: the excess moves on."""
+    from optimizer.slot_duration import energy_kwh_from_kw
+
+    powers = _capped_case(monkeypatch, 5.0)
+
+    assert max(powers) == pytest.approx(3.5)
+    assert energy_kwh_from_kw(powers) == pytest.approx(5.0)
+    # own slots first, then the following slots, nothing before the profile starts
+    assert powers[:2] == [0.0, 0.0]
+    assert powers[2:7] == pytest.approx([3.5] * 5)
+    assert powers[7] == pytest.approx(5.0 / 0.25 - 5 * 3.5)
+
+
+def test_matched_flex_undeliverable_target_is_capped_and_logged(monkeypatch, caplog):
+    from optimizer.slot_duration import energy_kwh_from_kw
+
+    with caplog.at_level("WARNING", logger="optimizer.sim_baseline"):
+        powers = _capped_case(monkeypatch, 10.0)
+
+    # eight slots at 3.5 kW hold 7 kWh
+    assert powers == pytest.approx([3.5] * 8)
+    assert energy_kwh_from_kw(powers) == pytest.approx(7.0)
+    assert "wallbox" in caplog.text and "3.000 kWh" in caplog.text
 
 
 def test_baseline_horizon_lower_soc_with_matrix_flex():
@@ -365,7 +416,7 @@ def test_matched_eauto_profile_shape_scaled_to_current_target():
         }
         for h in range(24)
     ]
-    target_kwh = 12.0
+    target_kwh = 2.0  # 2.67 kW in the three profile slots, below the 3.5 kW nominal power
     eauto = _eauto_historical_consumer()
     horizon_start = datetime(2025, 6, 17, 19, 0)
     ctx = historical_charging_context(

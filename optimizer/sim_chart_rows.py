@@ -235,21 +235,23 @@ def horizon_end_soc_percent(
     initial_soc: float,
     battery_params: dict,
 ) -> float:
-    """SoC nach der letzten Horizontstunde (Kette über alle chart_rows)."""
-    soc = float(initial_soc)
-    for row in chart_rows:
-        displayed = float(row[COL_SOC])
-        soc = displayed
-        batt = float(row.get(COL_BATTERIE_AKTION, 0.0) or 0.0)
-        soc, _ = bat.apply_soc_change(
-            soc,
-            batt,
-            battery_params["battery_capacity_kwh"],
-            battery_params["efficiency"],
-            battery_params["min_soc"],
-            battery_params["max_soc"],
-            dt_h=DEFAULT_DT_H,
-        )
+    """SoC after the last slot: its displayed start SoC plus its battery action.
+
+    Every row shows the SoC at its start, so the last row alone gives the end;
+    ``initial_soc`` is the answer for a run without rows.
+    """
+    if not chart_rows:
+        return round(float(initial_soc), 1)
+    last = chart_rows[-1]
+    soc, _ = bat.apply_soc_change(
+        float(last[COL_SOC]),
+        float(last.get(COL_BATTERIE_AKTION, 0.0) or 0.0),
+        battery_params["battery_capacity_kwh"],
+        battery_params["efficiency"],
+        battery_params["min_soc"],
+        battery_params["max_soc"],
+        dt_h=DEFAULT_DT_H,
+    )
     return round(soc, 1)
 
 

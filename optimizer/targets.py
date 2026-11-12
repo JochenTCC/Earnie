@@ -323,8 +323,10 @@ def resolve_horizon_consumer_targets_kwh(
     Flex-Zielenergie je Verbraucher für den gesamten Planungshorizont (einmalig).
     Kein erneutes Zählen bei Kalendertagwechsel im rollierenden Horizont.
     """
-    consumers_cfg = flexible_consumers or config.get_flexible_consumers(
-        optimizer_only=True
+    consumers_cfg = (
+        flexible_consumers
+        if flexible_consumers is not None
+        else config.get_flexible_consumers(optimizer_only=True)
     )
     if not optimization_matrix:
         return {c["id"]: 0.0 for c in consumers_cfg}
@@ -382,9 +384,13 @@ def resolve_matched_baseline_horizon_targets(
     optimization_matrix: list,
     consumer_daily_targets_kwh: dict | None = None,
     charging_contexts: dict[str, dict] | None = None,
+    *,
+    consumers: list | None = None,
 ) -> dict[str, float]:
     """
     Horizont-Ziele für BL-Ziel-Simulation.
+
+    ``consumers``: flex consumers of the window (default: the live scenario's).
 
     Verbraucher mit daily_target_source=config und daily_target_kwh=0, aber
     Profil-Energie im Horizont, erhalten die Profil-Summe als Ziel — sonst
@@ -393,16 +399,22 @@ def resolve_matched_baseline_horizon_targets(
     """
     from data import consumer_targets
 
+    consumers_cfg = (
+        consumers
+        if consumers is not None
+        else config.get_flexible_consumers(optimizer_only=True)
+    )
     targets = resolve_horizon_consumer_targets_kwh(
         optimization_matrix,
         consumer_daily_targets_kwh,
+        flexible_consumers=consumers_cfg,
     )
     contexts = charging_contexts or {}
     targets = apply_horizon_charging_limits(targets, contexts)
     profile_totals = consumer_targets.resolve_horizon_flex_targets_kwh(
-        optimization_matrix
+        optimization_matrix, consumers=consumers_cfg
     )
-    for consumer in config.get_flexible_consumers(optimizer_only=True):
+    for consumer in consumers_cfg:
         cid = consumer["id"]
         if (consumer.get("charging_schedule") or {}).get("enabled"):
             continue

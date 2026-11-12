@@ -1,6 +1,7 @@
 """Baseline and matched-baseline horizon simulation."""
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import NamedTuple, Sequence
@@ -19,12 +20,15 @@ from optimizer.milp_horizon import (
 from optimizer.rod_store import RodStoreBalance, next_level_kwh
 from optimizer.slot_duration import DEFAULT_DT_H
 from optimizer.sim_chart_rows import (
+    COL_VERBRAUCH_PROGNOSE,
     _chart_price_fields,
     _chart_row_slot_field,
     _finalize_chart_rows_for_display,
     _format_chart_uhrzeit,
 )
 from optimizer.targets import consumer_column_name
+
+logger = logging.getLogger(__name__)
 
 
 def _baseline_battery_params(
@@ -65,6 +69,8 @@ def build_matched_flex_kw_per_hour(
     ``consumers``: flex consumers of the window (default: the live scenario's).
     Zeitliche Form bleibt erhalten (auch unter Nennleistung); außerhalb des
     Ladezeitfensters null – wie im MILP. Live-Snapshot-Slots zählen nicht als Profil.
+    No slot exceeds the nominal power: the excess moves to other eligible slots
+    (``_cap_matched_flex_at_nominal``).
     """
     # Resolve via simulation facade so tests can monkeypatch
     # ``optimizer.simulation.config`` / ``consumer_charging_eligible_indices``.
@@ -91,39 +97,54 @@ def build_matched_flex_kw_per_hour(
         )
         eligible_by_consumer[cid] = set(eligible)
 
-    profile_sums: dict[str, float] = {c["id"]: 0.0 for c in consumers_cfg}
+    dt_h = float(DEFAULT_DT_H)
+    per_hour: list[dict[str, float]] = [{} for _ in range(hour_count)]
     for consumer in consumers_cfg:
         cid = consumer["id"]
-        eligible = eligible_by_consumer[cid]
-        for t, row in enumerate(rows):
-            if t not in eligible:
-                continue
-            profile_sums[cid] += _matched_baseline_profile_kw(row, consumer)
-
-    per_hour: list[dict[str, float]] = []
-    for t, row in enumerate(rows):
-        hour_flex: dict[str, float] = {}
-        for consumer in consumers_cfg:
-            cid = consumer["id"]
-            target = float(consumer_targets_kwh.get(cid, 0.0) or 0.0)
-            eligible = eligible_by_consumer[cid]
-            if t not in eligible:
-                hour_flex[cid] = 0.0
-                continue
-            eligible_count = len(eligible)
-            profile_sum = profile_sums[cid]
-            profile_val = _matched_baseline_profile_kw(row, consumer)
-            if profile_sum > 1e-6:
-                # target is kWh; profile_sum is Σ kW → scale so Σ(kW)*dt_h = target
-                hour_flex[cid] = profile_val * (
-                    target / (profile_sum * float(DEFAULT_DT_H))
-                )
-            elif target > 0 and eligible_count > 0:
-                hour_flex[cid] = target / (eligible_count * float(DEFAULT_DT_H))
-            else:
-                hour_flex[cid] = 0.0
-        per_hour.append(hour_flex)
+        target = float(consumer_targets_kwh.get(cid, 0.0) or 0.0)
+        eligible = sorted(eligible_by_consumer[cid])
+        profile_kw = {t: _matched_baseline_profile_kw(rows[t], consumer) for t in eligible}
+        profile_sum = sum(profile_kw.values())
+        if profile_sum > 1e-6:
+            # target is kWh; profile_sum is Σ kW → scale so Σ(kW)*dt_h = target
+            scale = target / (profile_sum * dt_h)
+            desired = {t: kw * scale for t, kw in profile_kw.items()}
+        elif target > 0 and eligible:
+            desired = {t: target / (len(eligible) * dt_h) for t in eligible}
+        else:
+            desired = {}
+        delivered = _cap_matched_flex_at_nominal(consumer, desired, eligible)
+        for t in range(hour_count):
+            per_hour[t][cid] = delivered.get(t, 0.0)
     return per_hour
+
+
+def _cap_matched_flex_at_nominal(
+    consumer: dict,
+    desired_kw: dict[int, float],
+    eligible: list[int],
+) -> dict[int, float]:
+    """No slot above the consumer's nominal power; the excess moves to other eligible slots.
+
+    A profile with its energy in a few slots, scaled to a larger target, would otherwise ask
+    for power the consumer cannot draw. Energy the eligible slots cannot take at nominal power
+    is left out and logged: the baseline then holds less than the target.
+    """
+    if not desired_kw:
+        return {}
+    max_kw = float(consumer["nominal_power_kw"])
+    delivered, undelivered_kw = _spread_with_power_cap(desired_kw, eligible, max_kw)
+    missing_kwh = undelivered_kw * float(DEFAULT_DT_H)
+    if missing_kwh > _ENERGY_EPSILON_KWH:
+        logger.warning(
+            "BL Ziel: Verbraucher '%s' erreicht sein Ziel nicht, es fehlen %.3f kWh "
+            "(%d zulässige Slots, max. %g kW).",
+            consumer["id"],
+            missing_kwh,
+            len(eligible),
+            max_kw,
+        )
+    return delivered
 
 
 _ENERGY_EPSILON_KWH = 1e-3
@@ -607,13 +628,15 @@ def _simulate_single_hour_baseline(
     battery_params: dict,
     flex_kw_override: dict[str, float] | None = None,
     steuerbefehl: str = "Baseline",
-    baseload_kw_override: float | None = None,
+    consumption_kw_override: float | None = None,
     *,
     consumers: list[dict] | None = None,
 ) -> tuple[float, dict]:
     """Simuliert eine einzelne Stunde im Baseline-Pfad.
 
     ``consumers`` names the flex columns of the chart row (default: the live scenario's).
+    ``consumption_kw_override``: consumption without flex, battery standby included (as in
+    the chart column), so no standby is added to it.
     """
     pv = row["expected_p_pv"]
     flex_kw = flex_kw_override if flex_kw_override is not None else (row.get("expected_flex_kw") or {})
@@ -624,8 +647,8 @@ def _simulate_single_hour_baseline(
         con = con + bat.standby_power_kw(battery_params)
         total_flex_power = 0.0
         flex_kw = {}
-    elif baseload_kw_override is not None:
-        con = float(baseload_kw_override) + bat.standby_power_kw(battery_params)
+    elif consumption_kw_override is not None:
+        con = float(consumption_kw_override)
         total_flex_power = sum(float(v or 0.0) for v in flex_kw.values())
     else:
         con = bat.effective_p_act(row, battery_params)
@@ -695,6 +718,19 @@ def _flex_kw_from_chart_row(
     }
 
 
+def _consumption_kw_of_optimized_row(
+    optimized_row: dict, row: dict, battery_params: dict
+) -> float:
+    """Consumption without flex of the optimized run, battery standby included.
+
+    The chart column already holds the standby; a row without the column gets the matrix
+    load plus standby.
+    """
+    if COL_VERBRAUCH_PROGNOSE in optimized_row:
+        return float(optimized_row[COL_VERBRAUCH_PROGNOSE] or 0.0)
+    return bat.effective_p_act(row, battery_params)
+
+
 def simulate_baseline_with_optimized_flex(
     optimization_matrix: list,
     optimized_rows: list,
@@ -717,8 +753,8 @@ def simulate_baseline_with_optimized_flex(
             battery_params,
             flex_kw_override=_flex_kw_from_chart_row(optimized_row, consumers),
             steuerbefehl="Baseline (Ziel)",
-            baseload_kw_override=float(
-                optimized_row.get("Verbrauch-Prognose (kW)", row["expected_p_act"]) or 0.0
+            consumption_kw_override=_consumption_kw_of_optimized_row(
+                optimized_row, row, battery_params
             ),
             consumers=consumers,
         )

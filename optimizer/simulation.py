@@ -89,6 +89,13 @@ from optimizer.sim_horizon_chart_soc import (  # noqa: F401  (re-exported)
 logger = logging.getLogger(__name__)
 
 
+def _consumers_or_configured(flexible_consumers: list | None) -> list:
+    """The given consumers, an empty list included; the configured ones only for ``None``."""
+    if flexible_consumers is not None:
+        return flexible_consumers
+    return config.get_flexible_consumers(optimizer_only=True)
+
+
 def _simulate_single_hour_optimizer(
     remaining_matrix: list,
     row: dict,
@@ -122,7 +129,7 @@ def _simulate_single_hour_optimizer(
         matrix_hour_index,
         len(remaining_matrix),
     )
-    consumers_cfg = flexible_consumers or config.get_flexible_consumers(optimizer_only=True)
+    consumers_cfg = _consumers_or_configured(flexible_consumers)
     mode, target_power, target_soc, consumer_powers, consumer_pv_follow, plan, _ = milp_optimizer(
         remaining_matrix,
         h,
@@ -212,7 +219,7 @@ def _prepare_horizon_state(
     current_soc_by_id: dict[str, float] | None = None,
 ) -> _HorizonSetup:
     """Bereitet Matrix, Lade-/Filterkontexte, Flex-Horizontgrenzen und Terminal-SoC auf."""
-    consumers_cfg = flexible_consumers or config.get_flexible_consumers(optimizer_only=True)
+    consumers_cfg = _consumers_or_configured(flexible_consumers)
     optimization_matrix, charging_contexts, consumer_daily_targets_kwh = (
         _matrix_and_charging_contexts(
             optimization_matrix,
@@ -512,6 +519,27 @@ def _booking_rows(
     return rows
 
 
+def _reject_slot_resolve_with_several_house_batteries(batteries: list[dict]) -> None:
+    """``commit_hours=1`` plans one battery: it cannot run a house with several.
+
+    The slot re-solve carries one plant SoC from slot to slot and gives the MILP the aggregate
+    of the batteries (capacity of the first, power of all). With several house batteries that
+    is a different plant, so the run stops instead of booking it. Open loop plans each battery.
+    """
+    from .milp_defaults import _default_inverter_params
+    from .milp_inverter import coerce_inverter_params_list, filter_house_balance_batteries
+
+    house = filter_house_balance_batteries(
+        batteries, coerce_inverter_params_list(_default_inverter_params())
+    )
+    if len(house) > 1:
+        ids = ", ".join(str(b.get("id") or "?") for b in house)
+        raise ValueError(
+            f"commit_hours=1 (Neuberechnung je Slot) unterstützt nur eine Hausbatterie, "
+            f"gefunden: {ids}. Mit mehreren Hausbatterien commit_hours > 1 (Open-Loop) verwenden."
+        )
+
+
 def _run_horizon_slots(
     setup: _HorizonSetup,
     initial_soc: float,
@@ -608,7 +636,8 @@ def simulate_horizon(
     """
     Simuliert einen Optimierungshorizont über die gesamte Matrix.
 
-    commit_hours=1: re-solve every matrix slot (Live MPC).
+    commit_hours=1: re-solve every matrix slot (Live MPC). One house battery only; with
+    several the run raises (the slot re-solve carries a single plant SoC).
     commit_hours=N (N>1): wall-clock hours → commit N/dt_h QH slots open-loop (SE).
     disable_horizon_soc_anchor: keine Terminal-/Sonnenaufgangs-SOC_min-Gleichheit.
     flex_book_hours / flex_book_start: Flex nur in Absolutstunden
@@ -653,6 +682,8 @@ def simulate_horizon(
         flexible_consumers=flexible_consumers,
         current_soc_by_id=current_soc_by_id,
     )
+    if commit_hours <= 1:
+        _reject_slot_resolve_with_several_house_batteries(setup.batteries)
     if booking_matrix is not None:
         setup = replace(
             setup,
