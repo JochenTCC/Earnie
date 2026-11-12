@@ -1,4 +1,4 @@
-# Project Roadmap & Backlog
+﻿# Project Roadmap & Backlog
 
 Completed items → [Backlog-Erledigt.md](Backlog-Erledigt.md)
 
@@ -54,6 +54,8 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 - [ ] **Ledger v2 — live check on the maintainer's install** `[feat]` *(Ledger P9, P10 and the heating rod are merged to `main`, `6d0e6ea9`, 2026-11-11; details in [Erledigt](Backlog-Erledigt.md))*: check the tile „Mit Earnie gespart“ with `savings_v: 2` on the productive install. Tracker row.
   - **Note:** no heating rod in the maintainer's productive log, so the check has no fuel day.
+
+  
 
 ### Version 2.+1 — epic **SUSI** prototype for the Energieinstitut (`feature/susi-prototyp`)
 
