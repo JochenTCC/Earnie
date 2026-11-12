@@ -1,16 +1,11 @@
 """Sidebar Info / About: Banner der Wahrheit, Version, Kontaktformular."""
 from __future__ import annotations
 
-import io
 import logging
-import zipfile
-from datetime import datetime
-from typing import Any
 from urllib.parse import quote
 
 import streamlit as st
 
-from runtime_store.config_pack import build_config_pack_bytes
 from ui.doc_links import MANUAL_URL
 from ui.github_issue_url import ISSUE_KIND_LABELS, build_github_issue_url
 from ui.truth_banner import (
@@ -24,16 +19,13 @@ from version import __version__
 
 logger = logging.getLogger(__name__)
 
-_CONTACT_ZIP_PREFIX = "earnie_kontakt"
-
-
 def build_mailto_url(topic: str, description: str) -> str:
-    """Build a private-support mailto (Layer C); reminder to attach the ZIP."""
+    """Build a private-support mailto (Layer C); reminder to attach the support package."""
     subject = (topic or "").strip() or "Earnie Support"
     body_parts = [
         (description or "").strip(),
         "",
-        "Bitte die heruntergeladene Kontakt-ZIP (Konfiguration + Anhänge) "
+        "Bitte das Support-Paket (Seitenleiste → Sichern & Übertragen) "
         "dieser E-Mail manuell anhängen.",
     ]
     body = "\n".join(body_parts).strip()
@@ -42,31 +34,6 @@ def build_mailto_url(topic: str, description: str) -> str:
         f"?subject={quote(subject, safe='')}"
         f"&body={quote(body, safe='')}"
     )
-
-
-def build_contact_bundle_bytes(
-    attachments: list[Any] | None,
-    *,
-    config_pack: bytes | None = None,
-) -> bytes:
-    """ZIP with config pack plus optional uploaded attachments."""
-    buffer = io.BytesIO()
-    with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-        pack = config_pack
-        if pack is None:
-            pack = build_config_pack_bytes()
-        if pack:
-            archive.writestr("earnie_config_pack.zip", pack)
-        for uploaded in attachments or []:
-            name = getattr(uploaded, "name", None) or "anhang.bin"
-            data = uploaded.getvalue() if hasattr(uploaded, "getvalue") else bytes(uploaded)
-            archive.writestr(f"anhänge/{name}", data)
-    return buffer.getvalue()
-
-
-def _contact_zip_filename() -> str:
-    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    return f"{_CONTACT_ZIP_PREFIX}_{stamp}.zip"
 
 
 def _render_info_links() -> None:
@@ -83,13 +50,15 @@ def _render_info_links() -> None:
     )
 
 
-def _render_contact_inputs() -> tuple[str, str, str, list[Any]]:
-    """Art / Thema / Beschreibung / Anhänge; returns them in that order."""
+def _render_contact_inputs() -> tuple[str, str, str]:
+    """Art / Thema / Beschreibung; returns them in that order."""
     st.markdown("#### Kontakt")
     st.caption(
         "Standardweg: **öffentliches** GitHub-Issue. Keine Passwörter, "
         "Hostnamen, Kundennamen oder vollständigen Config-/Debug-Dumps "
-        "einfügen. ZIP bleibt lokal — nur sichere Ausschnitte pasten."
+        "einfügen. Ein Support-Paket (Konfiguration, Logs, Anhänge) gibt es "
+        "unter **Sichern & Übertragen** — es bleibt lokal; nur sichere "
+        "Ausschnitte pasten."
     )
     kind = st.selectbox(
         "Art",
@@ -98,42 +67,14 @@ def _render_contact_inputs() -> tuple[str, str, str, list[Any]]:
     )
     topic = st.text_input("Thema", key="info_contact_topic")
     description = st.text_area("Beschreibung", key="info_contact_description")
-    attachments = st.file_uploader(
-        "Anhänge (nur für lokale ZIP)",
-        accept_multiple_files=True,
-        key="info_contact_attachments",
-    )
-    return kind, topic, description, list(attachments or [])
-
-
-def _render_contact_zip_download(attachments: list[Any]) -> None:
-    try:
-        bundle = build_contact_bundle_bytes(attachments)
-    except Exception as exc:  # noqa: BLE001 — surface to user
-        st.error(f"ZIP-Erstellung fehlgeschlagen: {exc}")
-        logger.exception("contact bundle export failed")
-        bundle = b""
-    if not bundle:
-        return
-    st.download_button(
-        label="Informationen in ZIP sammeln",
-        data=bundle,
-        file_name=_contact_zip_filename(),
-        mime="application/zip",
-        key="info_contact_zip_download",
-    )
-    st.caption(
-        "ZIP wird **nicht** hochgeladen. Für öffentliche Issues nur "
-        "sichere Ausschnitte pasten; für Vertrauliches die ZIP der "
-        f"Mail an {SUPPORT_EMAIL} anhängen."
-    )
+    return kind, topic, description
 
 
 def _render_private_support_expander(topic: str, description: str) -> None:
     with st.expander("Privater Support (Registry / vertraulich)"):
         st.caption(
             "Nur wenn öffentliche Issues ungeeignet sind: Registry-"
-            "Fingerprint, Zugangsdaten, vollständige Dumps. "
+            "Fingerprint, Zugangsdaten, Support-Paket. "
             f"Adresse: {SUPPORT_EMAIL}."
         )
         private_mailto = build_mailto_url(topic, description)
@@ -150,8 +91,7 @@ def render_info_sidebar() -> None:
         render_truth_banner(where="inline")
         render_registry_status_caption()
         _render_info_links()
-        kind, topic, description, attachments = _render_contact_inputs()
-        _render_contact_zip_download(attachments)
+        kind, topic, description = _render_contact_inputs()
         issue_url = build_github_issue_url(
             kind,
             topic,

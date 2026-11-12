@@ -15,6 +15,9 @@ from runtime_store.migration.steps.pool_filter import STEP as POOL_FILTER
 from runtime_store.migration.steps.flexible_consumers_overlay import (
     STEP as FLEX_OVERLAY,
 )
+from runtime_store.migration.steps.debug_dump_flag_removal import (
+    STEP as DEBUG_DUMP_FLAG_REMOVAL,
+)
 from runtime_store.migration.steps.ehal_http_port import STEP as EHAL_HTTP_PORT
 from runtime_store.migration.steps.ha_pull_removal import STEP as HA_PULL_REMOVAL
 from runtime_store.migration.steps.ha_sign import STEP as HA_SIGN
@@ -81,6 +84,7 @@ STEPS: tuple[MigrationStep, ...] = (
     HOUSE_GAINS,
     HOUSE_COOLING,
     WALLBOXES,
+    DEBUG_DUMP_FLAG_REMOVAL,
     TARIFF_FORMAT,
     GRID_AREA_LEVIES,
 )

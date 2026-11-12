@@ -2,7 +2,7 @@
 
 Earnie speichert die Haus- und Szenario-Konfiguration unter `earnie_env/config/`, Laufzeitdaten unter `earnie_env/runtime/`. Für neue Setups gilt `earnie_env/`. Ältere Installationen mit `./config` und `./runtime` bleiben über Umgebungsvariablen oder die bisherigen Pfade (Legacy-Pfade) nutzbar.
 
-Hausbezogene JSON- und CSV-Dateien sind **nicht** Teil des öffentlichen Earnie-Repos; sie liegen in einem privaten Repo oder werden per Junction eingebunden. Der veröffentlichte Tarifkatalog liegt unter `share/config/tariffs.json`. Details: [Private Haus-Config](../einrichtung/private-env.md). Für den Transfer zwischen Installationen dient weiterhin das ZIP aus der Sidebar.
+Hausbezogene JSON- und CSV-Dateien sind **nicht** Teil des öffentlichen Earnie-Repos; sie liegen in einem privaten Repo oder werden per Junction eingebunden. Der veröffentlichte Tarifkatalog liegt unter `share/config/tariffs.json`. Details: [Private Haus-Config](../einrichtung/private-env.md). Für den Transfer zwischen Installationen dient weiterhin das ZIP aus der Sidebar (**Sichern & Übertragen**).
 
 ## Auto-Speichern
 
@@ -12,10 +12,10 @@ Im Szenarienkonfigurator lassen sich gespeicherte Szenarien mit **Szenario entfe
 
 ## ZIP-Export / -Import (Sidebar)
 
-Die Streamlit-Seitenleiste bietet unter **„Konfiguration speichern / laden“** zwei Aktionen:
+Die Streamlit-Seitenleiste bündelt unter **„Sichern & Übertragen“** alles, was Daten aus Earnie heraus oder hinein bringt. Der Abschnitt **Konfiguration sichern / laden** bietet zwei Aktionen:
 
-- **ZIP herunterladen:** Packt die aktuellen JSON-Dateien und alle CSV-Dateien unter `uploads/` in ein ZIP.
-- **ZIP importieren:** Ersetzt nach einer Versionsprüfung dieselben Dateien durch die Inhalte des ZIP.
+- **Konfiguration herunterladen:** Packt die aktuellen JSON-Dateien und alle CSV-Dateien unter `uploads/` in ein ZIP.
+- **Konfiguration importieren (ZIP):** Ersetzt nach einer Versionsprüfung dieselben Dateien durch die Inhalte des ZIP.
 
 Enthaltene Dateien:
 
@@ -33,6 +33,8 @@ Enthaltene Dateien:
 | `uploads/*` | Profil-CSVs |
 
 **Nicht** enthalten ist `config/.env`. Die Zugangsdaten für Loxone und Home Assistant bleiben damit lokal.
+
+Darunter liegt im selben Menü das **Support-Paket** für Support-Anfragen (Konfiguration + Anhänge, oder vollständig mit Historie, Recorder und Logs) – siehe [Betrieb → Support-Paket](../einrichtung/betrieb.md#support-paket-debug-dump).
 
 ### Datenmodell-Version
 

@@ -2,9 +2,12 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 
 from settings.json_io import read_json_dict
+
+logger = logging.getLogger(__name__)
 
 _SILENT_MODE_KEYS = ("silent_mode", "loxone_silent_mode")
 
@@ -133,18 +136,51 @@ def load_ui_bool(raw_config: dict, key: str, default: bool) -> bool:
     return _validate_ui_bool(raw, f"ui.{key}")
 
 
-def load_ui_chart_debug_capture_enabled(
+_REMOVED_DEBUG_DUMP_KEY = "chart_debug_capture_enabled"
+_REMOVED_DEBUG_DUMP_ENV = "EARNIE_UI_CHART_DEBUG_CAPTURE_ENABLED"
+_warned_removed_debug_dump_sources: set[str] = set()
+
+
+def _warn_once(source: str, message: str, *args: object) -> None:
+    """Config is reloaded on every UI rerun; one warning per process is enough."""
+    if source in _warned_removed_debug_dump_sources:
+        return
+    _warned_removed_debug_dump_sources.add(source)
+    logger.warning(message, *args)
+
+
+def reject_removed_debug_dump_flag(
     raw_config: dict,
     local_settings: dict,
     local_settings_path: str,
-) -> bool:
-    """Chart-Debug-ZIP: local_settings.json überschreibt ui.chart_debug_capture_enabled."""
-    if "chart_debug_capture_enabled" in local_settings:
-        return _validate_ui_bool(
-            local_settings.get("chart_debug_capture_enabled"),
-            f"{local_settings_path} (chart_debug_capture_enabled)",
+) -> None:
+    """The Debug-Dump switch is gone; the support package is always available.
+
+    ``config.json`` is a pack file: a leftover key means the migration
+    ``dm6.debug_dump_flag_removal`` did not run, so fail loud. ``local_settings.json``
+    and the env var are machine-local and never block the daemon; they only warn.
+    """
+    ui = raw_config.get("ui")
+    if isinstance(ui, dict) and _REMOVED_DEBUG_DUMP_KEY in ui:
+        raise ValueError(
+            "Kritischer Konfigurationsfehler: ui.chart_debug_capture_enabled wurde "
+            "entfernt (Support-Paket ist immer verfügbar). Bitte die Konfig-Migration "
+            "ausführen (Assistent in der App oder python -m scripts.migrate_config)."
         )
-    return load_ui_bool(raw_config, "chart_debug_capture_enabled", False)
+    if _REMOVED_DEBUG_DUMP_KEY in local_settings:
+        _warn_once(
+            local_settings_path,
+            "%s: chart_debug_capture_enabled wird nicht mehr ausgewertet "
+            "(Support-Paket ist immer verfügbar) – Eintrag bitte löschen.",
+            local_settings_path,
+        )
+    if os.environ.get(_REMOVED_DEBUG_DUMP_ENV, "").strip():
+        _warn_once(
+            _REMOVED_DEBUG_DUMP_ENV,
+            "%s wird nicht mehr ausgewertet (Support-Paket ist immer verfügbar) – "
+            "Variable bitte entfernen.",
+            _REMOVED_DEBUG_DUMP_ENV,
+        )
 
 
 def load_shadow_feed_enabled(

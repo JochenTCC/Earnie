@@ -28,24 +28,21 @@ _CONFIG_ENV_KEYS = (
     "EARNIE_BACKTESTING_SCENARIOS_PATH",
     "EARNIE_OFFLINE",
     "EARNIE_RUNTIME_PATH",
-    "EARNIE_UI_CHART_DEBUG_CAPTURE_ENABLED",
     "EARNIE_LOCAL_SETTINGS_PATH",
 )
 
 
 @contextmanager
-def _chart_debug_config(tmp_path, monkeypatch, *, enabled: bool):
+def _chart_debug_config(tmp_path, monkeypatch):
     """Mini-Config für Tests; stellt danach Projekt-Config wieder her."""
     prev = {key: os.environ.get(key) for key in _CONFIG_ENV_KEYS}
     monkeypatch.setenv("EARNIE_OFFLINE", "1")
     monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path / "runtime"))
-    monkeypatch.delenv("EARNIE_UI_CHART_DEBUG_CAPTURE_ENABLED", raising=False)
     config_path, scenarios_path = write_minimal_config_tree(
         tmp_path,
         config_payload=minimal_config_payload(
             extra={
                 "ui": {
-                    "chart_debug_capture_enabled": enabled,
                     "chart_debug_capture_dir": "chart_debug",
                 }
             }
@@ -92,50 +89,13 @@ def _sample_bundle(now: datetime) -> OptimizationDisplayBundle:
     )
 
 
-def test_chart_debug_capture_config_default_disabled(tmp_path, monkeypatch):
-    with _chart_debug_config(tmp_path, monkeypatch, enabled=False):
-        assert config.get_ui_chart_debug_capture_enabled() is False
-
-
-def test_chart_debug_capture_config_enabled(tmp_path, monkeypatch):
-    with _chart_debug_config(tmp_path, monkeypatch, enabled=True):
-        assert config.get_ui_chart_debug_capture_enabled() is True
+def test_support_package_output_dir_default(tmp_path, monkeypatch):
+    with _chart_debug_config(tmp_path, monkeypatch):
         assert resolve_output_dir().endswith("chart_debug")
 
 
-def test_chart_debug_capture_env_overrides_config(tmp_path, monkeypatch):
-    with _chart_debug_config(tmp_path, monkeypatch, enabled=False):
-        monkeypatch.setenv("EARNIE_UI_CHART_DEBUG_CAPTURE_ENABLED", "1")
-        assert config.get_ui_chart_debug_capture_enabled() is True
-
-
-def test_chart_debug_capture_local_settings_override(tmp_path, monkeypatch):
-    prev = {key: os.environ.get(key) for key in _CONFIG_ENV_KEYS}
-    monkeypatch.setenv("EARNIE_OFFLINE", "1")
-    monkeypatch.delenv("EARNIE_UI_CHART_DEBUG_CAPTURE_ENABLED", raising=False)
-    config_path, scenarios_path = write_minimal_config_tree(tmp_path)
-    local_path = tmp_path / "local_settings.json"
-    local_path.write_text(
-        json.dumps({"chart_debug_capture_enabled": True}),
-        encoding="utf-8",
-    )
-    monkeypatch.setenv("EARNIE_CONFIG_PATH", config_path)
-    monkeypatch.setenv("EARNIE_BACKTESTING_SCENARIOS_PATH", scenarios_path)
-    monkeypatch.setenv("EARNIE_LOCAL_SETTINGS_PATH", str(local_path))
-    config.reinit_config()
-    try:
-        assert config.get_ui_chart_debug_capture_enabled() is True
-    finally:
-        for key, value in prev.items():
-            if value is None:
-                monkeypatch.delenv(key, raising=False)
-            else:
-                monkeypatch.setenv(key, value)
-        config.reinit_config()
-
-
 def test_write_capture_zip_contains_manifest(tmp_path, monkeypatch):
-    with _chart_debug_config(tmp_path, monkeypatch, enabled=True):
+    with _chart_debug_config(tmp_path, monkeypatch):
         rules_path = tmp_path / "deviation_rules.json"
         model_path = tmp_path / "runtime" / "price_model_coefficients.json"
         cons_data_path = tmp_path / "runtime" / "cons_data.csv"
@@ -235,7 +195,7 @@ def test_write_capture_zip_contains_manifest(tmp_path, monkeypatch):
 
 
 def test_build_capture_payload_json_safe(tmp_path, monkeypatch):
-    with _chart_debug_config(tmp_path, monkeypatch, enabled=True):
+    with _chart_debug_config(tmp_path, monkeypatch):
         now = datetime(2026, 7, 5, 23, 0, tzinfo=_TZ)
         bundle = OptimizationDisplayBundle(
             savings_info={},

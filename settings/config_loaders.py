@@ -77,6 +77,9 @@ def load_system_and_ui_params(
     config_path: str,
 ) -> dict[str, Any]:
     local_settings = load_local_settings_document(local_settings_path)
+    system_settings.reject_removed_debug_dump_flag(
+        raw_config, local_settings, local_settings_path
+    )
     return {
         "GLOBAL_TIMEOUT": get_strict(raw_config, ["system", "global_timeout"], config_path),
         "LOOP_TIMEOUT": get_strict(raw_config, ["system", "loop_timeout"], config_path),
@@ -94,9 +97,6 @@ def load_system_and_ui_params(
         ),
         "UI_MAIN_SYNC_POLL_SEC": system_settings.load_ui_fragment_refresh_sec(
             raw_config, "main_sync_poll_sec", 15
-        ),
-        "UI_CHART_DEBUG_CAPTURE_ENABLED": system_settings.load_ui_chart_debug_capture_enabled(
-            raw_config, local_settings, local_settings_path
         ),
         "UI_CHART_DEBUG_CAPTURE_DIR": system_settings.load_ui_chart_debug_capture_dir(
             raw_config

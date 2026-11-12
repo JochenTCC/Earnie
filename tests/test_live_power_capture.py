@@ -101,8 +101,8 @@ def test_read_live_power_kw_logs_and_returns_none_on_error(monkeypatch):
     assert ehal_live.read_live_power_kw() is None
 
 
-def test_ui_save_debug_dump_writes_captured_live_power(monkeypatch):
-    from ui import chart_debug_capture as ui_capture
+def test_ui_support_package_writes_captured_live_power(monkeypatch):
+    from ui import support_package as ui_capture
 
     captured = {
         "live_power": dict(_POWER),
@@ -114,6 +114,16 @@ def test_ui_save_debug_dump_writes_captured_live_power(monkeypatch):
         seen.update(kwargs)
         return {"live_power": kwargs["live_power"]}
 
+    monkeypatch.setattr(
+        ui_capture,
+        "st",
+        SimpleNamespace(
+            session_state={
+                ui_capture.SESSION_LIVE_DISPLAY_BUNDLE: SimpleNamespace(),
+                ui_capture._SESSION_LIVE_SOC: 55.0,
+            }
+        ),
+    )
     monkeypatch.setattr(ui_capture, "capture_live_power", lambda: captured)
     monkeypatch.setattr(ui_capture, "build_chart_section", _build_chart_section)
     monkeypatch.setattr(ui_capture, "_session_meta", lambda: {})
@@ -124,11 +134,12 @@ def test_ui_save_debug_dump_writes_captured_live_power(monkeypatch):
         lambda **kwargs: seen.setdefault("zip_kwargs", kwargs) and "dump.zip",
     )
 
-    path = ui_capture._save_debug_dump(
-        SimpleNamespace(), 55.0, title=" t ", symptom=" s "
+    path = ui_capture.save_full_support_package(
+        title=" t ", symptom=" s ", attachments=[]
     )
 
     assert path == "dump.zip"
     assert seen["live_power"] == _POWER
     assert seen["live_power_capture"] == captured["live_power_capture"]
     assert seen["zip_kwargs"]["chart_payload"] == {"live_power": _POWER}
+    assert seen["current_soc"] == 55.0

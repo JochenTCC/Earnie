@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 import config
 from tests.config_fixtures import minimal_config_payload, write_minimal_config_tree
 
@@ -117,27 +119,47 @@ def test_loxone_silent_mode_local_settings_overrides_central_config(tmp_path, mo
     assert cfg.is_loxone_silent_mode() is True
 
 
-def test_chart_debug_capture_local_settings_overrides_config(tmp_path, monkeypatch):
+def test_removed_debug_dump_flag_in_config_fails_loud(tmp_path, monkeypatch):
     monkeypatch.setenv("EARNIE_OFFLINE", "1")
-    monkeypatch.delenv("EARNIE_UI_CHART_DEBUG_CAPTURE_ENABLED", raising=False)
     config_path, scenarios_path = write_minimal_config_tree(
         tmp_path,
         config_payload=minimal_config_payload(
             extra={"ui": {"chart_debug_capture_enabled": False}}
         ),
     )
+    with pytest.raises(ValueError, match="chart_debug_capture_enabled wurde entfernt"):
+        config.Config(
+            config_path=config_path,
+            backtesting_scenarios_path=scenarios_path,
+            local_settings_path=str(tmp_path / "local_settings.json"),
+            require_loxone_credentials=False,
+        )
+
+
+def test_removed_debug_dump_flag_in_local_settings_only_warns(
+    tmp_path, monkeypatch, caplog
+):
+    from settings import system_settings
+
+    monkeypatch.setenv("EARNIE_OFFLINE", "1")
+    monkeypatch.setenv("EARNIE_UI_CHART_DEBUG_CAPTURE_ENABLED", "1")
+    monkeypatch.setattr(system_settings, "_warned_removed_debug_dump_sources", set())
+    config_path, scenarios_path = write_minimal_config_tree(tmp_path)
     local_path = tmp_path / "local_settings.json"
     local_path.write_text(
         json.dumps({"chart_debug_capture_enabled": True}),
         encoding="utf-8",
     )
-    cfg = config.Config(
-        config_path=config_path,
-        backtesting_scenarios_path=scenarios_path,
-        local_settings_path=str(local_path),
-        require_loxone_credentials=False,
-    )
-    assert cfg.get_ui_chart_debug_capture_enabled() is True
+    with caplog.at_level("WARNING", logger="settings.system_settings"):
+        for _ in range(2):
+            config.Config(
+                config_path=config_path,
+                backtesting_scenarios_path=scenarios_path,
+                local_settings_path=str(local_path),
+                require_loxone_credentials=False,
+            )
+    messages = [r.getMessage() for r in caplog.records if "nicht mehr ausgewertet" in r.getMessage()]
+    assert len(messages) == 2  # local_settings + env var, once each
 
 
 def test_shadow_feed_from_local_settings(tmp_path, monkeypatch):
@@ -248,7 +270,7 @@ def test_write_silent_mode_preserves_other_keys(tmp_path):
         json.dumps(
             {
                 "silent_mode": True,
-                "chart_debug_capture_enabled": True,
+                "recorder_enabled": True,
                 "shadow_feed_enabled": True,
             }
         ),
@@ -257,7 +279,7 @@ def test_write_silent_mode_preserves_other_keys(tmp_path):
     write_silent_mode_to_local_settings(str(local_path), False)
     data = json.loads(local_path.read_text(encoding="utf-8"))
     assert data["silent_mode"] is False
-    assert data["chart_debug_capture_enabled"] is True
+    assert data["recorder_enabled"] is True
     assert data["shadow_feed_enabled"] is True
     assert "loxone_silent_mode" not in data
     assert "earnie_data_model" not in data
@@ -270,13 +292,13 @@ def test_write_silent_mode_replaces_legacy_key(tmp_path, monkeypatch):
     config_path, scenarios_path = _write_minimal_config(tmp_path)
     local_path = tmp_path / "local_settings.json"
     local_path.write_text(
-        json.dumps({"loxone_silent_mode": True, "chart_debug_capture_enabled": False}),
+        json.dumps({"loxone_silent_mode": True, "recorder_enabled": False}),
         encoding="utf-8",
     )
     write_silent_mode_to_local_settings(str(local_path), False)
     data = json.loads(local_path.read_text(encoding="utf-8"))
     assert data == {
-        "chart_debug_capture_enabled": False,
+        "recorder_enabled": False,
         "silent_mode": False,
     }
     cfg = config.Config(

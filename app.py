@@ -107,7 +107,7 @@ def main() -> None:
         require_loxone_credentials_for_config,
     )
     from ui.chunk_load_recovery import inject_chunk_load_recovery
-    from ui.config_pack import render_config_pack_sidebar
+    from ui.config_pack import render_backup_transfer_sidebar
     from ui.flash import render_flash_notices
     from ui.info_sidebar import render_info_sidebar, render_missing_next_month_tariff_sidebar
     from ui.mode_selector import get_enabled_ui_mode_keys, render_ui_mode_env_notices
@@ -138,7 +138,7 @@ def main() -> None:
     inject_single_file_uploader_css()
     inject_checkbox_highlight_css()
     render_ui_mode_env_notices()
-    render_config_pack_sidebar()
+    render_backup_transfer_sidebar()
     render_setup_progress_notice()
     render_missing_next_month_tariff_sidebar()
     _render_downgrade_warning()

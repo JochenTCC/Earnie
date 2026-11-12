@@ -52,7 +52,7 @@ Earnie ist unabhängig von Energieversorger und Systemlieferant.
 
 ### Support
 
-- **Kontakt in der App:** In der Sidebar unter **Info / About** Art, Thema und Beschreibung eintragen, dann **GitHub-Issue öffnen**. Issues sind öffentlich, daher gehören keine Zugangsdaten oder andere Geheimnisse hinein. Optional stellt **Informationen in ZIP sammeln** eine ZIP zusammen, die lokal bleibt.
+- **Kontakt in der App:** In der Sidebar unter **Info / About** Art, Thema und Beschreibung eintragen, dann **GitHub-Issue öffnen**. Issues sind öffentlich, daher gehören keine Zugangsdaten oder andere Geheimnisse hinein. Ein ZIP für den Support (nur Konfiguration oder vollständig mit Historie und Logs) erstellt **Sichern & Übertragen → Support-Paket**; es bleibt lokal.
 - **Registry und Vertrauliches:** Expander **Privater Support** an `support@earnie-hems.com`.
 - **Projekt und Issues:** [GitHub – JochenTCC/Earnie](https://github.com/JochenTCC/Earnie/issues)
 - **Website:** [earnie-hems.com](https://earnie-hems.com)
@@ -119,7 +119,7 @@ Unter **Konfiguration → Hauskonfigurator** werden die baulichen und technische
 
 Die Sidebar zeigt, welche Schritte der Ersteinrichtung noch fehlen.
 
-Änderungen im Hauskonfigurator und im Szenarienkonfigurator speichert Earnie **automatisch**. Komplette Konfigurationspakete (ZIP) lassen sich in der Sidebar unter **„Konfiguration speichern / laden“** exportieren und importieren – siehe [Speichern / Laden](../konfiguration/speichern-laden.md).
+Änderungen im Hauskonfigurator und im Szenarienkonfigurator speichert Earnie **automatisch**. Komplette Konfigurationspakete (ZIP) lassen sich in der Sidebar unter **„Sichern & Übertragen“** exportieren und importieren – siehe [Speichern / Laden](../konfiguration/speichern-laden.md).
 
 #### Hausprofil anlegen
 
@@ -573,7 +573,7 @@ Die signierte Datei lässt sich **nicht selbst erzeugen**. Earnie berechnet nur 
    Die Ausgabe enthält `fingerprint=` (vollständig) und `fingerprint_display=` (Kurzform).
 4. Über **Info / About → Registry per E-Mail anfordern** an `support@earnie-hems.com` senden. Betreff („Earnie Registry“), Fingerprint und Datenschutzhinweis sind im Mailtext bereits enthalten.
   - Die Speicherung der Absenderadresse für Supportzwecke ist standardmäßig aus (**Nein**, DSGVO); bei Bedarf auf **Ja** stellen.
-  - Optional die Kontakt-ZIP über **Privater Support** anhängen – nicht in öffentlichen GitHub-Issues.
+  - Optional das Support-Paket (**Sichern & Übertragen**) an die Mail anhängen – nicht in öffentlichen GitHub-Issues.
 5. Die Antwort enthält die Datei `earnie_registry.json`.
 6. Datei ablegen:
 

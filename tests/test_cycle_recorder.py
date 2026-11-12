@@ -255,10 +255,8 @@ def test_debug_dump_includes_recorder_window(tmp_path, monkeypatch):
         monkeypatch,
         local={
             "silent_mode": False,
-            "chart_debug_capture_enabled": True,
         },
     )
-    monkeypatch.setenv("EARNIE_UI_CHART_DEBUG_CAPTURE_ENABLED", "1")
     # Re-apply dump-friendly ui via config tree already written; ensure history exists.
     runtime = tmp_path / "runtime"
     runtime.mkdir(parents=True, exist_ok=True)

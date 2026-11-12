@@ -159,6 +159,7 @@ def test_per_step_detect_apply_smoke(tmp_path):
         "dm5.house_gains": "v5_pre_heating_systems",
         "dm5.house_cooling": "v5_pre_heating_systems",
         "dm6.wallboxes": "v5_pre_heat_source",
+        "dm6.debug_dump_flag_removal": "v5_pre_heat_source",
         "tf1.tariff_format": "v4_pre_tariff_track",
         "tf1.grid_area_levies": "v5_pre_grid_levies",
     }

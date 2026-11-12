@@ -33,7 +33,6 @@ _CONFIG_ENV_KEYS = (
     "EARNIE_BACKTESTING_SCENARIOS_PATH",
     "EARNIE_OFFLINE",
     "EARNIE_RUNTIME_PATH",
-    "EARNIE_UI_CHART_DEBUG_CAPTURE_ENABLED",
     "EARNIE_LOCAL_SETTINGS_PATH",
 )
 
@@ -43,13 +42,11 @@ def _dump_config(tmp_path, monkeypatch):
     prev = {key: os.environ.get(key) for key in _CONFIG_ENV_KEYS}
     monkeypatch.setenv("EARNIE_OFFLINE", "1")
     monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path / "runtime"))
-    monkeypatch.delenv("EARNIE_UI_CHART_DEBUG_CAPTURE_ENABLED", raising=False)
     config_path, scenarios_path = write_minimal_config_tree(
         tmp_path,
         config_payload=minimal_config_payload(
             extra={
                 "ui": {
-                    "chart_debug_capture_enabled": True,
                     "chart_debug_capture_dir": "chart_debug",
                 }
             }
@@ -144,7 +141,6 @@ def test_write_debug_dump_zip_uses_volume_runtime_when_earnie_env_empty(
         config_payload=minimal_config_payload(
             extra={
                 "ui": {
-                    "chart_debug_capture_enabled": True,
                     "chart_debug_capture_dir": "chart_debug",
                 }
             }
@@ -233,6 +229,38 @@ def test_write_debug_dump_zip_without_chart(tmp_path, monkeypatch):
         assert "runtime/powerstation_reserves.json" in manifest["files"][
             "optional_present"
         ]
+
+
+def test_write_debug_dump_zip_includes_logs_run_stats_and_attachments(
+    tmp_path, monkeypatch
+):
+    with _dump_config(tmp_path, monkeypatch):
+        _write_history(tmp_path)
+        runtime = tmp_path / "runtime"
+        for name in ("earnie.log", "main_stdio.log"):
+            (runtime / name).write_text("log line\n", encoding="utf-8")
+        (runtime / "cycle_stats.jsonl").write_text("{}\n", encoding="utf-8")
+        (runtime / "daemon_heartbeat.json").write_text("{}", encoding="utf-8")
+        zip_path = write_debug_dump_zip(
+            captured_at=datetime(2026, 7, 16, 8, 0, 0),
+            attachments=[
+                (r"C:\Users\x\screen.png", b"png"),
+                ("screen.png", b"png2"),
+            ],
+        )
+    with zipfile.ZipFile(zip_path) as archive:
+        names = set(archive.namelist())
+        for name in (
+            "runtime/earnie.log",
+            "runtime/main_stdio.log",
+            "runtime/cycle_stats.jsonl",
+            "runtime/daemon_heartbeat.json",
+        ):
+            assert name in names
+        assert archive.read("anhaenge/screen.png") == b"png"
+        assert archive.read("anhaenge/screen_2.png") == b"png2"
+        manifest = json.loads(archive.read("manifest.json"))
+        assert manifest["attachments"] == ["anhaenge/screen.png", "anhaenge/screen_2.png"]
 
 
 def test_write_debug_dump_zip_with_chart(tmp_path, monkeypatch):

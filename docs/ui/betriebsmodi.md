@@ -27,12 +27,12 @@ Einige Seiten hängen nicht von `EARNIE_UI_MODES` ab:
 - **Hauskonfigurator** und **Szenarienkonfigurator:** Sie werden je nach Fortschritt der Einrichtung freigeschaltet (`ui/setup_readiness.py`).
 - **Analyse Verbrauch & Kosten:** Die Seite erscheint nur mit `live_environment` und nur im Abschnitt Live-Cockpit. Ohne Live-Verbindung zur Smarthome-Steuerung zeigt sie einen Hinweis statt der Analyse. Die Analyse nutzt rollierende **7-/28-Tage**-Charts (keine Kalenderwochen) und eine Kennzahl über die letzten **365 Tage** vorhandener Log-Daten.
 
-Die Sidebar enthält oben Setup-Hinweise und **„Konfiguration speichern / laden“**. Diese Funktion exportiert und importiert die Config-Sidecars und `uploads/` als ZIP (siehe [Speichern / Laden](../konfiguration/speichern-laden.md)).
+Die Sidebar enthält oben Setup-Hinweise und **„Sichern & Übertragen“**. Dort liegen der Export und Import der Config-Sidecars und `uploads/` als ZIP (siehe [Speichern / Laden](../konfiguration/speichern-laden.md)) und das Support-Paket (siehe [Betrieb → Support-Paket](../einrichtung/betrieb.md#support-paket-debug-dump)).
 
 Unten in der Sidebar liegt der Abschnitt **Info / About** mit folgenden Inhalten:
 
 - Banner der Wahrheit und Version.
-- Kontakt über ein **GitHub-Issue** mit Art, Thema und Beschreibung; optional eine lokale Kontakt-ZIP.
+- Kontakt über ein **GitHub-Issue** mit Art, Thema und Beschreibung; ein lokales ZIP für den Support erstellt **Sichern & Übertragen → Support-Paket**.
 - Privater Ausnahmekanal `support@earnie-hems.com` für Registry-Anfragen und vertrauliche Inhalte.
 
 ### Navigationsabschnitte (nach vollständiger Einrichtung)

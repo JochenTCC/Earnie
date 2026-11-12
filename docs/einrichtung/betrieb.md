@@ -66,7 +66,9 @@ Earnie rechnet mit dem Paar aus Auto und Wallbox: größerer Mindeststrom, klein
 
 Steht dasselbe E-Auto (gleiche Kennung) in mehreren Hausprofilen, legt der Schritt eine gemeinsame Wallbox an, solange Leistung, Spannung, Phasen und Lade-Bindings übereinstimmen. Unterscheiden sie sich, stoppt die Migration mit Hinweis auf das Hausprofil: Ein E-Auto gehört zu genau einem Hausprofil. Vor der Migration die Werte angleichen oder das E-Auto in einem Profil umbenennen.
 
-Ohne diese Migration lädt Earnie Hausprofile mit `nominal_power_kw` oder `min_power_kw` am E-Auto nicht; die Meldung verweist auf den Assistenten. Details: [E-Auto und Wallbox](../konfiguration/flexible-verbraucher.md#e-auto-und-wallbox-ladestrom).
+Im selben Datenmodell entfernt **`dm6.debug_dump_flag_removal`** den Schalter `ui.chart_debug_capture_enabled` aus `config.json`: Das Support-Paket ist immer verfügbar (Seitenleiste → **Sichern & Übertragen**). Bleibt der Schlüssel stehen, lädt Earnie die Config nicht. Ein noch vorhandener Eintrag in `runtime/local_settings.json` oder die Umgebungsvariable `EARNIE_UI_CHART_DEBUG_CAPTURE_ENABLED` blockieren nichts; Earnie schreibt nur eine Warnung ins Log – beides bitte entfernen.
+
+Ohne die Wallbox-Migration lädt Earnie Hausprofile mit `nominal_power_kw` oder `min_power_kw` am E-Auto nicht; die Meldung verweist auf den Assistenten. Details: [E-Auto und Wallbox](../konfiguration/flexible-verbraucher.md#e-auto-und-wallbox-ladestrom).
 
 ### Loxone: alte Merkernamen behalten oder leeren
 
@@ -186,7 +188,7 @@ Standardverzeichnis: `earnie_env/runtime/`. Es lässt sich mit `EARNIE_RUNTIME_P
 | `live_optimization_debug.json`  | Anzeige-Snapshot des Optimierungs-Horizonts (von `main.py` geschrieben, von der App gelesen). |
 | `edibert_market/market_<zone>.json` | Cache der Live-Day-Ahead-Preise (QH, letzte 7 Tage bis morgen; Zone z. B. `AT`; Quelle ENTSO-E, Energy-Charts oder aWATTar). Deckt er das erwartete Fenster ab, fragt Earnie keine Quelle. Die alte Datei `live_day_ahead_<zone>.json` wird nicht mehr gelesen und kann gelöscht werden. |
 | `edibert_market/market_archive/<zone>/` | Monats-Cache der Börsenpreise für Szenario-Explorer und Backtesting (`JJJJ-MM.json`, Quelle Energy-Charts). Abgeschlossene Monate werden nicht erneut abgefragt; löschen erzwingt einen neuen Abruf. |
-| `local_settings.json`           | Lokale Betriebseinstellungen, z. B. `silent_mode` (auch über die Seite **Optimierer-Dienst**), `chart_debug_capture_enabled` und die Cycle-Recorder-Schlüssel `recorder_enabled` / `recorder_retention_days`. |
+| `local_settings.json`           | Lokale Betriebseinstellungen, z. B. `silent_mode` (auch über die Seite **Optimierer-Dienst**) und die Cycle-Recorder-Schlüssel `recorder_enabled` / `recorder_retention_days`. |
 | `recorder/`                     | Cycle-Recorder-Ringpuffer (`cycles_YYYY-MM-DD.jsonl.gz`, Config-Snapshots unter `configs/`). Enthält Lastprofile für die Regression; bleibt lokal und ist standardmäßig an. |
 | `timing/`                       | Optional: Phasen-Zeiten des Live-Zyklus (`cycles.jsonl`). Nur bei `EARNIE_CYCLE_TIMING=1`. |
 | `profile/`                      | Optional: `cProfile`-Dumps (`cycle_*.prof`, `*_top30.txt`). Nur bei `EARNIE_CYCLE_PROFILE=1`, und nur kurz aktiv lassen. |
@@ -274,7 +276,7 @@ Earnie speichert die Eingaben jedes Optimierungszyklus in einem lokalen Ringpuff
 
 - **Standard:** an. Abschalten mit `recorder_enabled: false` in `runtime/local_settings.json`.
 - **Aufbewahrung:** `recorder_retention_days` (Standard 7 Tage).
-- **Debug-Dump:** Ein Debug-Dump (siehe unten) enthält das aktuelle Recorder-Fenster und sollte nur an den Maintainer gehen.
+- **Support-Paket:** Das vollständige Support-Paket (siehe [unten](#support-paket-debug-dump)) enthält das aktuelle Recorder-Fenster und sollte nur an den Maintainer gehen.
 
 ### Log- und Historiendateien
 
@@ -307,7 +309,6 @@ Betriebsstatus der wichtigsten Log-, Historien- und Debug-Dateien (Review 2026-0
 | `EARNIE_UI_MODES`                       | Kommagetrennt: `sunset2sunset` (Monitor, Manuelle Geräte), `scenario_explorer`, `live_environment` (Smarthome-Backend, EHAL-Com, Optimierer-Dienst, Analyse Verbrauch & Kosten), `price_forecast`. Ohne Variable gilt `sunset2sunset,scenario_explorer,live_environment` (`price_forecast` nur bei `ui.price_forecast_page_enabled=true`). Die Compose-Dateien für den Produktivbetrieb setzen oft `sunset2sunset,live_environment`, die Cloud `scenario_explorer`. Siehe [Betriebsmodi](../ui/betriebsmodi.md). |
 | `EARNIE_UI_STREAMLIT_PORT`              | TCP-Port für Streamlit (überschreibt `ui.streamlit_port`; siehe [Streamlit-Ports](../dev/streamlit-ports.md)).                                                                                                                  |
 | `EARNIE_EHAL_HTTP_PORT`                 | TCP-Port für den Daemon-HTTP (`Earnie_Request_Optimize` / Telemetry inkl. Heartbeat / `status.json`). Überschreibt `system.ehal_http_port`; Standard **8541**. Alter Name `EARNIE_EHAL_LOXONE_HTTP_PORT` gilt weiter.                  |
-| `EARNIE_UI_CHART_DEBUG_CAPTURE_ENABLED` | `1` = Button „Debug-Dump speichern“ im Cockpit (überschreibt `ui.chart_debug_capture_enabled`; ZIP unter `runtime/chart_debug/`). |
 | `EARNIE_AUTO_START_MAIN`                | `1` = beim Start von `scripts.run_streamlit` automatisch `main.py` starten, falls es nicht schon läuft (Docker-Compose setzt das). Ohne Variable bzw. lokal: aus.                                                                     |
 | `EARNIE_OFFLINE`                        | `1` = keine Loxone-/Live-Verbindung erforderlich. Der Bootstrap füllt leere Entitäts-IDs im Live-Szenario aus den Katalogen. Sinnvoll für die Streamlit Community Cloud. |
 | `EARNIE_OPEN_METEO_CACHE_PATH`          | Verzeichnis für den Open-Meteo-Klimacache (Standard: `data/cache/open_meteo_utc`; das frühere `data/cache/open_meteo` wird nicht mehr gelesen und kann gelöscht werden). Vor allem für Tests und Container mit eigenem Cache-Volume. |
@@ -391,30 +392,33 @@ Wurde in einer Sitzung eine Simulation im **Szenario-Explorer** gestartet, kann 
 - **Einmalig:** Nach **Senden** oder **Abbrechen** fragt Earnie auf dieser Installation nicht erneut. Der Zustand liegt in `runtime/feature_reviews.json`. In der Streamlit Community Cloud (`EARNIE_CLOUD_DEMO=1`) liegt `runtime/` im temporären Workspace der Browser-Sitzung. Dort gilt „einmalig“ deshalb nur pro Sitzung; in einer neuen Sitzung kann der Dialog wieder erscheinen.
 - **Endpunkt:** fest in der App hinterlegt (`https://cloudserver.earnie-hems.com/review`). Schlägt das Senden fehl, zeigt der Dialog eine Fehlermeldung; die Optimierung ist nicht betroffen.
 
-## Debug-Dump
+## Support-Paket (Debug-Dump)
 
-Ein Debug-Dump hilft, Anzeige- oder Optimierungsprobleme nachzuvollziehen, ohne die Produktivdateien erneut zu durchsuchen. Aktiviert wird er über `ui.chart_debug_capture_enabled`, `local_settings.json` oder die Umgebungsvariable (siehe [Umgebungsvariablen](#umgebungsvariablen-optional)).
+Das Support-Paket hilft, Anzeige- und Optimierungsprobleme nachzuvollziehen, ohne die Produktivdateien erneut zu durchsuchen. Es ist immer verfügbar: Seitenleiste → **Sichern & Übertragen** → **Support-Paket**. Ein Schalter wird nicht mehr gebraucht (der frühere Schlüssel `ui.chart_debug_capture_enabled` wird per Migration entfernt, siehe [Datenmodell 6](#datenmodell-6-wallboxen)).
 
-Ablauf im Live-Cockpit:
+Ablauf:
 
-1. „Debug-Dump speichern“ anklicken.
-2. Im Dialog optional Titel/Symptom eintragen.
-3. „ZIP erstellen“ wählen (nur speichern) oder „ZIP erstellen und herunterladen“ (speichern und Browser-Download in einem Schritt).
+1. Optional Anhänge hochladen (z. B. Screenshots).
+2. Variante wählen:
+   - **Konfiguration + Anhänge herunterladen:** nur das Konfigurations-ZIP (wie unter [Speichern / Laden](../konfiguration/speichern-laden.md)) plus Anhänge – ohne Historie und Logs. Hilft nur bei Fragen, die **nicht** den Live-Betrieb betreffen (Einrichtung, Hausprofil, Szenarien, Backtesting).
+   - **Support-Paket erstellen:** das vollständige Paket für Fragen zum Live-Betrieb. Optional Titel und Symptom eintragen, dann **Support-Paket erstellen** und anschließend **Support-Paket herunterladen**.
 
-Ein Dump enthält immer die volle Optimierungshistorie und die aktiven Inputs. Die Chart-Daten der Oberfläche (UI-Payload) schreibt Earnie mit, wenn die Live-Anzeige (Display-Bundle) vorhanden ist. Sonst enthält der Dump nur Historie und Inputs; die UI weist darauf hin.
+Das vollständige Paket enthält immer die volle Optimierungshistorie und die aktiven Inputs. Die Chart-Daten der Oberfläche (UI-Payload) schreibt Earnie mit, wenn die Monitor-Seite in dieser Browser-Sitzung schon geöffnet war (Stand: letzter Besuch der Seite); sonst fehlen sie.
 
 | Inhalt | Pflicht / optional |
 | ------ | ------------------ |
 | `runtime/optimization_history.jsonl` | Pflicht (vollständig) |
-| `optimizer_run_state.json`, `live_optimization_debug.json`, `flexible_consumers_state.json`, `pv_counter_state.json`, `powerstation_reserves.json`, `capacity_peaks.json`, `capacity_peaks_observe.json`, `capacity_peaks_observe_measured.json`, `import_cap_report.json` | Optional, falls vorhanden |
+| `optimizer_run_state.json`, `live_optimization_debug.json`, `flexible_consumers_state.json`, `pv_counter_state.json`, `powerstation_reserves.json`, `capacity_peaks.json`, `capacity_peaks_observe.json`, `capacity_peaks_observe_measured.json`, `import_cap_report.json`, `cycle_stats.jsonl`, `daemon_heartbeat.json` | Optional, falls vorhanden |
+| `earnie.log`, `main_stdio.log` | Optional, falls vorhanden (aktueller Monat) |
 | `recorder/` (Cycle-Recorder-Ringpuffer inkl. Config-Snapshots) | Optional. Fenster = Retention (Default 7 Tage); enthält Lastprofile. |
-| `manifest.chart` | Optional (nur mit Live-Anzeige) |
+| `anhaenge/*` | Optional: hochgeladene Anhänge (`manifest.attachments`) |
+| `manifest.chart` | Optional (nur wenn die Monitor-Seite in der Sitzung offen war) |
 | `manifest.recorder` | Optional (`from` / `to` / `cycle_count` / `config_hashes`) |
 | Titel / Symptom | Optional (`manifest.meta`) |
 
-> **Datenschutz:** Das ZIP kann Lastprofile aus dem Cycle-Recorder enthalten – so viele Tage, wie `recorder_retention_days` vorgibt (Standard 7). Es nur an den Maintainer weitergeben und nicht in öffentliche Issues hochladen. Recorder abschalten: `recorder_enabled: false` in `local_settings.json` (siehe [Cycle-Recorder](#cycle-recorder-regression-r-rec)).
+> **Datenschutz:** Das vollständige Paket kann Lastprofile aus dem Cycle-Recorder enthalten – so viele Tage, wie `recorder_retention_days` vorgibt (Standard 7) – und die Logs. Es nur an den Maintainer weitergeben und nicht in öffentliche Issues hochladen. Recorder abschalten: `recorder_enabled: false` in `local_settings.json` (siehe [Cycle-Recorder](#cycle-recorder)).
 
-Gemeinsam in jedem ZIP:
+Gemeinsam in jedem vollständigen Paket:
 
 - **`manifest.json`:** `schema_version: 3`, `dump_type: debug`, App-Version, Env-Overrides, aufgelöste Pfade; optional `chart`, immer `meta` (Titel/Symptom/case_id).
 - **`inputs/*`:** aktive `config.json`, Sidecars, optional Preis-Modell und `cons_data.csv`.

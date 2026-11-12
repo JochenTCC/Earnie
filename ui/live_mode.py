@@ -25,8 +25,8 @@ from ui.help_hint import render_status_with_help
 from ui.ledger_kpi import render_ledger_kpi
 from ui.main_py_sync import MAIN_PY_SYNC_HELP, main_py_sync_status_message
 from ui.runtime_config import reload_runtime_config, simulation_settings_fingerprint
-from ui.chart_debug_capture import render_chart_debug_capture_controls
 from ui.sankey import render_live_power_flow
+from ui.support_package import remember_live_soc
 from ui.simulation_results import (
     SESSION_LIVE_DISPLAY_BUNDLE,
     build_optimization_display_bundle,
@@ -396,7 +396,7 @@ def _live_optimization_chart1_fragment(current_soc: float) -> None:
     bundle = st.session_state.get(SESSION_LIVE_DISPLAY_BUNDLE)
     if bundle is not None:
         render_optimization_chart1(bundle)
-        render_chart_debug_capture_controls(current_soc)
+        remember_live_soc(current_soc)
 
 
 @st.fragment(run_every=CHARTS_FRAGMENT_RUN_EVERY)

@@ -365,13 +365,6 @@ class Config:
     def get_ui_main_sync_poll_sec(self) -> int:
         return int(self.get("UI_MAIN_SYNC_POLL_SEC", default=15))
 
-    def get_ui_chart_debug_capture_enabled(self) -> bool:
-        from runtime_store.env_vars import is_truthy
-
-        if is_truthy("UI_CHART_DEBUG_CAPTURE_ENABLED"):
-            return True
-        return bool(self.get("UI_CHART_DEBUG_CAPTURE_ENABLED", default=False))
-
     def get_ui_chart_debug_capture_dir(self) -> str:
         return str(self.get("UI_CHART_DEBUG_CAPTURE_DIR", default="chart_debug"))
 
@@ -661,10 +654,6 @@ def get_ui_fragment_status_sec() -> int:
 
 def get_ui_main_sync_poll_sec() -> int:
     return CONFIG.get_ui_main_sync_poll_sec()
-
-
-def get_ui_chart_debug_capture_enabled() -> bool:
-    return CONFIG.get_ui_chart_debug_capture_enabled()
 
 
 def get_ui_chart_debug_capture_dir() -> str:

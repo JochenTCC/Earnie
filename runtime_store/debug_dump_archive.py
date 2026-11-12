@@ -8,7 +8,7 @@ import tempfile
 import zipfile
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Sequence
 
 import config
 from runtime_store import optimization_history
@@ -32,7 +32,12 @@ _OPTIONAL_RUNTIME = (
     "capacity_peaks_observe.json",
     "capacity_peaks_observe_measured.json",
     "import_cap_report.json",
+    "cycle_stats.jsonl",
+    "daemon_heartbeat.json",
+    "earnie.log",
+    "main_stdio.log",
 )
+ATTACHMENTS_DIR = "anhaenge"
 
 # Arcnames relative to ZIP root (validate/replay profiles).
 PROFILE_REQUIRED: dict[str, tuple[str, ...]] = {
@@ -131,6 +136,7 @@ def _readme_text() -> str:
         "inputs/* – aktive Konfigurationen fuer spaetere Reproduktion\n"
         "recorder/* – optional cycle-recorder ring buffer "
         "(Lastprofile, nur an Maintainer weitergeben)\n"
+        f"{ATTACHMENTS_DIR}/* – optional vom Benutzer beigelegte Dateien\n"
         f"Required runtime: {required}\n"
         f"Optional runtime: {optional}\n"
         "Replay: python -m scripts.replay_debug_dump <zip-or-dir>\n"
@@ -164,13 +170,15 @@ def write_debug_dump_zip(
     symptom: str = "",
     case_id: str = "",
     captured_at: datetime | None = None,
+    attachments: Sequence[tuple[str, bytes]] = (),
 ) -> str:
     """
     Write a unified debug-dump ZIP (schema v3). Returns absolute path.
 
     Always includes full ``runtime/optimization_history.jsonl`` plus any
     monthly archive siblings ``optimization_history.jsonl.*``. Optional
-    ``chart_payload`` is stored under ``manifest.chart`` when provided.
+    ``chart_payload`` is stored under ``manifest.chart`` when provided;
+    ``attachments`` (file name, bytes) land under ``anhaenge/``.
     """
     moment = captured_at or datetime.now()
     if moment.tzinfo is not None:
@@ -221,6 +229,7 @@ def write_debug_dump_zip(
         recorder_arcnames = _write_recorder_to_zip(
             archive, manifest, runtime_base=runtime_base
         )
+        manifest["attachments"] = _write_attachments(archive, attachments)
 
         manifest["files"] = {
             "required_present": required_present,
@@ -233,6 +242,31 @@ def write_debug_dump_zip(
         archive.writestr("README.txt", _readme_text())
 
     return zip_path
+
+
+def _attachment_arcname(name: str, used: set[str]) -> str:
+    base = os.path.basename(name.replace("\\", "/")) or "anhang.bin"
+    stem, ext = os.path.splitext(base)
+    candidate = base
+    index = 2
+    while candidate in used:
+        candidate = f"{stem}_{index}{ext}"
+        index += 1
+    used.add(candidate)
+    return f"{ATTACHMENTS_DIR}/{candidate}"
+
+
+def _write_attachments(
+    archive: zipfile.ZipFile,
+    attachments: Sequence[tuple[str, bytes]],
+) -> list[str]:
+    used: set[str] = set()
+    written: list[str] = []
+    for name, data in attachments:
+        arcname = _attachment_arcname(name, used)
+        archive.writestr(arcname, data)
+        written.append(arcname)
+    return written
 
 
 def _write_recorder_to_zip(
