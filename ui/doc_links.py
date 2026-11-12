@@ -66,6 +66,9 @@ def docs_blob_url(rel_path: str, fragment: str | None = None) -> str:
 
 MANUAL_URL = docs_blob_url(HANDBOOK_REL_PATH)
 
+# Privacy statement of the project website (covers the online demo's session count).
+PRIVACY_URL = "https://earnie-hems.com/datenschutzerklaerung/"
+
 
 def _handbook(label: str, fragment: str) -> DocLink:
     return DocLink(label=label, path=HANDBOOK_REL_PATH, fragment=fragment)

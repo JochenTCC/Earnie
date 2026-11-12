@@ -84,6 +84,7 @@ def render_cloud_demo_intro() -> None:
         return
     import streamlit as st
 
+    from ui.doc_links import PRIVACY_URL
     from ui.info_sidebar import MANUAL_URL
 
     if st.session_state.get(SESSION_INTRO_DISMISSED_KEY):
@@ -103,7 +104,8 @@ def render_cloud_demo_intro() -> None:
         "Ihre Eingaben gelten nur für **diese Browser-Sitzung** und werden nicht "
         "mit anderen Besuchern geteilt. Sie können die Daten mit **Konfiguration Speichern / laden** lokal sichern und zu einem späteren Zeitpunkt hier wieder verwenden.\n\n"
         "Earnie zählt anonym, wie oft die Online-Demo geöffnet wird: eine Zahl pro Sitzung, "
-        "ohne Angaben zu Ihnen oder Ihrer Konfiguration.\n\n"
+        "ohne Angaben zu Ihnen oder Ihrer Konfiguration. "
+        f"Details stehen in der [Datenschutzerklärung]({PRIVACY_URL}).\n\n"
         f"Weitere Informationen erhalten Sie im "
         f"[Benutzer-Handbuch]({MANUAL_URL}). "
         "Der Link ist auch unter **Info** zu finden."
