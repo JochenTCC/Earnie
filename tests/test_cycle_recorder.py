@@ -21,8 +21,10 @@ def _cfg(tmp_path, monkeypatch, *, local: dict | None = None):
         config_payload=minimal_config_payload(),
     )
     local_path = tmp_path / "local_settings.json"
+    # Long retention by default: tests record cycles on fixed dates, and
+    # finish_cycle prunes segments older than retention relative to today.
     local_path.write_text(
-        json.dumps(local or {"silent_mode": False}),
+        json.dumps(local or {"silent_mode": False, "recorder_retention_days": 36500}),
         encoding="utf-8",
     )
     monkeypatch.setenv("EARNIE_CONFIG_PATH", config_path)
