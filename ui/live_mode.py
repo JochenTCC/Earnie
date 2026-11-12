@@ -135,14 +135,25 @@ def _render_opt_in_simulation_prompt() -> None:
         st.rerun()
 
 
+SAVINGS_SECTION_TITLE = "Earnie-Effekt"
+
+
 def render_optimization_savings_and_chart(current_soc: float) -> None:
-    """Cockpit-Charts aus main.py-Persistenz (opt-in UI-Simulation bei Ausfall)."""
+    """Cockpit-Charts aus main.py-Persistenz (opt-in UI-Simulation bei Ausfall).
+
+    The savings section (ledger tile + Chart 2) is followed by the capacity-charge block,
+    which belongs to the cost view.
+    """
+    from ui.capacity_charge_panel import render_capacity_charge_panel
+
     reload_runtime_config()
     _live_optimization_prepare_fragment(current_soc)
     _live_optimization_chart1_fragment(current_soc)
     render_s2_nav_buttons(now=live_now())
     render_live_power_flow(current_soc)
+    st.subheader(SAVINGS_SECTION_TITLE)
     _live_optimization_chart2_fragment()
+    render_capacity_charge_panel()
     bundle = st.session_state.get(SESSION_LIVE_DISPLAY_BUNDLE)
     if bundle is not None:
         render_optimization_results_tail(bundle)

@@ -2,6 +2,10 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Monitor: savings section "Earnie-Effekt" (2026-11-12)
+
+- [x] **Monitor: capacity-charge block below Chart 2, savings section heading** `[feat]` *(maintainer request 2026-11-12)*: the "Leistungspreis" block moved from the top of the Monitor page (under the absent-mode notice) to below Chart 2. The savings tile "Mit Earnie gespart" and Chart 2 now sit under the heading "Earnie-Effekt" (chosen over "Kostenersparnis" and "Earnies Beitrag" because it reads right for a saving and for a loss). Code `ui/live_mode.py` (`SAVINGS_SECTION_TITLE`), `ui/pages/page_cockpit.py`; test `tests/apptest/test_page_cockpit_apptest.py`; user manual and `docs/dev/max-power-tariff-plan.md` updated.
+
 ### Battery target SoC: no grid trickle during Entladesperre (2026-11-11)
 
 - [x] **Plant charges 0.2 kW from the grid during Entladesperre** `[fix]` *(found 2026-11-09 in the ledger analysis, [Erledigt](Backlog-Erledigt.md) "Ledger: negative saving … explained"; trial fix 2026-11-09, live on prod since 2.8.0-dev.13)*: in mode 2 Earnie wrote `set_ess_active_power` 0, `set_ess_discharge_power_limit` 0, `set_ess_charge_power_limit` 5 kW, `set_ess_mode` 1 and no target SoC. With no PV the maintainer's plant then charged a steady ~0.2 kW from the grid (most common `battery_kw` −0.20, ~280 slots from 01.11. to 08.11., at any SoC from 11 % to 82 %). Only ~63 % reached the SoC (7.8 kWh charged, 4.95 kWh stored); grid share 1.19 kWh on 02.11, 4.36 kWh on 03.11. The planner plans 0 kW for these slots, so neither plan nor baseline sees it.

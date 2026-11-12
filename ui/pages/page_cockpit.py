@@ -46,9 +46,6 @@ def render() -> None:
         page_docs_key="cockpit",
     )
     _render_absent_mode_hint()
-    from ui.capacity_charge_panel import render_capacity_charge_panel
-
-    render_capacity_charge_panel()
     from ui.ev_assignment_panel import render_ev_assignment_panel
 
     render_ev_assignment_panel()

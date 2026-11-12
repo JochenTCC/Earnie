@@ -197,7 +197,7 @@ Split on 2026-11-11 (maintainer) into **P6a** report, **P6b** Monitor page and *
 - **Not covered:** an SoC pinned by an equality (SE SA₁ carry-in) is not read as a reserve. "None detected" stays possible and is reported as such.
 - **Tests:** `tests/test_import_cap_report.py` (each cause, inverter limit, report in the plan, trivial and Automatik, cycle record, store, measured check, Live hooks).
 
-**P6b built 2026-11-11.** `ui/capacity_charge_panel.py` puts a "Leistungspreis" block on the Monitor page (`ui/pages/page_cockpit.py`, under the absent-mode notice), only when the resolved Live scenario has a cap or the grid area a capacity charge in the current month (host clock, as the peak store keeps months).
+**P6b built 2026-11-11.** `ui/capacity_charge_panel.py` puts a "Leistungspreis" block on the Monitor page (`ui/pages/page_cockpit.py`, under the absent-mode notice; since 2026-11-12 below Chart 2 in the "Earnie-Effekt" section), only when the resolved Live scenario has a cap or the grid area a capacity charge in the current month (host clock, as the peak store keeps months).
 
 - Figures: month peak from `capacity_peak_store.month_peak` with measured-since, peak slot and missing quarter hours; billed power = max(peak, charge minimum); amount so far and the next kW (`capacity_charge_eur(billed + 1) − capacity_charge_eur(billed)`), both gross with the import tariff's VAT as in `simulation/capacity_charge.py`. A month without entry shows "unbekannt" and the minimum amount ("mind. …"), never 0, and no next-kW price.
 - Cap: cap, margin and the planning limit `max(cap, peak) − margin`; a peak above the cap is named.
