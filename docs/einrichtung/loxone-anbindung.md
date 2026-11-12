@@ -23,9 +23,11 @@ Die **Einrichtung** beschreibt [Loxone-Signale und Vorlagen](../referenz/loxone-
 | `LOXONE_USER` | Benutzername (HTTP Basic Auth)                                                                         |
 | `LOXONE_PASS` | Passwort                                                                                               |
 
+Earnie braucht die Zugangsdaten für den Loxone-Import (`LoxAPP3.json`) und die Presence-Probe auf EHAL-Com. Der Optimierer-Dienst plant und schreibt auch ohne sie, weil Telemetrie und Sollwerte nur über VO-Push und `status.json` laufen.
+
 Im Produktivbetrieb (Docker) legt der Container-Start (Entrypoint) eine fehlende `config/.env` aus der Vorlage an. Die Werte werden danach unter **Smarthome-Backend → Anbindung** eingetragen oder direkt in der Datei gesetzt. Lokal ohne Container: [.env.example](../../.env.example) nach `config/.env` kopieren, sofern die Datei noch fehlt.
 
-Lehnt der Miniserver die Zugangsdaten ab (HTTP **401** oder **403**), pausiert der Optimierer-Dienst (`main.py`) alle Miniserver-Zugriffe. Die Web-Oberfläche zeigt dann einen Fehlerhinweis. Abhilfe: IP, Benutzer und Passwort unter **Smarthome-Backend → Anbindung** korrigieren und die Merker erneut testen.
+Lehnt der Miniserver die Zugangsdaten ab (HTTP **401** oder **403**), zeigt die Web-Oberfläche einen Fehlerhinweis. Betroffen sind nur Loxone-Import und Presence-Probe; der Optimierer-Dienst läuft weiter. Abhilfe: IP, Benutzer und Passwort unter **Smarthome-Backend → Anbindung** korrigieren und die Merker erneut testen.
 
 ## HTTP-Schnittstelle
 

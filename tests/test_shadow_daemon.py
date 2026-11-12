@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from runtime_store.shadow.hooks import (
     after_prod_cycle,
-    maybe_clear_auth_gate,
     maybe_flush_after_sampler,
     prepare_shadow_cycle,
     resolve_next_trigger,
@@ -34,22 +33,6 @@ def test_maybe_flush_after_sampler_swallows_errors(monkeypatch):
 
     monkeypatch.setattr("runtime_store.shadow.feed.flush_after_sampler", boom)
     maybe_flush_after_sampler()  # must not raise
-
-
-def test_maybe_clear_auth_gate_shadow(monkeypatch):
-    cleared: list[bool] = []
-    monkeypatch.setenv("EARNIE_SHADOW", "1")
-    monkeypatch.setattr(
-        "runtime_store.loxone_auth_error.clear_loxone_auth_error",
-        lambda: cleared.append(True),
-    )
-    assert maybe_clear_auth_gate() is True
-    assert cleared == [True]
-
-
-def test_maybe_clear_auth_gate_prod(monkeypatch):
-    monkeypatch.delenv("EARNIE_SHADOW", raising=False)
-    assert maybe_clear_auth_gate() is False
 
 
 def test_prepare_shadow_cycle_skip(monkeypatch):
