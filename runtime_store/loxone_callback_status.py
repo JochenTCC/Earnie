@@ -28,14 +28,35 @@ def _ensure_parent(path: str) -> None:
         os.makedirs(parent, exist_ok=True)
 
 
-def record_loxone_callback(client_ip: str) -> None:
-    """Atomically store last callback time (UTC ISO) and client IP."""
+def _load_raw(path: str) -> dict[str, Any]:
+    if not os.path.isfile(path):
+        return {}
+    try:
+        with open(path, encoding="utf-8") as handle:
+            data = json.load(handle)
+    except (OSError, json.JSONDecodeError, TypeError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def record_loxone_callback(client_ip: str, *, status_json: bool = False) -> None:
+    """Atomically store last callback time (UTC ISO) and client IP.
+
+    ``status_json=True`` marks a ``status.json`` fetch: ``status_json_ts`` is
+    the proof that the hub actually polled the setpoints (incl.
+    ``heartbeat_earnie``). Other callbacks (heartbeat push) keep the previous
+    ``status_json_ts``.
+    """
     ip = str(client_ip or "").strip() or "?"
-    payload = {
-        "ts": datetime.now(timezone.utc).isoformat(),
-        "client_ip": ip,
-    }
+    now = datetime.now(timezone.utc).isoformat()
     path = _callback_path()
+    payload: dict[str, Any] = {"ts": now, "client_ip": ip}
+    if status_json:
+        payload["status_json_ts"] = now
+    else:
+        previous = str(_load_raw(path).get("status_json_ts") or "").strip()
+        if previous:
+            payload["status_json_ts"] = previous
     _ensure_parent(path)
     tmp = f"{path}.tmp"
     raw = json.dumps(payload, indent=2, ensure_ascii=False)
@@ -59,22 +80,17 @@ def record_loxone_callback(client_ip: str) -> None:
 
 
 def load_loxone_callback_status() -> dict[str, Any] | None:
-    """Return ``{ts, client_ip}`` or ``None`` if missing/invalid."""
-    path = _callback_path()
-    if not os.path.isfile(path):
-        return None
-    try:
-        with open(path, encoding="utf-8") as handle:
-            data = json.load(handle)
-    except (OSError, json.JSONDecodeError, TypeError):
-        return None
-    if not isinstance(data, dict):
-        return None
+    """Return ``{ts, client_ip, status_json_ts}`` or ``None`` if missing/invalid.
+
+    ``status_json_ts`` is ``None`` until the hub fetched ``status.json``.
+    """
+    data = _load_raw(_callback_path())
     ts = str(data.get("ts") or "").strip()
     ip = str(data.get("client_ip") or "").strip()
     if not ts:
         return None
-    return {"ts": ts, "client_ip": ip or "?"}
+    status_json_ts = str(data.get("status_json_ts") or "").strip()
+    return {"ts": ts, "client_ip": ip or "?", "status_json_ts": status_json_ts or None}
 
 
 def format_loxone_callback_caption(

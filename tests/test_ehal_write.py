@@ -59,8 +59,18 @@ def test_status_payload_sees_published_value(publish_dir: Path) -> None:
 
 def test_published_fetched_at_from_callback(publish_dir: Path) -> None:
     assert ew.published_fetched_at() is None
-    cbs.record_loxone_callback("10.0.0.1")
+    cbs.record_loxone_callback("10.0.0.1", status_json=True)
     assert ew.published_fetched_at()
+
+
+def test_heartbeat_push_alone_is_no_status_json_fetch(publish_dir: Path) -> None:
+    cbs.record_loxone_callback("10.0.0.1")
+    assert ew.published_fetched_at() is None
+    cbs.record_loxone_callback("10.0.0.1", status_json=True)
+    fetched = ew.published_fetched_at()
+    assert fetched
+    cbs.record_loxone_callback("10.0.0.1")
+    assert ew.published_fetched_at() == fetched
 
 
 def test_send_huawei_publishes_only(publish_dir: Path) -> None:

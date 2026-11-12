@@ -183,14 +183,16 @@ def load_published_records() -> dict[str, dict[str, Any]]:
 
 
 def published_fetched_at() -> str | None:
-    """Last Miniserver fetch time (global callback ``ts``), or ``None``."""
+    """Last hub fetch of ``status.json`` (``status_json_ts``), or ``None``.
+
+    A heartbeat push alone is no proof that the setpoints were polled.
+    """
     from runtime_store.loxone_callback_status import load_loxone_callback_status
 
     status = load_loxone_callback_status()
     if not status:
         return None
-    ts = str(status.get("ts") or "").strip()
-    return ts or None
+    return status.get("status_json_ts") or None
 
 
 def clear_published_for_tests() -> None:

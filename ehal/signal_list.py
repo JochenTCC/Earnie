@@ -98,6 +98,12 @@ def _write_match(
     published: dict[str, dict[str, Any]],
     fetched_at: str | None,
 ) -> tuple[MatchKind, str]:
+    if ehal_id == HEARTBEAT_WRITE_ID:
+        # Not in the publish ledger: status.json fills in the current Unix time
+        # on every fetch, so the fetch itself is the publication.
+        if not fetched_at:
+            return "never", "status.json noch nicht abgerufen"
+        return "published", f"MS-Abruf {fetched_at}"
     rec = published.get(ehal_id)
     if not rec:
         return "never", "nie veröffentlicht"

@@ -117,6 +117,20 @@ def test_build_signal_rows_has_read_and_write() -> None:
     assert any("Einspeiseleistung" in label for label in write.required_by)
 
 
+def test_heartbeat_earnie_counts_as_published_once_status_json_was_fetched() -> None:
+    house, components = _minimal_docs()
+    fetched = build_signal_rows(
+        house, components, published={}, fetched_at="2026-11-12T10:00:00+00:00"
+    )
+    hb = next(r for r in fetched if r.ehal_id == "heartbeat_earnie")
+    assert hb.match_kind == "published"
+    assert hb.match_text == "MS-Abruf 2026-11-12T10:00:00+00:00"
+    never = build_signal_rows(house, components, published={}, fetched_at=None)
+    hb_never = next(r for r in never if r.ehal_id == "heartbeat_earnie")
+    assert hb_never.match_kind == "never"
+    assert hb_never.match_text == "status.json noch nicht abgerufen"
+
+
 def test_catalog_includes_optional_inactive() -> None:
     house, components = _minimal_docs()
     rows = build_signal_rows(house, components, inbox={}, published={}, fetched_at=None)
