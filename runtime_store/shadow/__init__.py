@@ -10,7 +10,6 @@ from runtime_store.shadow.cycle import (
 from runtime_store.shadow.daemon import (
     ShadowCyclePrep,
     after_prod_cycle,
-    maybe_clear_auth_gate,
     maybe_flush_after_sampler,
     prepare_shadow_cycle,
     resolve_next_trigger,
@@ -54,7 +53,6 @@ __all__ = [
     "is_shadow_config_readonly",
     "is_shadow_mode",
     "log_would_write",
-    "maybe_clear_auth_gate",
     "maybe_flush_after_sampler",
     "prepare_shadow_cycle",
     "read_shadow_writes",

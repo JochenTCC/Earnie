@@ -32,21 +32,6 @@ def maybe_flush_after_sampler() -> None:
         logger.exception("shadow feed sampler flush failed")
 
 
-def maybe_clear_auth_gate() -> bool:
-    """If Shadow and auth recovery is needed, clear the gate and return True.
-
-    Prod returns False so ``main`` keeps its live credential probe loop.
-    """
-    from runtime_store.shadow.mode import is_shadow_mode
-
-    if not is_shadow_mode():
-        return False
-    from runtime_store.loxone_auth_error import clear_loxone_auth_error
-
-    clear_loxone_auth_error()
-    return True
-
-
 def prepare_shadow_cycle(next_trigger: str, *, optimize_trigger: str) -> ShadowCyclePrep:
     """Shadow: consume optimize trigger + wait for Prod cycle.
 

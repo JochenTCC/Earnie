@@ -91,9 +91,15 @@ def run_loxone_verify_on_startup() -> None:
         return
 
     from integrations.loxone_connectivity import probe_current_loxone_credentials
-    from runtime_store.loxone_auth_error import persist_loxone_auth_error
+    from runtime_store.loxone_auth_error import (
+        clear_loxone_auth_error,
+        persist_loxone_auth_error,
+    )
 
     ok, detail = probe_current_loxone_credentials()
+    if ok:
+        # Credentials fixed in .env outside the UI: drop the stale banner.
+        clear_loxone_auth_error()
     if not ok:
         if detail.startswith("Loxone auth failed"):
             code = 401 if "HTTP 401" in detail else 403

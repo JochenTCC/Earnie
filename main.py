@@ -1087,10 +1087,7 @@ if __name__ == "__main__":
     run_loxone_verify_on_startup()
     ehal_live.push_safe_setpoints_on_startup()
 
-    from runtime_store.dotenv_io import (
-        deferred_loxone_blocks_live,
-        needs_loxone_setup,
-    )
+    from runtime_store.dotenv_io import needs_loxone_setup
     from runtime_store.dotenv_loader import load_app_dotenv
     from runtime_store.daemon_heartbeat import touch_daemon_heartbeat
     from runtime_store.env_vars import is_planning_offline_gated
@@ -1126,21 +1123,6 @@ if __name__ == "__main__":
             config.reinit_config()
             continue
 
-        if deferred_loxone_blocks_live():
-            log_setup_gate_wait(
-                _setup_gate_state,
-                "loxone_deferred",
-                "Loxone-Zugangsdaten noch nicht hinterlegt (optional bis Live-/Silent-Betrieb). "
-                "Planung/Backtesting in der UI (Port %s) möglich. "
-                "Erneuter Versuch in %s Sekunden.",
-                config.get_ui_streamlit_port(),
-                _SETUP_WAIT_SEC,
-                level=logging.INFO,
-            )
-            time.sleep(_SETUP_WAIT_SEC)
-            config.reinit_config()
-            continue
-
         if is_planning_offline_gated():
             log_setup_gate_wait(
                 _setup_gate_state,
@@ -1169,46 +1151,6 @@ if __name__ == "__main__":
             time.sleep(_SETUP_WAIT_SEC)
             config.reinit_config()
             continue
-
-        from integrations.loxone_connectivity import (
-            LoxoneAuthError,
-            probe_current_loxone_credentials,
-        )
-        from runtime_store.loxone_auth_error import (
-            clear_loxone_auth_error,
-            needs_loxone_auth_recovery,
-            persist_loxone_auth_error,
-        )
-
-        if needs_loxone_auth_recovery():
-            from runtime_store.shadow import maybe_clear_auth_gate
-
-            if not maybe_clear_auth_gate():
-                ok, detail = probe_current_loxone_credentials()
-                if ok:
-                    clear_loxone_auth_error()
-                else:
-                    if detail.startswith("Loxone auth failed"):
-                        code = 401 if "HTTP 401" in detail else 403
-                        persist_loxone_auth_error(
-                            message=detail,
-                            http_status=code,
-                            source="main_gate",
-                        )
-                    log_setup_gate_wait(
-                        _setup_gate_state,
-                        "loxone_auth",
-                        "Loxone-Zugang verweigert (%s). "
-                        "Bitte Zugangsdaten in der Streamlit-UI (Port %s) unter "
-                        "Smarthome-Backend prüfen. Erneuter Versuch in %s Sekunden.",
-                        detail,
-                        config.get_ui_streamlit_port(),
-                        _SETUP_WAIT_SEC,
-                    )
-                    time.sleep(_SETUP_WAIT_SEC)
-                    load_app_dotenv(override=True)
-                    config.reinit_config()
-                    continue
 
         _setup_gate_state.clear()
         try:
@@ -1255,7 +1197,6 @@ if __name__ == "__main__":
                 next_trigger = _wait_after_aborted_cycle()
                 woke_at = datetime.now()
                 continue
-            clear_loxone_auth_error()
             next_trigger = TRIGGER_QUARTER_HOUR
             after_prod_cycle()
             from runtime_store.usage_ping import spawn_maybe_send_ping
@@ -1309,16 +1250,6 @@ if __name__ == "__main__":
                 optimize_trigger=TRIGGER_REQUEST_OPTIMIZE,
             )
 
-        except LoxoneAuthError as exc:
-            logger.error(
-                "Loxone-Zugang verweigert (HTTP %s). Optimierung pausiert — "
-                "erneuter Versuch in %s Sekunden.",
-                exc.http_status,
-                _SETUP_WAIT_SEC,
-            )
-            time.sleep(_SETUP_WAIT_SEC)
-            load_app_dotenv(override=True)
-            config.reinit_config()
         except Exception as e:
             logger.exception(
                 "🚨 Unerwarteter Fehler während des Durchlaufs: %s", e
