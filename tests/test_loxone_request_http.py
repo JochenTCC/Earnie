@@ -172,6 +172,7 @@ def test_http_heartbeat_records_callback(tmp_path, monkeypatch) -> None:
     status = cbs.load_loxone_callback_status()
     assert status is not None
     assert status["client_ip"] in ("127.0.0.1", "::1", "localhost")
+    assert status["status_json_ts"] is None
     inbox.flush_inbox_now()
     assert "heartbeat_smarthome" in inbox.load_inbox()
     with pytest.raises(urllib.error.HTTPError) as exc:
@@ -214,11 +215,13 @@ def test_http_get_status_json_canonical_matches_loxone_path(monkeypatch) -> None
     assert canonical_data == loxone_data == payload
 
 
-def test_http_get_status_json(monkeypatch) -> None:
+def test_http_get_status_json(tmp_path, monkeypatch) -> None:
     import json
 
     from integrations import loxone_status_json as status_mod
+    from runtime_store import loxone_callback_status as cbs
 
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path))
     monkeypatch.setattr(
         status_mod,
         "build_loxone_status_payload",
@@ -240,6 +243,9 @@ def test_http_get_status_json(monkeypatch) -> None:
         data = json.loads(resp.read().decode("utf-8"))
     assert data["heartbeat_earnie"] == 42
     assert data["set_ess_active_power"] == -1.5
+    status = cbs.load_loxone_callback_status()
+    assert status is not None
+    assert status["status_json_ts"]
 
 
 def test_http_unknown_path_404() -> None:
