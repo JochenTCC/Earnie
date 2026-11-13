@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import math
 from datetime import datetime
 from typing import Optional
 
@@ -153,7 +154,7 @@ def ess_target_soc_percent(
     from optimizer.slot_duration import DEFAULT_DT_H
 
     value = float(target_soc)
-    if value != value:  # NaN
+    if math.isnan(value):
         raise ValueError("set_ess_target_soc: target SoC is NaN")
     if mode in (1, 3) and abs(float(target_power_kw)) > 0.0:
         buffer = ess_target_soc_buffer_percent(
