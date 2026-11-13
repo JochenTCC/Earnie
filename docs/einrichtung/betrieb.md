@@ -344,7 +344,7 @@ Ab Version 2.7 kann Earnie optional und anonym melden, dass eine Installation ak
 | `context` | Installationskontext: `loxberry`, `homeassistant_addon` oder `manual`. |
 | `stage` | Höchster erreichter Meilenstein: `explorer` (Szenario-Explorer bzw. Fallback Szenarienkonfigurator) bzw. `live` (erster erfolgreicher Live-Zyklus). |
 | `points` | Nur im Live-Betrieb: Summe der **Earnie-Points** der Live-Anlage (ganze Zahl, siehe [Earnie-Points](#earnie-points)). |
-| `points_v` | Nur zusammen mit `points`: Version der Berechnungsregel (aktuell `2`). |
+| `points_v` | Nur zusammen mit `points`: Version der Berechnungsregel (aktuell `3`). |
 
 **Nicht** gesendet werden u. a. Preise, Orte, Gerätenamen, Konfigurationsinhalte, Hardware-Fingerprint und Einzelwerte der Anlage (nur die Punktesumme).
 
@@ -354,18 +354,18 @@ Wer bereits zugestimmt hat, wird wegen `points` nicht erneut gefragt. Die exakte
 
 Die Earnie-Points sind eine grobe Größenkennzahl **einer Anlage** (ein Standort). Earnie berechnet sie aus dem **Live-Szenario**, nicht aus Szenarien des Szenarienkonfigurators. Die Seite **Optimierer-Dienst** zeigt sie unter **Earnie-Points dieser Anlage** mit Aufschlüsselung an. Zweck der Earnie-Points ist zukünftig die Zuordnung zu möglichen Abo-Tarifen. Derzeit ist das rein informativ und bei selbst verwalteten Installationen fallen auch keine Kosten an. Fehlen Angaben im Live-Szenario, zeigt Earnie den Grund an und sendet keine Punkte.
 
-Regel (Version 2). Jeder Teil wird kaufmännisch auf ganze Punkte gerundet:
+Regel (Version 3). Jeder Teil wird kaufmännisch auf ganze Punkte gerundet. Ein Ausbau der Anlage (mehr PV, mehr Speicher, eine weitere Wallbox) senkt die Punkte nie:
 
 | Teil | Punkte |
 | --- | --- |
 | PV-Felder | 1 Punkt je 7 kWp |
-| Speicher (Hausspeicher und Powerstations) | bis 1 kWh je kWp PV: 1 Punkt je 5 kWh; darüber 1 Punkt je 2,5 kWh |
-| Wallboxen | 2 Punkte je Wallbox; ohne Speicher (unter 1 kWh) einmal 4 Punkte dazu. Bei einer bidirektionalen Wallbox zählt zusätzlich der Autoakku mit einem Viertel wie ein Speicher, mindestens 1 Punkt. |
+| Speicher (Hausspeicher und Powerstations) | 1 Punkt je 4 kWh. Hat die Anlage mindestens eine Wallbox, zählt dieser Teil mindestens 3 Punkte, auch ganz ohne Speicher. |
+| Wallboxen | 2 Punkte je Wallbox. Bei einer bidirektionalen Wallbox zählt zusätzlich der Autoakku mit einem Viertel wie ein Speicher, mindestens 1 Punkt. |
 | Wärmepumpe / Klimaanlage | 1 Punkt je Wärmepumpe; 1 Punkt für eine Klimaanlage unter **Kühlung** (die Wärmepumpe, die auch kühlt, zählt nur einmal). Ein Kessel zählt hier nicht. |
-| Heizstab | nach der Wärmequelle, die er ergänzt: Gas, Öl, Fernwärme 7; Pellets, Holz 4; Wärmepumpe, elektrische Direktheizung 0. Davon 1 Punkt je 5 kWp PV ab, mindestens 0. |
+| Heizstab | nach der Wärmequelle, die er ergänzt: Gas, Öl, Fernwärme 6; Pellets, Holz 3; Wärmepumpe, elektrische Direktheizung 0. |
 | Weitere flexible Großverbraucher | 1 Punkt je von Earnie gesteuertem Verbraucher ab 2,5 kW (z. B. Pool) |
 
-Die Phasenzahl einer Wallbox spielt keine Rolle mehr. Mit dem Wechsel auf Version 2 ändert sich die angezeigte Summe einmal, ohne dass sich an der Anlage etwas ändert.
+Die Phasenzahl einer Wallbox spielt keine Rolle, und die Größe der PV-Anlage ändert die Punkte für Speicher und Heizstab nicht mehr. Mit dem Wechsel auf Version 3 ändert sich die angezeigte Summe einmal, ohne dass sich an der Anlage etwas ändert.
 
 **Abschalten:**
 

@@ -2,6 +2,15 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Earnie-Points rule version 3 (2026-11-13)
+
+- [x] **Earnie-Points rule version 3** `[feat]` *(maintainer's decision 2026-11-13, before market start)*: with rule 2 an upgrade of the plant could lower the points (a battery at a wallbox removed the +4, more PV lowered the heating-rod points and moved storage kWh below the kink). `house_config/earnie_points.py` now computes `points_v: 3`; no upgrade (more PV, more storage, another wallbox) lowers the total.
+  - **Rule:** storage 1 point per 4 kWh, independent of PV, at least 3 when the plant has a wallbox (replaces the +4 "without storage"); wallbox 2 each; heating rod gas / oil / district heat 6, pellets / wood 3, no PV deduction; PV, heat pump / air conditioning and other flex consumers unchanged. Spec: `docs/workflow/earnie-points.md` §2.
+  - **Bidirectional wallbox:** the car batteries still count a quarter, now rounded on their own (1 point per 4 kWh of the quarter, at least 1 per bidirectional wallbox). The rule-2 difference of two rounded storage values could drop by a point when the stationary storage grew.
+  - **Docs:** `earnie-points.md` (rule 2 kept as history), `usage-ping.md`, public rule table in `docs/einrichtung/betrieb.md`, `docs/konfiguration/flexible-verbraucher.md`; release-note draft `v2.8.0-earnie-points-v3.draft.md` replaces the rule-2 fragment (rule 2 only existed in `-dev` builds).
+  - **Tests:** `tests/test_earnie_points.py` (incl. the monotonicity test over a grid of plants), `tests/test_usage_points.py`.
+  - **Open:** the receiver's `points_hist` (earnie-server) still does not separate `points_v`; pack records and build logs under `studies/viability/` were written with rule 2 and are not regenerated.
+
 ### Live checks: reserve-refill ping-pong, Chart 1 SoC BL Ziel, heating variants (2026-11-12)
 
 - [x] **Reserve-refill ping-pong: Automatik drains the virtual reserve, the next cycle refills it from the grid** `[fix]` *(found 2026-11-09 in the ledger analysis, [Erledigt](Backlog-Erledigt.md) "Ledger: negative saving … explained"; fixed 2026-11-09 on branch `analysis/ledger-negative-saving`)*: the house battery holds the virtual powerstation reserves (`virtual_gs` 1.0 + `virtual_washing` 0.1 kWh), so Earnie's floor is 12.3 % (`min_soc` 5 % + 7.3 %), a hard lower bound in the MILP. In Automatik (mode 0) Earnie wrote discharge limit 5 kW, so the plant could discharge to its own 5 %. When Earnie started the SwimSpa (2.3–2.8 kW), the battery fell from 13 % to 7–9 % within one slot and the next cycle had to restore the floor in slot 0 with Zwangsladen 2.2–3.5 kW at the same price (03.11: four times 09:45–13:15, ~45 ct; 02.11 22:30–23:45 twice). At a reading of 12 % the 0.3 % gap to 12.3 % forced a 0.21 kW charge every slot (up to 44 refill cycles a day). `main` (2.8 Shadow) refilled the same way. Grid share of the refills 2–4 kWh most days at a measured round trip of 0.82.

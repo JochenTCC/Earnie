@@ -143,10 +143,10 @@ def spawns(monkeypatch: pytest.MonkeyPatch) -> list[int]:
 
 def test_compute_live_points_uses_live_scenario_selection_only(plant: Path) -> None:
     result = pts.compute_live_points()
-    # pv_main 8 kWp -> 1 (8/7), bat_main 9 kWh -> 2 (8/5 + 1/2.5), wallbox -> 2;
+    # pv_main 8 kWp -> 1 (8/7), bat_main 9 kWh -> 2.25, floor 3 with a wallbox, wallbox -> 2;
     # alternatives ignored.
     assert result == {
-        "total": 5, "pv": 1, "storage": 2, "wallbox": 2, "heat": 0, "heating_rod": 0, "other": 0
+        "total": 6, "pv": 1, "storage": 3, "wallbox": 2, "heat": 0, "heating_rod": 0, "other": 0
     }
 
 
@@ -158,12 +158,12 @@ def test_powerstations_are_always_counted(plant: Path) -> None:
             "label": "Powerstation",
             "type": "powerstation",
             "backing": "virtual",
-            "battery_capacity_kwh": 2.0,
+            "battery_capacity_kwh": 5.0,
         }
     )
     _write(plant / "components.json", doc)
     clear_components_doc_cache()
-    assert pts.compute_live_points()["storage"] == 3  # 11 kWh: 8/5 + 3/2.5 = 2.8
+    assert pts.compute_live_points()["storage"] == 4  # 9 + 5 = 14 kWh: 3.5
 
 
 def test_unknown_pv_reference_raises(plant: Path) -> None:
@@ -189,8 +189,8 @@ def test_set_consent_on_refreshes_points_without_live_cycle(
 ) -> None:
     """Opt-in computes Earnie-Points from config; no optimiser cycle required."""
     state = up.set_consent("on")
-    assert state["points"] == 5
-    assert state["points_v"] == 2
+    assert state["points"] == 6
+    assert state["points_v"] == 3
     assert state["stage"] == "explorer"
     assert state["points_stamp"] == pts.config_stamp()
     assert spawns == [1]
@@ -205,10 +205,11 @@ def test_set_consent_on_with_live_stage_yields_payload_v2(
     up.save_state({"consent": "unset", "stage": "live"})
     state = up.set_consent("on")
     assert state["stage"] == "live"
-    assert state["points"] == 5
+    assert state["points"] == 6
     payload = up.build_payload(state)
     assert payload["v"] == 2
-    assert payload["points"] == 5
+    assert payload["points"] == 6
+    assert payload["points_v"] == 3
     assert spawns == [1]
 
 
@@ -227,8 +228,8 @@ def test_refresh_stores_points_and_triggers_resend(plant: Path, spawns: list[int
 
     assert pts.refresh_points() is True
     state = up.load_state()
-    assert state["points"] == 5
-    assert state["points_v"] == 2
+    assert state["points"] == 6
+    assert state["points_v"] == 3
     assert state["points_stamp"] == pts.config_stamp()
     assert "last_sent_date" not in state
     assert "last_attempt_at" not in state
@@ -253,8 +254,8 @@ def test_refresh_recomputes_on_config_change(plant: Path, spawns: list[int]) -> 
     up.set_consent("on")
     _write(plant / "house_profiles.json", _profiles(bidirectional=True))
     assert pts.refresh_points() is True
-    # Car 60 kWh at a quarter: storage 9 + 15 kWh -> 8 points, 6 more than without the car.
-    assert up.load_state()["points"] == 11
+    # Car 60 kWh at a quarter: 15 kWh -> 4 points more than without the car.
+    assert up.load_state()["points"] == 10
     assert spawns == [1, 1]
 
 
@@ -262,7 +263,7 @@ def test_changed_config_with_same_total_does_not_resend(plant: Path, spawns: lis
     up.set_consent("on")
     _write(plant / "config.json", {"live_scenario_id": "live", "note": "touch"})
     assert pts.refresh_points() is False
-    assert up.load_state()["points"] == 5
+    assert up.load_state()["points"] == 6
     assert spawns == [1]
 
 
@@ -270,7 +271,7 @@ def test_error_clears_points_and_warns_once_per_stamp(
     plant: Path, spawns: list[int], caplog: pytest.LogCaptureFixture
 ) -> None:
     up.set_consent("on")
-    assert up.load_state()["points"] == 5
+    assert up.load_state()["points"] == 6
 
     _write(plant / "backtesting_scenarios.json", _scenarios(pv_system_ids=["gone"]))
     caplog.set_level("WARNING")
@@ -290,7 +291,7 @@ def test_note_live_cycle_success_refreshes_points(plant: Path, spawns: list[int]
     up.note_live_cycle_success()
     state = up.load_state()
     assert state["stage"] == "live"
-    assert state["points"] == 5
+    assert state["points"] == 6
 
 
 def test_note_live_cycle_success_skips_points_in_shadow(

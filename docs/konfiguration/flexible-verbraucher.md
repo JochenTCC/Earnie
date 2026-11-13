@@ -13,7 +13,7 @@ Die Optimierung legt fest, **wann** die Verbraucher laufen. Ob die Anlage techni
 | `nominal_power_kw` | Nennleistung für die MILP |
 | `chart_color_index` | Farbindex 0–7 für Chart 1 und Sankey (siehe [Charts](../ui/charts.md)) |
 | `optimizer_enabled` | `false` = von der Optimierung ausgeschlossen |
-| `bidirectional` | Nur Typ `ev`, optional (`true`/`false`, fehlt = `false`): Die Wallbox kann entladen (V2G). Fließt mit 3 Punkten in die [Earnie-Points](../einrichtung/betrieb.md#earnie-points) ein. Im Hauskonfigurator: **Wallbox bidirektional (V2G)**. |
+| `bidirectional` | Nur Typ `ev`, optional (`true`/`false`, fehlt = `false`): Die Wallbox kann entladen (V2G). Der Autoakku fließt dann in die [Earnie-Points](../einrichtung/betrieb.md#earnie-points) ein (mindestens 1 Punkt). Im Hauskonfigurator: **Wallbox bidirektional (V2G)**. |
 
 ## Abwesenheits- / Urlaubsmodus (Live)
 

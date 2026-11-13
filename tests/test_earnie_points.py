@@ -1,5 +1,7 @@
-"""Earnie-Points calculation, rule version 2 (docs/workflow/earnie-points.md)."""
+"""Earnie-Points calculation, rule version 3 (docs/workflow/earnie-points.md)."""
 from __future__ import annotations
+
+import itertools
 
 import pytest
 
@@ -61,8 +63,8 @@ def _points(components=None, consumers=()) -> dict:
     return compute_earnie_points(components or _components(), {"consumers": list(consumers)})
 
 
-def test_rule_version_is_2():
-    assert POINTS_RULE_VERSION == 2
+def test_rule_version_is_3():
+    assert POINTS_RULE_VERSION == 3
 
 
 @pytest.mark.parametrize(
@@ -74,25 +76,22 @@ def test_pv_one_point_per_7_kwp_rounded_half_up(kwp, expected):
 
 
 @pytest.mark.parametrize(
-    ("kwp", "kwh", "expected"),
-    [
-        (10.0, 0.0, 0),
-        (10.0, 2.4, 0),  # 0.48
-        (10.0, 2.5, 1),  # 0.5 rounds up
-        (10.0, 10.0, 2),  # all below the kink: 10/5
-        (10.0, 15.0, 4),  # 10/5 + 5/2.5
-        (5.0, 10.0, 3),  # 5/5 + 5/2.5
-        (0.0, 5.0, 2),  # no PV: everything above the kink, 5/2.5
-    ],
+    ("kwh", "expected"),
+    [(0.0, 0), (1.9, 0), (2.0, 1), (5.9, 1), (6.0, 2), (10.0, 3), (12.0, 3), (14.0, 4), (40.0, 10)],
 )
-def test_storage_kink_at_1_kwh_per_kwp(kwp, kwh, expected):
-    assert _points(_components(kwp=[kwp], kwh=[kwh]))["storage"] == expected
+def test_storage_one_point_per_4_kwh_rounded_half_up(kwh, expected):
+    assert _points(_components(kwh=[kwh]))["storage"] == expected
+
+
+@pytest.mark.parametrize("kwp", [0.0, 5.0, 10.0, 30.0])
+def test_storage_does_not_depend_on_pv(kwp):
+    assert _points(_components(kwp=[kwp], kwh=[10.0]))["storage"] == 3
 
 
 def test_sums_are_added_before_rounding_and_float_noise_ignored():
     assert _points(_components(kwp=[1.75, 1.75]))["pv"] == 1  # 3.5 kWp, exactly 0.5
     assert _points(_components(kwp=[1.1, 1.2, 1.2]))["pv"] == 1  # 3.5000000000000004
-    assert _points(_components(kwp=[10.0], kwh=[1.25, 1.25]))["storage"] == 1
+    assert _points(_components(kwh=[1.0, 1.0]))["storage"] == 1  # 2 kWh, exactly 0.5
 
 
 def test_no_pv_no_storage_no_consumers_is_zero():
@@ -109,27 +108,40 @@ def test_wallbox_two_points_each_regardless_of_phases():
     assert _points(with_storage, [_ev(), _ev("ev2")])["wallbox"] == 4
 
 
-@pytest.mark.parametrize(("kwh", "expected"), [(0.0, 6), (0.9, 6), (1.0, 2)])
-def test_wallbox_without_storage_adds_4_once(kwh, expected):
-    assert _points(_components(kwh=[kwh]), [_ev()])["wallbox"] == expected
-    assert _points(_components(kwh=[kwh]), [_ev(), _ev("ev2")])["wallbox"] == expected + 2
+@pytest.mark.parametrize(
+    ("kwh", "expected"), [((), 3), ((0.0,), 3), ((5.0,), 3), ((12.0,), 3), ((14.0,), 4), ((40.0,), 10)]
+)
+def test_storage_counts_at_least_3_with_a_wallbox(kwh, expected):
+    one = _points(_components(kwh=kwh), [_ev()])
+    assert (one["storage"], one["wallbox"]) == (expected, 2)
+    # The floor applies once per plant, not per wallbox.
+    two = _points(_components(kwh=kwh), [_ev(), _ev("ev2")])
+    assert (two["storage"], two["wallbox"]) == (expected, 4)
 
 
-def test_no_wallbox_no_storage_extra():
-    assert _points(_components(kwh=[0.0]))["wallbox"] == 0
+def test_no_wallbox_no_storage_floor():
+    assert _points(_components(kwh=[0.0]))["storage"] == 0
+    assert _points(_components(kwh=[4.0]))["storage"] == 1
+
+
+def test_first_battery_at_a_wallbox_does_not_lower_the_total():
+    """Version 2 lost 4 points here: the battery removed the "without storage" extra."""
+    without = _points(_components(kwp=[10.0]), [_ev()])["total"]
+    for kwh in (1.0, 5.0, 10.0, 20.0):
+        assert _points(_components(kwp=[10.0], kwh=[kwh]), [_ev()])["total"] >= without
 
 
 def test_bidirectional_car_battery_counts_a_quarter_in_wallbox():
     plant = _components(kwp=[10.0], kwh=[10.0])
-    # 10 + 60/4 = 25 kWh: 10/5 + 15/2.5 = 8 storage points, 6 more than the stationary 2.
+    # Car 60 kWh at a quarter = 15 kWh: 15/4 = 3.75 → 4 points on top of the wallbox.
     result = _points(plant, [_ev(bidirectional=True)])
-    assert result["storage"] == 2
-    assert result["wallbox"] == 2 + 6
+    assert result["storage"] == 3
+    assert result["wallbox"] == 2 + 4
 
 
 def test_bidirectional_gives_at_least_one_point():
     plant = _components(kwp=[10.0], kwh=[2.0])
-    # Stationary 2 kWh → 0.4 → 0; with the car 2 + 1/4 = 2.25 kWh → 0.45 → 0: delta 0, minimum 1.
+    # Car 1 kWh at a quarter: 0.25/4 → 0, minimum 1 per bidirectional wallbox.
     small = _ev(bidirectional=True, battery_capacity_kwh=1.0)
     assert _points(plant, [small])["wallbox"] == 2 + 1
     two = [small, _ev("ev2", bidirectional=True, battery_capacity_kwh=1.0)]
@@ -140,9 +152,15 @@ def test_bidirectional_false_is_a_plain_wallbox():
     assert _points(_components(kwh=[5.0]), [_ev(bidirectional=False)])["wallbox"] == 2
 
 
-def test_bidirectional_without_storage_keeps_the_extra():
-    # Car battery does not lift the "without storage" extra: 2 + 4 + car (15 kWh above kink → 6).
-    assert _points(_components(), [_ev(bidirectional=True)])["wallbox"] == 2 + 4 + 6
+def test_bidirectional_car_battery_does_not_count_towards_the_storage_floor():
+    result = _points(_components(), [_ev(bidirectional=True)])
+    assert (result["storage"], result["wallbox"]) == (3, 2 + 4)
+
+
+def test_bidirectional_points_do_not_depend_on_the_stationary_storage():
+    """A difference of rounded storage values dropped by a point at 2 kWh (17 kWh → 4, 2 kWh → 1)."""
+    for kwh in (0.0, 2.0, 5.0, 14.0):
+        assert _points(_components(kwh=[kwh]), [_ev(bidirectional=True)])["wallbox"] == 2 + 4
 
 
 def test_bidirectional_without_capacity_raises():
@@ -161,20 +179,18 @@ def test_heat_pump_one_point_boiler_none():
 @pytest.mark.parametrize(
     ("source", "kwp", "expected"),
     [
-        ("gas", 0.0, 7),
-        ("oil", 0.0, 7),
-        ("district_heat", 0.0, 7),
-        ("gas", 10.0, 5),  # 7 - 2
-        ("gas", 12.5, 5),  # 7 - 2.5 = 4.5 rounds up
-        ("pellets", 0.0, 4),
-        ("wood", 0.0, 4),
-        ("pellets", 15.0, 1),
-        ("pellets", 25.0, 0),  # 4 - 5, at least 0
+        ("gas", 0.0, 6),
+        ("oil", 0.0, 6),
+        ("district_heat", 0.0, 6),
+        ("gas", 12.5, 6),  # PV does not reduce the rod points any more
+        ("pellets", 0.0, 3),
+        ("wood", 0.0, 3),
+        ("pellets", 25.0, 3),
         ("electric_direct", 0.0, 0),
         ("heat_pump", 0.0, 0),
     ],
 )
-def test_heating_rod_by_heat_source_minus_pv(source, kwp, expected):
+def test_heating_rod_by_heat_source_independent_of_pv(source, kwp, expected):
     result = _points(_components(kwp=[kwp]), [_heating(source, rod=True)])
     assert result["heating_rod"] == expected
 
@@ -228,14 +244,70 @@ def test_other_flex_consumers_from_2_5_kw():
 
 def test_spec_examples():
     assert _points(_components(kwp=[7.0]), [_ev()]) == {
-        "total": 7, "pv": 1, "storage": 0, "wallbox": 6, "heat": 0, "heating_rod": 0, "other": 0
+        "total": 6, "pv": 1, "storage": 3, "wallbox": 2, "heat": 0, "heating_rod": 0, "other": 0
     }
     assert _points(_components(kwp=[10.0], kwh=[10.0]), [_heating()]) == {
-        "total": 4, "pv": 1, "storage": 2, "wallbox": 0, "heat": 1, "heating_rod": 0, "other": 0
+        "total": 5, "pv": 1, "storage": 3, "wallbox": 0, "heat": 1, "heating_rod": 0, "other": 0
     }
     assert _points(_components(kwp=[12.0, 8.0], kwh=[15.0]), [_ev(), _heating("gas", rod=True)]) == {
-        "total": 11, "pv": 3, "storage": 3, "wallbox": 2, "heat": 0, "heating_rod": 3, "other": 0
+        "total": 15, "pv": 3, "storage": 4, "wallbox": 2, "heat": 0, "heating_rod": 6, "other": 0
     }
+
+
+_GRID_KWP = [0.0, 1.0, 3.4, 3.5, 5.0, 7.0, 10.0, 10.5, 12.5, 15.0, 20.0, 25.0, 30.0]
+_GRID_KWH = [0.0, 0.5, 0.9, 1.0, 1.9, 2.0, 4.0, 5.0, 6.0, 9.0, 10.0, 12.0, 14.0, 15.0, 20.0, 30.0]
+_GRID_WALLBOXES = [0, 1, 2, 3]
+_GRID_HEATING = [None, "heat_pump", "gas", "pellets"]
+_KEYS = ("total", "pv", "storage", "wallbox", "heat", "heating_rod", "other")
+
+
+def _grid_plant(kwp, kwh, wallboxes, bidirectional, heating) -> dict:
+    consumers = [_ev(f"ev{i}", bidirectional=i < bidirectional) for i in range(wallboxes)]
+    if heating is not None:
+        consumers.append(_heating(heating, rod=True))
+    return _points(_components(kwp=[kwp], kwh=[kwh]), consumers)
+
+
+def test_no_upgrade_lowers_the_points():
+    """Guarantee of rule version 3: more PV, more storage or another wallbox (plain or
+    bidirectional) never lowers the total, nor any single part."""
+    plants = {}
+    for kwp, kwh, wallboxes, heating in itertools.product(
+        _GRID_KWP, _GRID_KWH, _GRID_WALLBOXES, _GRID_HEATING
+    ):
+        for bidirectional in range(wallboxes + 1):
+            key = (kwp, kwh, wallboxes, bidirectional, heating)
+            plants[key] = _grid_plant(*key)
+
+    def upgrades(key):
+        kwp, kwh, wallboxes, bidirectional, heating = key
+        i, j = _GRID_KWP.index(kwp), _GRID_KWH.index(kwh)
+        if i + 1 < len(_GRID_KWP):
+            yield "pv", (_GRID_KWP[i + 1], kwh, wallboxes, bidirectional, heating)
+        if j + 1 < len(_GRID_KWH):
+            yield "storage", (kwp, _GRID_KWH[j + 1], wallboxes, bidirectional, heating)
+        if wallboxes + 1 in _GRID_WALLBOXES:
+            yield "wallbox", (kwp, kwh, wallboxes + 1, bidirectional, heating)
+            yield "bidirectional wallbox", (kwp, kwh, wallboxes + 1, bidirectional + 1, heating)
+
+    checked = 0
+    for key, before in plants.items():
+        for what, upgraded in upgrades(key):
+            after = plants[upgraded]
+            lower = [k for k in _KEYS if after[k] < before[k]]
+            assert not lower, f"{what}: {key} {before} -> {upgraded} {after}"
+            checked += 1
+    assert checked > 10_000
+
+
+def test_heating_rod_and_storage_parts_ignore_pv_on_the_grid():
+    """Version 2 lowered both parts with more PV (rod deduction, storage kink)."""
+    for kwh, wallboxes in itertools.product(_GRID_KWH, (0, 1)):
+        parts = {
+            (p["storage"], p["heating_rod"], p["wallbox"])
+            for p in (_grid_plant(kwp, kwh, wallboxes, 0, "gas") for kwp in _GRID_KWP)
+        }
+        assert len(parts) == 1
 
 
 @pytest.mark.parametrize(

@@ -55,14 +55,14 @@ Exact keys only: `v`, `id`, `app_version`, `context`, `stage`. `context` = `dete
 ### Schema v2 (Earnie-Points)
 
 ```json
-{"v": 2, "id": "<uuid4>", "app_version": "2.7.0", "context": "homeassistant_addon", "stage": "live", "points": 5, "points_v": 2}
+{"v": 2, "id": "<uuid4>", "app_version": "2.7.0", "context": "homeassistant_addon", "stage": "live", "points": 5, "points_v": 3}
 ```
 
 - Exact keys: `v`, `id`, `app_version`, `context`, `stage`, `points`, `points_v`.
 - The client sends v2 **only** when `stage == "live"` and the state holds valid points (`points` int ≥ 0, `points_v` int ≥ 1); otherwise it sends v1 exactly as above. `points` is the total of the Earnie-Points of the **live** plant (rule and breakdown: [`earnie-points.md`](earnie-points.md)); no tariff name is sent.
 - A change of `points` while consent is `on` clears `last_sent_date` / `last_attempt_at` and triggers a send, so the daily statistic is current (same mechanism as the scenario counter).
 - **Receiver:** accepts v1 and v2. v2 requires `stage == "live"`, `points` int 0–99, `points_v` int ≥ 1. Per UTC day and salted id, install counters (stage, context, version) stay first-wins; `points` is **latest-wins**. `usage_daily.csv` gets a `points_hist` column (JSON histogram, buckets `"0"` … `"20"` and `"21+"`). The tariff split S / M / L is computed offline from the histogram with the then-current ranges.
-- **Rule versions:** `points_v` 1 until 2.8.0-dev.9, 2 since (see [`earnie-points.md`](earnie-points.md) §2). A client update changes an install's total once without a change of the plant. The receiver's `points_hist` does not separate rule versions yet, so days with clients on both versions mix v1 and v2 totals.
+- **Rule versions:** `points_v` 1 until 2.8.0-dev.9, 2 in the `-dev` builds from 2026-11-08, 3 since 2026-11-13 (see [`earnie-points.md`](earnie-points.md) §2). A client update changes an install's total once without a change of the plant. The receiver's `points_hist` does not separate rule versions yet, so days with clients on different versions mix their totals.
 - Consent: no re-prompt for installs that already opted in; "Was wird gesendet?" shows the exact v2 JSON and the German docs / privacy note describe `points`.
 
 ## 5. Server design
