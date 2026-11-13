@@ -29,6 +29,11 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## New Bugs (Do not remove this chapter — even if empty)
 
+- [ ] **[release/2.7] `set_ess_mode` is "Pflicht" in the Loxone docs but not required by EHAL-Com (found 2026-11-12 in tester support):** `docs/einrichtung/loxone-anbindung.md` (and `docs/referenz/ehal.md` § sticky backends) say Earnie writes `set_ess_mode` on every ESS cycle and Loxone Config must treat `0` as Automatik, because Virtual-In values are sticky. `ehal/required_signals.py::required_kinds_for_battery` requires only the limits and `set_ess_active_power` for `control: full`, so EHAL-Com marks the mapping complete without it; `ui/setup_readiness.py::_required_plant_live_bindings_present` still lists `set_ess_mode`, but only on the onboarding path. Consequences seen on a tester install:
+  - The VI template (`scripts/pilot_vi_template_gen.py`) only contains activated `set_*` signals, so `ess.{id}.set_ess_mode` was missing.
+  - `integrations/loxone_writes.py` publishes `ess.{id}.set_ess_mode` only when bound, so a hand-added VI command found no key in `status.json` and Loxone showed it as faulty.
+  - `status.json` still carries the plant-flat `"set_ess_mode": 0.0` from `integrations/loxone_status_json.py::_plant_status_keys`; unbound, it is a constant placeholder that looks like a real Automatik value.
+  - Fix: decide whether `set_ess_mode` is required for `control: full` on Loxone (then add it to `required_kinds_for_battery` for that backend and pre-activate it in the mapping) or optional (then fix the docs and say how Loxone Config tells Automatik from a forced `0` kW). Either way, drop or mark the plant-flat placeholder when no battery binds the mode. User docs in the same change.
 
 ## Minor changes (no bugs but still not worth to put it in backlog.md - do not remove this chapter - even if empty)
 
