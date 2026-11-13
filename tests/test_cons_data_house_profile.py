@@ -94,3 +94,19 @@ def test_consumer_labels_for_ids_uses_profile_labels(monkeypatch):
     )
     labels = consumer_labels_for_ids(["swimspa"])
     assert labels["swimspa"] == "Swimspa"
+
+
+def test_build_synthetic_without_consumers_scales_to_annual_kwh(monkeypatch):
+    from scripts import generate_cons_data as gcd
+
+    class _Climate:
+        def pv_kw_at(self, _moment):
+            return 0.0
+
+    profile = {"id": "no_consumers", "annual_kwh": 3500.0, "consumers": []}
+    monkeypatch.setattr(gcd, "resolve_runtime_house_profile", lambda: profile)
+    monkeypatch.setattr(
+        gcd.ModeledClimateContext, "for_house_profile", lambda *_a, **_k: _Climate()
+    )
+    df = gcd.build_synthetic(date(2025, 1, 1), date(2025, 12, 31))
+    assert df["total_kw"].sum() == pytest.approx(3500.0, rel=0.01)
