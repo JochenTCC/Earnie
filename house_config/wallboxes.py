@@ -82,7 +82,7 @@ def _positive_float(raw: Any, *, label: str, field: str, allow_zero: bool = Fals
         value = float(raw)
     except (TypeError, ValueError):
         raise ValueError(f"{label}: {field} muss eine Zahl sein (ist {raw!r}).") from None
-    if value < 0.0 or (value == 0.0 and not allow_zero):
+    if value < 0.0 or (not value and not allow_zero):
         raise ValueError(f"{label}: {field} muss {'>= 0' if allow_zero else '> 0'} sein.")
     return value
 

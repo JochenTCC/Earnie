@@ -51,7 +51,7 @@ def _fee_from_spec(spec: dict | None, key: str = "monthly_fee_eur") -> float:
     if raw is None:
         return 0.0
     fee = float(raw)
-    if fee == 0.0:
+    if not fee:
         return 0.0
     include_vat = spec.get("prices_include_vat")
     vat = spec.get("vat_percent")

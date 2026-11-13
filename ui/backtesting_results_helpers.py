@@ -432,7 +432,7 @@ def _soc_correction_hint(meta: dict, scenario_id: str) -> list[str]:
     if not block:
         return ["SoC am Periodenende nicht bewertet (Log vor dieser Auswertung)"]
     step = block["steps"][LADDER_L2]
-    if round(float(step["correction_eur"]), 2) == 0.0:
+    if not round(float(step["correction_eur"]), 2):
         return []
     return [
         f"Ersparnis mit SoC am Periodenende: {soc_correction_text(step['correction_eur'])} "
