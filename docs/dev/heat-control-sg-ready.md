@@ -1,8 +1,11 @@
 # Predictive heat control: generic EHAL signal set (SG-Ready and beyond)
 
-Status: **draft (2026-11-14)**. Concept only, nothing is implemented. Written before the
-hydraulic sketch and the controller program of the reference plant were available; the
-sections marked *preliminary* are refined once they are.
+Status: **draft (2026-11-14)**. Concept only, nothing is implemented.
+
+This document is the **generic** part: the signal set, its levels and the model. It names no
+individual plant. The first plant it is applied to is described in
+[heat-control-reference-plant.md](heat-control-reference-plant.md); what that plant taught the
+generic design is marked "(from the reference plant)".
 
 ## 1. Goal
 
@@ -12,8 +15,8 @@ when electricity is cheap or the heat pump is efficient, and live off the stored
 1. Give Earnie a heat-control interface that works with plain SG-Ready and can be extended.
 2. Define it as a **generic EHAL signal set** for heating systems with a heat store and an
    optional heating rod. The smart-home backend translates it to the individual controller.
-3. Adapt the reference plant: a freely programmable controller (Technische Alternative
-   UVR 1611) without SG-Ready.
+3. Adapt a first plant with a freely programmable controller without SG-Ready (separate
+   document, see above).
 4. Check that Earnie receives the right measurements for this.
 
 ## 2. Why SG-Ready alone is not enough
@@ -75,8 +78,7 @@ Every thermal store is described by the same four numbers:
 | Charge cost | Extra electricity per kWh of heat, compared with normal operation |
 
 Illustrative values for a well-insulated 150 m² house of heavy construction (Earnie's
-`building_mass` "schwer", 130 Wh/m²K) and an 887 l store. They are not measurements of the
-reference plant.
+`building_mass` "schwer", 130 Wh/m²K) and a 900 l store. They are not measurements.
 
 | | Building | Heat store |
 | --- | --- | --- |
@@ -96,9 +98,13 @@ Consequences:
   only if `p_a / COP_a × e^((b−a)/τ) < p_b / COP_b`. For the building that is hours up to
   about a day, for the store two to three days.
 - **The outside temperature counts like the price** for an air-source heat pump: running in
-  the warm hours of the day raises the COP, often by more than the price spread gains.
+  the warm hours of the day raises the COP, often by more than the price spread gains. A
+  ground-source heat pump has a nearly constant source, so only the sink temperature counts.
 - **Solar gains:** preheating the building before a sunny day is wasted; the forecast gains
   (`thermal.solar_gains`) must enter the same plan.
+- **Solar thermal** (from the reference plant): a collector that feeds the lower part of the
+  store yields less when that part was charged electrically before. The plan must not boost
+  the store ahead of forecast collector heat.
 
 ## 5. Layers and responsibilities
 
@@ -167,17 +173,24 @@ smart home, the boosts read from the heat pump's settings.
 
 | Signal | Dir | Unit | Meaning |
 | --- | --- | --- | --- |
-| `set_temperature_heat_storage_target` | write | °C | Charge the store up to this temperature |
-| `set_temperature_dhw_target` | write | °C | Hot-water target (separate tank or hot-water zone) |
-| `set_temperature_room_offset` | write | K | Shift of the heating curve or room setpoint, may be negative |
+| `set_temperature_heat_storage_target` | write | °C | Charge the store, or the heating zone of a combined store, up to this temperature |
+| `set_temperature_dhw_target` | write | °C | Hot-water target (separate tank, or the hot-water zone of a combined store) |
+| `set_temperature_room_offset` | write | K | Shift of the room setpoint, may be negative |
 
 The targets apply in states 3 and 4; in state 2 the controller ignores them. They replace the
 fixed boosts and let Earnie dose the energy.
 
-The store target refers to the sensor at which the controller ends the charge. Earnie plans
-with `T_eq`, so it assumes that the store is at the target at the end of a completed charge
-and corrects itself with the next measured `T_eq`. Whether this holds depends on the sensor
-position and is checked on the reference plant (open point O2).
+A value of 0 means "no target"; the backend may use this instead of a separate state input
+(from the reference plant).
+
+Each target refers to the sensor at which the controller ends the charge of that sink.
+Earnie plans with the heat content, so it assumes that the zone is at the target at the end
+of a completed charge and corrects itself with the next measurement. How well this holds
+depends on the sensor position and is checked per plant.
+
+The backend decides how it realises the room offset: a shifted room setpoint in its own room
+control, a shifted heating curve, or a raised flow setpoint. A negative offset may also be
+realised by switching a heating circuit off.
 
 ### Level 3: feedback
 
@@ -193,6 +206,11 @@ position and is checked on the reference plant (open point O2).
 | `get_temperature_dhw_min` | read | °C | Hot-water comfort minimum |
 | `get_temperature_room_setpoint` | read | °C | Effective room setpoint |
 | `heatpump.<id>.sens_heat_power` | read | W | Thermal power (heat meter), optional |
+| `heatpump.<id>.sens_temperature_source` | read | °C | Source temperature (brine, ground water), optional; replaces the outside temperature in the COP |
+
+The operating mode reports what the controller requests. Whether the compressor runs is
+taken from the electric power, because a heat pump with its own controller may delay a
+request (from the reference plant).
 
 The `get_*` values replace Earnie-side configuration where they are mapped, as the pool does
 with `get_temperature_water_setpoint`. A missing optional signal switches the function that
@@ -239,15 +257,17 @@ x_store[t+1] = (1 − Δt/τ_store) · x_store[t] + q_gen[t] + q_rod[t] − q_to
 ```
 
 The leak term is linear in the level, so the model stays linear. `q_to_house` is limited by
-the heat the emitters can transfer. Whether the generator feeds the heating circuit through
-the store or beside it depends on the hydraulics (open point O1).
+the heat the emitters can transfer. A store in parallel to the heating circuits (the
+generator feeds the circuits directly and the rest goes into the store) has the same energy
+balance, so it needs no separate model.
 
 ### 8.2 Efficiency by temperature
 
 `COP = f(sink temperature, source temperature)` replaces the constant JAZ in the plan:
 
 - **Source side:** the outside temperature forecast gives one factor per slot; it is known
-  before the solve and costs no variables.
+  before the solve and costs no variables. With a measured source temperature
+  (`sens_temperature_source`) the factor is that value held over the horizon.
 - **Sink side:** the store band is split into segments with falling COP, like tariff tiers.
   Cost minimisation fills the efficient segments first, so no binaries are needed.
 - **Data:** the heating system stores a few COP points (manufacturer data or measured with
@@ -256,15 +276,24 @@ the store or beside it depends on the hydraulics (open point O1).
 
 ### 8.3 Hot water
 
-Hot water needs a high temperature at the top of the store, not a high `T_eq`. A separate
-tank becomes a third level with a comfort minimum. A combined store needs a rule for the
-top zone; it is specified with the hydraulics (O1).
+Hot water needs a high temperature at the top of the store, not a high `T_eq`. Both
+hydraulic variants become a second store level with a comfort minimum:
+
+- **Separate tank:** its own volume and sensor.
+- **Combined store with a hot-water zone** (from the reference plant): the generator charges
+  either the top zone or the heating zone through a changeover valve. The top zone is the
+  hot-water level, the rest the heating level. The heating system stores the zone split
+  (share of the volume above the changeover port). When the heating zone is charged hotter
+  than the top zone, the store acts as one volume.
+
+The generator serves one sink at a time, and the controller gives hot water priority. The
+plan predicts this rule; it does not command the sink.
 
 ### 8.4 One model for Live and the Scenario Explorer
 
 Live keeps the store physics outside the solver today, the Scenario Explorer has the level
 inside. The two-store model belongs in one shared place, with Live starting from the
-measured `T_eq` and room temperature. This is a decision to take before implementation (O5).
+measured `T_eq` and room temperature. This is a decision to take before implementation (O1).
 
 ### 8.5 Parameters and their source
 
@@ -289,24 +318,13 @@ The backend needs, per plant: inputs for the state and the targets, a timeout to
 and outputs for the feedback signals. `share/ehal/roles/heatpump.json` and the Loxone recipe
 `share/loxone/recipes/heatpump.json` are extended per level.
 
-### 9.2 Reference plant: UVR 1611 (preliminary)
+### 9.2 Plants
 
-The controller reproduces the states in its own program:
-
-- **Inputs:** network inputs for the state and for each target.
-- **State 1:** blocks the generator request, limited by a maximum duration and overridden by
-  the minimum top temperature and frost protection.
-- **State 3:** raises the setpoints of the store and hot-water requests to the targets,
-  capped by the heat pump's maximum flow temperature, and shifts the heating curve.
-- **State 4:** as 3 with the maximum temperatures.
-- **No signal:** state 2.
-- **Outputs:** operating mode, effective setpoints, sensors.
-
-A mixed heating circuit is required: without a mixer an overcharged store reaches the house
-as too high a flow temperature.
-
-This section is rewritten against the scanned function-block diagram and the hydraulic
-sketch. Missing controller inputs or outputs are added on the plant side.
+| Plant type | Translation |
+| --- | --- |
+| Heat pump with SG-Ready contacts | Level 1: two relay contacts; boosts from the heat pump's settings. Feedback as far as the heat pump's interface offers it. |
+| Heat pump with a bus interface (Modbus, manufacturer API) | Levels 1–3 as far as the registers allow: setpoints as targets, status as operating mode. |
+| Freely programmable controller | Levels 1–3 in the controller program; first case: [heat-control-reference-plant.md](heat-control-reference-plant.md). |
 
 ### 9.3 Room control
 
@@ -335,16 +353,15 @@ reads one, `sens_temperature_room`.
 | Thermal power | no | measured COP, loss identification | medium |
 | Hot-water tank temperature | no | only with a separate tank | by hydraulics |
 
-Whether the mapped signals of the reference plant are correct cannot be seen in the
-repository; it needs the `ehal_bindings` of the house profile.
+The state of a concrete plant is checked per plant, see the reference plant document.
 
 ## 11. Phases
 
 | Phase | Content |
 | --- | --- |
-| P0 | Measurement check on the reference plant; add top sensor, operating mode and room temperature; record two weeks; identify `τ_store`, `τ_house` and COP points. No optimizer change. |
+| P0 | Measurement check on the reference plant; add the missing feedback signals; record two weeks; identify `τ_store`, `τ_house` and COP points. No optimizer change. |
 | P1 | Signal set levels 1–3 in EHAL (role, functions, recipes, EHAL-Com, German user docs). Earnie writes state and targets from today's plan. |
-| P2 | Translation on the reference plant (UVR 1611) including the timeout; plan against actual with the reported operating mode. |
+| P2 | Translation on the reference plant including the timeout; plan against actual with the reported operating mode. |
 | P3 | Two leaky stores and COP by temperature in the Scenario Explorer and Live; catalog fields and migration. |
 | P4 | Hot-water level, heating rod in the same plan, adaptation of the parameters from measurements. |
 
@@ -352,13 +369,12 @@ HouseSim needs a controller that understands the states for the tests of P1 and 
 
 ## 12. Open points
 
-- **O1 Hydraulics:** combined store or separate hot-water tank, fresh-water station, store in
-  series or parallel to the heating circuit, mixers, solar thermal. Decides 8.1 and 8.3.
-- **O2 Charge sensor:** which sensor ends a store charge, and how `T_eq` relates to it.
-- **O3 Heat pump:** air or ground source, modulating or on/off, how the controller requests
-  it, maximum flow temperature.
-- **O4 Path:** how the smart home reaches the controller (C.M.I., CAN, Modbus) and which
-  backend sits between.
-- **O5 Model location:** store physics inside the Live MILP or outside as today (8.4).
-- **O6 Lock:** whether Earnie uses state 1 at all, or only 2–4.
-- **O7 Comfort band:** symmetric as today or asymmetric, constant or by time of day.
+Plant-specific questions are in the reference plant document.
+
+- **O1 Model location:** store physics inside the Live MILP or outside as today (8.4).
+- **O2 Lock:** whether Earnie uses state 1 at all, or only 2–4.
+- **O3 Comfort band:** symmetric as today or asymmetric, constant or by time of day.
+- **O4 Cooling:** passive or active cooling uses the same emitters and excludes heating. How
+  the cooling follow-up (`house-cooling.md`) shares the signal set is not designed here.
+- **O5 Measured collector heat:** whether a solar heat meter becomes an EHAL signal to
+  correct the collector forecast.
