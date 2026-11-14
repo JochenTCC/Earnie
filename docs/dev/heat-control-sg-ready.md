@@ -202,6 +202,7 @@ realised by switching a heating circuit off.
 | `sens_temperature_dhw` | read | °C | Separate hot-water tank, if present |
 | `sens_temperature_room` | read | °C | Reference room or mean of several rooms |
 | `get_temperature_heat_storage_setpoint` | read | °C | Controller's normal store setpoint |
+| `get_temperature_heat_storage_tolerance` | read | K | Band below the setpoint in which the controller does not yet request heat |
 | `get_temperature_heat_storage_max` | read | °C | Highest store temperature the controller allows |
 | `get_temperature_dhw_min` | read | °C | Hot-water comfort minimum |
 | `get_temperature_room_setpoint` | read | °C | Effective room setpoint |
@@ -215,9 +216,20 @@ The operating mode reports what the controller requests. Whether the compressor 
 taken from the electric power, because a heat pump with its own controller may delay a
 request (from the reference plant).
 
-The `get_*` values replace Earnie-side configuration where they are mapped, as the pool does
-with `get_temperature_water_setpoint`. A missing optional signal switches the function that
-needs it off; it is not replaced by a default (rule `no-implicit-fallbacks`).
+**The backend owns the band in Live.** Where the setpoint and tolerance signals are mapped,
+Live plans with them and not with `heat_storage.setpoint_c` / `tolerance_c` of the house
+configurator, as the pool does with `get_temperature_water_setpoint` and
+`get_temperature_tolerance_c`. Controller and plan then cannot drift apart. Consequences:
+
+- **Scenario Explorer:** it has no backend, so the configured values stay its input. The
+  house configurator shows that Live overrides them and with which present values.
+- **Changing setpoint:** a setpoint that follows a heating curve moves with the outside
+  temperature. Live reads it every cycle and holds it over the horizon.
+- **Band by level:** on levels 0 and 1 the band is setpoint − tolerance up to the setpoint.
+  On level 2 the setpoint is the lower end and `get_temperature_heat_storage_max` the upper.
+
+A missing optional signal switches the function that needs it off; it is not replaced by a
+default (rule `no-implicit-fallbacks`).
 
 ### Fail-safe
 
@@ -309,7 +321,11 @@ ready-by time (`get_evcs_ready_by_time`): **a temperature that must be reached b
   system, for plants whose backend has no such schedule.
 
 A zone uses one of the two sources; with the signals mapped, a configured schedule for the
-same zone fails loud. The plan then charges the zone in the cheapest slots before the time
+same zone fails loud. The ready temperature is the backend's best estimate; a setpoint that
+exists only while a circuit is active may be reported as the value of its last active
+period. If the real demand turns out higher, the controller requests the rest itself.
+
+The plan then charges the zone in the cheapest slots before the time
 instead of letting the controller start the generator when the window opens. With neither
 source the controller still serves the demand; Earnie sees it only as a deviation.
 

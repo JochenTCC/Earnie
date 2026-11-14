@@ -151,8 +151,10 @@ high and a low store setpoint with Earnie's `heatpump.<id>.set_enable`.
 - **Enable = 0:** the low setpoint. Through the maximum function the heating curves still
   win when they are higher, so this is state 2, not a lock.
 
-Earnie's `heat_storage.setpoint_c` has to equal the high setpoint, otherwise the plan and
-the controller disagree about the end of a charge (Q2).
+Loxone reports the band to Earnie (`get_temperature_heat_storage_setpoint`,
+`get_temperature_heat_storage_tolerance`), so Live plans with the controller's values and
+not with those of the house configurator. Until these signals exist, the configured
+`heat_storage.setpoint_c` has to equal the high setpoint by hand.
 
 ### Level 1: operating state
 
@@ -185,6 +187,15 @@ generic ready-by pair: `get_heat_storage_ready_by_time` = start of the next wind
 `get_temperature_heat_storage_ready` = the wall heating's flow setpoint for it. Earnie then
 sends a store target before the window. Nothing in the signals is specific to the wall
 heating.
+
+The wall heating's flow setpoint exists only while the circuit is enabled; disabled, the
+controller outputs an artificially low value. Options for the ready temperature:
+
+| Option | How | Assessment |
+| --- | --- | --- |
+| A Hold the last value | Loxone stores the flow setpoint of the last window and reports it for the next one. | Recommended first step: no controller change, no second curve. The error is the day-to-day change of the outside temperature times the curve slope, a few kelvin at most; a small margin covers it. |
+| B Shadow controller | A second heating-circuit function in the UVR with the same curve, always enabled, without outputs; its flow setpoint is sent to Loxone. | Exact for the present outside temperature. Two parameter sets of the same curve in one device have to be kept equal. |
+| C Curve in Loxone | Loxone computes the curve itself. | Not recommended: a copy outside the controller drifts from the original. |
 
 ### Level 3: feedback
 
@@ -247,8 +258,8 @@ morning window.
 
 - **Q1 Running program:** a current function overview, or a check of the affected blocks at
   the controller (`HZ_ANF`, `WW_ANF`, `MAX(An)2`, network inputs and outputs in use).
-- **Q2 Setpoints of the enable:** the high and the low value on `MAX(An)2`, and the store
-  setpoint and tolerance configured in Earnie.
+- **Q2 Setpoints of the enable:** the high and the low value on `MAX(An)2`. Needed for the
+  Scenario Explorer's configured values and until Loxone reports the band.
 - **Q3 Heat pump interface:** to which terminals of the Weider SW 70 A5 and A11 go and what
   they do there; maximum flow temperature; fixed speed or modulating; whether it has a lock
   input. Sources: the heat pump's wiring diagram or the installer. Not blocking: levels 1–3
