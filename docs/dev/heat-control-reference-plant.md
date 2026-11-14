@@ -156,6 +156,29 @@ Loxone reports the band to Earnie (`get_temperature_heat_storage_setpoint`,
 not with those of the house configurator. Until these signals exist, the configured
 `heat_storage.setpoint_c` has to equal the high setpoint by hand.
 
+### The band on this plant
+
+| End | Value | Remark |
+| --- | --- | --- |
+| Lower end | flow setpoint of the floor heating curve, plus the wall heating's while its window is open | What `MAX(An)2` yields without Earnie's input. No permanent boost on it: a store that is always kept hotter pays the lower COP and the higher loss all the time. |
+| Upper end, levels 0 and 1 | lower end plus a fixed boost | The present "high" value. |
+| Upper end, level 2 | Earnie's target, capped by the maximum | The boost is planned per day. |
+| Hot water | separate: top zone, sensor S3, own setpoint and target | Not part of the heating zone's setpoint. Charging the whole lower zone to the hot-water temperature costs COP on the full volume. |
+
+How far a boost carries, with the whole store at about 1.03 kWh/K (the heating zone alone
+has less) and illustrative heat loads:
+
+| Heat load | Heat for 6 h | Boost needed |
+| --- | --- | --- |
+| 1 kW (mild day) | 6 kWh | about 6 K |
+| 2 kW | 12 kWh | about 12 K |
+| 3 kW (cold day) | 18 kWh | about 17 K |
+
+On a cold day six hours from the store alone need a flow temperature near the heat pump's
+limit. The building covers the same heat with about 1 K of its comfort band (about
+20 kWh/K, illustrative). A fixed bridging time is therefore not a design value of this
+plant: the store and the building bridge together, and the plan decides the split.
+
 ### Level 1: operating state
 
 The controller needs no state input. The smart home resolves the state:

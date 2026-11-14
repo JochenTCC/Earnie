@@ -163,6 +163,11 @@ Differences from the BWP definition:
 - **Fixed boosts:** on level 1 the controller raises by amounts Earnie cannot set. The
   heating system therefore stores the boost per sink in kelvin (store, hot water, room), so
   that state 3 has a known capacity: `C × boost`.
+- **Sizing a fixed boost:** the boost that lets the generator stay off for a time `t` at a
+  heat load `P` is `ΔT = P × t / C`. The load changes with the weather, so a fixed boost
+  fits one load only. On level 2 the bridged time is a **result** of the plan, not a
+  setting: Earnie sets the target from the forecast demand, the prices, the building's
+  band and the cost of charging hotter.
 - **Lock limits:** whether state 1 may be used and for how long is a setting of the heating
   system. Without it Earnie sends 2 instead and predicts the controller's own starts.
 
