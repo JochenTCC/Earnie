@@ -17,6 +17,7 @@ When a document becomes a maintained reference again, move it to the matching us
 | [openems-testing-platform-todo.md](openems-testing-platform-todo.md) | Lab checklist for the OpenEMS stack (referenced by `docker/compose/openems-lab.yml`) |
 | [ha-lab-setup.md](ha-lab-setup.md) | Lab stack Earnie + Home Assistant + evcc (`docker/compose/ha-lab.yml`) |
 | [openems-lab-setup.md](openems-lab-setup.md) | Lab stack Earnie + OpenEMS (`docker/compose/openems-lab.yml`) |
+| [heat-control-sg-ready.md](heat-control-sg-ready.md) | Draft (2026-11-14) — predictive heat control: generic EHAL signal set (SG-Ready and beyond), heat store and building as two stores |
 | [house-sim.md](house-sim.md) | House simulator HouseSim S1–S4 (`house_sim/`) |
 | [cloud-poc-study.md](cloud-poc-study.md) | In progress (2026-10-23) — offline cloud POC study: what it does, verification, next steps |
 | [data-model-stability-decisions.md](data-model-stability-decisions.md) | Decided (2026-10-25) — D1–D3 before the 2.8 migration steps |
