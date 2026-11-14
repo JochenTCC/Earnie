@@ -205,6 +205,9 @@ realised by switching a heating circuit off.
 | `get_temperature_heat_storage_max` | read | °C | Highest store temperature the controller allows |
 | `get_temperature_dhw_min` | read | °C | Hot-water comfort minimum |
 | `get_temperature_room_setpoint` | read | °C | Effective room setpoint |
+| `get_heat_storage_ready_by_time` | read | time | Next time at which the store, or its heating zone, must be at the temperature below; optional, see 8.3a |
+| `get_temperature_heat_storage_ready` | read | °C | Minimum temperature required at that time |
+| `get_dhw_ready_by_time`, `get_temperature_dhw_ready` | read | time, °C | The same for hot water |
 | `heatpump.<id>.sens_heat_power` | read | W | Thermal power (heat meter), optional |
 | `heatpump.<id>.sens_temperature_source` | read | °C | Source temperature (brine, ground water), optional; replaces the outside temperature in the COP |
 
@@ -293,11 +296,22 @@ plan predicts this rule; it does not command the sink.
 
 The lower limit of a store level is not constant (from the reference plant): hot-water
 comfort times, or a heating circuit that needs a higher flow temperature at a fixed time of
-day, raise it for a window. `get_*` signals report only the present setpoint, so the
-schedule is configuration of the heating system: windows with a minimum temperature per
-zone. The plan then charges the zone in the cheapest slots before the window instead of
-letting the controller start the generator when the window opens. Without the schedule the
-controller still serves the demand; Earnie only sees it as a deviation.
+day, raise it for a window. The setpoint signals report only the present value, so Earnie needs
+the next demand ahead of time. This is the thermal counterpart of the electric car's
+ready-by time (`get_evcs_ready_by_time`): **a temperature that must be reached by a time**.
+
+- **From the backend:** `get_heat_storage_ready_by_time` with
+  `get_temperature_heat_storage_ready` (and the hot-water pair). The backend reports the
+  next demand it knows, whatever its reason: a comfort window, a hot-water time, a
+  legionella program, guests. Earnie does not need to know the reason. The time format
+  follows `get_evcs_ready_by_time`.
+- **From configuration:** fixed windows with a minimum temperature per zone in the heating
+  system, for plants whose backend has no such schedule.
+
+A zone uses one of the two sources; with the signals mapped, a configured schedule for the
+same zone fails loud. The plan then charges the zone in the cheapest slots before the time
+instead of letting the controller start the generator when the window opens. With neither
+source the controller still serves the demand; Earnie sees it only as a deviation.
 
 ### 8.4 One model for Live and the Scenario Explorer
 

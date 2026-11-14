@@ -143,8 +143,16 @@ its behaviour while the new network inputs are 0.
 
 ### Level 0 (today)
 
-Earnie's `heatpump.<id>.set_enable` has no input in the program as printed: the heating
-request has no external enable. How the enable acts today is an open question (Q2).
+The running program has a third input on `MAX(An)2` (not in the print). It jumps between a
+high and a low store setpoint with Earnie's `heatpump.<id>.set_enable`.
+
+- **Enable = 1:** the heating zone is charged up to the high setpoint. This already is the
+  generic state 3 with a fixed boost.
+- **Enable = 0:** the low setpoint. Through the maximum function the heating curves still
+  win when they are higher, so this is state 2, not a lock.
+
+Earnie's `heat_storage.setpoint_c` has to equal the high setpoint, otherwise the plan and
+the controller disagree about the end of a charge (Q2).
 
 ### Level 1: operating state
 
@@ -168,13 +176,15 @@ Controller additions:
 
 | Generic signal | Controller addition |
 | --- | --- |
-| `set_temperature_heat_storage_target` | New analog network input on a free input of `MAX(An)2`. Limited by a new minimum function against a fixed maximum (heat pump flow limit minus a margin). |
+| `set_temperature_heat_storage_target` | The existing third input of `MAX(An)2` takes Earnie's target instead of the two fixed values. Limited by a new minimum function against a fixed maximum (heat pump flow limit minus a margin). |
 | `set_temperature_dhw_target` | Loxone already provides the hot-water setpoint, so Loxone sends the larger of its own setpoint and Earnie's target; no controller change. The limit against the heat pump's maximum is added in the controller or in Loxone. |
 | `set_temperature_room_offset` | **No controller change in the first step:** Loxone adds the offset to the setpoints of the participating rooms and thereby changes the circuit enables it already sends. The wall heating's morning window does not take part. Second step, if the floor heating takes the heat too slowly: a raised flow setpoint on a free input of `MAX(An)4` and `MAX(An)2`. |
 
-The morning window of the wall heating needs no signal. Its schedule and flow temperature
-are entered in Earnie as a scheduled minimum of the heating zone; Earnie then sends a store
-target before the window.
+The morning window of the wall heating is reported by Loxone, which holds its times, as the
+generic ready-by pair: `get_heat_storage_ready_by_time` = start of the next window,
+`get_temperature_heat_storage_ready` = the wall heating's flow setpoint for it. Earnie then
+sends a store target before the window. Nothing in the signals is specific to the wall
+heating.
 
 ### Level 3: feedback
 
@@ -189,6 +199,7 @@ New network outputs; the smart home builds the generic signals from them.
 | `heatpump.<id>.sens_temperature_source` | S13 (brine flow) |
 | `get_temperature_heat_storage_setpoint` | result of `MAX(An)2`. Exported from the controller, not rebuilt in Loxone: a copy of the heating curves would drift from the original. |
 | `sens_temperature_room`, `get_temperature_room_setpoint` | already in the smart home |
+| `get_heat_storage_ready_by_time`, `get_temperature_heat_storage_ready` | Loxone schedule of the wall heating and its flow setpoint from the controller |
 | heat pump flow and return, solar power | S11, S12, `WMZ SOLAR`; for identification, no generic signal yet |
 
 ### Fail-safe
@@ -231,11 +242,13 @@ New network outputs; the smart home builds the generic signals from them.
 ## 8. Open questions
 
 Answered and worked in above: CAN node 48, circuit enables, sensor pockets, heating rod,
-store temperatures in Loxone, hot-water setpoint.
+store temperatures in Loxone, hot-water setpoint, how the enable acts today, source of the
+morning window.
 
 - **Q1 Running program:** a current function overview, or a check of the affected blocks at
   the controller (`HZ_ANF`, `WW_ANF`, `MAX(An)2`, network inputs and outputs in use).
-- **Q2 Enable today:** how does Earnie's heat pump enable act on the plant at present?
+- **Q2 Setpoints of the enable:** the high and the low value on `MAX(An)2`, and the store
+  setpoint and tolerance configured in Earnie.
 - **Q3 Heat pump interface:** to which terminals of the Weider SW 70 A5 and A11 go and what
   they do there; maximum flow temperature; fixed speed or modulating; whether it has a lock
   input. Sources: the heat pump's wiring diagram or the installer. Not blocking: levels 1–3
@@ -243,7 +256,6 @@ store temperatures in Loxone, hot-water setpoint.
   the behaviour.
 - **Q4 Controller parameters:** request and switch-off differences of `HZ_ANF` and its
   switch-off sensor, both heating curves, minimum run times.
-- **Q5 Morning window:** times of the wall-heating window and whether they are fixed.
-- **Q6 Network timeout:** whether the UVR 1611 or the CAN–KNX interface replaces a network
+- **Q5 Network timeout:** whether the UVR 1611 or the CAN–KNX interface replaces a network
   input by a default when Loxone is silent.
-- **Q7 Sensor labels:** S12 (heat pump return?), S2 (solar flow, unused in the program), S10.
+- **Q6 Sensor labels:** S12 (heat pump return?), S2 (solar flow, unused in the program), S10.
