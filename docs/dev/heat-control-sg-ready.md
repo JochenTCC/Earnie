@@ -289,6 +289,16 @@ hydraulic variants become a second store level with a comfort minimum:
 The generator serves one sink at a time, and the controller gives hot water priority. The
 plan predicts this rule; it does not command the sink.
 
+### 8.3a Scheduled minimum temperatures
+
+The lower limit of a store level is not constant (from the reference plant): hot-water
+comfort times, or a heating circuit that needs a higher flow temperature at a fixed time of
+day, raise it for a window. `get_*` signals report only the present setpoint, so the
+schedule is configuration of the heating system: windows with a minimum temperature per
+zone. The plan then charges the zone in the cheapest slots before the window instead of
+letting the controller start the generator when the window opens. Without the schedule the
+controller still serves the demand; Earnie only sees it as a deviation.
+
 ### 8.4 One model for Live and the Scenario Explorer
 
 Live keeps the store physics outside the solver today, the Scenario Explorer has the level
@@ -338,6 +348,12 @@ building: they close when it is being charged. Recommended split:
 
 Earnie therefore controls one quantity for the building, `set_temperature_room_offset`, and
 reads one, `sens_temperature_room`.
+
+A backend with its own room-by-room control keeps it (from the reference plant). It applies
+the offset to the setpoints of the rooms that take part and leaves the others alone, for
+example bedrooms. Which rooms take part is a setting of the backend; `sens_temperature_room`
+is then the mean of the participating rooms, and the house capacity in Earnie is reduced to
+their share of the living area.
 
 ## 10. Measurement check
 

@@ -7,22 +7,25 @@ This is the **plant-specific** part of the heat-control design. The generic sign
 levels and the model are in [heat-control-sg-ready.md](heat-control-sg-ready.md). This
 document applies them to the first plant: the maintainer's house.
 
-Source: the installer's hydraulic schema ("Schema mit Kühlung", 2015) and the printed
-function overview of the controller program (three pages). The print shows the function
-blocks and their wiring, **not the parameters** (setpoints, hystereses, times, heating
-curves). Readings that are inferred and not explicit in the print are marked *(inferred)*.
+Sources: the installer's hydraulic schema ("Schema mit Kühlung", 2015), the printed
+function overview of the controller program (three pages), and the maintainer's answers of
+2026-11-14. The print shows the function blocks and their wiring, **not the parameters**
+(setpoints, hystereses, times, heating curves). Readings that are inferred and not explicit
+in the print are marked *(inferred)*.
 
 ## 1. Plant
 
 | Part | Data |
 | --- | --- |
 | Heat pump | Weider SW 70, brine-water, ground source with brine distributors |
-| Store | one combined store, 887 l, three sensors (top, middle, bottom), solar coil in the lower part |
+| Store | one combined store, 887 l, three sensors in the **lower three** of four pockets, solar coil in the lower part |
 | Hot water | fresh-water station (plate heat exchanger) fed from the top of the store; no separate tank |
 | Heating circuits | floor heating and wall / bench heating, each with pump and mixer |
 | Solar thermal | 10.6 m² collector, heat meter in the solar circuit |
 | Cooling | passive, brine through a heat exchanger into the floor heating |
+| Heating rod | none |
 | Controller | Technische Alternative UVR 1611, CAN bus; the heat pump keeps its own internal controller |
+| Smart home | Loxone, connected through a CAN–KNX interface (CAN node 48) |
 
 ## 2. Hydraulics
 
@@ -72,8 +75,9 @@ program is taken as valid.
 | Digital in 3 (node 48) | in | enable wall heating circuit |
 | Analog out 1 | out | collector temperature S1 |
 
-So a CAN node 48 already sends setpoints and enables to the controller, and the controller
-sends **one** value back. All other free network variables are available.
+Node 48 is the CAN–KNX interface to Loxone. Loxone already sends setpoints and enables to
+the controller, and the controller sends **one** value back. All other free network
+variables are available.
 
 ### 3.3 Functions
 
@@ -81,7 +85,7 @@ sends **one** value back. All other free network variables are available.
 | --- | --- |
 | `SOLAR`, `ANALOG3`, `WMZ SOLAR` | Solar control on S1 against S5, pump speed, solar heat meter |
 | `KUEHLFKT` | Re-cools the store through the collector when S4 exceeds the network maximum |
-| `Wandheizung`, `Fusbodenheiz` (heating-circuit controllers) | Flow setpoint from the outside temperature. **No room sensor is connected.** Enabled by `LOGIK2` / `LOGIK4`. |
+| `Wandheizung`, `Fusbodenheiz` (heating-circuit controllers) | Flow setpoint from the outside temperature, each with its own heating curve stored in the controller. **No room sensor is connected.** Enabled by `LOGIK2` / `LOGIK4`, that is by Loxone. |
 | `WW_ANF` (hot-water request) | S3 below the hot-water setpoint → A11, A10, A7. The setpoint input is not wired (parameter in the controller). |
 | `MAX(An)2` → `HZ_ANF` (heating request) | Largest flow setpoint of the two circuits is the request setpoint; S4 below it → A5, A7. The enable input and the switch-off sensor are not wired. |
 | `MAX(An)1` | Charge pump speed from the heat pump flow S11 → A16 |
@@ -102,14 +106,24 @@ sends **one** value back. All other free network variables are available.
 5. **Ground source:** the COP depends on the sink temperature and the slowly drifting brine
    temperature, not on the time of day. The "run in the warm hours" lever does not apply
    here. The brine temperature is measured (S13, S14).
-6. **The room control is outside the controller.** The heating circuits have no room sensor
-   and are enabled from the network *(inferred: the smart home switches them by room
-   temperature)*. The building is therefore charged in the smart home, not in the controller.
+6. **The room control is in Loxone.** It controls every room by its room temperature and
+   enables the two circuits over the network. The building is therefore charged in Loxone,
+   not in the controller.
 7. **Request is not run.** A5 and A11 are requests to the heat pump's own controller. The
    compressor state comes from the electric power.
 8. **Solar thermal shares the lower zone.** A boosted lower zone lowers the collector yield;
    the plan must respect the collector forecast. The solar heat meter can check it.
 9. **Cooling excludes heating** in the controller already; out of scope here.
+10. **The wall heating is a scheduled comfort demand.** Loxone switches it on separately in
+    the morning to warm the walls of the open shower, with a higher flow temperature from
+    its own heating curve. Through `MAX(An)2` this raises the request setpoint of the store
+    for that window. It is the case of the generic "scheduled minimum temperatures": the
+    demand is known in advance, needs a high temperature, and can be pre-charged in cheap
+    hours instead of starting the heat pump when the window opens.
+11. **The top of the store is not measured.** With the sensors in the lower three pockets
+    the sensor called "top" (S3) sits at about 60 % of the height. The hottest part, from
+    which the fresh-water station draws, has no sensor.
+12. **No heating rod:** state 4 equals state 3 with the maximum targets.
 
 ## 5. Mapping of the levels
 
@@ -136,16 +150,21 @@ The controller needs no state input. The smart home resolves the state:
 Controller additions:
 
 - **Lock:** a new digital network input, inverted, on the free enable input of `HZ_ANF`. A
-  comparison "S4 below a minimum" overrides it so that the heating never starves. The
-  hot-water request stays unlocked: comfort first, and its energy is small.
+  comparison "S4 below a minimum" overrides it so that the heating never starves, and so
+  does the wall-heating enable, so that the morning window is always served. The hot-water
+  request stays unlocked: comfort first, and its energy is small.
 
 ### Level 2: targets
 
 | Generic signal | Controller addition |
 | --- | --- |
 | `set_temperature_heat_storage_target` | New analog network input on a free input of `MAX(An)2`. Limited by a new minimum function against a fixed maximum (heat pump flow limit minus a margin). |
-| `set_temperature_dhw_target` | New analog network input and a new maximum function with the present hot-water setpoint, on the free setpoint input of `WW_ANF`. Same limit. |
-| `set_temperature_room_offset` | **No controller change in the first step:** the smart home shifts its own room setpoints and thereby the circuit enables it already sends. Second step, if the floor heating takes the heat too slowly: a raised flow setpoint on a free input of `MAX(An)4` and `MAX(An)2`. |
+| `set_temperature_dhw_target` | Loxone already provides the hot-water setpoint, so Loxone sends the larger of its own setpoint and Earnie's target; no controller change. Precondition: the setpoint path is clarified (Q3). The limit against the heat pump's maximum is added in the controller. |
+| `set_temperature_room_offset` | **No controller change in the first step:** Loxone adds the offset to the setpoints of the participating rooms and thereby changes the circuit enables it already sends. The wall heating's morning window does not take part. Second step, if the floor heating takes the heat too slowly: a raised flow setpoint on a free input of `MAX(An)4` and `MAX(An)2`. |
+
+The morning window of the wall heating needs no signal. Its schedule and flow temperature
+are entered in Earnie as a scheduled minimum of the heating zone; Earnie then sends a store
+target before the window.
 
 ### Level 3: feedback
 
@@ -158,7 +177,7 @@ New network outputs; the smart home builds the generic signals from them.
 | `sens_temperature_heat_storage` (`T_eq`) | weighted mean of S3, S4, S5 in the smart home |
 | `heatpump.<id>.sens_operating_mode` | cooling if A12, else hot water if A11, else heating if A5, else off; "locked" while the lock bit is set |
 | `heatpump.<id>.sens_temperature_source` | S13 (brine flow) |
-| `get_temperature_heat_storage_setpoint` | result of `MAX(An)2` |
+| `get_temperature_heat_storage_setpoint` | result of `MAX(An)2`. Exported from the controller, not rebuilt in Loxone: a copy of the heating curves would drift from the original. |
 | `sens_temperature_room`, `get_temperature_room_setpoint` | already in the smart home |
 | heat pump flow and return, solar power | S11, S12, `WMZ SOLAR`; for identification, no generic signal yet |
 
@@ -174,8 +193,9 @@ New network outputs; the smart home builds the generic signals from them.
 
 | Measurement | State on this plant |
 | --- | --- |
-| Store temperatures | Three sensors exist. Which of the four pockets they occupy decides the weights of `T_eq` (`waermespeicher-schichtung-teq.md`, table for this store size). |
-| Top sensor, bottom sensor | Exist (S3, S5); only the path to Earnie is missing or to be confirmed. |
+| Store temperatures | Three sensors in the lower three pockets (310 / 745 / 1250 mm of 2040 mm). Weights of `T_eq` from `waermespeicher-schichtung-teq.md`: bottom 0.26, middle 0.23, top 0.51. The top layer above 1250 mm is unmeasured, so `T_eq` tends to be too low. |
+| Top sensor | **Missing.** S3 is not the top of the store. A fourth sensor in the free top pocket (1710 mm) gives the hot-water comfort temperature and brings the weights close to 0.25 each. Highest priority among the additions. |
+| Bottom sensor | Exists (S5); the path to Earnie is to be confirmed. |
 | Operating mode | Derivable from A5, A11, A12; needs network outputs. |
 | Room temperature | Not in the controller; expected in the smart home. |
 | Source temperature | Exists (S13, S14). |
@@ -189,6 +209,7 @@ New network outputs; the smart home builds the generic signals from them.
 | Parameter | First estimate | How to get the real value |
 | --- | --- | --- |
 | Zone split | top zone about a third of 887 l | height of the changeover port from the store's data sheet |
+| Morning window of the wall heating | – | schedule from Loxone, flow temperature from the wall heating curve |
 | Capacity | whole store about 1.03 kWh/K | – |
 | Hot-water band | present setpoint up to the heat pump limit | controller parameters, heat pump data sheet |
 | Heating-zone band | flow setpoint (about 30 °C) up to the limit | same |
@@ -198,15 +219,22 @@ New network outputs; the smart home builds the generic signals from them.
 
 ## 8. Open questions
 
-- **Q1 Node 48:** which device sends the network variables (C.M.I., smart home gateway), and
-  how do sensor values reach the smart home and Earnie today?
-- **Q2 Enable today:** how does Earnie's heat pump enable act on the plant at present?
-- **Q3 Controller parameters:** hot-water setpoint and times, request and switch-off
-  differences of `HZ_ANF` and its switch-off sensor, heating curves, minimum run times.
-- **Q4 Heat pump:** maximum flow temperature, fixed speed or modulating, what A5 and A11 do
+Answered on 2026-11-14 and worked in above: CAN node 48, circuit enables, sensor pockets,
+heating rod.
+
+- **Q1 Values in Loxone today:** the program sends only the collector temperature. Which
+  store temperatures does Loxone receive at present, and on which path?
+- **Q2 Enable today:** how does Earnie's heat pump enable act on the plant at present? The
+  heating request has no external enable in the print.
+- **Q3 Hot-water setpoint:** it comes from Loxone, but in the print the setpoint input of
+  `WW_ANF` is not wired. Analog input 2 from Loxone goes to the maximum temperature of the
+  collector re-cooling. Either the print is older than the running program, or the setpoint
+  takes another path.
+- **Q4 Controller parameters:** request and switch-off differences of `HZ_ANF` and its
+  switch-off sensor, both heating curves, minimum run times. The curves are not at hand yet.
+- **Q5 Heat pump:** maximum flow temperature, fixed speed or modulating, what A5 and A11 do
   inside its controller (two setpoints?), minimum run and pause times, lock input.
-- **Q5 Sensor pockets:** which three of the four store pockets hold S3, S4, S5.
-- **Q6 Circuit enables:** are digital inputs 2 and 3 switched by room temperature, by
-  schedule, or constantly on?
-- **Q7 Heating rod:** none is in the schema. Is one installed or planned?
+- **Q6 Morning window:** times of the wall-heating window and whether they are fixed.
+- **Q7 Network timeout:** whether the UVR 1611 or the CAN–KNX interface replaces a network
+  input by a default when Loxone is silent.
 - **Q8 Sensor labels:** S12 (heat pump return?), S2 (solar flow, unused in the program), S10.
