@@ -16,6 +16,7 @@ from optimizer.thermal_coupled import (
 from optimizer.thermal_live_band import (  # noqa: F401  (re-exported)
     BAND_SOURCE_BACKEND,
     BAND_SOURCE_CONFIG,
+    BAND_SOURCE_CONFIG_NO_VALUE,
     resolve_live_store_band,
 )
 from optimizer.thermal_model import ThermalBand, capacity_kwh_per_k_from_volume, heat_content_kwh

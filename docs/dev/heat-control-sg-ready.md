@@ -247,8 +247,14 @@ default (rule `no-implicit-fallbacks`).
   `loxone` block of `share/ehal/roles/heatpump.json`).
 - **Band:** function `heat_storage_band` in `ehal/functions.py`, resolved in
   `optimizer/thermal_live_band.py`. Both signals mapped: the backend's band. One of the
-  two: the configured band and a warning. Both mapped but a value missing: error, the
-  configured band does not step in.
+  two: the configured band and a warning. Both mapped but a value missing in a cycle (e.g.
+  activated before the backend sends it): the configured band, a warning per cycle and
+  `band_source = "config_no_value"` (decided 2026-11-15 after the first activation on the
+  reference plant stopped the store plan). A negative tolerance is an error.
+- **One key per kind:** the mapping UI stores the heat and pool read kinds bare
+  (`house_config.ehal_bindings.consumer_bare_stored_kinds`); the signal list now writes
+  the same key and treats the qualified spelling as activated too. Migration
+  `dm6.consumer_bare_bindings` merges packs that hold both.
 - **Recording:** the mapped kinds are read in the planning path of every cycle, so the
   cycle recorder stores them with its push reads; `thermal_observability[]` carries
   `band_source` and `feedback` in `optimization_history.jsonl`.

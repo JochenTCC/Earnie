@@ -114,6 +114,7 @@
                     "ehal_bindings": {
                         "pool.pool_swimspa.sens_power_act": "",
                         "pool.pool_swimspa.set_enable": "",
+                        "pool.pool_swimspa.sens_temperature_water": "",
                         "sens_temperature_water": "",
                         "get_temperature_water_setpoint": "",
                         "get_temperature_tolerance_c": "",

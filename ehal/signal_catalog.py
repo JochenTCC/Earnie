@@ -96,17 +96,48 @@ def _bindings_of(entity: dict[str, Any] | None) -> dict[str, Any]:
     return raw if isinstance(raw, dict) else {}
 
 
-def _key_activated(bindings: dict[str, Any], binding_key: str, entity_id: str) -> bool:
+def _consumer_binding_key(entity_id: str, kind: str, consumer_type: str) -> str:
+    """Storage key of a consumer kind, spelled as the mapping UI stores it."""
+    from house_config.ehal_bindings import consumer_bare_stored_kinds
+
+    if kind in consumer_bare_stored_kinds(consumer_type):
+        return kind
+    return binding_key_for_kind(
+        component_kind="consumer",
+        entity_id=entity_id,
+        kind=kind,
+        consumer_type=consumer_type,
+    )
+
+
+def _consumer_key_spellings(entity_id: str, kind: str, consumer_type: str) -> tuple[str, ...]:
+    """Every key one consumer kind may be stored under (bare, qualified, legacy flex)."""
+    from ehal.flex_fields import flex_ehal_slug
+    from ehal.qualified_ids import qualified_consumer_id
+
+    keys = [kind, qualified_consumer_id(entity_id, consumer_type, kind)]
+    slug = flex_ehal_slug(entity_id)
+    if slug:
+        keys.append(f"flex.{slug}.{kind}")
+    return tuple(dict.fromkeys(keys))
+
+
+def _key_activated(
+    bindings: dict[str, Any],
+    binding_key: str,
+    entity_id: str,
+    *,
+    component_kind: ComponentKind,
+    consumer_type: str = "",
+) -> bool:
     if binding_key in bindings:
         return True
     kind = field_kind(binding_key)
-    if not kind or not entity_id:
+    if component_kind != "consumer" or not kind or not entity_id:
         return False
-    # Legacy flex spelling for consumers (storage may still use flex.{slug}.*).
-    from ehal.flex_fields import flex_ehal_slug
-
-    slug = flex_ehal_slug(entity_id)
-    return bool(slug) and f"flex.{slug}.{kind}" in bindings
+    return any(
+        key in bindings for key in _consumer_key_spellings(entity_id, kind, consumer_type)
+    )
 
 
 def _entry(
@@ -119,12 +150,15 @@ def _entry(
     required: set[str],
 ) -> CatalogEntry | None:
     try:
-        binding_key = binding_key_for_kind(
-            component_kind=component_kind,
-            entity_id=entity_id,
-            kind=kind,
-            consumer_type=consumer_type,
-        )
+        if component_kind == "consumer":
+            binding_key = _consumer_binding_key(entity_id, kind, consumer_type)
+        else:
+            binding_key = binding_key_for_kind(
+                component_kind=component_kind,
+                entity_id=entity_id,
+                kind=kind,
+                consumer_type=consumer_type,
+            )
     except ValueError:
         return None
     if _is_read(binding_key):
@@ -146,7 +180,13 @@ def _entry(
         direction=direction,
         digital=is_digital_id(ehal_id),
         is_required=binding_key in required,
-        is_activated=_key_activated(bindings, binding_key, entity_id),
+        is_activated=_key_activated(
+            bindings,
+            binding_key,
+            entity_id,
+            component_kind=component_kind,
+            consumer_type=consumer_type,
+        ),
     )
 
 
@@ -183,12 +223,16 @@ def _consumer_role_id(consumer_type: str) -> str:
 def iter_catalog_entries(house: dict, components: dict) -> list[CatalogEntry]:
     """All role signals for configured plant / batteries / inverters / PV / consumers."""
     out: list[CatalogEntry] = []
-    seen: set[str] = set()
+    # Bare consumer keys (heat / pool kinds) repeat across consumers: key by entity too.
+    seen: set[tuple[str, str, str]] = set()
 
     def _add(entry: CatalogEntry | None) -> None:
-        if entry is None or entry.binding_key in seen:
+        if entry is None:
             return
-        seen.add(entry.binding_key)
+        ident = (entry.component_kind, entry.entity_id, entry.binding_key)
+        if ident in seen:
+            return
+        seen.add(ident)
         out.append(entry)
 
     plant = house.get("plant") if isinstance(house.get("plant"), dict) else {}
@@ -422,14 +466,15 @@ def set_binding_activation(
                         continue
                     c = dict(consumer)
                     bindings = dict(c.get("ehal_bindings") or {})
+                    ctype = str(c.get("type") or consumer_type or "").strip()
+                    peers = _consumer_key_spellings(entity_id, field_kind(key), ctype)
                     if activated:
-                        bindings.setdefault(key, "")
+                        # Already stored under another spelling: keep that one, add none.
+                        if not any(peer in bindings for peer in (key, *peers)):
+                            bindings[key] = ""
                     else:
-                        bindings.pop(key, None)
-                        # Drop legacy flex peer of the same kind.
-                        kind = field_kind(key)
-                        flex = f"flex.{entity_id}.{kind}"
-                        bindings.pop(flex, None)
+                        for peer in (key, *peers):
+                            bindings.pop(peer, None)
                     c["ehal_bindings"] = bindings
                     consumers.append(c)
                 new_profiles[pname] = {**profile, "consumers": consumers}

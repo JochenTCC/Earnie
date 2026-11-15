@@ -33,9 +33,9 @@ def live_band_override_note(consumer: dict) -> tuple[NoteLevel, str] | None:
     if unread:
         return (
             "warning",
-            "Live plant mit dem Speicherband der Regelung, nicht mit Soll und Toleranz von "
-            f"hier. Gerade liefert {', '.join(unread)} aber keinen Wert – Live meldet dann "
-            "einen Fehler, statt mit den Werten von hier zu planen.",
+            "Das Speicherband der Regelung ist gemappt, gerade liefert "
+            f"{', '.join(unread)} aber keinen Wert. Live plant deshalb mit Soll und Toleranz "
+            "von hier, bis das Backend beide Werte sendet.",
         )
     return (
         "info",

@@ -61,6 +61,20 @@ THERMAL_RC_EHAL_FIELDS: tuple[str, ...] = (
 # Store temperatures (level 0) + feedback signals (level 3), see ``ehal.heat_fields``.
 THERMAL_ANNUAL_EHAL_FIELDS: tuple[str, ...] = THERMAL_ANNUAL_READ_KINDS
 
+
+def consumer_bare_stored_kinds(consumer_type: str) -> tuple[str, ...]:
+    """Consumer kinds stored bare in ``ehal_bindings`` (no ``<namespace>.<Kennung>.``).
+
+    The mapping UI stores these kinds bare; every writer (signal list included) uses the
+    same spelling, so one kind never sits under two keys of one consumer.
+    """
+    ctype = str(consumer_type or "").strip()
+    if ctype == "thermal_annual":
+        return THERMAL_ANNUAL_EHAL_FIELDS
+    if ctype == "thermal_rc":
+        return THERMAL_RC_EHAL_FIELDS
+    return ()
+
 _INPUT_MARKER_KEYS: frozenset[str] = frozenset(
     {
         "power_name",

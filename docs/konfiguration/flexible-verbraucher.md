@@ -348,9 +348,9 @@ Im Heizsystem lässt sich unter `heat_storage` ein **Pufferspeicher** modelliere
 
 - **Voraussetzung:** Beide Signale sind am `thermal_annual`-Verbraucher zugeordnet: `get_temperature_heat_storage_setpoint` und `get_temperature_heat_storage_tolerance`. Ist nur eines zugeordnet, plant Live weiter mit den konfigurierten Werten; die EHAL-Zuordnung und das `earnie.log` nennen das fehlende Signal.
 - **Jeder Lauf liest neu:** Earnie liest beide Werte in jedem Optimierungslauf und hält sie über den Planungshorizont konstant. Ein Sollwert, der einer Heizkurve folgt, wandert so von Lauf zu Lauf mit.
-- **Kein Wert:** Sind beide Signale zugeordnet, aber eines liefert keinen Wert, bricht der Speicherplan mit einer Fehlermeldung ab. Earnie plant dann nicht ersatzweise mit den konfigurierten Werten.
+- **Kein Wert:** Sind beide Signale zugeordnet, aber eines liefert in einem Lauf keinen Wert (z. B. direkt nach dem Aktivieren, bevor das Backend sendet), plant Live in diesem Lauf mit den konfigurierten Werten. Das `earnie.log` warnt in jedem solchen Lauf und nennt das Signal, der Hauskonfigurator zeigt den Hinweis unter den Speicherfeldern. Eine negative Toleranz bricht den Speicherplan dagegen mit einer Fehlermeldung ab.
 - **Szenarien-Explorer:** Er hat kein Backend und rechnet weiter mit `setpoint_c` / `tolerance_c`. Der Hauskonfigurator zeigt unter den Speicherfeldern, dass Live das Band der Regelung nutzt, und mit welchen aktuellen Werten.
-- **Historie:** `optimization_history.jsonl` hält je Lauf fest, woher das Band kam (`thermal_observability[].band_source`: `backend` oder `config`).
+- **Historie:** `optimization_history.jsonl` hält je Lauf fest, woher das Band kam (`thermal_observability[].band_source`: `backend`, `config` oder `config_no_value`, wenn beide Signale zugeordnet sind, aber ein Wert fehlte).
 
 Darüber hinaus darf die Live-Optimierung opportunistisch Energie bis zum Sollwert einplanen. Die Jahressimulation bleibt dagegen reines Bang-Bang an der Untergrenze. Das gilt für jeden regulären Optimierungslauf, auch wenn Earnie die Live-Telemetrie eines Laufs verwirft (z. B. Nullwerte oder negativer Hausverbrauch) und die Matrix bei Prognosewerten bleibt.
 

@@ -115,7 +115,10 @@ def _render_optional_toggles(
         house_cur, comp_cur = house, components
         for row in optional:
             label = f"{row.ehal_id} — {row.meaning}"
-            key = f"ehal_sig_opt::{row.binding_key}"
+            # Consumer keys may be bare and repeat across consumers; the EHAL ID is unique
+            # (and equals the former qualified binding key, so widget keys stay stable).
+            ident = row.ehal_id if row.component_kind == "consumer" else row.binding_key
+            key = f"ehal_sig_opt::{ident}"
             new_val = st.checkbox(
                 label,
                 value=row.is_activated,

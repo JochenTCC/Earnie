@@ -1,6 +1,9 @@
 """Ordered MigrationStep registry (ConfigMigration P1)."""
 from __future__ import annotations
 
+from runtime_store.migration.steps.consumer_bare_bindings import (
+    STEP as CONSUMER_BARE_BINDINGS,
+)
 from runtime_store.migration.steps.consumer_flex_bindings import (
     STEP as CONSUMER_FLEX,
 )
@@ -85,6 +88,7 @@ STEPS: tuple[MigrationStep, ...] = (
     HOUSE_COOLING,
     WALLBOXES,
     DEBUG_DUMP_FLAG_REMOVAL,
+    CONSUMER_BARE_BINDINGS,
     TARIFF_FORMAT,
     GRID_AREA_LEVIES,
 )
