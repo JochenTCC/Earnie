@@ -13,17 +13,17 @@ function overview of the controller program (three pages), and the maintainer's 
 (setpoints, hystereses, times, heating curves). Readings that are inferred and not explicit
 in the print are marked *(inferred)*.
 
-**The print is not the running program.** At least two things differ: Loxone provides the
-hot-water setpoint and receives the store temperatures S3–S5, and the print shows neither.
-Every statement below about a "free input" or a missing output therefore has to be checked
-against the running program before the controller is changed.
+**The print is not the running program.** The maintainer read the affected blocks and the
+network variables at the controller on 2026-11-15; the result is in section 3.4 and worked
+into sections 4 to 9. Sections 3.1 to 3.3 still describe the print. Where the two differ,
+section 3.4 is valid.
 
 ## 1. Plant
 
 | Part | Data |
 | --- | --- |
 | Heat pump | Weider SW 70, brine-water, ground source with brine distributors |
-| Store | one combined store, 887 l, three sensors in the **upper three** of four pockets (per maintainer, to be checked once at the store), solar coil in the lower part |
+| Store | one combined store, 887 l, three sensors at their own position marks, not in the four sensor pockets (section 3.4), solar coil in the lower part |
 | Hot water | fresh-water station (plate heat exchanger) fed from the top of the store; no separate tank |
 | Heating circuits | floor heating and wall / bench heating, each with pump and mixer |
 | Solar thermal | 10.6 m² collector, heat meter in the solar circuit |
@@ -97,17 +97,93 @@ running program Loxone also receives S3, S4 and S5 and sends the hot-water setpo
 | `LOGIK2`, `LOGIK4` | Circuit enable = network enable AND no hot-water request AND no cooling |
 | `LOGIK1`, `MAX(An)4`, `M-REG.1`, `NACHLAUF`, `ZEIT` | Cooling: valves, pumps and the floor-heating mixer setpoint |
 
+### 3.4 Check of the running program (2026-11-15)
+
+Read at the controller display at 8:00 with 1 °C outside, wall heating window active. Ambiguous
+entries of the filled-in sheet were confirmed by the maintainer the same day.
+
+**`MAX(An)2`**
+
+| Input | Source | Value |
+| --- | --- | --- |
+| 1 | flow setpoint of the floor heating | 31.5 °C |
+| 2 | flow setpoint of the wall heating | 41.1 °C |
+| 3 | **network analog input 5** (store setpoint from Loxone) | 35.0 °C (the low value) |
+| Result | | 41.1 °C |
+
+There is no function between Loxone and the third input: the jump between the high and the
+low store setpoint is made **in Loxone**, the controller only receives one analog value.
+
+**`HZ_ANF`:** request sensor **S5** (store bottom), not S4 as in the print. No switch-off
+sensor. Setpoint from `MAX(An)2`. Switch-on difference 2.0 K, switch-off difference 2.5 K,
+minimum run time 10 min, base temperature 10 °C. **The enable input is in use:** NOT
+(changeover valve hot water, A10), so there is no heating request during a hot-water charge.
+
+**`WW_ANF`:** request sensor S3 (store top), setpoint 50 °C, differences −2.0 / 2.0 K.
+Setpoint from network analog input 4, enable from network digital input 4, external switch
+from network digital input 5.
+
+**Network inputs (Loxone → controller)**
+
+| No. | Analog | Value | | No. | Digital | Value |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | outside temperature | 2.4 °C | | 1 | cooling enable | off |
+| 2 | maximum store temperature (collector re-cooling) | 94.9 °C | | 2 | enable floor heating | 1 |
+| 3 | flow setpoint cooling | 20.0 °C | | 3 | enable wall heating | 1 |
+| 4 | **hot-water setpoint** | 50.0 °C | | 4 | enable of `WW_ANF` | 1 |
+| 5 | **store setpoint** | 35.0 °C | | 5 | external switch of `WW_ANF` | 0 |
+| | | | | 6 | enable solar re-cooling | 0 |
+
+New against the print: analog 4 and 5, digital 4 to 6. Analog inputs 6 to 16 and digital
+inputs 7 to 16 are free.
+
+**Network outputs (controller → Loxone)**
+
+| No. | Analog | Value | | No. | Digital | Value |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | collector temperature | 4.3 °C | | 1 | solar pump | 0 |
+| 2–7 | not identified yet | 0 / 32.8 / 10.3 / 14.4 / 38.4 / 41.9 | | 2 | pump wall heating | 1 |
+| 8 | floor heating flow | 31.1 °C | | 3 | heating request to the heat pump | 0 |
+| 9 | floor heating return | 29.0 °C | | 4 | pump floor heating | 1 |
+| 10 | store bottom | 43.4 °C | | 5 | store charge pump | – |
+| 11 | store middle | 43.4 °C | | 6 | changeover valve hot water | – |
+| 12 | store top | 51.4 °C | | 7 | hot-water request | – |
+| 13 | solar power | 0 | | | | |
+| 14, 15 | not identified yet | 9713 / 62 | | | | |
+| 16 | wall heating flow | 41.0 °C | | | | |
+
+**All 16 analog outputs are in use**; 9 of the 16 digital outputs are free. The print showed
+one analog output.
+
+**Timeout:** the network inputs have a timeout, set to 60 min. What a function receives
+after it is not read yet.
+
+**Functions:** 19 in the running program. New against the print: a third heating-circuit
+controller named "Kühlung" and `LOGIK5`. `Timer 1` and `Zeit 4` are taken as the print's
+`NACHLAUF` and `ZEIT`.
+
+**Store sensors:** they do not sit in the four sensor pockets. The store carries position
+marks for the sensors that do not match the pockets and lie roughly as in the installer's
+schema: S3 at about three quarters of the height, S4 at about half, S5 at about a fifth,
+beside the lower part of the solar coil. The schema is not to scale; the heights of the
+three marks are to be measured once (Q7).
+
+**Access:** no C.M.I. and no BL-NET, so the program cannot be downloaded.
+
 ## 4. What this means for the design
 
 1. **Two zones, one store.** Hot water is the top zone (sensor S3), heating the lower zone
-   (sensor S4). This is the "combined store with a hot-water zone" of the generic model.
+   (sensor S5, see 3.4). This is the "combined store with a hot-water zone" of the generic
+   model.
 2. **Sink priority is hard-wired:** during a hot-water charge both heating circuits are
    disabled. Earnie predicts this, it does not command it.
-3. **The charge sensors are known:** S3 ends a hot-water charge, S4 a heating charge
-   *(inferred for S4: the switch-off sensor is not wired, the parameters decide)*.
-4. **The heating request already is a maximum function.** `MAX(An)2` has free inputs. A
-   store target from outside enters there and wins over the heating curve when it is
-   higher. No existing logic has to be rewritten.
+3. **The charge sensors are known:** S3 ends a hot-water charge, S5 a heating charge (the
+   request sensor of `HZ_ANF`; no switch-off sensor is set). A heating charge therefore
+   ends when the lowest sensor is 2.5 K above the setpoint, so the measured part of the
+   store is at or above the target at the end of a charge.
+4. **The heating request already is a maximum function, and its third input already comes
+   from Loxone** (network analog input 5). A store target from outside enters there and
+   wins over the heating curves when it is higher. The controller needs no new path for it.
 5. **Ground source:** the COP depends on the sink temperature and the slowly drifting brine
    temperature, not on the time of day. The "run in the warm hours" lever does not apply
    here. The brine temperature is measured (S13, S14).
@@ -125,10 +201,11 @@ running program Loxone also receives S3, S4 and S5 and sends the hot-water setpo
     for that window. It is the case of the generic "scheduled minimum temperatures": the
     demand is known in advance, needs a high temperature, and can be pre-charged in cheap
     hours instead of starting the heat pump when the window opens.
-11. **The bottom of the store is not measured.** With the sensors in the upper three
-    pockets the sensor called "bottom" (S5) sits at about 37 % of the height. The cold layer
-    below it, where the solar coil and the heat pump's return are, has no sensor. S3 is a
-    real top sensor.
+11. **The bottom sensor sits low.** S5 is at about a fifth of the height, beside the lower
+    part of the solar coil (section 3.4, height to be measured). The earlier assumption of
+    sensors in the upper three pockets, with S5 at 37 % and a large unmeasured cold layer,
+    does not hold. S3 is at about three quarters of the height, so the volume above it is
+    the part that `T_eq` extrapolates.
 12. **The heat pump is a black box so far.** The controller sends requests (A5 heating, A11
     hot water); how they are wired to the Weider SW 70 and what its own controller does with
     them is not known. Until then the plan treats a request as "may run" and learns the
@@ -143,8 +220,9 @@ its behaviour while the new network inputs are 0.
 
 ### Level 0 (today)
 
-The running program has a third input on `MAX(An)2` (not in the print). It jumps between a
-high and a low store setpoint with Earnie's `heatpump.<id>.set_enable`.
+The third input of `MAX(An)2` is network analog input 5, the store setpoint from Loxone
+(section 3.4). Loxone switches it between a high and a low value with Earnie's
+`heatpump.<id>.set_enable`; the two values are Loxone settings.
 
 - **Enable = 1:** the heating zone is charged up to the high setpoint. This already is the
   generic state 3 with a fixed boost.
@@ -192,8 +270,10 @@ The controller needs no state input. The smart home resolves the state:
 
 Controller additions:
 
-- **Lock:** a new digital network input, inverted, on the free enable input of `HZ_ANF`. A
-  comparison "S4 below a minimum" overrides it so that the heating never starves, and so
+- **Lock:** a new digital network input. The enable input of `HZ_ANF` is in use (NOT
+  hot-water valve, section 3.4), so a logic function combines the two: enable = NOT valve
+  AND NOT lock. A
+  comparison "S5 below a minimum" overrides it so that the heating never starves, and so
   does the wall-heating enable, so that the morning window is always served. The hot-water
   request stays unlocked: comfort first, and its energy is small.
 
@@ -201,7 +281,7 @@ Controller additions:
 
 | Generic signal | Controller addition |
 | --- | --- |
-| `set_temperature_heat_storage_target` | The existing third input of `MAX(An)2` takes Earnie's target instead of the two fixed values. Limited by a new minimum function against a fixed maximum (heat pump flow limit minus a margin). |
+| `set_temperature_heat_storage_target` | **No controller change for the path:** Loxone sends Earnie's target on network analog input 5 instead of its two fixed values. The limit against a fixed maximum (heat pump flow limit minus a margin) is set in Loxone first; a minimum function in the controller protects against a wrong value from Loxone and is the optional second step. |
 | `set_temperature_dhw_target` | Loxone already provides the hot-water setpoint, so Loxone sends the larger of its own setpoint and Earnie's target; no controller change. The limit against the heat pump's maximum is added in the controller or in Loxone. |
 | `set_temperature_room_offset` | **No controller change in the first step:** Loxone adds the offset to the setpoints of the participating rooms and thereby changes the circuit enables it already sends. The wall heating's morning window does not take part. Second step, if the floor heating takes the heat too slowly: a raised flow setpoint on a free input of `MAX(An)4` and `MAX(An)2`. |
 
@@ -222,16 +302,17 @@ controller outputs an artificially low value. Options for the ready temperature:
 
 ### Level 3: feedback
 
-New network outputs; the smart home builds the generic signals from them.
+Most values already reach Loxone (section 3.4); the smart home builds the generic signals
+from them. Only the store setpoint needs a change in the controller.
 
 | Generic signal | From |
 | --- | --- |
-| `sens_temperature_heat_storage_top` | S3 |
-| `sens_temperature_heat_storage_low` | S5 (lowest sensor, not the bottom of the store) |
+| `sens_temperature_heat_storage_top` | S3, analog output 12 |
+| `sens_temperature_heat_storage_low` | S5, analog output 10 (lowest sensor, not the bottom of the store) |
 | `sens_temperature_heat_storage` (`T_eq`) | weighted mean of S3, S4, S5 in the smart home |
-| `heatpump.<id>.sens_operating_mode` | cooling if A12, else hot water if A11, else heating if A5, else off; "locked" while the lock bit is set |
-| `heatpump.<id>.sens_temperature_source` | S13 (brine flow) |
-| `get_temperature_heat_storage_setpoint` | result of `MAX(An)2`. Exported from the controller, not rebuilt in Loxone: a copy of the heating curves would drift from the original. |
+| `heatpump.<id>.sens_operating_mode` | cooling if Loxone's own cooling enable is set, else hot water if digital output 7, else heating if digital output 3, else off; "locked" while the lock bit is set. No new output. |
+| `heatpump.<id>.sens_temperature_source` | S13 (brine flow); probably one of the analog outputs 2–7, to be identified |
+| `get_temperature_heat_storage_setpoint` | result of `MAX(An)2`. Exported from the controller, not rebuilt in Loxone: a copy of the heating curves would drift from the original. **All 16 analog outputs are in use, so one has to be freed for it** (Q8). |
 | `sens_temperature_room`, `get_temperature_room_setpoint` | already in the smart home |
 | `get_heat_storage_ready_by_time`, `get_temperature_heat_storage_ready` | Loxone schedule of the wall heating and its flow setpoint from the controller |
 | heat pump flow and return, solar power | S11, S12, `WMZ SOLAR`; for identification, no generic signal yet |
@@ -248,10 +329,10 @@ New network outputs; the smart home builds the generic signals from them.
 
 | Measurement | State on this plant |
 | --- | --- |
-| Store temperatures | Three sensors in the upper three pockets (745 / 1250 / 1710 mm of 2040 mm), all available in Loxone. Weights of `T_eq` from `waermespeicher-schichtung-teq.md`: bottom 0.49, middle 0.24, top 0.27. The layer below 745 mm is unmeasured, so `T_eq` tends to be too high, most of all with a discharged store. |
+| Store temperatures | Three sensors, all available in Loxone. Per the check of 2026-11-15 they are at their own position marks, not in the sensor pockets, so the heights assumed so far (745 / 1250 / 1710 mm of 2040 mm) and the weights derived from them (bottom 0.49, middle 0.24, top 0.27) do not apply. With the positions read from the schema (about 0.2 / 0.5 / 0.75 of the height) the weights of `T_eq` are roughly a third each; exact values follow from the measured heights (Q7). |
 | Top sensor | Exists (S3). |
-| Bottom sensor | **Missing.** S5 is not the bottom of the store. A fourth sensor in the free bottom pocket (310 mm) removes the error (about 4 kWh in the example of the `T_eq` guide) and brings the weights close to 0.25 each. It also shows how much room the solar coil has left. |
-| Operating mode | Derivable from A5, A11, A12; needs network outputs. |
+| Bottom sensor | Exists (S5), at about a fifth of the height (to be measured, Q7). A fourth sensor is not needed for the bottom; whether one in the top quarter is worth it follows from the measured heights. |
+| Operating mode | Derivable in Loxone from the two requests it already receives (digital outputs 3 and 7) and its own cooling enable. |
 | Room temperature | Not in the controller; expected in the smart home. |
 | Source temperature | Exists (S13, S14). |
 | Thermal power of the heat pump | **Missing.** Flow and return temperature exist (S11, S12) but no flow meter, and the charge pump is speed-controlled. A flow sensor in the heat pump circuit would give the measured COP. |
@@ -279,20 +360,28 @@ Answered and worked in above: CAN node 48, circuit enables, sensor pockets, heat
 store temperatures in Loxone, hot-water setpoint, how the enable acts today, source of the
 morning window.
 
-- **Q1 Running program:** a current function overview, or a check of the affected blocks at
-  the controller (`HZ_ANF`, `WW_ANF`, `MAX(An)2`, network inputs and outputs in use).
-- **Q2 Setpoints of the enable:** the high and the low value on `MAX(An)2`. Needed for the
-  Scenario Explorer's configured values and until Loxone reports the band.
+- **Q1 Running program:** answered by the check of 2026-11-15 (section 3.4).
+- **Q2 Setpoints of the enable:** the high and the low value are Loxone settings. The low
+  value is 35.0 °C; the high value is still to be read in Loxone. With a floor heating
+  setpoint of 31.5 °C at 1 °C outside, the low value lies above the floor heating curve on
+  most days: it acts as the permanent boost that section 5 advises against, and is to be
+  reviewed with HeatControl P3. Needed for
+  the Scenario Explorer's configured values and until Loxone reports the band.
 - **Q3 Heat pump interface:** to which terminals of the Weider SW 70 A5 and A11 go and what
   they do there; maximum flow temperature; fixed speed or modulating; whether it has a lock
   input. Sources: the heat pump's wiring diagram or the installer. Not blocking: levels 1–3
   need only the requests the controller already sends, and the recording of section 7 gives
   the behaviour.
-- **Q4 Controller parameters:** request and switch-off differences of `HZ_ANF` and its
-  switch-off sensor, both heating curves, minimum run times.
-- **Q5 Network timeout:** whether the UVR 1611 or the CAN–KNX interface replaces a network
-  input by a default when Loxone is silent.
+- **Q4 Controller parameters:** the differences and the minimum run time of `HZ_ANF` are
+  read (section 3.4). Open: both heating curves.
+- **Q5 Network timeout:** the network inputs have a timeout of 60 min. Open: which value a
+  function receives after it, and whether 60 min is short enough for the store setpoint
+  (a high target would stay active for up to an hour when Loxone is silent).
 - **Q6 Sensor labels:** S12 (heat pump return?), S2 (solar flow, unused in the program), S10.
+- **Q7 Sensor heights:** the heights of the three position marks at the store (S3, S4, S5),
+  measured from the floor, and the total height of the store; for the weights of `T_eq`.
+- **Q8 Analog network outputs:** what the outputs 2–7, 14 and 15 carry and which of them
+  Loxone does not use. One is needed for the result of `MAX(An)2`.
 
 ## 9. Implementation order on this plant
 
@@ -307,10 +396,10 @@ Nothing in this table is specific to the wall heating.
 
 | Phase | In Loxone | In the controller | Before the phase |
 | --- | --- | --- | --- |
-| HeatControl P1 Feedback | Builds the level 3 signals of section 5: S3 as top sensor, the store setpoint, the operating mode, S13 as source temperature, the room mean. | New network outputs for the result of `MAX(An)2` and for A5, A11, A12. | Q1: check the affected blocks and the free network outputs at the controller. |
+| HeatControl P1 Feedback | Builds the level 3 signals of section 5 from values it already receives: S3 as top sensor, the operating mode from the two requests, the room mean. New: the store setpoint and the source temperature. | One analog network output re-assigned to the result of `MAX(An)2`. No new digital output. | Q8: which analog output can be freed. |
 | HeatControl P2 Operating state | State 3 sends today's high value, state 2 the low one. No lock bit. | None. | Q2 (the two values), Q5 (network timeout). |
-| HeatControl P3 Store target | Passes Earnie's target through; 0 while the state is 2. | The third input of `MAX(An)2` takes the target instead of the two fixed values; new minimum function against a fixed maximum. | Maximum flow temperature of the heat pump (Q3). |
-| HeatControl P4 Two leaky stores | None. | None. | `τ_store` and `τ_house` from the recording of P1. A fourth sensor in the bottom pocket (section 6), otherwise `T_eq` stays too high. |
+| HeatControl P3 Store target | Sends Earnie's target on network analog input 5, limited to a fixed maximum; the low value while the state is 2. | None in the first step; optional minimum function against a fixed maximum. | Maximum flow temperature of the heat pump (Q3). |
+| HeatControl P4 Two leaky stores | None. | None. | `τ_store` and `τ_house` from the recording of P1. The measured sensor heights (Q7) for the weights of `T_eq`. |
 | HeatControl P5 COP by temperature | None. | None. | COP points from the data sheet of the heat pump; the brine temperature comes from P1. Collector forecast against the solar heat meter. |
 | HeatControl P6 Building as a store | Adds the offset to the setpoints of the participating rooms. | None in the first step (section 5, level 2). | Which rooms take part. |
 
