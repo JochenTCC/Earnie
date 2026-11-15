@@ -408,15 +408,33 @@ The state of a concrete plant is checked per plant, see the reference plant docu
 
 ## 11. Phases
 
-| Phase | Content |
-| --- | --- |
-| P0 | Measurement check on the reference plant; add the missing feedback signals; record two weeks; identify `τ_store`, `τ_house` and COP points. No optimizer change. |
-| P1 | Signal set levels 1–3 in EHAL (role, functions, recipes, EHAL-Com, German user docs). Earnie writes state and targets from today's plan. |
-| P2 | Translation on the reference plant including the timeout; plan against actual with the reported operating mode. |
-| P3 | Two leaky stores and COP by temperature in the Scenario Explorer and Live; catalog fields and migration. |
-| P4 | Hot-water level, heating rod in the same plan, adaptation of the parameters from measurements. |
+Order decided 2026-11-15: **generic first**. Every phase is usable on its own, on any plant
+whose backend maps the signals of that phase. Backlog epic: `HeatControl`. What each phase
+needs on the reference plant, and the steps that exist only there, are in
+[heat-control-reference-plant.md](heat-control-reference-plant.md) § 9.
 
-HouseSim needs a controller that understands the states for the tests of P1 and P3.
+| Phase | Content | Gain |
+| --- | --- | --- |
+| P1 Feedback | Read signals of level 3 in EHAL (role, functions, recipes, EHAL-Com, German user docs). Live plans with the store band of the backend where it is mapped (section 6). The new signals are recorded. No change of the plan itself. | Plan and controller cannot drift apart. The recording yields `τ_store`, `τ_house` and the generator's behaviour. |
+| P2 Operating state | `heatpump.<id>.set_sg_ready_state` (level 1), derived from today's plan: 3 where the plan charges, otherwise 2; the lock stays unused until O2 is decided. Fixed boost per sink in the heating system. HouseSim controller that understands the states; watchdog for modes in the Home Assistant package. | Standard SG-Ready heat pumps can be driven. On a plant that runs level 0 the behaviour stays the same, so the changeover carries no risk. |
+| P3 Store target | `set_temperature_heat_storage_target` (level 2), computed from the planned energy. The band stays the one of levels 0 and 1 until P5. | The charge is dosed instead of switched between two values. |
+| P4 Two leaky stores | Model of 8.1 in one place for the Scenario Explorer and Live (8.4); catalog fields and migration. Needs O1 decided. Time constants from the recording of P1. | Losses limit the look-ahead; store and building are planned separately. |
+| P5 COP by temperature | Model of 8.2: source factor per slot, sink segments, COP points in the heating system. Releases the charge band above the setpoint. One curve together with SUSI P7. The plan does not boost ahead of forecast collector heat (section 4). | Charging hotter has a price; the usable band grows. |
+| P6 Building as a store | `set_temperature_room_offset` and `sens_temperature_room`; the comfort band is planned (O3); Live starts the house from the measured room temperature. | The largest store with the lowest charge cost. |
+| P7 Scheduled demand: study | For a plant with a scheduled minimum temperature (8.3a): from the recording of P1, how often the demand starts the generator in expensive slots and with how much energy; gain estimated in the Scenario Explorer with a configured window. Decision whether P8 is built. | Decision basis, no change on any plant. |
+| P8 Ready-by | Model of 8.3a: the ready-by signals and configured windows as the two sources; the plan charges the zone before the time. Only after a positive P7. | A known demand is pre-charged in cheap slots. |
+
+Dependencies:
+
+- P1 → P2 → P3 build on each other and need no model change.
+- P4 needs O1. P5 and P6 need P4; P6 may move before P5 when the gain counts more than the
+  comfort risk (room sensor, room control and cool-down nights for the calibration).
+- P7 needs only P1. P8 needs P3 and gets more accurate with P5, because a scheduled demand
+  usually asks for a high temperature.
+
+Not scheduled yet, separate items once P5 is done: the hot-water level (8.3, with
+`set_temperature_dhw_target` and the hot-water ready-by pair), the heating rod in the same
+plan, the adaptation of the parameters from measurements, and cooling (O4).
 
 ## 12. Open points
 

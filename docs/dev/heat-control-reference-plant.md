@@ -293,3 +293,35 @@ morning window.
 - **Q5 Network timeout:** whether the UVR 1611 or the CAN–KNX interface replaces a network
   input by a default when Loxone is silent.
 - **Q6 Sensor labels:** S12 (heat pump return?), S2 (solar flow, unused in the program), S10.
+
+## 9. Implementation order on this plant
+
+Order decided 2026-11-15: the generic phases of
+[heat-control-sg-ready.md](heat-control-sg-ready.md) § 11 come first, each with the smallest
+translation that makes it usable here. The steps that exist only because of the wall heating
+follow after them.
+
+### 9.1 Translation per generic phase
+
+Nothing in this table is specific to the wall heating.
+
+| Phase | In Loxone | In the controller | Before the phase |
+| --- | --- | --- | --- |
+| HeatControl P1 Feedback | Builds the level 3 signals of section 5: S3 as top sensor, the store setpoint, the operating mode, S13 as source temperature, the room mean. | New network outputs for the result of `MAX(An)2` and for A5, A11, A12. | Q1: check the affected blocks and the free network outputs at the controller. |
+| HeatControl P2 Operating state | State 3 sends today's high value, state 2 the low one. No lock bit. | None. | Q2 (the two values), Q5 (network timeout). |
+| HeatControl P3 Store target | Passes Earnie's target through; 0 while the state is 2. | The third input of `MAX(An)2` takes the target instead of the two fixed values; new minimum function against a fixed maximum. | Maximum flow temperature of the heat pump (Q3). |
+| HeatControl P4 Two leaky stores | None. | None. | `τ_store` and `τ_house` from the recording of P1. A fourth sensor in the bottom pocket (section 6), otherwise `T_eq` stays too high. |
+| HeatControl P5 COP by temperature | None. | None. | COP points from the data sheet of the heat pump; the brine temperature comes from P1. Collector forecast against the solar heat meter. |
+| HeatControl P6 Building as a store | Adds the offset to the setpoints of the participating rooms. | None in the first step (section 5, level 2). | Which rooms take part. |
+
+### 9.2 Wall heating
+
+The morning window is the generic "scheduled minimum temperature", so the plant-specific
+part is small.
+
+| Step | Content | Kind |
+| --- | --- | --- |
+| HeatControl P7 Study | From the recording of P1: how often the window starts the heat pump in expensive slots, at which flow temperature, with how much energy. Gain estimated in the Scenario Explorer with a configured window. | Decision, nothing changes on the plant. |
+| HeatControl P8 Ready-by | Generic code; built only after a positive study. | Generic. |
+| Report the window | Loxone sends the start of the next window from its schedule and the temperature after option A (last flow setpoint held). No controller change. | Plant-specific, with P8. |
+| Later, if needed | Option B (shadow controller) when the held value is too inaccurate. The wall-heating enable overrides the lock, if state 1 is ever used (O2 of the generic document). The wall heating stays out of the room offset of P6. | Plant-specific, optional. |
