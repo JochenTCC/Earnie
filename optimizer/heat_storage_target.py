@@ -1,11 +1,11 @@
 """Store charge target from the planned energy (HeatControl P3, level 2).
 
-Design: docs/dev/heat-control-sg-ready.md § 6 (level 2) and § 7. Where the plan runs the
-heat pump in the present slot, the target is the store temperature at the end of that run:
-the measured ``T_eq`` plus the planned heat of the run, minus the net draw (house, hot
-water, collector) and the store's loss over the same slots. The target stays inside the
-band of levels 0 and 1 until P5: at least the setpoint, at most setpoint + boost, capped by
-the reported maximum. ``0`` means "no target" (the plan does not run the generator now).
+Design: docs/dev/heat-control-sg-ready.md § 6 (level 2), § 7 and § 8.6. Where the plan runs
+the heat pump in the present slot, the target is the store temperature at the end of that
+run, read from the store level of the MILP (HeatControl P4): band minimum + level / C. The
+target stays inside the band of levels 0 and 1 until P5: at least the setpoint, at most
+setpoint + boost, capped by the reported maximum. ``0`` means "no target" (the plan does not
+run the generator now).
 
 The deviation check compares the plan with the operating mode the controller reports.
 """
@@ -13,8 +13,6 @@ from __future__ import annotations
 
 import logging
 from typing import Any
-
-from optimizer.thermal_model import compute_heat_loss_kw
 
 logger = logging.getLogger(__name__)
 
@@ -25,37 +23,27 @@ _RUN_EPS_KW = 1e-3
 _BLOCKING_MODES: dict[int, str] = {4: "locked", 6: "fault"}
 
 
-def store_charge_target_c(plan: Any, run_electric_kw: list[float], dt_h: float) -> float:
+def store_temp_c(plan: Any, level_kwh: float) -> float:
+    """Store temperature of a level [kWh above the band minimum]."""
+    if plan.capacity_kwh_per_k <= 0:
+        raise ValueError("Ladeziel: Speicherplan ohne Kapazität, Ziel nicht berechenbar.")
+    return float(plan.band.min_c) + float(level_kwh) / float(plan.capacity_kwh_per_k)
+
+
+def store_charge_target_c(plan: Any, run_slots: int, level_after_run_kwh: float | None) -> float:
     """End temperature of the run that starts now; ``NO_TARGET_C`` without a run.
 
-    ``plan`` is a ``LiveStorePlan``; ``run_electric_kw`` the planned electric power of the
-    heat pump per slot from slot 0 on, ending with the last slot of the run.
+    ``plan`` is a ``LiveStorePlan``; ``run_slots`` the length of the present run (0 = none);
+    ``level_after_run_kwh`` the planned store level after its last slot.
     """
-    if dt_h <= 0:
-        raise ValueError("dt_h must be > 0")
-    if not run_electric_kw or float(run_electric_kw[0]) <= _RUN_EPS_KW:
+    if run_slots <= 0:
         return NO_TARGET_C
-    if plan.capacity_kwh_per_k <= 0 or plan.jaz <= 0:
-        raise ValueError(
-            "Ladeziel: Speicherplan ohne Kapazität oder Wirkungsgrad, Ziel nicht berechenbar."
-        )
-    temp = float(plan.start_temp_c)
-    for slot, power_kw in enumerate(run_electric_kw):
-        hour = int(slot * dt_h)
-        ambient = _at(plan.ambient_c, hour, "Außentemperatur")
-        draw = _at(plan.draw_kw_by_hour, hour, "Wärmeentnahme")
-        loss = compute_heat_loss_kw(temp, ambient, plan.heat_loss_kw_per_k)
-        heat = float(power_kw) * plan.jaz
-        temp += (heat - draw - loss) * dt_h / plan.capacity_kwh_per_k
+    if level_after_run_kwh is None:
+        raise ValueError("Ladeziel: kein Speicherstand am Ende des Laufs.")
+    temp = store_temp_c(plan, level_after_run_kwh)
     lower = float(plan.band.setpoint_c)
     upper = float(plan.charge_max_c)
     return round(min(max(temp, lower), upper), 1)
-
-
-def _at(values: list[float], hour: int, label: str) -> float:
-    if hour >= len(values):
-        raise ValueError(f"Ladeziel: {label} der Speicherprognose reicht nicht bis Stunde {hour}.")
-    return float(values[hour])
 
 
 def planned_run_kw(model: Any, cid: str) -> list[float]:
@@ -75,12 +63,23 @@ def planned_run_kw(model: Any, cid: str) -> list[float]:
 def heat_storage_targets(model: Any) -> dict[str, float]:
     """Charge target per heat pump with a Live store plan (empty outside Live)."""
     plans = getattr(model, "live_store_plans", None) or {}
+    levels = getattr(model, "live_store_levels", None) or {}
     planned = {str(c["id"]) for c in model.planned_consumers}
     out: dict[str, float] = {}
     for cid, plan in plans.items():
         if cid not in planned:
             continue
-        target = store_charge_target_c(plan, planned_run_kw(model, cid), float(model.dt_h))
+        run = planned_run_kw(model, cid)
+        level_after = None
+        if run:
+            if cid not in levels:
+                raise ValueError(f"Ladeziel {cid}: Speicherstand fehlt im MILP.")
+            level_vars = levels[cid][1]
+            last_slot = len(run) - 1  # the run starts at slot 0
+            if last_slot not in level_vars.levels:
+                raise ValueError(f"Ladeziel {cid}: kein Speicherstand für Slot {last_slot}.")
+            level_after = level_vars.level_kwh(last_slot)
+        target = store_charge_target_c(plan, len(run), level_after)
         out[cid] = target
         if target > 0:
             logger.info(
@@ -90,6 +89,42 @@ def heat_storage_targets(model: Any) -> dict[str, float]:
                 plan.start_temp_c,
                 plan.charge_max_c,
             )
+    return out
+
+
+def store_level_report(model: Any) -> dict[str, dict]:
+    """Planned store temperature per slot and the slack of the band, per Live heat pump (P4).
+
+    Slack means the plan could not keep the store in its band (too little power, pulse limit,
+    window); it is logged as a warning, never silent.
+    """
+    from optimizer.thermal_store_model import STORE_SLACK_REPORT_KWH
+
+    plans = getattr(model, "live_store_plans", None) or {}
+    out: dict[str, dict] = {}
+    for cid, (store, level_vars) in (getattr(model, "live_store_levels", None) or {}).items():
+        plan = plans.get(cid)
+        if plan is None:
+            continue
+        slots = sorted(level_vars.levels)
+        slack = level_vars.slack_kwh()
+        if slack > STORE_SLACK_REPORT_KWH:
+            logger.warning(
+                "Wärmepumpe %s: Plan hält den Speicher nicht im Band (bis %.2f kWh außerhalb).",
+                cid,
+                slack,
+            )
+        out[cid] = {
+            "planned_temp_c": [
+                round(store_temp_c(plan, level_vars.level_kwh(slot)), 2) for slot in slots
+            ],
+            "terminal_min_temp_c": (
+                None
+                if store.terminal_min_kwh is None
+                else round(store_temp_c(plan, store.terminal_min_kwh), 2)
+            ),
+            "band_slack_kwh": round(slack, 3),
+        }
     return out
 
 
@@ -109,8 +144,10 @@ def attach_targets_to_observability(
     observability: list[dict] | None,
     targets: dict[str, float],
     consumer_powers: dict[str, float],
+    levels: dict[str, dict] | None = None,
 ) -> None:
-    """Add ``heat_control`` (target, planned run, deviation) to the heat-storage items."""
+    """Add ``heat_control`` (target, planned run, deviation, planned store level) to the
+    heat-storage items."""
     from ehal.heat_fields import KIND_OPERATING_MODE
 
     for item in observability or []:
@@ -132,4 +169,5 @@ def attach_targets_to_observability(
             "planned_run": planned_run,
             "operating_mode": mode,
             "deviation": deviation,
+            "store_level": (levels or {}).get(cid),
         }

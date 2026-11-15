@@ -35,6 +35,8 @@ class MilpHorizonModel:
     relaxed_soc_bounds_percent: dict[str, tuple[float, float]] | None = None
     # Live: store plan per heat pump with a store (HeatControl P3 charge target).
     live_store_plans: dict[str, Any] | None = None
+    # Live: (StoreLevelModel, StoreLevelVars) per heat pump with a store (HeatControl P4).
+    live_store_levels: dict[str, tuple[Any, Any]] | None = None
 
 
 @dataclass

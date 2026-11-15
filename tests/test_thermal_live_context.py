@@ -1,11 +1,15 @@
-"""ThermalHorizon P2 — Live store flex context from the horizon plan, one plan per cycle."""
+"""ThermalHorizon P2 / HeatControl P4 — Live store context from the horizon plan, one plan per cycle."""
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import date, datetime, time, timedelta
+
+import pytest
 
 from house_config.planning_flex_bridge import planning_thermal_to_milp
 from optimizer.live_cycle_scope import cycle_memo, live_cycle_scope
-from optimizer.thermal_live_store import LiveStorePlan, live_store_slot_energy_kwh
+from optimizer.thermal_flex_context import LIVE_STORE_PLAN_KEY
+from optimizer.thermal_live_store import LiveStorePlan
 from optimizer.thermal_model import ThermalBand
 
 _DAY = date(2026, 10, 15)
@@ -61,27 +65,27 @@ def _live_matrix(hours: int = 3) -> list[dict]:
     return rows
 
 
-def _plan(electric_by_hour: list[float]) -> LiveStorePlan:
+def _plan(hours: int = 3, *, temp_low_c: float | None = None) -> LiveStorePlan:
     return LiveStorePlan(
-        forced_hour_flags=[kwh > 0.0 for kwh in electric_by_hour],
-        floor_electric_kwh=round(sum(electric_by_hour), 3),
+        forced_hour_flags=[False] * hours,
+        floor_electric_kwh=0.0,
         opp_cap_electric_kwh=0.0,
         start_temp_c=44.0,
-        temp_low_c=None,
+        temp_low_c=temp_low_c,
         used_measured_eq=True,
-        used_measured_low=False,
+        used_measured_low=temp_low_c is not None,
         band=ThermalBand(47.0, 5.0),
-        electric_by_hour=electric_by_hour,
+        electric_by_hour=[0.0] * hours,
+        store_temp_c=[44.0] * hours,
+        capacity_kwh_per_k=1.0,
+        heat_loss_kw_per_k=0.0,
+        jaz=4.0,
+        ambient_c=[5.0] * hours,
+        draw_kw_by_hour=[1.0] * hours,
     )
 
 
-def test_slot_energy_maps_hourly_electric_to_quarter_hours():
-    energies = live_store_slot_energy_kwh(_live_matrix(3), _plan([0.0, 1.9, 0.4]))
-
-    assert energies == [0.0] * 4 + [0.475] * 4 + [0.1] * 4
-
-
-def test_live_store_context_skips_year_profile(monkeypatch):
+def test_live_store_context_carries_the_plan_and_skips_year_profile(monkeypatch):
     import optimizer.thermal_flex_context as tfc
     import optimizer.thermal_live_store as tls
     from optimizer.thermal_flex_context import resolve_thermal_flex_contexts
@@ -89,22 +93,37 @@ def test_live_store_context_skips_year_profile(monkeypatch):
     def _no_year_profile(*_a, **_k):
         raise AssertionError("Live store context must not build the year profile")
 
+    plan = _plan()
     monkeypatch.setattr(tfc, "_slot_aligned_thermal_energy_kwh", _no_year_profile)
+    monkeypatch.setattr(tls, "live_store_plan_for_matrix", lambda *_a, **_k: plan)
     monkeypatch.setattr(
-        tls, "live_store_plan_for_matrix", lambda *_a, **_k: _plan([0.0, 1.9, 0.0])
+        "optimizer.absent_mode.resolve_absent_status", lambda _p: {"effective": False}
+    )
+    consumer = planning_thermal_to_milp(_source())
+
+    ctx = resolve_thermal_flex_contexts(_live_matrix(3), [consumer], _profile())[consumer["id"]]
+
+    assert ctx[LIVE_STORE_PLAN_KEY] is plan
+    assert ctx["forced_indices"] == []
+    assert ctx["live_store_start_c"] == 44.0
+    assert "daily_targets" not in ctx
+
+
+def test_bottom_sensor_below_the_band_still_forces_the_first_hour(monkeypatch):
+    import optimizer.thermal_live_store as tls
+    from optimizer.thermal_flex_context import resolve_thermal_flex_contexts
+
+    monkeypatch.setattr(
+        tls, "live_store_plan_for_matrix", lambda *_a, **_k: _plan(temp_low_c=40.0)
     )
     monkeypatch.setattr(
         "optimizer.absent_mode.resolve_absent_status", lambda _p: {"effective": False}
     )
     consumer = planning_thermal_to_milp(_source())
-    matrix = _live_matrix(3)
 
-    ctx = resolve_thermal_flex_contexts(matrix, [consumer], _profile())[consumer["id"]]
+    ctx = resolve_thermal_flex_contexts(_live_matrix(3), [consumer], _profile())[consumer["id"]]
 
-    assert ctx["slot_energy_kwh"] == [0.0] * 4 + [0.475] * 4 + [0.0] * 4
-    assert ctx["daily_targets"] == {_DAY: 1.9}
-    assert ctx["forced_indices"] == [4, 5, 6, 7]
-    assert ctx["live_store_start_c"] == 44.0
+    assert ctx["forced_indices"] == [0, 1, 2, 3]
 
 
 def test_one_store_plan_per_cycle_for_context_and_targets(monkeypatch):
@@ -116,7 +135,7 @@ def test_one_store_plan_per_cycle_for_context_and_targets(monkeypatch):
 
     def _build(*_a, **_k):
         builds["n"] += 1
-        return _plan([1.9, 0.0, 0.0])
+        return _plan()
 
     monkeypatch.setattr(tls, "_build_live_store_plan", _build)
     consumer = planning_thermal_to_milp(_source())
@@ -127,7 +146,8 @@ def test_one_store_plan_per_cycle_for_context_and_targets(monkeypatch):
         need = _live_heat_storage_horizon_need_kwh(_source(), _profile(), matrix)
         _live_store_flex_overlay(matrix, _source(), _profile(), consumer)
     assert builds["n"] == 1
-    assert need == 1.9
+    # Room 47 − 44 = 3 kWh, draw 3 × (1 kW + 0) → 6 kWh heat / JAZ 4.
+    assert need == pytest.approx(1.5)
 
     # Outside a Live cycle (tests, backtesting, UI) every call computes.
     _live_heat_storage_horizon_need_kwh(_source(), _profile(), matrix)
@@ -150,8 +170,7 @@ def test_cycle_memo_is_scoped():
     assert cycle_memo("k", _compute) == 3
 
 
-def test_live_overlay_keeps_pulse_limits_without_day_targets():
-    """Empty plan day targets must not skip max-on constraints (MILP unchanged vs. HDD days)."""
+def test_live_store_keeps_the_pulse_limit_per_day():
     from optimizer.milp_consumers import filter_feasible_consumers
     from optimizer.milp_horizon import _build_milp_model
     from optimizer.thermal_flex_context import add_thermal_flex_constraints
@@ -168,19 +187,8 @@ def test_live_overlay_keeps_pulse_limits_without_day_targets():
         for row in _live_matrix(12)
     ]
     n = len(matrix)
-    contexts = {
-        consumer["id"]: {
-            "daily_targets": {},
-            "slot_energy_kwh": [0.0] * n,
-            "targets_slot_aligned": True,
-            "forced_indices": [],
-            "live_day_min_kwh": {},
-            "floor_kwh": 0.0,
-            "opp_cap_kwh": 0.0,
-            "live_store_start_c": 50.0,
-            "live_store_temp_low_c": None,
-        }
-    }
+    plan = replace(_plan(12), start_temp_c=50.0, store_temp_c=[50.0] * 12)
+    contexts = {consumer["id"]: {"forced_indices": [], LIVE_STORE_PLAN_KEY: plan}}
     remaining = {consumer["id"]: 2.0}
     battery = {
         "min_soc": 10.0,
@@ -193,7 +201,11 @@ def test_live_overlay_keeps_pulse_limits_without_day_targets():
         [consumer], remaining, matrix, list(range(n)), False, {}, {}
     )
     model = _build_milp_model(matrix, n, battery, 50.0, planned, 0.0, remaining, {})
-    assert consumer["id"] in model.consumer_on
     add_thermal_flex_constraints(model, matrix, list(range(n)), contexts)
 
-    assert any(f"{consumer['id']}_max_on_" in name for name in model.prob.constraints)
+    names = set(model.prob.variablesDict())
+    for day in {row["date"] for row in matrix}:
+        # PuLP turns the "-" of the date into "_" in variable names.
+        prefix = f"{consumer['id']}_{day.isoformat()}_start_".replace("-", "_")
+        assert any(name.startswith(prefix) for name in names)
+    assert consumer["id"] in model.live_store_levels

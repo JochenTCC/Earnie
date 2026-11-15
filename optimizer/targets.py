@@ -131,13 +131,15 @@ def _live_heat_storage_horizon_need_kwh(
     profile: dict,
     optimization_matrix: list,
 ) -> float | None:
-    """Live + heat_storage: floor + opp electric kWh (HDD calendar sum is wrong here)."""
+    """Live + heat_storage: electricity the store can take over the horizon (HDD calendar sum is
+    wrong here). Only gates whether the MILP plans the heat pump; the store level decides how
+    much it runs (HeatControl P4)."""
     from optimizer.thermal_live_store import live_store_plan_for_matrix
 
     plan = live_store_plan_for_matrix(source, profile, optimization_matrix)
     if plan is None:
         return None
-    return round(float(plan.floor_electric_kwh) + float(plan.opp_cap_electric_kwh), 3)
+    return round(float(plan.charge_room_electric_kwh), 3)
 
 
 def _live_house_horizon_need_kwh(
@@ -168,7 +170,7 @@ def resolve_thermal_annual_horizon_kwh(
 ) -> float:
     """Horizon WP electric target for thermal_annual.
 
-    Live + heat_storage: open-loop store floor + opp (not full-calendar HDD).
+    Live + heat_storage: the store's room over the horizon (not full-calendar HDD).
     Live without storage: house horizon plan over the matrix slots (ThermalHorizon P4).
     Otherwise (SE / backtesting): sum of HDD day targets over calendar dates in the matrix.
     """

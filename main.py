@@ -768,7 +768,10 @@ def _main_cycle(
         from optimizer.heat_storage_target import attach_targets_to_observability
 
         attach_targets_to_observability(
-            thermal_observability, heat_storage_targets, consumer_powers
+            thermal_observability,
+            heat_storage_targets,
+            consumer_powers,
+            dict((milp_plan or {}).get("heat_storage_levels") or {}),
         )
         # Export cap travels only on set_grid_export_power_limit; set_ess_mode stays battery-only.
         export_cap = export_ctx["effective_export_cap_kw"]

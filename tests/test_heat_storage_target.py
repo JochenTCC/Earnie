@@ -40,35 +40,33 @@ def _plan(*, start=33.0, boost=22.0, store_max=None, draw=2.0, loss=0.0) -> Live
 
 
 def test_no_run_now_means_no_target():
-    assert store_charge_target_c(_plan(), [], 0.25) == NO_TARGET_C
-    assert store_charge_target_c(_plan(), [0.0, 2.0], 0.25) == NO_TARGET_C
+    assert store_charge_target_c(_plan(), 0, None) == NO_TARGET_C
 
 
-def test_target_is_the_end_temperature_of_the_planned_run():
-    # 4 quarter hours at 2 kW electric, JAZ 4: 8 kW heat − 2 kW draw = 6 kW for 1 h → +6 K.
-    assert store_charge_target_c(_plan(), [2.0] * 4, 0.25) == pytest.approx(39.0)
+def test_target_is_the_planned_level_at_the_end_of_the_run():
+    # Band minimum 31 °C, C = 1 kWh/K: a level of 8 kWh is 39 °C.
+    assert store_charge_target_c(_plan(), 4, 8.0) == pytest.approx(39.0)
 
 
-def test_target_counts_the_store_loss():
-    # 0.1 kW/K × (33..39 − 10) K ≈ 2.6 kW on average less heat over the hour.
-    with_loss = store_charge_target_c(_plan(loss=0.1), [2.0] * 4, 0.25)
-    assert 36.0 < with_loss < 39.0
+def test_a_run_without_its_level_fails_loud():
+    with pytest.raises(ValueError, match="Speicherstand"):
+        store_charge_target_c(_plan(), 4, None)
 
 
 def test_target_stays_inside_setpoint_and_setpoint_plus_boost():
-    assert store_charge_target_c(_plan(), [2.0] * 40, 0.25) == pytest.approx(55.0)
+    assert store_charge_target_c(_plan(), 40, 40.0) == pytest.approx(55.0)
     # A run that does not even reach the setpoint still asks for the setpoint.
-    assert store_charge_target_c(_plan(start=30.0, draw=8.0), [2.0] * 4, 0.25) == 33.0
+    assert store_charge_target_c(_plan(), 4, 0.5) == 33.0
 
 
 def test_reported_maximum_caps_the_target_and_the_charge_band():
     plan = _plan(store_max=50.0)
     assert plan.charge_max_c == 50.0
-    assert store_charge_target_c(plan, [2.0] * 40, 0.25) == pytest.approx(50.0)
+    assert store_charge_target_c(plan, 40, 40.0) == pytest.approx(50.0)
 
 
 def test_without_boost_the_target_is_the_setpoint():
-    assert store_charge_target_c(_plan(boost=0.0), [2.0] * 8, 0.25) == 33.0
+    assert store_charge_target_c(_plan(boost=0.0), 8, 2.0) == 33.0
 
 
 def test_live_headroom_respects_the_reported_maximum():
@@ -179,16 +177,23 @@ def test_ha_watchdog_sets_target_zero():
 # --- milp + deviation -----------------------------------------------------------------
 
 
-def test_targets_from_model_follow_the_run():
+def test_targets_from_model_read_the_level_after_the_run():
     from optimizer.heat_storage_target import heat_storage_targets
+    from optimizer.thermal_store_model import StoreLevelVars
 
     powers = [2.0, 2.0, 2.0, 2.0, 0.0, 2.0]
+    level_kwh = [2.0, 4.0, 6.0, 8.0, 7.5, 9.5]
+    levels = StoreLevelVars(
+        levels={slot: SimpleNamespace(varValue=v) for slot, v in enumerate(level_kwh)},
+        slack={},
+    )
     model = SimpleNamespace(
         horizon=len(powers),
         dt_h=0.25,
         planned_consumers=[{"id": "waermepumpe"}],
         consumer_p={"waermepumpe": [SimpleNamespace(varValue=p) for p in powers]},
         live_store_plans={"waermepumpe": _plan()},
+        live_store_levels={"waermepumpe": (None, levels)},
     )
     assert heat_storage_targets(model) == {"waermepumpe": pytest.approx(39.0)}
 
@@ -219,5 +224,6 @@ def test_observability_gets_target_and_deviation():
         "planned_run": True,
         "operating_mode": 6,
         "deviation": "fault",
+        "store_level": None,
     }
     assert "heat_control" not in items[1]

@@ -12,7 +12,6 @@ from optimizer.thermal_live_store import (
     _resolve_house_live_params,
     _space_heat_demand_kw,
     build_heat_storage_observability,
-    live_min_kwh_by_day,
     map_forced_hours_to_slot_indices,
     plan_live_store_horizon,
 )
@@ -166,22 +165,13 @@ def test_map_forced_hours_to_quarter_slots():
     assert forced == [0, 1]
 
 
-def test_live_min_kwh_adds_opp_on_first_day():
-    day = date(2026, 1, 15)
-    matrix = [
-        {
-            "date": day,
-            "hour": 0,
-            "slot_datetime": datetime(2026, 1, 15, 0, 0),
-            "consumption_mode": "live_snapshot",
-        },
-    ]
-    band = _band()
+def test_charge_room_counts_the_band_room_and_the_horizon_draw():
+    """HeatControl P4: the room gates Live planning; the store level decides the amount."""
     capacity = capacity_kwh_per_k_from_volume(500.0)
     plan = plan_live_store_horizon(
         start_temp_c=42.0,
         ambient_forecast_c=[15.0] * 4,
-        band=band,
+        band=_band(),
         capacity_kwh_per_k=capacity,
         heat_loss_kw_per_k=0.005,
         wp_electric_kw=2.0,
@@ -189,40 +179,24 @@ def test_live_min_kwh_adds_opp_on_first_day():
         living_area_m2=0.0,
         persons=0,
     )
-    by_day = live_min_kwh_by_day(matrix, plan)
-    assert plan.opp_cap_electric_kwh > 0.0
-    assert by_day == {day: round(plan.opp_cap_electric_kwh, 3)}
+    loss_at_min = 4 * 0.005 * (40.0 - 15.0)
+    assert plan.charge_room_heat_kwh == pytest.approx(capacity * 3.0 + loss_at_min)
+    assert plan.charge_room_electric_kwh == pytest.approx(plan.charge_room_heat_kwh / 4.0)
 
 
-def test_live_min_kwh_excludes_floor_when_above_setpoint():
-    """Above setpoint: opp=0 and floor must not create a movable day budget."""
-    day = date(2026, 1, 15)
-    matrix = [
-        {
-            "date": day,
-            "hour": hour,
-            "slot_datetime": datetime(2026, 1, 15, hour, 0),
-            "consumption_mode": "live_snapshot",
-        }
-        for hour in range(24)
-    ]
-    band = _band()
-    capacity = capacity_kwh_per_k_from_volume(887.0)
+def test_a_store_above_its_charge_maximum_has_no_room_without_draw():
     plan = plan_live_store_horizon(
         start_temp_c=60.0,
-        ambient_forecast_c=[10.0] * 48,
-        band=band,
-        capacity_kwh_per_k=capacity,
-        heat_loss_kw_per_k=0.01,
+        ambient_forecast_c=[40.0] * 4,
+        band=_band(),
+        capacity_kwh_per_k=capacity_kwh_per_k_from_volume(887.0),
+        heat_loss_kw_per_k=0.0,
         wp_electric_kw=1.9,
         jaz=4.0,
-        living_area_m2=157.0,
-        building_mass="mittel",
-        house_heat_loss_kw_per_k=0.1,
-        persons=2,
+        living_area_m2=0.0,
+        persons=0,
     )
-    assert plan.opp_cap_electric_kwh == 0.0
-    assert live_min_kwh_by_day(matrix, plan) == {}
+    assert plan.charge_room_heat_kwh == 0.0
 
 
 def test_hot_store_floor_does_not_force_within_few_hours():
@@ -320,7 +294,7 @@ def test_space_heat_climb_rate_limited_at_band_min():
     assert demand < 2.0
 
 
-def test_live_horizon_need_uses_floor_not_hdd(monkeypatch):
+def test_live_horizon_need_uses_the_store_plan_not_hdd(monkeypatch):
     """Regression: Live+heat_storage remaining was full-calendar HDD (e.g. 25.57 kWh)."""
     from datetime import date, datetime, time
 

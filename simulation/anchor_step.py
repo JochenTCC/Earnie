@@ -370,7 +370,7 @@ def hp_store_levels_after_window(
         for slot, row in enumerate(book_rows):
             heat_kwh = sum(float(row.get(column, 0.0) or 0.0) for column in columns) * dt_h * balance.efficiency
             heat_kwh += sum(float(row.get(column, 0.0) or 0.0) for column in rod_columns) * dt_h
-            level = next_hp_level_kwh(level, heat_kwh, balance.drain_kwh[slot], balance.capacity_kwh)
+            level = next_hp_level_kwh(balance, level, heat_kwh, slot)
         after[str(pump["id"])] = level
     return after
 

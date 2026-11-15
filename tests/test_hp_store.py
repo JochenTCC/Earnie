@@ -116,6 +116,27 @@ def test_a_store_adds_its_band_to_the_house() -> None:
     assert capacity.store_kwh == pytest.approx(capacity_kwh_per_k_from_volume(500.0) * 5.0)
     assert capacity.total_kwh == pytest.approx(capacity.store_kwh + capacity.house_kwh)
     assert capacity.total_kwh > hp_store_capacity(_pump(house_tolerance_c=0.5)).total_kwh
+    # HeatControl P4 (D1): the house is passive beside a store, the level is the store alone.
+    assert capacity.level_kwh == pytest.approx(capacity.store_kwh)
+
+
+def test_a_store_leaks_toward_the_middle_of_its_normal_band() -> None:
+    pump = _pump(
+        heat_storage={"volume_liters": 500.0, "tolerance_c": 4.0, "heat_loss_kw_per_k": 0.002}
+    )
+    balance = hp_store_balance("wp_heating", pump, [0.0] * 4, 4.0, start_levels_kwh=None)
+    c = capacity_kwh_per_k_from_volume(500.0)
+
+    assert balance.leak_per_slot == pytest.approx(0.25 * 0.002 / c)
+    assert balance.leak_ref_kwh == pytest.approx(c * 2.0)
+    assert balance.start_kwh == pytest.approx(balance.leak_ref_kwh)
+    # Above the reference the level decays toward it; without a store there is no leak.
+    above = next_hp_level_kwh(balance, balance.leak_ref_kwh + 1.0, 0.0, 0)
+    assert balance.leak_ref_kwh < above < balance.leak_ref_kwh + 1.0
+    house_only = hp_store_balance(
+        "wp_heating", _pump(house_tolerance_c=0.5), [0.0] * 4, 4.0, start_levels_kwh=None
+    )
+    assert house_only.leak_per_slot == 0.0
 
 
 def test_no_store_and_no_living_area_fails_loud() -> None:
@@ -134,9 +155,12 @@ def test_a_window_starts_in_the_middle_of_the_band_or_at_the_carried_level() -> 
 
 
 def test_the_booked_level_stays_inside_the_band() -> None:
-    assert next_hp_level_kwh(1.0, 5.0, 0.5, 3.0) == 3.0
-    assert next_hp_level_kwh(1.0, 0.0, 2.0, 3.0) == 0.0
-    assert next_hp_level_kwh(1.0, 1.0, 0.5, 3.0) == pytest.approx(1.5)
+    from optimizer.hp_store import HpStoreBalance
+
+    balance = HpStoreBalance(capacity_kwh=3.0, start_kwh=1.0, efficiency=4.0, drain_kwh=[0.5, 2.0])
+    assert next_hp_level_kwh(balance, 1.0, 5.0, 0) == 3.0
+    assert next_hp_level_kwh(balance, 1.0, 0.0, 1) == 0.0
+    assert next_hp_level_kwh(balance, 1.0, 1.0, 0) == pytest.approx(1.5)
 
 
 # --- Contexts
@@ -169,7 +193,7 @@ def test_a_narrow_band_keeps_the_pump_running_in_dear_hours() -> None:
     assert any(8 <= hour <= 20 for hour in narrow_on)
     balance = ctx[HP_STORE_CONTEXT_KEY]
     for slot in range(24):
-        level = pulp.value(model.prob.variablesDict()[f"wp_heating_hp_store_{slot}"])
+        level = pulp.value(model.prob.variablesDict()[f"wp_heating_hp_store_level_{slot}"])
         below, above = model.hp_store_slack["wp_heating"][slot]
         assert -1e-6 - (below.varValue or 0.0) <= level <= balance.capacity_kwh + (above.varValue or 0.0) + 1e-6
 

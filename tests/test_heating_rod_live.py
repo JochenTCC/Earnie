@@ -378,9 +378,8 @@ def test_gas_house_rod_stays_off_after_the_first_day(live):
     assert _on_slots(model, _ROD_ID) == []
 
 
-def test_heat_pump_house_rod_runs_only_within_the_store_overlay(live):
-    from optimizer.thermal_live_store import live_min_kwh_by_day
-
+def test_heat_pump_house_rod_runs_only_within_the_store_level(live):
+    """HeatControl P4: beside a heat pump the rod's heat fills the same store level."""
     profile = _profile(_consumer(_HP, rod_bindings=_BOUND))
     jaz = heat_source_efficiency(_HP)
     plan = _store_plan(45.0, jaz=jaz)
@@ -388,10 +387,12 @@ def test_heat_pump_house_rod_runs_only_within_the_store_overlay(live):
     matrix = _matrix([-5.0] * 4 + [30.0] * 20)
     model, remaining, contexts = _solve(matrix, profile)
     assert contexts[_ROD_ID] == {"live_pulse_limit": True}
-    assert remaining[_ROD_ID] == pytest.approx(plan.opp_cap_electric_kwh * jaz, abs=1e-2)
-    assert contexts[_CID]["live_day_min_kwh"] == live_min_kwh_by_day(matrix, plan)
-    assert 0.0 < _rod_kwh(model) <= remaining[_ROD_ID] + 1e-6
+    assert remaining[_ROD_ID] == pytest.approx(plan.charge_room_heat_kwh, abs=1e-2)
+    store, levels = model.live_store_levels[_CID]
+    assert 0.0 < _rod_kwh(model)
     assert all(slot < 4 for slot in _on_slots(model, _ROD_ID))
+    assert levels.slack_kwh() == pytest.approx(0.0, abs=1e-6)
+    assert max(levels.level_kwh(slot) for slot in levels.levels) <= store.capacity_kwh + 1e-6
 
 
 def test_live_rod_has_a_pulse_limit(live):

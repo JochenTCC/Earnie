@@ -21,6 +21,7 @@ from optimizer.thermal_live_band import (  # noqa: F401  (re-exported)
     resolve_live_store_band,
 )
 from optimizer.thermal_model import ThermalBand, capacity_kwh_per_k_from_volume, heat_content_kwh
+from optimizer.thermal_store_model import StoreLevelModel
 from optimizer.thermal_live_solar import (  # noqa: F401  (re-exported)
     SOLAR_SOURCE_ARCHIVE_FALLBACK,
     SOLAR_SOURCE_FORECAST,
@@ -93,6 +94,27 @@ class LiveStorePlan:
         if self.store_max_c is not None:
             upper = min(upper, float(self.store_max_c))
         return max(upper, self.band.setpoint_c)
+
+    def hourly_draw_at_min_kw(self) -> list[float]:
+        """Net draw per hour [kW] plus the store's loss at the band minimum (store level model)."""
+        if len(self.ambient_c) < len(self.draw_kw_by_hour):
+            raise ValueError("Speicherplan: Außentemperatur kürzer als die Wärmeentnahme.")
+        t_min = float(self.band.min_c)
+        return [
+            float(draw) + self.heat_loss_kw_per_k * (t_min - float(self.ambient_c[hour]))
+            for hour, draw in enumerate(self.draw_kw_by_hour)
+        ]
+
+    @property
+    def charge_room_heat_kwh(self) -> float:
+        """Heat [kWh] the store can take over the horizon: room up to the charge maximum plus
+        the net draw and loss at the band minimum (HeatControl P4; gates whether Live plans)."""
+        room = self.capacity_kwh_per_k * (self.charge_max_c - float(self.start_temp_c))
+        return max(0.0, room + sum(self.hourly_draw_at_min_kw()))
+
+    @property
+    def charge_room_electric_kwh(self) -> float:
+        return self.charge_room_heat_kwh / self.jaz if self.jaz > 0 else 0.0
 
 
 def resolve_heat_storage_setpoint_band(heat_storage: dict) -> ThermalBand:
@@ -446,11 +468,76 @@ def hourly_electric_to_slot_energy_kwh(
     return energies
 
 
-def live_store_slot_energy_kwh(matrix: list, plan: LiveStorePlan) -> list[float]:
-    """WP electric kWh per matrix slot from the store plan."""
-    return hourly_electric_to_slot_energy_kwh(matrix, plan.electric_by_hour)
+TERMINAL_WINDOW_H = 24.0
+"""The terminal level is the mean level of normal operation over the last day of the book, so it
+does not depend on where in a charge cycle the simulation happens to end (design § 8.6 D2)."""
 
 
+def _slot_hours(matrix: list, n_hours: int) -> list[int]:
+    """Hour of the plan for every matrix slot (offset from the horizon start).
+
+    The plan has ``floor(slots × Δt)`` hours (``thermal_horizon_hours_from_slots``), and the
+    recorded forecasts of the regression cases have exactly as many. Slots in the partial hour
+    after the last full one therefore use the last hour of the plan; this is the only hold, a
+    slot further out fails loud.
+    """
+    from optimizer.charging_context import matrix_slot_datetime
+
+    if n_hours < 1:
+        raise ValueError("Speicherplan ohne Stunden.")
+    start = matrix_slot_datetime(matrix, 0)
+    hours: list[int] = []
+    for index in range(len(matrix)):
+        hour = int((matrix_slot_datetime(matrix, index) - start).total_seconds() // 3600)
+        if hour == n_hours:
+            hour = n_hours - 1  # partial last hour of the matrix
+        if not 0 <= hour < n_hours:
+            raise ValueError(
+                f"Speicherplan reicht nur {n_hours} h, Matrix-Slot {index} liegt in Stunde {hour}."
+            )
+        hours.append(hour)
+    return hours
+
+
+def live_store_level_model(matrix: list, plan: LiveStorePlan, dt_h: float) -> StoreLevelModel:
+    """Store level of the Live MILP (HeatControl P4): kWh above the band minimum.
+
+    Capacity up to ``charge_max_c``; start from the measured ``T_eq``; drain = net draw plus the
+    loss at the band minimum; collector surplus may be spilled; leak ``Δt · H / C``.
+    """
+    if plan.capacity_kwh_per_k <= 0 or plan.jaz <= 0:
+        raise ValueError("Speicherplan ohne Kapazität oder Wirkungsgrad: kein Speicherstand möglich.")
+    if dt_h <= 0:
+        raise ValueError("dt_h must be > 0")
+    c = float(plan.capacity_kwh_per_k)
+    t_min = float(plan.band.min_c)
+    draw = plan.hourly_draw_at_min_kw()
+    hours = _slot_hours(matrix, len(draw))
+    return StoreLevelModel(
+        capacity_kwh=c * (plan.charge_max_c - t_min),
+        start_kwh=c * (float(plan.start_temp_c) - t_min),
+        efficiency=float(plan.jaz),
+        drain_kwh=[draw[hour] * dt_h for hour in hours],
+        leak_per_slot=dt_h * float(plan.heat_loss_kw_per_k) / c,
+        leak_ref_kwh=0.0,
+        spill_max_kwh=[max(0.0, -float(plan.draw_kw_by_hour[hour])) * dt_h for hour in hours],
+    )
+
+
+def live_store_terminal_kwh(matrix: list, plan: LiveStorePlan, last_slot: int, dt_h: float) -> float:
+    """Mean level of normal operation over the last ``TERMINAL_WINDOW_H`` up to ``last_slot``."""
+    if not plan.store_temp_c:
+        raise ValueError("Speicherplan ohne Temperaturverlauf: kein Endstand möglich.")
+    c = float(plan.capacity_kwh_per_k)
+    t_min = float(plan.band.min_c)
+    cap = c * (plan.charge_max_c - t_min)
+    hours = _slot_hours(matrix, len(plan.store_temp_c))
+    first = max(0, last_slot + 1 - int(round(TERMINAL_WINDOW_H / dt_h)))
+    levels = [
+        min(cap, max(0.0, c * (float(plan.store_temp_c[hours[slot]]) - t_min)))
+        for slot in range(first, last_slot + 1)
+    ]
+    return sum(levels) / len(levels)
 
 
 def live_house_plan_for_matrix(
@@ -535,24 +622,6 @@ def map_forced_hours_to_slot_indices(
         if forced_hour_flags[hour_offset]:
             forced_slots.append(index)
     return forced_slots
-
-
-def live_min_kwh_by_day(matrix: list, plan: LiveStorePlan) -> dict[Any, float]:
-    """Flexible Live day lower bound: opportunistic headroom to setpoint on first day.
-
-    Bang-bang floor energy is enforced only via ``forced_indices`` (correct timing).
-    Putting floor kWh into a movable day budget made MILP heat while the store was
-    still hot (e.g. 60 °C) to satisfy later floor hours — including hours outside
-    the MILP window.
-    """
-    from optimizer.charging_context import matrix_slot_datetime
-
-    if not matrix:
-        return {}
-    if plan.opp_cap_electric_kwh <= 1e-9:
-        return {}
-    first_day = matrix_slot_datetime(matrix, 0).date()
-    return {first_day: round(float(plan.opp_cap_electric_kwh), 3)}
 
 
 def build_heat_storage_observability(
