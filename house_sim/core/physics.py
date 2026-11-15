@@ -208,7 +208,7 @@ def initial_physics(package: ArchetypePackage) -> PhysicsState:
     thermal = params.get("thermal") if isinstance(params.get("thermal"), dict) else None
     evcs = EvcsState()
     if has_wallbox_model(params):
-        if float(params.get("initial_evcs_power_w", 0.0)) != 0.0:
+        if float(params.get("initial_evcs_power_w", 0.0)):
             raise ValueError(
                 "initial_evcs_power_w does not apply with house_params.wallboxes; "
                 "plug an EV in with initial_ev_id instead"

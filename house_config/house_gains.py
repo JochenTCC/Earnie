@@ -79,7 +79,7 @@ def normalize_consumer_gain_factor(
     if raw is None or raw == "":
         return default_consumer_gain_factor(consumer_type, consumer_id)
     value = _fraction(raw, where=where)
-    if consumer_type in ZERO_GAIN_CONSUMER_TYPES and value != 0.0:
+    if consumer_type in ZERO_GAIN_CONSUMER_TYPES and value:
         raise ValueError(
             f"{where} muss beim Heizungs-Verbraucher 0 sein (ist {value:g}): seine Wärme ist "
             "das Hausmodell selbst und würde sonst doppelt zählen."
@@ -92,7 +92,7 @@ def normalize_part_gain_factor(raw: Any, *, label: str) -> float:
     if raw is None or raw == "":
         return float(schema_default("consumer_part", INTERNAL_GAIN_FACTOR_KEY))
     value = _fraction(raw, where=f"{label}: {INTERNAL_GAIN_FACTOR_KEY}")
-    if value != 0.0:
+    if value:
         raise ValueError(
             f"{label}: {INTERNAL_GAIN_FACTOR_KEY} muss beim Heizstab 0 sein (ist {value:g}): "
             "seine Wärme geht in den Wärmespeicher und ist dort modelliert."

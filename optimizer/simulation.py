@@ -514,7 +514,7 @@ def _booking_rows(
             for key in _BOOKED_KW_FIELDS:
                 if key in actual:
                     added = float(prepared[key]) - float(raw[key])
-                    row[key] = actual[key] if added == 0.0 else float(actual[key]) + added
+                    row[key] = float(actual[key]) + added if added else actual[key]
         rows.append(row)
     return rows
 
