@@ -321,6 +321,19 @@ def _render_thermal_storage_fields(
             ratios=WIDE_LABEL_RATIOS,
             key=_scoped_key(session_scope, f"hc_storage_tol_{index}"),
         ),
+        "boost_k": labeled_number_input(
+            "Wärmespeicher Boost (K)",
+            min_value=0.0,
+            value=float(existing.get("boost_k", heat_storage_default("boost_k")) or 0.0),
+            step=1.0,
+            help=(
+                "Um so viel hebt die Regelung das Soll an, wenn Earnie die Wärmepumpe "
+                "freigibt (Freigabe 1 bzw. SG-Ready-Zustand 3). Earnie lädt auf Vorrat "
+                "bis Soll + Boost. 0 = nur bis zum Soll."
+            ),
+            ratios=WIDE_LABEL_RATIOS,
+            key=_scoped_key(session_scope, f"hc_storage_boost_{index}"),
+        ),
     }
 
 

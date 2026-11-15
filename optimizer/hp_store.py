@@ -5,7 +5,7 @@ store at all, allowed the same shift. Here the heat the pump (and a heating rod 
 fills a level, the year model's heat of the slot empties it, and the level stays between 0 and the
 capacity on every slot of the book:
 
-- the store's band, volume × tolerance (``heat_storage``), and
+- the store's band, volume × (tolerance + boost) (``heat_storage``), and
 - the house's mass, ``house_capacity_kwh_per_k`` (living area × building mass) × the comfort band
   ``house_tolerance_c``.
 
@@ -58,7 +58,9 @@ def hp_store_capacity(source: dict) -> HpStoreCapacity:
     store_kwh = (
         0.0
         if storage is None
-        else capacity_kwh_per_k_from_volume(storage["volume_liters"]) * storage["tolerance_c"]
+        # Band below the setpoint plus the fixed boost above it (HeatControl P2).
+        else capacity_kwh_per_k_from_volume(storage["volume_liters"])
+        * (storage["tolerance_c"] + storage["boost_k"])
     )
     living = float(thermal.get("living_area_m2", 0.0) or 0.0)
     tol_raw = thermal.get("house_tolerance_c")

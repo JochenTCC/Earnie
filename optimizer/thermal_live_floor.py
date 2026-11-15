@@ -126,18 +126,26 @@ def _simulate_store_floor_hours(
     ww: float,
     house: _HouseLiveParams,
     gain_kw_by_hour: list[float] | None = None,
-) -> tuple[list[bool], list[float], float, list[float]]:
+) -> tuple[list[bool], list[float], float, list[float], list[float]]:
+    """Normal operation over the horizon.
+
+    Returns forced flags, electric kWh per hour, floor electricity, the store temperature at
+    the end of each hour and the net heat drawn from the store per hour [kW] (house + hot
+    water − collector, without the store's own loss; HeatControl P3 target).
+    """
     store_temp = float(start_temp_c)
     gains = list(gain_kw_by_hour or [])
     house_temp = house.house_temp
     forced: list[bool] = []
     electric_by_hour: list[float] = []
     store_temps: list[float] = []
+    draw_kw: list[float] = []
     floor_electric = 0.0
     for hour, ambient_raw in enumerate(ambient_forecast_c):
         ambient = float(ambient_raw)
         gain = float(gains[hour]) if hour < len(gains) else 0.0
         space_kw = _space_heat_demand_kw(house, house_temp, ambient, gain)
+        draw_kw.append(float(space_kw + ww - float(solar[hour])))
         result = step_coupled_hour(
             store_temp,
             ambient,
@@ -168,7 +176,7 @@ def _simulate_store_floor_hours(
                 ambient,
                 house.house_target_c,
             )
-    return forced, electric_by_hour, floor_electric, store_temps
+    return forced, electric_by_hour, floor_electric, store_temps, draw_kw
 
 
 def _apply_t_low_near_term_force(

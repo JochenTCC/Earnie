@@ -49,6 +49,28 @@ HEAT_STORE_BAND_KINDS: tuple[str, ...] = (KIND_STORE_SETPOINT, KIND_STORE_TOLERA
 
 THERMAL_ANNUAL_READ_KINDS: tuple[str, ...] = HEAT_STORE_TEMP_KINDS + HEAT_FEEDBACK_KINDS
 
+# Level 1: operating state (HeatControl P2). Written on the consumer's ``ehal_bindings``
+# as ``heatpump.<Kennung>.set_sg_ready_state``; optional next to ``set_enable``.
+KIND_SET_SG_READY_STATE = "set_sg_ready_state"
+
+# SG-Ready states Earnie sends in P2. 1 (lock) waits for decision O2, 4 (forced charge)
+# for HeatControl P5 (the energy above setpoint + boost is not planned before).
+SG_READY_NORMAL = 2
+SG_READY_CHARGE = 3
+
+# Level 2: store charge target (HeatControl P3), °C; 0 = no target. Written on the
+# consumer's ``ehal_bindings`` as ``heatpump.<Kennung>.set_temperature_heat_storage_target``.
+KIND_SET_STORE_TARGET = "set_temperature_heat_storage_target"
+
+
+def sg_ready_state_for_plan(charges: bool) -> int:
+    """State for one slot: 3 where the plan runs the generator, otherwise 2.
+
+    Level 1 is today's enable in SG-Ready terms: enable 1 ↔ state 3, enable 0 ↔ state 2.
+    """
+    return SG_READY_CHARGE if charges else SG_READY_NORMAL
+
+
 # ``sens_operating_mode``: what the controller requests (not whether the compressor runs).
 OPERATING_MODES: dict[int, str] = {
     0: "off",

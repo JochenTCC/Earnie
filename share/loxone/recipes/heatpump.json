@@ -1,7 +1,7 @@
 {
   "role_id": "heatpump",
   "label": "Wärmepumpe",
-  "baustein_notes": "Greenfield prefix Earnie_Waermepumpe_* (+ Earnie_Waermespeicher_* temps). HK type thermal_annual (id wp_heating). Prefer EFM Load Bezeichnung for flex.wp_heating.sens_power_act. T_eq/T_low: SM supplies volume-weighted T_eq; T_low = raw bottom sensor. Level 3 feedback (HeatControl P1) is optional and read-only; Soll + Toleranz together switch Live to the controller's store band.",
+  "baustein_notes": "Greenfield prefix Earnie_Waermepumpe_* (+ Earnie_Waermespeicher_* temps). HK type thermal_annual (id wp_heating). Prefer EFM Load Bezeichnung for flex.wp_heating.sens_power_act. T_eq/T_low: SM supplies volume-weighted T_eq; T_low = raw bottom sensor. Level 1 (HeatControl P2): optional SG-Ready state next to the Freigabe; the boost of state 3 is heat_storage.boost_k in the heating system. Level 3 feedback (HeatControl P1) is optional and read-only; Soll + Toleranz together switch Live to the controller's store band.",
   "recommended_markers": [
     {
       "ehal_field": "flex.sens_power_act",
@@ -13,7 +13,19 @@
       "ehal_field": "flex.set_enable",
       "loxone_blocks_key": "ehal_bindings.flex.wp_heating.set_enable",
       "suggested_name": "Earnie_Waermepumpe_Freigabe",
-      "notes": "SG-Ready / Freigabe 0/1. VI Check key flex.{hk_id}.Earnie_Waermepumpe_Freigabe."
+      "notes": "Freigabe 0/1 (level 0). VI Check key flex.{hk_id}.Earnie_Waermepumpe_Freigabe."
+    },
+    {
+      "ehal_field": "heatpump.wp_heating.set_sg_ready_state",
+      "loxone_blocks_key": "ehal_bindings.heatpump.wp_heating.set_sg_ready_state",
+      "suggested_name": "Earnie_Waermepumpe_SG_Ready_Soll",
+      "notes": "Level 1 (HeatControl P2), optional. SG-Ready state Earnie requests: 3 = charge up to setpoint + boost, 2 = normal. 1 and 4 are not sent yet. Timeout: set 2 when heartbeat_earnie is older than 2-3 x the VI poll time (docs/referenz/loxone-signals.md, Rückfallebene). Two relay contacts: state 3 = contact 2 on, contact 1 off; state 2 = both off."
+    },
+    {
+      "ehal_field": "heatpump.wp_heating.set_temperature_heat_storage_target",
+      "loxone_blocks_key": "ehal_bindings.heatpump.wp_heating.set_temperature_heat_storage_target",
+      "suggested_name": "Earnie_Waermespeicher_Ladeziel",
+      "notes": "Level 2 (HeatControl P3), optional. Store charge target °C: charge the store (heating zone) up to it; 0 = no target, run the controller's normal setpoints. Replaces the fixed boost: high value = MAX(normal setpoint, target). Timeout: use 0 when heartbeat_earnie is stale."
     },
     {
       "ehal_field": "sens_temperature_heat_storage",

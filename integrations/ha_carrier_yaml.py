@@ -98,6 +98,19 @@ def _active_power_write_ids(writes: list[Signal]) -> list[str]:
     return [s.ehal_id for s in writes if field_kind(s.ehal_id) == "set_ess_active_power"]
 
 
+# Signals the watchdog sets to a fixed value while Earnie is unreachable. The value is part
+# of the signal's meaning, not a user setting: SG-Ready 2 = normal (HeatControl P2), store
+# charge target 0 = no target (P3).
+MODE_FAIL_SAFE_VALUES: dict[str, int] = {
+    "set_sg_ready_state": 2,
+    "set_temperature_heat_storage_target": 0,
+}
+
+
+def _mode_fail_safe_ids(writes: list[Signal]) -> list[str]:
+    return [s.ehal_id for s in writes if field_kind(s.ehal_id) in MODE_FAIL_SAFE_VALUES]
+
+
 def fail_safe_signals(writes: list[Signal], force: dict[str, Any] | None) -> list[Signal]:
     """Written signals that can take a fail-safe value: numbers with a physical unit.
 
@@ -649,18 +662,22 @@ def _watchdog_automation(
     always do. A fail-safe value of the active power replaces the release to 0. The
     trigger is the REST status sensor going ``unavailable`` / ``unknown`` for
     ``timeout_s``; HA then has no attributes, so the periodic setpoint automations stop
-    re-asserting Earnie's values.
+    re-asserting Earnie's values. Mode signals with a fixed fail-safe state
+    (``MODE_FAIL_SAFE_VALUES``, e.g. SG-Ready 2) are always set to it.
     """
     active_ids = _active_power_write_ids(writes)
+    mode_ids = _mode_fail_safe_ids(writes)
     values = fail_safe or {}
-    if timeout_s <= 0 or not (active_ids or force or values):
+    if timeout_s <= 0 or not (active_ids or force or values or mode_ids):
         return []
     alias = (
         "Earnie watchdog: write fail-safe values when Earnie is unreachable"
-        if values
+        if values or mode_ids
         else "Earnie watchdog: release forced power when Earnie is unreachable"
     )
-    outcome = "fail-safe values written" if values else "forced active power released"
+    outcome = (
+        "fail-safe values written" if values or mode_ids else "forced active power released"
+    )
     lines = [
         f"  - id: {WATCHDOG_AUTOMATION_ID}",
         f"    alias: {_q(alias)}",
@@ -698,6 +715,16 @@ def _watchdog_automation(
             ]
     for ehal_id, value in values.items():
         lines += _fail_safe_write(ehal_id, value)
+    for qid in mode_ids:
+        entity = entity_placeholder(qid)
+        lines += [
+            f"      - action: {_q(set_value_action(entity))}",
+            "        continue_on_error: true",
+            "        target:",
+            f"          entity_id: {entity}",
+            "        data:",
+            f"          value: {MODE_FAIL_SAFE_VALUES[field_kind(qid)]}",
+        ]
     lines += [
         "      - action: system_log.write",
         "        data:",

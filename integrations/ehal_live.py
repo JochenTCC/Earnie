@@ -629,7 +629,8 @@ def _push_safe_setpoints_loxone() -> None:
     # Automatik target SoC is 99 like the optimizer's Automatik; 0 would ask the
     # inverter to discharge to empty where it honours set_ess_target_soc.
     huawei = write_huawei_modbus_states(0, 0.0, 99.0)
-    flex = write_flexible_consumer_states({}, None, None)
+    # Startup: no plan yet, so the store charge target is 0 (no target, HeatControl P3).
+    flex = write_flexible_consumer_states({}, None, None, heat_storage_targets={})
     _inv_err, inv_rows = write_inv_ac_limits_from_plan(plant_curtail_kw=0.0)
     failed = [
         row
@@ -650,14 +651,20 @@ def write_flex_enables_for_ha(
     consumer_powers: dict[str, float],
     charging_contexts: dict[str, dict] | None = None,
     consumer_pv_follow: dict[str, int] | None = None,
+    *,
+    heat_storage_targets: dict[str, float] | None = None,
 ) -> list[dict[str, Any]]:
-    """Publish the flex ``set_enable`` (heat pump, pool, generic) for the HA backend.
+    """Publish the flex ``set_enable`` (heat pump, pool, generic) for the HA backend,
+    plus the heat pump's SG-Ready state and store charge target (HeatControl P2/P3).
 
     Returns ``optimizer_run_state.ehal_writes`` rows. The EV current is not part of this
     (``write_evcs_max_current_from_consumers`` writes it).
     """
     records = write_flexible_consumer_enables(
-        consumer_powers, charging_contexts, consumer_pv_follow
+        consumer_powers,
+        charging_contexts,
+        consumer_pv_follow,
+        heat_storage_targets=heat_storage_targets,
     )
     return [
         {

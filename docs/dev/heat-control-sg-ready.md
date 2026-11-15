@@ -259,6 +259,54 @@ default (rule `no-implicit-fallbacks`).
   cycle recorder stores them with its push reads; `thermal_observability[]` carries
   `band_source` and `feedback` in `optimization_history.jsonl`.
 
+**Implementation of P2 (2026-11-15).**
+
+- **Signal:** `heatpump.<id>.set_sg_ready_state`, an optional write on the `thermal_annual`
+  consumer (role `heatpump`, `ehal/heat_fields.py`). `set_enable` stays required and is
+  sent as before; the state goes out next to it when its key is activated
+  (`integrations/loxone_writes.py`, both backends through the `status.json` ledger).
+- **Derivation:** `sg_ready_state_for_plan`: 3 where the planned power of the slot is
+  above zero (enable 1), otherwise 2. State 1 waits for O2. State 4 moved to P5
+  (decided 2026-11-15): before P5 the energy above setpoint + boost is neither planned nor
+  priced, and on the reference plant 3 and 4 would reach the same temperature.
+- **Boost:** `heat_storage.boost_k` (K, default 0, schema default, no migration: 0 keeps
+  the old behaviour). Store only; hot-water and room boosts come with their levels. Live's
+  opportunistic headroom reaches setpoint + boost (`LiveStorePlan.charge_max_c`), the
+  floor (normal operation) still ends at the setpoint; the Scenario Explorer's store band
+  is volume × (tolerance + boost). With the backend band the reported setpoint must be the
+  normal one, without the boost; the boost is the configured value.
+- **HouseSim:** `house_sim/core/heat_pump.py`, a store with its own controller that takes
+  enable or state 1–4 (one source per step). Not wired into the HA integration or the mock
+  REST yet.
+- **Fail-safe:** the HA package's watchdog writes 2 to every mapped state
+  (`MODE_FAIL_SAFE_VALUES` in `integrations/ha_carrier_yaml.py`); Loxone: fallback logic
+  in `docs/referenz/loxone-signals.md`.
+
+**Implementation of P3 (2026-11-15).**
+
+- **Signal:** `heatpump.<id>.set_temperature_heat_storage_target`, an optional write on the
+  `thermal_annual` consumer (°C, 0 = no target).
+- **Computation** (`optimizer/heat_storage_target.py`): the Live store plan travels in the
+  thermal MILP context (`LIVE_STORE_PLAN_KEY`) to `MilpHorizonModel.live_store_plans`.
+  After the solve, the run is the planned power of the heat pump from slot 0 until the
+  first slot without power. The target is `T_eq` plus the run's heat (power × JAZ) minus
+  the net draw of the store plan (house + hot water − collector, per hour) and the store
+  loss, clamped to [setpoint, `charge_max_c`]. `charge_max_c` = setpoint + boost, capped
+  by `get_temperature_heat_storage_max` when it is read; the same cap now limits the
+  opportunistic headroom. No run in slot 0, no optimal solve, or startup: 0.
+- **Path:** `milp_plan["heat_storage_targets"]` → `main.py` → flex writes (both backends,
+  `status.json` ledger). A call without targets (the Loxone watchdog's snapshot) writes none.
+- **Deviation check:** `operating_mode_deviation`: a planned run while the controller
+  reports locked (4) or fault (6) is logged as a warning. Other modes are not deviations
+  (own runs, hot water during a planned charge). Recorded per cycle as
+  `thermal_observability[].heat_control` (target, planned run, mode, deviation).
+- **HouseSim:** `store_target_c` on `step_heat_pump_store`: with enable 1 / state 3 the
+  controller charges to the target instead of setpoint + boost; the target alone also works
+  (> 0 charge, 0 normal), as on the reference plant.
+- **Fail-safe:** the HA watchdog writes 0; Loxone: fallback logic.
+- **Known limit:** the controller starts only below target − its switch-on difference, so a
+  target just above `T_eq` does not start a run. The plan does not model this yet.
+
 ### Fail-safe
 
 - The backend falls back to state 2 when `status.json` is no longer refreshed. The watchdog
@@ -439,10 +487,10 @@ needs on the reference plant, and the steps that exist only there, are in
 | Phase | Content | Gain |
 | --- | --- | --- |
 | P1 Feedback | Read signals of level 3 in EHAL (role, functions, recipes, EHAL-Com, German user docs). Live plans with the store band of the backend where it is mapped (section 6). The new signals are recorded. No change of the plan itself. | Plan and controller cannot drift apart. The recording yields `τ_store`, `τ_house` and the generator's behaviour. |
-| P2 Operating state | `heatpump.<id>.set_sg_ready_state` (level 1), derived from today's plan: 3 where the plan charges, otherwise 2; the lock stays unused until O2 is decided. Fixed boost per sink in the heating system. HouseSim controller that understands the states; watchdog for modes in the Home Assistant package. | Standard SG-Ready heat pumps can be driven. On a plant that runs level 0 the behaviour stays the same, so the changeover carries no risk. |
+| P2 Operating state | `heatpump.<id>.set_sg_ready_state` (level 1), derived from today's plan: 3 where the plan charges, otherwise 2; the lock stays unused until O2 is decided, state 4 comes with P5. Fixed boost per sink in the heating system. HouseSim controller that understands the states; watchdog for modes in the Home Assistant package. | Standard SG-Ready heat pumps can be driven. On a plant that runs level 0 the behaviour stays the same, so the changeover carries no risk. |
 | P3 Store target | `set_temperature_heat_storage_target` (level 2), computed from the planned energy. The band stays the one of levels 0 and 1 until P5. | The charge is dosed instead of switched between two values. |
 | P4 Two leaky stores | Model of 8.1 in one place for the Scenario Explorer and Live (8.4); catalog fields and migration. Needs O1 decided. Time constants from the recording of P1. | Losses limit the look-ahead; store and building are planned separately. |
-| P5 COP by temperature | Model of 8.2: source factor per slot, sink segments, COP points in the heating system. Releases the charge band above the setpoint. One curve together with SUSI P7. The plan does not boost ahead of forecast collector heat (section 4). | Charging hotter has a price; the usable band grows. |
+| P5 COP by temperature | Model of 8.2: source factor per slot, sink segments, COP points in the heating system. Releases the charge band above the setpoint, and with it SG-Ready state 4 (moved here from P2). One curve together with SUSI P7. The plan does not boost ahead of forecast collector heat (section 4). | Charging hotter has a price; the usable band grows. |
 | P6 Building as a store | `set_temperature_room_offset` and `sens_temperature_room`; the comfort band is planned (O3); Live starts the house from the measured room temperature. | The largest store with the lowest charge cost. |
 | P7 Scheduled demand: study | For a plant with a scheduled minimum temperature (8.3a): from the recording of P1, how often the demand starts the generator in expensive slots and with how much energy; gain estimated in the Scenario Explorer with a configured window. Decision whether P8 is built. | Decision basis, no change on any plant. |
 | P8 Ready-by | Model of 8.3a: the ready-by signals and configured windows as the two sources; the plan charges the zone before the time. Only after a positive P7. | A known demand is pre-charged in cheap slots. |

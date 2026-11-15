@@ -9,6 +9,7 @@ import logging
 from dataclasses import dataclass, field, replace
 from typing import Any
 
+from ehal.heat_fields import KIND_STORE_MAX
 from optimizer.thermal_coupled import (
     heat_storage_enabled,
     normalize_heat_storage,
@@ -74,6 +75,24 @@ class LiveStorePlan:
     band_source: str = BAND_SOURCE_CONFIG
     # Mapped level 3 feedback reads of this cycle (kind → value, None = no value).
     feedback: dict[str, float | None] = field(default_factory=dict)
+    # Fixed boost (K) above the setpoint that an Earnie charge reaches (HeatControl P2).
+    boost_k: float = 0.0
+    # Highest store temperature the controller reports (get_temperature_heat_storage_max).
+    store_max_c: float | None = None
+    # Inputs of the charge target (HeatControl P3): model and net draw per hour [kW].
+    capacity_kwh_per_k: float = 0.0
+    heat_loss_kw_per_k: float = 0.0
+    jaz: float = 0.0
+    ambient_c: list[float] = field(default_factory=list)
+    draw_kw_by_hour: list[float] = field(default_factory=list)
+
+    @property
+    def charge_max_c(self) -> float:
+        """Upper end of an Earnie charge: setpoint + boost, capped by the reported maximum."""
+        upper = self.band.setpoint_c + self.boost_k
+        if self.store_max_c is not None:
+            upper = min(upper, float(self.store_max_c))
+        return max(upper, self.band.setpoint_c)
 
 
 def resolve_heat_storage_setpoint_band(heat_storage: dict) -> ThermalBand:
@@ -149,8 +168,15 @@ def plan_live_store_horizon(
     used_measured_eq: bool = False,
     used_measured_low: bool = False,
     gain_kw_by_hour: list[float] | None = None,
+    boost_k: float = 0.0,
+    store_max_c: float | None = None,
 ) -> LiveStorePlan:
-    """Bang-bang floor on T_eq plus optional T_low near-term force; opp headroom."""
+    """Bang-bang floor on T_eq plus optional T_low near-term force; opp headroom.
+
+    The floor simulates normal operation (charge ends at the setpoint). The opportunistic
+    headroom reaches setpoint + ``boost_k``: an Earnie charge (enable 1 / SG-Ready state 3)
+    ends there on levels 0 and 1 (HeatControl P2).
+    """
     horizon = len(ambient_forecast_c)
     if horizon < 1:
         raise ValueError("ambient_forecast_c darf nicht leer sein")
@@ -169,7 +195,7 @@ def plan_live_store_horizon(
         start_house_temp_c=start_house_temp_c,
         max_heat=wp_kw * jaz_f,
     )
-    forced, electric_by_hour, floor_electric, store_temps = _simulate_store_floor_hours(
+    forced, electric_by_hour, floor_electric, store_temps, draw_kw = _simulate_store_floor_hours(
         start_temp_c=start_temp_c,
         ambient_forecast_c=ambient_forecast_c,
         solar=solar,
@@ -190,9 +216,12 @@ def plan_live_store_horizon(
         band=band,
         wp_kw=wp_kw,
     )
-    fill_thermal = max(
-        0.0, (band.setpoint_c - float(start_temp_c)) * capacity_kwh_per_k
-    )
+    if boost_k < 0.0:
+        raise ValueError(f"boost_k darf nicht negativ sein (ist {boost_k:g} K).")
+    charge_max = band.setpoint_c + float(boost_k)
+    if store_max_c is not None:
+        charge_max = max(band.setpoint_c, min(charge_max, float(store_max_c)))
+    fill_thermal = max(0.0, (charge_max - float(start_temp_c)) * capacity_kwh_per_k)
     opp_cap = max(0.0, fill_thermal / jaz_f - floor_electric)
     q_sim = [
         heat_content_kwh(temp_c, capacity_kwh_per_k) for temp_c in store_temps
@@ -209,6 +238,13 @@ def plan_live_store_horizon(
         electric_by_hour=electric_by_hour,
         store_temp_c=store_temps,
         q_sim_kwh=q_sim,
+        boost_k=float(boost_k),
+        store_max_c=None if store_max_c is None else float(store_max_c),
+        capacity_kwh_per_k=float(capacity_kwh_per_k),
+        heat_loss_kw_per_k=float(heat_loss_kw_per_k),
+        jaz=jaz_f,
+        ambient_c=[float(v) for v in ambient_forecast_c],
+        draw_kw_by_hour=draw_kw,
     )
 
 
@@ -307,6 +343,8 @@ def plan_live_store_for_thermal_consumer(
         used_measured_eq=readings.used_measured_eq,
         used_measured_low=readings.used_measured_low,
         gain_kw_by_hour=gains,
+        boost_k=float(storage["boost_k"]),
+        store_max_c=feedback.get(KIND_STORE_MAX),
     )
     return replace(
         plan,
@@ -556,6 +594,9 @@ def build_heat_storage_observability(
             "tolerance": plan.band.tolerance_c,
             "band_min": plan.band.min_c,
             "band_max": plan.band.max_c,
+            # HeatControl P2: an Earnie charge ends at setpoint + boost.
+            "boost": plan.boost_k,
+            "charge_max": plan.charge_max_c,
         },
         # "backend": Live planned with the band the backend reports, not the configured one.
         "band_source": plan.band_source,

@@ -1,8 +1,9 @@
 {
   "core": {
-    "__init__.py": "c97cee3fbddf2b40183ee3d3917be9f133701e6e017f269f8786e647c55da3ca",
+    "__init__.py": "54662969a1774627198f68c76b395f32b5f57a147ccda96504775a26138640c0",
     "archetype.py": "b6740a0061827edb0ba483abcead21b3e3bc5b1e147f48d16795572960b7d4de",
     "evcs.py": "92c1a154613f87be0c5bb6d72ffdfb44f33becd11695c617f6a518a00d9aca39",
+    "heat_pump.py": "eca0a9eb0d6f3485ce4f3e015e73a0bdf00c17dc3413a850976d98435f23ee3b",
     "physics.py": "42203a2bff45bb183465305b777c9cc4b17323ce879773278b9ace87d57ca5e8",
     "thermal.py": "c834992e196a077dd8da1e36fea596491d7da47a8a4a018b656fccc1c17387d9",
     "weather_pv.py": "b26d7bc16238e0eee10e65d3e1b37e3e566416b37cc3d95bc41ebddfd8709d29"

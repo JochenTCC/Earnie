@@ -763,6 +763,13 @@ def _main_cycle(
 
     with timing.phase("writes"):
         plant_curtail_kw = float((milp_plan or {}).get("p_pv_curtail") or 0.0)
+        # HeatControl P3: store charge target per heat pump; none planned → 0 (no target).
+        heat_storage_targets = dict((milp_plan or {}).get("heat_storage_targets") or {})
+        from optimizer.heat_storage_target import attach_targets_to_observability
+
+        attach_targets_to_observability(
+            thermal_observability, heat_storage_targets, consumer_powers
+        )
         # Export cap travels only on set_grid_export_power_limit; set_ess_mode stays battery-only.
         export_cap = export_ctx["effective_export_cap_kw"]
         if isinstance(battery_params, list):
@@ -869,7 +876,10 @@ def _main_cycle(
                 # Heat pump / pool / generic enables; the EV current went out above.
                 logger.info("Sende EHAL Flex-Freigaben an %s...", backend)
                 flex_enable_records = ehal_live.write_flex_enables_for_ha(
-                    consumer_powers, charging_contexts, consumer_pv_follow
+                    consumer_powers,
+                    charging_contexts,
+                    consumer_pv_follow,
+                    heat_storage_targets=heat_storage_targets,
                 )
             if err_ess is None and err_evcs is None and err_inv is None:
                 ehal_live.clear_write_error()
@@ -891,7 +901,10 @@ def _main_cycle(
             )
             logger.info("📤 Sende flexible Verbraucher-Sollwerte an Loxone...")
             flex_writes = ehal_live.write_flexible_consumer_states(
-                consumer_powers, charging_contexts, consumer_pv_follow
+                consumer_powers,
+                charging_contexts,
+                consumer_pv_follow,
+                heat_storage_targets=heat_storage_targets,
             )
             logger.info("📤 Sende WR-AC-Limits an Loxone...")
             _err_inv, inv_rows = ehal_live.write_inv_ac_limits_from_plan(

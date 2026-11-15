@@ -20,6 +20,8 @@ logger = logging.getLogger(__name__)
 
 THERMAL_MAX_ON_HOURS = 4
 THERMAL_MAX_PULSES_PER_DAY = 4
+# Context key of the Live store plan (``LiveStorePlan``) of a heat pump with a store.
+LIVE_STORE_PLAN_KEY = "live_store_plan"
 
 
 def is_thermal_flex_consumer(consumer: dict) -> bool:
@@ -415,6 +417,8 @@ def _live_store_flex_overlay(
         "live_day_min_kwh": live_min_kwh_by_day(matrix, plan),
         "live_store_start_c": plan.start_temp_c,
         "live_store_temp_low_c": plan.temp_low_c,
+        # HeatControl P3: the charge target is computed from this plan after the solve.
+        LIVE_STORE_PLAN_KEY: plan,
     }
 
 

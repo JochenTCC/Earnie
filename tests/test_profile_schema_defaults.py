@@ -95,4 +95,5 @@ def test_heat_storage_missing_keys_use_schema_defaults():
         "heat_loss_kw_per_k": 0.02,
         "setpoint_c": 45.0,
         "tolerance_c": 5.0,
+        "boost_k": 0.0,
     }

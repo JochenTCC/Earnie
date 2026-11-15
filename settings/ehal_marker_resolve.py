@@ -141,6 +141,20 @@ def marker_flex_enable(consumer: dict) -> str:
     return ""
 
 
+def marker_set_sg_ready_state(consumer: dict) -> str:
+    """Heat pump operating state (HeatControl P2): Merker or qid when the key is present."""
+    from ehal.heat_fields import KIND_SET_SG_READY_STATE
+
+    return resolve_output_marker(consumer, KIND_SET_SG_READY_STATE)
+
+
+def marker_set_store_target(consumer: dict) -> str:
+    """Store charge target (HeatControl P3): Merker or qid when the key is present."""
+    from ehal.heat_fields import KIND_SET_STORE_TARGET
+
+    return resolve_output_marker(consumer, KIND_SET_STORE_TARGET)
+
+
 def marker_sens_consumer_active(consumer: dict) -> str:
     """Digital Gerät-läuft Merker (2.7.p) from entity-scoped bindings."""
     from ehal.flex_fields import (

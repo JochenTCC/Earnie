@@ -12,6 +12,8 @@ from settings.ehal_marker_resolve import (
     marker_flex_enable,
     marker_set_evcs_max_current,
     marker_set_evcs_mode,
+    marker_set_sg_ready_state,
+    marker_set_store_target,
 )
 from settings.ev_power import ev_nominal_power_conversion, kw_to_ampere
 from settings.flexible_consumers import runtime_consumer_id
@@ -339,11 +341,64 @@ def _enable_output_values(
     return {str(enable_name): float(enabled)}
 
 
+def _sg_ready_state_output_values(
+    consumer: dict,
+    consumer_powers: dict[str, float],
+    charging_contexts: dict[str, dict],
+) -> dict[str, float]:
+    """Heat pump operating state (HeatControl P2): 3 where the plan runs it, else 2.
+
+    Sent next to ``set_enable`` when the key is mapped; it never replaces it.
+    """
+    from ehal.heat_fields import sg_ready_state_for_plan
+
+    state_name = marker_set_sg_ready_state(consumer)
+    if not state_name:
+        return {}
+    power_kw = _effective_consumer_power_kw(
+        consumer, consumer_powers, charging_contexts, consumer["id"]
+    )
+    state = sg_ready_state_for_plan(power_kw > 1e-3)
+    logger.info(
+        "Flex consumer %s -> SG-Ready-Zustand=%s (optimiert %.2f kW, Loxone: %s)",
+        consumer["name"],
+        state,
+        power_kw,
+        state_name,
+    )
+    return {str(state_name): float(state)}
+
+
+def _store_target_output_values(
+    consumer: dict,
+    heat_storage_targets: dict[str, float] | None,
+) -> dict[str, float]:
+    """Store charge target (HeatControl P3): the plan's target, 0 = no target.
+
+    ``None``: no plan was made in this call (e.g. the watchdog's snapshot); nothing is
+    written then. A heat pump without a computed target gets 0 (no target).
+    """
+    if heat_storage_targets is None:
+        return {}
+    name = marker_set_store_target(consumer)
+    if not name:
+        return {}
+    value = float(heat_storage_targets.get(str(consumer["id"]), 0.0) or 0.0)
+    logger.info(
+        "Flex consumer %s -> Speicher-Ladeziel=%.1f °C (0 = kein Ziel, Loxone: %s)",
+        consumer["name"],
+        value,
+        name,
+    )
+    return {str(name): value}
+
+
 def _flexible_consumer_output_values(
     consumer: dict,
     consumer_powers: dict[str, float],
     charging_contexts: dict[str, dict],
     consumer_pv_follow: dict[str, int] | None = None,
+    heat_storage_targets: dict[str, float] | None = None,
 ) -> dict[str, float]:
     """Berechnet Loxone-Merker → Wert für einen flexiblen Verbraucher (ohne HTTP)."""
     if _skip_flexible_consumer_output(consumer, charging_contexts):
@@ -360,11 +415,18 @@ def _flexible_consumer_output_values(
             current_name,
         )
 
-    if not enable_name:
-        return {}
-    return _enable_output_values(
-        consumer, consumer_powers, charging_contexts, enable_name
+    values: dict[str, float] = {}
+    if enable_name:
+        values.update(
+            _enable_output_values(
+                consumer, consumer_powers, charging_contexts, enable_name
+            )
+        )
+    values.update(
+        _sg_ready_state_output_values(consumer, consumer_powers, charging_contexts)
     )
+    values.update(_store_target_output_values(consumer, heat_storage_targets))
+    return values
 
 
 def _publish_flexible_consumer_outputs(
@@ -388,6 +450,8 @@ def _publish_flexible_consumer_outputs(
     current = marker_set_evcs_max_current(consumer)
     mode = marker_set_evcs_mode(consumer)
     enable = marker_flex_enable(consumer)
+    sg_state = marker_set_sg_ready_state(consumer)
+    store_target = marker_set_store_target(consumer)
     for io_name, value in values.items():
         name = str(io_name or "").strip()
         if not name:
@@ -398,6 +462,10 @@ def _publish_flexible_consumer_outputs(
             kind = "set_evcs_mode"
         elif enable and name == enable:
             kind = "set_enable"
+        elif sg_state and name == sg_state:
+            kind = "set_sg_ready_state"
+        elif store_target and name == store_target:
+            kind = "set_temperature_heat_storage_target"
         else:
             continue
         if kinds is not None and kind not in kinds:
@@ -418,10 +486,15 @@ def _write_flexible_consumer_output(
     *,
     send: bool,
     publish_kinds: frozenset[str] | None = None,
+    heat_storage_targets: dict[str, float] | None = None,
 ) -> list[LoxoneWriteRecord]:
     """Publishes Freigabe/Strom-Sollwert/Modus via status.json and/or snapshot."""
     values = _flexible_consumer_output_values(
-        consumer, consumer_powers, charging_contexts, consumer_pv_follow
+        consumer,
+        consumer_powers,
+        charging_contexts,
+        consumer_pv_follow,
+        heat_storage_targets=heat_storage_targets,
     )
     records: list[LoxoneWriteRecord] = []
     if send:
@@ -701,14 +774,26 @@ def send_flexible_consumer_states(
     consumer_powers: dict[str, float],
     charging_contexts: dict[str, dict] | None = None,
     consumer_pv_follow: dict[str, int] | None = None,
+    *,
+    heat_storage_targets: dict[str, float] | None = None,
 ) -> list[LoxoneWriteRecord]:
-    """Sendet Freigabe (0/1), set_evcs_max_current (A) und set_evcs_mode an Loxone."""
+    """Sendet Freigabe (0/1), set_evcs_max_current (A) und set_evcs_mode an Loxone.
+
+    ``heat_storage_targets``: store charge target per heat pump (HeatControl P3); ``None``
+    writes no target, a missing heat pump in the dict gets 0 (no target).
+    """
     contexts = charging_contexts or {}
     records: list[LoxoneWriteRecord] = []
     for consumer in config.get_flexible_consumers(optimizer_only=True):
         records.extend(
             _write_flexible_consumer_output(
-                consumer, consumer_powers, contexts, None, consumer_pv_follow, send=True
+                consumer,
+                consumer_powers,
+                contexts,
+                None,
+                consumer_pv_follow,
+                send=True,
+                heat_storage_targets=heat_storage_targets,
             )
         )
     return records
@@ -718,8 +803,11 @@ def send_flexible_consumer_enables(
     consumer_powers: dict[str, float],
     charging_contexts: dict[str, dict] | None = None,
     consumer_pv_follow: dict[str, int] | None = None,
+    *,
+    heat_storage_targets: dict[str, float] | None = None,
 ) -> list[LoxoneWriteRecord]:
-    """Publish only the flex ``set_enable`` (heat pump, pool, generic consumers).
+    """Publish only the flex ``set_enable`` (heat pump, pool, generic consumers), the
+    heat pump's ``set_sg_ready_state`` (HeatControl P2) and its store charge target (P3).
 
     For the HA backend: the EV current is written through the EVCS adapter
     (``ehal_live.write_evcs_max_current_from_consumers``), so it is not published a
@@ -736,7 +824,10 @@ def send_flexible_consumer_enables(
                 None,
                 consumer_pv_follow,
                 send=True,
-                publish_kinds=frozenset({"set_enable"}),
+                publish_kinds=frozenset(
+                    {"set_enable", "set_sg_ready_state", "set_temperature_heat_storage_target"}
+                ),
+                heat_storage_targets=heat_storage_targets,
             )
         )
     return records

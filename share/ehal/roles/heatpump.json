@@ -1,7 +1,7 @@
 {
   "role_id": "heatpump",
   "label": "Wärmepumpe / Wärmespeicher (Stub)",
-  "description": "Not in M1 EHAL plant wire; live as thermal_annual flex + heat-store signals, exchanged as heatpump.{hk_id}.<field>. Level 0: enable, optional power, T_eq / T_low. Level 3 (HeatControl P1): read-only feedback of the controller; all optional. Design: docs/dev/heat-control-sg-ready.md § 6.",
+  "description": "Not in M1 EHAL plant wire; live as thermal_annual flex + heat-store signals, exchanged as heatpump.{hk_id}.<field>. Level 0: enable, optional power, T_eq / T_low. Level 1 (HeatControl P2): optional SG-Ready state next to the enable. Level 2 (P3): optional store charge target. Level 3 (HeatControl P1): read-only feedback of the controller; all optional. Design: docs/dev/heat-control-sg-ready.md § 6.",
   "status": "stub",
   "ehal_fields": [
     {
@@ -14,7 +14,19 @@
       "field": "flex.{hk_id}.set_enable",
       "required": false,
       "kind": "stub",
-      "notes": "entity-scoped Freigabe / SG-Ready."
+      "notes": "entity-scoped Freigabe (level 0)."
+    },
+    {
+      "field": "heatpump.{hk_id}.set_sg_ready_state",
+      "required": false,
+      "kind": "stub",
+      "notes": "Level 1 (HeatControl P2). SG-Ready operating state: 3 where the plan runs the generator (charge up to setpoint + boost), otherwise 2. States 1 and 4 are not sent yet. Fail-safe: the backend falls back to 2 when status.json is stale."
+    },
+    {
+      "field": "heatpump.{hk_id}.set_temperature_heat_storage_target",
+      "required": false,
+      "kind": "stub",
+      "notes": "Level 2 (HeatControl P3). Store charge target in °C where the plan runs the generator: the planned end temperature of the run, between the setpoint and setpoint + boost (capped by get_temperature_heat_storage_max). 0 = no target (normal operation). Fail-safe: 0 when status.json is stale."
     },
     {
       "field": "sens_temperature_heat_storage",

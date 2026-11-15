@@ -212,7 +212,7 @@ def test_push_safe_setpoints_on_startup_loxone(config_mock, huawei_mock, flex_mo
     _clear_safe_setpoints_skip_env()
     ehal_live.push_safe_setpoints_on_startup()
     huawei_mock.assert_called_once_with(0, 0.0, 99.0)
-    flex_mock.assert_called_once_with({}, None, None)
+    flex_mock.assert_called_once_with({}, None, None, heat_storage_targets={})
 
 
 @patch("integrations.ehal_live.write_ess_setpoints_from_control")
@@ -244,7 +244,7 @@ def test_read_generic_value_delegates(fetch_mock):
 def test_write_flexible_consumer_states_delegates(send_mock):
     send_mock.return_value = []
     assert ehal_live.write_flexible_consumer_states({"a": 1.0}, None, None) == []
-    send_mock.assert_called_once_with({"a": 1.0}, None, None)
+    send_mock.assert_called_once_with({"a": 1.0}, None, None, heat_storage_targets=None)
 
 
 @patch("integrations.loxone_writes._publish_setpoint_traced")

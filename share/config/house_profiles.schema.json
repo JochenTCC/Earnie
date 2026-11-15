@@ -440,6 +440,12 @@
           "default": 5.0,
           "type": "number",
           "minimum": 0.1
+        },
+        "boost_k": {
+          "default": 0.0,
+          "type": "number",
+          "minimum": 0,
+          "description": "Fester Boost (K) über dem Soll, den die Regelung bei Freigabe 1 bzw. SG-Ready-Zustand 3 anfährt (HeatControl P2). 0 = Ladung nur bis zum Soll."
         }
       }
     },

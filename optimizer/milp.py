@@ -75,6 +75,8 @@ from .milp_defaults import (  # noqa: F401  (re-exported for recorder_replay / f
 logger = logging.getLogger(__name__)
 
 _AUTOMATIK_FALLBACK = (0, 0.0, 99.0, {}, {}, EMPTY_MILP_PLAN, {})
+# ``milp_plan`` key: heat pump id → store charge target °C, 0 = none (HeatControl P3).
+HEAT_STORAGE_TARGETS_KEY = "heat_storage_targets"
 
 
 def _add_virtual_reserve_refill(
@@ -232,13 +234,23 @@ def _add_flex_side_constraints(
     )
     add_ev_pool_constraints(model)
     window = matrix[: inputs.horizon]
+    thermal_contexts = _resolve_thermal_flex_contexts(
+        window, inputs.active, thermal_flex_contexts
+    )
     add_thermal_flex_constraints(
         model,
         window,
         inputs.schedule_indices,
-        _resolve_thermal_flex_contexts(window, inputs.active, thermal_flex_contexts),
+        thermal_contexts,
         consumer_continue_on=consumer_continue_on,
     )
+    from optimizer.thermal_flex_context import LIVE_STORE_PLAN_KEY
+
+    model.live_store_plans = {
+        str(cid): ctx[LIVE_STORE_PLAN_KEY]
+        for cid, ctx in thermal_contexts.items()
+        if isinstance(ctx, dict) and ctx.get(LIVE_STORE_PLAN_KEY) is not None
+    }
 
 
 def _add_soc_anchor_constraints(
@@ -629,6 +641,11 @@ def milp_optimizer(
         controls.milp_plan["import_cap_report"] = report_from_model(
             model, matrix, import_caps, remaining
         )
+    if model.live_store_plans:
+        from optimizer.heat_storage_target import heat_storage_targets
+
+        # HeatControl P3: charge target per heat pump from the planned energy.
+        controls.milp_plan[HEAT_STORAGE_TARGETS_KEY] = heat_storage_targets(model)
     urgent_observability = _collect_urgent_rule_observability(
         model, matrix, remaining, schedule_indices, contexts, filters
     )

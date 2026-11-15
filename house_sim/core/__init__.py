@@ -10,6 +10,12 @@ from .archetype import (
     project_physics_to_store,
 )
 from .evcs import EvcsState, WallboxSetpoints
+from .heat_pump import (
+    HeatPumpStoreParams,
+    HeatPumpStoreState,
+    controller_target_c,
+    step_heat_pump_store,
+)
 from .physics import (
     EssSetpoints,
     PhysicsState,
@@ -27,9 +33,12 @@ __all__ = [
     "ArchetypePackage",
     "EssSetpoints",
     "EvcsState",
+    "HeatPumpStoreParams",
+    "HeatPumpStoreState",
     "PhysicsState",
     "ScenarioOverlay",
     "compute_heat_loss_kw",
+    "controller_target_c",
     "ess_setpoints_from_lookup",
     "initial_physics",
     "load_archetype",
@@ -38,6 +47,7 @@ __all__ = [
     "pv_kw_from_weather",
     "run_ticks",
     "simulate_next_temp_c",
+    "step_heat_pump_store",
     "step_physics",
     "WallboxSetpoints",
 ]

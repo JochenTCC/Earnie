@@ -329,13 +329,14 @@ Im Heizsystem lässt sich unter `heat_storage` ein **Pufferspeicher** modelliere
 
 **Temperaturband (Jahressimulation):** Die Speichertemperatur darf zwischen `setpoint_c − tolerance_c` und **95 °C** liegen. Die Wärmepumpe heizt hart nach, wenn die Temperatur unter die Untergrenze fallen würde. Sie speist höchstens bis zum Sollwert (`setpoint_c`) und bleibt darüber aus. Überschusswärme oberhalb des Sollwerts kommt nur von der Solarthermie; deren Eingang wird erst oberhalb von 95 °C begrenzt.
 
-**Verschiebung im Szenarien-Explorer:** Der Szenarien-Explorer darf die Tagesenergie einer Wärmepumpe innerhalb ihres Fensters verschieben, aber nur so weit, wie Speicher und Haus die Wärme puffern können. Die Wärme der Wärmepumpe (und eines Heizstabs daneben) füllt einen Pegel, die Wärme, die das Jahresmodell in derselben Viertelstunde braucht, leert ihn. Der Pegel bleibt in jeder Viertelstunde zwischen 0 und der Kapazität: Speicherband (Volumen × `tolerance_c`) plus Hausmasse (Wohnfläche × Bauweise, wie in Live) × Komfortband `house_tolerance_c`. Ein Haus ohne Speicher puffert also nur über seine Masse, ein Speicher erlaubt immer mehr Verschiebung als keiner. Jedes Fenster beginnt mit dem Pegel, mit dem das vorige endete; das erste Fenster beginnt in der Mitte. Hält das Band nicht (z. B. bei einem kurzen Freigabefenster), plant der Optimierer trotzdem, aber mit hohen Strafkosten für die Wärme außerhalb des Bands. Live plant Haus und Speicher mit eigenem Modell und nutzt diese Grenze nicht; die Standard-Regeln der Referenzleiter (L2) auch nicht. Ohne Speicher und ohne Wohnfläche bricht der Szenarien-Explorer mit einer Meldung ab.
+**Verschiebung im Szenarien-Explorer:** Der Szenarien-Explorer darf die Tagesenergie einer Wärmepumpe innerhalb ihres Fensters verschieben, aber nur so weit, wie Speicher und Haus die Wärme puffern können. Die Wärme der Wärmepumpe (und eines Heizstabs daneben) füllt einen Pegel, die Wärme, die das Jahresmodell in derselben Viertelstunde braucht, leert ihn. Der Pegel bleibt in jeder Viertelstunde zwischen 0 und der Kapazität: Speicherband (Volumen × (`tolerance_c` + `boost_k`)) plus Hausmasse (Wohnfläche × Bauweise, wie in Live) × Komfortband `house_tolerance_c`. Ein Haus ohne Speicher puffert also nur über seine Masse, ein Speicher erlaubt immer mehr Verschiebung als keiner. Jedes Fenster beginnt mit dem Pegel, mit dem das vorige endete; das erste Fenster beginnt in der Mitte. Hält das Band nicht (z. B. bei einem kurzen Freigabefenster), plant der Optimierer trotzdem, aber mit hohen Strafkosten für die Wärme außerhalb des Bands. Live plant Haus und Speicher mit eigenem Modell und nutzt diese Grenze nicht; die Standard-Regeln der Referenzleiter (L2) auch nicht. Ohne Speicher und ohne Wohnfläche bricht der Szenarien-Explorer mit einer Meldung ab.
 
 | Feld | Bedeutung |
 | ---- | --------- |
 | `heat_storage.volume_liters` | Speichervolumen; `≤ 0` oder fehlend = bisheriges Modell ohne Speicher |
 | `heat_storage.heat_loss_kw_per_k` | Speicherverlust gegen die Umgebung |
-| `heat_storage.setpoint_c` / `tolerance_c` | Sollwert und Untergrenze (`setpoint − tolerance`); Obergrenze für die Wärmepumpe = Sollwert, absolute Obergrenze (Solarthermie) = 95 °C |
+| `heat_storage.setpoint_c` / `tolerance_c` | Normaler Sollwert der Regelung und Untergrenze (`setpoint − tolerance`); Obergrenze im Normalbetrieb = Sollwert, absolute Obergrenze (Solarthermie) = 95 °C |
+| `heat_storage.boost_k` | Fester Boost in K: um so viel hebt die Regelung das Soll an, wenn Earnie die Wärmepumpe freigibt (Freigabe 1 bzw. SG-Ready-Zustand 3). Earnie lädt auf Vorrat bis `setpoint + boost`. Vorgabe 0 = nur bis zum Sollwert |
 
 **Schichtspeicher → Temperaturen für Earnie:** Hat der Speicher mehrere Fühler, muss das **Smarthome-Backend** eine **äquivalente Temperatur** `T_eq` bilden (volumengewichtetes Mittel). Zusätzlich liefert es den **untersten Fühler** `T_low`. Bindings am `thermal_annual`-Verbraucher: `sens_temperature_heat_storage` (`T_eq`) und `sens_temperature_heat_storage_low` (`T_low`). Anleitung: [Wärmespeicher Schichtung / T_eq](waermespeicher-schichtung-teq.md).
 
@@ -352,7 +353,7 @@ Im Heizsystem lässt sich unter `heat_storage` ein **Pufferspeicher** modelliere
 - **Szenarien-Explorer:** Er hat kein Backend und rechnet weiter mit `setpoint_c` / `tolerance_c`. Der Hauskonfigurator zeigt unter den Speicherfeldern, dass Live das Band der Regelung nutzt, und mit welchen aktuellen Werten.
 - **Historie:** `optimization_history.jsonl` hält je Lauf fest, woher das Band kam (`thermal_observability[].band_source`: `backend`, `config` oder `config_no_value`, wenn beide Signale zugeordnet sind, aber ein Wert fehlte).
 
-Darüber hinaus darf die Live-Optimierung opportunistisch Energie bis zum Sollwert einplanen. Die Jahressimulation bleibt dagegen reines Bang-Bang an der Untergrenze. Das gilt für jeden regulären Optimierungslauf, auch wenn Earnie die Live-Telemetrie eines Laufs verwirft (z. B. Nullwerte oder negativer Hausverbrauch) und die Matrix bei Prognosewerten bleibt.
+Darüber hinaus darf die Live-Optimierung opportunistisch Energie bis `Sollwert + boost_k` einplanen, höchstens bis zur gemeldeten Maximaltemperatur `get_temperature_heat_storage_max`: So weit lädt die Regelung, wenn Earnie freigibt. Das gilt auch mit dem Band aus der Regelung. Deren Sollwert muss der normale sein, ohne den Boost: Enthielte er ihn, würde Earnie seine eigene Ladung als Normalbetrieb sehen. Der Boost gehört deshalb in `boost_k`. Die Jahressimulation bleibt dagegen reines Bang-Bang an der Untergrenze. Das gilt für jeden regulären Optimierungslauf, auch wenn Earnie die Live-Telemetrie eines Laufs verwirft (z. B. Nullwerte oder negativer Hausverbrauch) und die Matrix bei Prognosewerten bleibt.
 
 **Live-Prognose über den Planungshorizont:** Die Live-Optimierung simuliert den Speicher nur über den Planungshorizont. Startwert ist die gemessene Speichertemperatur. Eingänge sind die Außentemperatur **und die Kollektor-Einstrahlung aus der Open-Meteo-Wetterprognose** (Neigung/Ausrichtung aus `solar_thermal_tilt_deg` / `solar_thermal_azimuth_deg`).
 
@@ -361,6 +362,37 @@ Darüber hinaus darf die Live-Optimierung opportunistisch Energie bis zum Sollwe
 - **Hauskonfigurator beim ersten Öffnen:** Für den Jahresbedarf einer Wärmepumpe (`thermal_annual`) lädt der Hauskonfigurator die Klimadaten des Archivs einmal von Open-Meteo und legt sie im Cache ab (`data/cache/open_meteo_utc`, anderes Verzeichnis über `EARNIE_OPEN_METEO_CACHE_PATH`). Währenddessen zeigt die Seite einen Hinweis. Dauert der Abruf länger als 30 s (langsames Netz, Ratenlimit), bricht Earnie ab und zeigt eine Fehlermeldung; ein erneutes Öffnen versucht es noch einmal.
 
 **Live ohne Wärmespeicher:** Auch ohne `heat_storage` rechnet die Live-Optimierung nur über den Planungshorizont. Die Simulation des Hauses startet bei der Solltemperatur (`target_temp_c`), da es keinen Innentemperatur-Fühler gibt. Sie nutzt die Außentemperatur-Prognose und dieselben Regeln wie die Jahressimulation. Daraus ergeben sich der WP-Bedarf je Viertelstunde und die Tagesziele. Ohne Wohnfläche (`living_area_m2 = 0`) plant Earnie nur Warmwasser und zieht den prognostizierten Kollektorertrag pro Tag ab. Szenario-Explorer und Backtesting nutzen weiterhin die Jahressimulation mit historischem Wetter.
+
+<a id="haus-wärme-sg-ready"></a>
+
+### Betriebszustand (SG-Ready)
+
+Statt oder neben der Freigabe kann Earnie der Wärmepumpe einen **SG-Ready-Zustand** senden: `heatpump.<Kennung>.set_sg_ready_state`. Damit lässt sich eine Standard-SG-Ready-Wärmepumpe über zwei Relaiskontakte im Smarthome ansteuern.
+
+| Zustand | Wann Earnie ihn sendet | Was die Regelung tut |
+| ------- | ---------------------- | -------------------- |
+| 3 Laden | wo der Plan die Wärmepumpe laufen lässt (wie Freigabe 1) | hebt das Soll um den festen Boost an und lädt bis `Sollwert + boost_k` |
+| 2 Normal | sonst (wie Freigabe 0) | arbeitet mit ihren eigenen Sollwerten |
+
+- **Zustände 1 und 4:** Earnie sendet sie noch nicht. Die Sperre (1) kommt erst, wenn entschieden ist, ob Earnie sie überhaupt nutzt; die Zwangsladung bis zur Maximaltemperatur (4) erst, wenn Earnie das Laden über den Boost hinaus mit seinem Wirkungsgrad plant.
+- **Optional:** Das Signal ist ein optionales Schreibsignal am `thermal_annual`-Verbraucher. Aktivieren in EHAL-Com unter **Optionale Signale aktivieren**. Die Freigabe `set_enable` bleibt Pflicht und wird weiter gesendet; ein Backend, das nur den Zustand braucht, ignoriert sie.
+- **Boost:** Der Boost der Wärmepumpe gehört in `heat_storage.boost_k` des Heizsystems (Hauskonfigurator, **Wärmespeicher Boost (K)**). Bei einer SG-Ready-Wärmepumpe steht er in deren Einstellungen für Zustand 3.
+- **Rückfallebene:** Ist Earnie nicht erreichbar, muss das Backend auf Zustand 2 zurückfallen. Das Home-Assistant-Paket aus EHAL-Com enthält dafür einen Watchdog, der den Zustand nach dem Timeout auf 2 setzt. Für Loxone: [Rückfallebene in Loxone Config](../referenz/loxone-signals.md#earnie-dead-fallback-in-loxone-config).
+
+<a id="haus-wärme-ladeziel"></a>
+
+### Speicher-Ladeziel
+
+Mit dem Ladeziel `heatpump.<Kennung>.set_temperature_heat_storage_target` (°C) sagt Earnie der Regelung, **wie weit** sie den Speicher laden soll, statt nur ob. Die Ladung wird dosiert und nicht mehr zwischen Soll und Soll + Boost umgeschaltet.
+
+- **Berechnung:** Wo der Plan die Wärmepumpe jetzt laufen lässt, ist das Ziel die Speichertemperatur am Ende dieses Laufs. Earnie geht dabei von der gemessenen `T_eq` aus, rechnet die geplante Wärme dazu und zieht Wärmebedarf von Haus und Warmwasser, den Kollektorertrag sowie den Speicherverlust ab.
+- **Grenzen:** Das Ziel liegt mindestens beim Sollwert und höchstens bei `Sollwert + boost_k`. Meldet die Regelung `get_temperature_heat_storage_max`, begrenzt Earnie zusätzlich darauf. Diese Grenze gilt auch für die Ladung auf Vorrat. Ein Laden über den Boost hinaus kommt erst, wenn Earnie den Wirkungsgrad der Wärmepumpe nach Temperatur kennt.
+- **0 = kein Ziel:** Läuft die Wärmepumpe im Plan jetzt nicht oder gibt es keinen Plan (Automatik, Start), sendet Earnie 0. Die Regelung arbeitet dann mit ihren eigenen Sollwerten. Ein Backend kann das Ziel deshalb auch ohne Freigabe- oder Zustandseingang nutzen: Ziel > 0 heißt bis zum Ziel laden, 0 heißt Normalbetrieb.
+- **Schaltdifferenz:** Die Regelung startet erst, wenn der Speicher um ihre Schaltdifferenz unter dem Ziel liegt. Ein Ziel knapp über der aktuellen Temperatur startet die Wärmepumpe daher nicht.
+- **Optional:** Aktivieren in EHAL-Com unter **Optionale Signale aktivieren**. Merker-Vorschlag für Loxone: `Earnie_Waermespeicher_Ladeziel`.
+- **Rückfallebene:** Ist Earnie nicht erreichbar, muss das Backend 0 annehmen. Das Home-Assistant-Paket setzt das Ziel über den Watchdog auf 0, für Loxone siehe [Rückfallebene](../referenz/loxone-signals.md#earnie-dead-fallback-in-loxone-config).
+- **Abweichung:** Meldet die Regelung über `sens_operating_mode` „gesperrt“ (4) oder „Störung“ (6), während der Plan die Wärmepumpe laufen lässt, schreibt Earnie eine Warnung ins `earnie.log`. Ein Warmwasserlauf während einer geplanten Heizungsladung ist keine Abweichung.
+- **Historie:** `optimization_history.jsonl` hält je Lauf unter `thermal_observability[].heat_control` das Ziel, ob die Wärmepumpe geplant lief, die gemeldete Betriebsart und eine Abweichung fest.
 
 <a id="haus-wärme-rückmeldesignale"></a>
 
@@ -372,7 +404,7 @@ Zusätzlich zu `T_eq` und `T_low` kann das Smarthome-Backend weitere Werte der H
 | ------ | ------- | --------- | ----------------- |
 | `get_temperature_heat_storage_setpoint` | °C | Aktueller Speicher-Sollwert der Regelung | Mit der Toleranz zusammen: Live plant mit diesem Band (siehe oben) |
 | `get_temperature_heat_storage_tolerance` | K | Band unter dem Sollwert, in dem die Regelung noch keine Wärme anfordert | wie oben |
-| `get_temperature_heat_storage_max` | °C | Höchste Speichertemperatur, die die Regelung zulässt | wird aufgezeichnet |
+| `get_temperature_heat_storage_max` | °C | Höchste Speichertemperatur, die die Regelung zulässt | begrenzt Ladung auf Vorrat und Ladeziel |
 | `sens_temperature_heat_storage_top` | °C | Oberster Speicherfühler (Warmwasser-Komfort, obere Ladegrenze) | wird aufgezeichnet |
 | `sens_operating_mode` | – | Betriebsart, die die Regelung anfordert: 0 aus, 1 Raumheizung, 2 Warmwasser, 3 Abtauen, 4 gesperrt, 5 Kühlen, 6 Störung | wird aufgezeichnet |
 | `sens_sg_ready_state` | – | SG-Ready-Zustand 1–4, den die Regelung anwendet | wird aufgezeichnet |

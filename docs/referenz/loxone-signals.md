@@ -179,6 +179,8 @@ Empfohlenes Vorgehen (Logikbausteine in Config, kein Earnie-Code):
 3. **Wenn die Rückfallebene auslöst:**
    - `Earnie_Steuerbefehl` / ESS-Modus lokal auf **Automatik** (`0`) setzen oder die sicheren ESS-Regeln der Anlage anwenden.
    - Flex-**Freigaben** (`Earnie_*_Freigabe`) auf `0` (gesperrt) setzen oder bekannte Notfalllogik anwenden.
+   - **SG-Ready-Zustand** der Wärmepumpe (`heatpump.<Kennung>.set_sg_ready_state`, Merker-Vorschlag `Earnie_Waermepumpe_SG_Ready_Soll`) auf `2` (Normalbetrieb) setzen. Die Regelung arbeitet dann mit ihren eigenen Sollwerten weiter.
+   - **Speicher-Ladeziel** (`heatpump.<Kennung>.set_temperature_heat_storage_target`, Merker-Vorschlag `Earnie_Waermespeicher_Ladeziel`) auf `0` (kein Ziel) setzen.
    - Keine EV-Sollwerte mehr aus dem Earnie-Merker übernehmen.
 4. **Wenn Earnie wieder erreichbar ist:** Die Earnie-Merker wie vorgesehen an Aktoren bzw. Programm durchreichen.
 
