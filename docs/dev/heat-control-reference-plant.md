@@ -370,7 +370,7 @@ morning window.
   the plan still counts with a constant efficiency and would charge hot too often. With
   the switch-off difference of 2.5 K at S5 the high value is `setpoint_c` minus 2.5 K, so
   that a charge ends at the configured setpoint. Hot water is not affected (own request,
-  sensor S3). With a floor heating
+  sensor S3). Set in Loxone on 2026-11-15; the values of section 3.4 show the state before. With a floor heating
   setpoint of 31.5 °C at 1 °C outside, the low value lies above the floor heating curve on
   most days: it acts as the permanent boost that section 5 advises against, and is to be
   reviewed with HeatControl P3. Needed for
@@ -386,8 +386,8 @@ morning window.
   function receives after it, and whether 60 min is short enough for the store setpoint
   (a high target would stay active for up to an hour when Loxone is silent).
 - **Q6 Sensor labels:** S12 (heat pump return?), S2 (solar flow, unused in the program), S10.
-- **Q7 Sensor heights:** answered 2026-11-15 (section 3.4, weights in section 6). Open:
-  enter the weights 0.38 / 0.22 / 0.40 in the `T_eq` formula of the smart home.
+- **Q7 Sensor heights:** answered 2026-11-15 (section 3.4, weights in section 6). The
+  weights 0.38 / 0.22 / 0.40 are set in the `T_eq` formula of the smart home since that day.
 - **Q8 Analog network outputs:** answered 2026-11-15. The outputs 2–7 carry flow and return
   temperatures of the heat pump, 14 and 15 energy counters of the collector; per the
   maintainer any of them may be replaced. Proposal: give up a collector energy counter (or
