@@ -93,9 +93,42 @@ def _table_records(
     return out
 
 
+_TOGGLE_ERROR_KEY = "ehal_sig_opt_error"
+
+
+def _toggle_key(row: SignalRow) -> str:
+    # Consumer keys may be bare and repeat across consumers; the EHAL ID is unique
+    # (and equals the former qualified binding key, so widget keys stay stable).
+    ident = row.ehal_id if row.component_kind == "consumer" else row.binding_key
+    return f"ehal_sig_opt::{ident}"
+
+
+def _on_toggle(key: str, row: SignalRow) -> None:
+    """Apply one click to the files on disk (callback: runs only on a real change)."""
+    activated = bool(st.session_state.get(key))
+    try:
+        house, components = _load_docs()
+        house, components = set_binding_activation(
+            house,
+            components,
+            component_kind=row.component_kind,  # type: ignore[arg-type]
+            entity_id=row.entity_id,
+            binding_key=row.binding_key,
+            activated=activated,
+            consumer_type=row.consumer_type,
+            is_required=False,
+        )
+        _persist_docs(house, components)
+    except ConfigReadOnlyError:
+        st.session_state[_TOGGLE_ERROR_KEY] = ("caption", SHADOW_READONLY_CAPTION)
+    except (ValueError, OSError) as exc:
+        st.session_state[_TOGGLE_ERROR_KEY] = ("error", str(exc))
+
+
 def _render_optional_toggles(
     house: dict, components: dict, rows: list[SignalRow]
 ) -> None:
+    del house, components  # the callback re-reads the files it changes
     optional = [
         r
         for r in rows
@@ -111,43 +144,23 @@ def _render_optional_toggles(
         readonly = is_shadow_config_readonly()
         if readonly:
             st.caption(SHADOW_READONLY_CAPTION)
-        changed = False
-        house_cur, comp_cur = house, components
+        notice = st.session_state.pop(_TOGGLE_ERROR_KEY, None)
+        if notice:
+            level, text = notice
+            (st.caption if level == "caption" else st.error)(text)
         for row in optional:
-            label = f"{row.ehal_id} — {row.meaning}"
-            # Consumer keys may be bare and repeat across consumers; the EHAL ID is unique
-            # (and equals the former qualified binding key, so widget keys stay stable).
-            ident = row.ehal_id if row.component_kind == "consumer" else row.binding_key
-            key = f"ehal_sig_opt::{ident}"
-            new_val = st.checkbox(
-                label,
-                value=row.is_activated,
+            key = _toggle_key(row)
+            # The file is the truth: a switch state left from an earlier session (e.g. a
+            # browser tab kept open over a container restart) never changes the config.
+            # Only a click does, through ``on_change``.
+            st.session_state[key] = bool(row.is_activated)
+            st.checkbox(
+                f"{row.ehal_id} — {row.meaning}",
                 key=key,
                 disabled=readonly,
+                on_change=_on_toggle,
+                args=(key, row),
             )
-            if bool(new_val) == bool(row.is_activated):
-                continue
-            try:
-                house_cur, comp_cur = set_binding_activation(
-                    house_cur,
-                    comp_cur,
-                    component_kind=row.component_kind,  # type: ignore[arg-type]
-                    entity_id=row.entity_id,
-                    binding_key=row.binding_key,
-                    activated=bool(new_val),
-                    consumer_type=row.consumer_type,
-                    is_required=False,
-                )
-                changed = True
-            except ValueError as exc:
-                st.error(str(exc))
-        if changed:
-            try:
-                _persist_docs(house_cur, comp_cur)
-            except ConfigReadOnlyError:
-                st.caption(SHADOW_READONLY_CAPTION)
-                return
-            st.rerun()
 
 
 def _persist_docs(house: dict, components: dict) -> None:

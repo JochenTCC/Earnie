@@ -303,3 +303,19 @@ def test_export_caption_points_to_the_ha_yaml_package_on_the_ha_backend(
     assert "HA Push-Carrier" in captions
     assert "folgt" not in captions
     assert "P5c" not in captions
+
+
+def test_stale_switch_state_never_changes_the_config() -> None:
+    """A tab kept open over a restart sends old switch states: only a click may write."""
+    key, kind, steps = SIGNALS[5]
+    _toggle(_run(), key, True)
+    before = _path(kind).read_text(encoding="utf-8")
+
+    at = AppTest.from_file(str(_SCRIPT))
+    at.session_state[_PREFIX + key] = False
+    at.run(timeout=_TIMEOUT_S)
+
+    assert_clean(at)
+    assert _path(kind).read_text(encoding="utf-8") == before
+    assert _bindings(kind, steps)[key] == ""
+    assert at.checkbox(key=_PREFIX + key).value is True
