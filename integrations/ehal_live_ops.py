@@ -247,6 +247,16 @@ def fetch_heat_storage_temps(
     return loxone_client.fetch_heat_storage_temps(consumer, house_doc=house_doc)
 
 
+def fetch_heat_feedback(
+    consumer: dict,
+    *,
+    kinds: tuple[str, ...] | None = None,
+) -> dict[str, float | None]:
+    from integrations import loxone_client
+
+    return loxone_client.fetch_heat_feedback(consumer, kinds=kinds)
+
+
 def fetch_thermal_readings(
     consumer: dict,
     *,

@@ -54,6 +54,7 @@ from integrations.ehal_live_ops import (  # noqa: F401 — façade re-exports
     consumers_with_live_nominal_power,
     fetch_filter_native_start_hour,
     fetch_flexible_consumers_live_kw,
+    fetch_heat_feedback,
     fetch_heat_storage_temps,
     fetch_live_power,
     fetch_ready_by_time,

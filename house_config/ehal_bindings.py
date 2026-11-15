@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import copy
 
+from ehal.heat_fields import THERMAL_ANNUAL_READ_KINDS
 from integrations.loxone_ehal_mapping import EHAL_TO_BLOCKS
 from house_config.ehal_bindings_filter import (  # noqa: F401  (re-exported)
     FILTER_EHAL_FIELDS,
@@ -57,10 +58,8 @@ THERMAL_RC_EHAL_FIELDS: tuple[str, ...] = (
     "sens_heating_active",
 )
 
-THERMAL_ANNUAL_EHAL_FIELDS: tuple[str, ...] = (
-    "sens_temperature_heat_storage",
-    "sens_temperature_heat_storage_low",
-)
+# Store temperatures (level 0) + feedback signals (level 3), see ``ehal.heat_fields``.
+THERMAL_ANNUAL_EHAL_FIELDS: tuple[str, ...] = THERMAL_ANNUAL_READ_KINDS
 
 _INPUT_MARKER_KEYS: frozenset[str] = frozenset(
     {

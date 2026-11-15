@@ -13,6 +13,11 @@ from optimizer.thermal_coupled import (
     heat_storage_enabled,
     normalize_heat_storage,
 )
+from optimizer.thermal_live_band import (  # noqa: F401  (re-exported)
+    BAND_SOURCE_BACKEND,
+    BAND_SOURCE_CONFIG,
+    resolve_live_store_band,
+)
 from optimizer.thermal_model import ThermalBand, capacity_kwh_per_k_from_volume, heat_content_kwh
 from optimizer.thermal_live_solar import (  # noqa: F401  (re-exported)
     SOLAR_SOURCE_ARCHIVE_FALLBACK,
@@ -64,6 +69,10 @@ class LiveStorePlan:
     q_sim_kwh: list[float] = field(default_factory=list)
     # Collector heat input: SOLAR_SOURCE_* (ThermalHorizon P3); "provided" when passed in.
     solar_source: str = "provided"
+    # Where ``band`` comes from: BAND_SOURCE_* (HeatControl P1).
+    band_source: str = BAND_SOURCE_CONFIG
+    # Mapped level 3 feedback reads of this cycle (kind → value, None = no value).
+    feedback: dict[str, float | None] = field(default_factory=dict)
 
 
 def resolve_heat_storage_setpoint_band(heat_storage: dict) -> ThermalBand:
@@ -239,10 +248,20 @@ def plan_live_store_for_thermal_consumer(
         resolved_solar, solar_source = resolve_live_collector_solar_kw(
             thermal, house_profile, len(ambient_forecast_c)
         )
-    band = ThermalBand(storage["setpoint_c"], storage["tolerance_c"])
-    readings = resolve_heat_storage_readings(
-        consumer, house_doc=house_doc, heat_storage=storage
+    from integrations.ehal_live import fetch_heat_feedback
+
+    # The backend owns the band where it reports it; read every cycle, held over the horizon.
+    live_band = resolve_live_store_band(
+        consumer, ThermalBand(storage["setpoint_c"], storage["tolerance_c"])
     )
+    band = live_band.band
+    readings = resolve_heat_storage_readings(
+        consumer,
+        house_doc=house_doc,
+        heat_storage={**storage, "setpoint_c": band.setpoint_c, "tolerance_c": band.tolerance_c},
+    )
+    # Read in the planning path so the cycle recorder stores them like the store temperatures.
+    feedback = fetch_heat_feedback(consumer)
     capacity = capacity_kwh_per_k_from_volume(storage["volume_liters"])
     wp_kw = float(
         thermal.get("nominal_power_kw")
@@ -288,7 +307,12 @@ def plan_live_store_for_thermal_consumer(
         used_measured_low=readings.used_measured_low,
         gain_kw_by_hour=gains,
     )
-    return replace(plan, solar_source=solar_source)
+    return replace(
+        plan,
+        solar_source=solar_source,
+        band_source=live_band.source,
+        feedback=feedback,
+    )
 
 
 
@@ -532,6 +556,9 @@ def build_heat_storage_observability(
             "band_min": plan.band.min_c,
             "band_max": plan.band.max_c,
         },
+        # "backend": Live planned with the band the backend reports, not the configured one.
+        "band_source": plan.band_source,
+        "feedback": dict(plan.feedback),
         "heat_content_kwh": {
             "q_meas": round(q_meas, 3),
             "q_sim": round(q_sim, 3),

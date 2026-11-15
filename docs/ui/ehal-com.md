@@ -216,9 +216,21 @@ Role template: `share/ehal/roles/heatpump.json`. Greenfield prefix `Earnie_Waerm
 | Heat pump enable / SG-Ready   | Control value | `heatpump.{slug}.set_enable`    |         |      |         | HA switch/input_boolean / `Earnie_Waermepumpe_Freigabe` |
 | Heat storage `T_eq`           | Measurement   | `sens_temperature_heat_storage` |         |      |         | HA °C sensor / `Earnie_Waermespeicher_Temp_eq` |
 | Heat storage `T_low`          | Measurement   | `sens_temperature_heat_storage_low` |     |      |         | HA °C sensor (bottom) / `Earnie_Waermespeicher_Temp_low` |
+| Heat storage top sensor       | Measurement   | `sens_temperature_heat_storage_top` |     |      |         | HA °C sensor (top) / `Earnie_Waermespeicher_Temp_top` |
+| Store setpoint of the controller | Parameter  | `get_temperature_heat_storage_setpoint` | |      |         | HA °C sensor / `Earnie_Waermespeicher_Soll` |
+| Store tolerance of the controller | Parameter | `get_temperature_heat_storage_tolerance` | |     |         | HA K sensor / `Earnie_Waermespeicher_Toleranz` |
+| Store maximum                 | Parameter     | `get_temperature_heat_storage_max` |      |      |         | HA °C sensor / `Earnie_Waermespeicher_Temp_max` |
+| Operating mode (0–6)          | Measurement   | `sens_operating_mode`           |         |      |         | HA sensor / `Earnie_Waermepumpe_Betriebsart` |
+| SG-Ready state applied (1–4)  | Measurement   | `sens_sg_ready_state`           |         |      |         | HA sensor / `Earnie_Waermepumpe_SG_Ready` |
+| Thermal power                 | Measurement   | `sens_heat_power`               |         |      |         | HA power entity / `Earnie_Waermepumpe_Waermeleistung` (kW) |
+| Source temperature            | Measurement   | `sens_temperature_source`       |         |      |         | HA °C sensor / `Earnie_Waermepumpe_Temp_Quelle` |
+| Hot-water tank / comfort minimum | Measurement / Parameter | `sens_temperature_dhw` / `get_temperature_dhw_min` | | | | HA °C sensors / `Earnie_Warmwasser_Temp` / `_min` |
+| Room temperature / setpoint   | Measurement / Parameter | `sens_temperature_room` / `get_temperature_room_setpoint` | | | | HA °C sensors / `Earnie_Raum_Temp` / `_Soll` |
 
 
 Notes: entity-scoped — VI = enable from Earnie (`flex.{hk_id}.…` in the check); VO = optional push `flex.{hk_id}.sens_power_act` plus store temps. Outside temperature only on the plant (`sens_temperature_outside`, see C.1) — not on the heat-pump VO. There is no target-kW Merker for the heat pump. Recipe: `share/loxone/recipes/heatpump.json`; VO: `VO_Earnie_Heatpump.xml`.
+
+**Feedback (HeatControl P1):** the rows from the top sensor down are optional and read-only; Live-Lesen lists them for every `thermal_annual` consumer as `heatpump.{slug}.<field>`. With setpoint and tolerance both mapped, Live plans with the controller's store band instead of `heat_storage.setpoint_c` / `tolerance_c`; the mapping page warns when only one of the two is mapped. The other fields are recorded (`thermal_observability[].feedback`).
 
 **Heat storage:** stratified tanks must expose energy-equivalent `T_eq` (volume-weighted mean) as `sens_temperature_heat_storage`, plus raw bottom sensor `T_low` as `sens_temperature_heat_storage_low`. Do not bind a single top-layer sensor as the RC state. On HA, activate both fields on the `thermal_annual` consumer (same entity-scoped activation keys as Loxone) and fill the two temperature entities into the matching `ENTITY_*` placeholders of the YAML package. Operator guide: [waermespeicher-schichtung-teq.md](../konfiguration/waermespeicher-schichtung-teq.md); physics in [thermals-p2.md](../dev/done/thermals-p2.md).
 

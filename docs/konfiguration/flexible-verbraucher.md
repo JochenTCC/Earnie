@@ -344,6 +344,14 @@ Im Heizsystem lässt sich unter `heat_storage` ein **Pufferspeicher** modelliere
 - **Prognose:** Die Open-Loop-Prognose von `T_eq` würde unter `setpoint − tolerance` fallen (wie in der Jahressimulation).
 - **Unterster Fühler:** `T_low` liegt unter derselben Grenze. Diese Freigabe wirkt kurzfristig.
 
+**Speicherband aus der Regelung:** Meldet das Smarthome-Backend Sollwert und Toleranz der Heizungsregelung, plant Live mit diesen Werten und nicht mit `heat_storage.setpoint_c` / `tolerance_c`. Plan und Regelung können dann nicht auseinanderlaufen.
+
+- **Voraussetzung:** Beide Signale sind am `thermal_annual`-Verbraucher zugeordnet: `get_temperature_heat_storage_setpoint` und `get_temperature_heat_storage_tolerance`. Ist nur eines zugeordnet, plant Live weiter mit den konfigurierten Werten; die EHAL-Zuordnung und das `earnie.log` nennen das fehlende Signal.
+- **Jeder Lauf liest neu:** Earnie liest beide Werte in jedem Optimierungslauf und hält sie über den Planungshorizont konstant. Ein Sollwert, der einer Heizkurve folgt, wandert so von Lauf zu Lauf mit.
+- **Kein Wert:** Sind beide Signale zugeordnet, aber eines liefert keinen Wert, bricht der Speicherplan mit einer Fehlermeldung ab. Earnie plant dann nicht ersatzweise mit den konfigurierten Werten.
+- **Szenarien-Explorer:** Er hat kein Backend und rechnet weiter mit `setpoint_c` / `tolerance_c`. Der Hauskonfigurator zeigt unter den Speicherfeldern, dass Live das Band der Regelung nutzt, und mit welchen aktuellen Werten.
+- **Historie:** `optimization_history.jsonl` hält je Lauf fest, woher das Band kam (`thermal_observability[].band_source`: `backend` oder `config`).
+
 Darüber hinaus darf die Live-Optimierung opportunistisch Energie bis zum Sollwert einplanen. Die Jahressimulation bleibt dagegen reines Bang-Bang an der Untergrenze. Das gilt für jeden regulären Optimierungslauf, auch wenn Earnie die Live-Telemetrie eines Laufs verwirft (z. B. Nullwerte oder negativer Hausverbrauch) und die Matrix bei Prognosewerten bleibt.
 
 **Live-Prognose über den Planungshorizont:** Die Live-Optimierung simuliert den Speicher nur über den Planungshorizont. Startwert ist die gemessene Speichertemperatur. Eingänge sind die Außentemperatur **und die Kollektor-Einstrahlung aus der Open-Meteo-Wetterprognose** (Neigung/Ausrichtung aus `solar_thermal_tilt_deg` / `solar_thermal_azimuth_deg`).
@@ -354,7 +362,32 @@ Darüber hinaus darf die Live-Optimierung opportunistisch Energie bis zum Sollwe
 
 **Live ohne Wärmespeicher:** Auch ohne `heat_storage` rechnet die Live-Optimierung nur über den Planungshorizont. Die Simulation des Hauses startet bei der Solltemperatur (`target_temp_c`), da es keinen Innentemperatur-Fühler gibt. Sie nutzt die Außentemperatur-Prognose und dieselben Regeln wie die Jahressimulation. Daraus ergeben sich der WP-Bedarf je Viertelstunde und die Tagesziele. Ohne Wohnfläche (`living_area_m2 = 0`) plant Earnie nur Warmwasser und zieht den prognostizierten Kollektorertrag pro Tag ab. Szenario-Explorer und Backtesting nutzen weiterhin die Jahressimulation mit historischem Wetter.
 
-Entwickler-Spec: [thermals-p2.md](../dev/done/thermals-p2.md).
+<a id="haus-wärme-rückmeldesignale"></a>
+
+### Rückmeldesignale der Heizung
+
+Zusätzlich zu `T_eq` und `T_low` kann das Smarthome-Backend weitere Werte der Heizungsregelung melden. Alle sind optional und werden nur gelesen. Earnie steuert damit nichts. Zuordnung in der EHAL-Zuordnung am `thermal_annual`-Verbraucher, Anzeige in EHAL-Com unter Live-Lesen als `heatpump.<Kennung>.<Signal>`.
+
+| Signal | Einheit | Bedeutung | Wirkung in Earnie |
+| ------ | ------- | --------- | ----------------- |
+| `get_temperature_heat_storage_setpoint` | °C | Aktueller Speicher-Sollwert der Regelung | Mit der Toleranz zusammen: Live plant mit diesem Band (siehe oben) |
+| `get_temperature_heat_storage_tolerance` | K | Band unter dem Sollwert, in dem die Regelung noch keine Wärme anfordert | wie oben |
+| `get_temperature_heat_storage_max` | °C | Höchste Speichertemperatur, die die Regelung zulässt | wird aufgezeichnet |
+| `sens_temperature_heat_storage_top` | °C | Oberster Speicherfühler (Warmwasser-Komfort, obere Ladegrenze) | wird aufgezeichnet |
+| `sens_operating_mode` | – | Betriebsart, die die Regelung anfordert: 0 aus, 1 Raumheizung, 2 Warmwasser, 3 Abtauen, 4 gesperrt, 5 Kühlen, 6 Störung | wird aufgezeichnet |
+| `sens_sg_ready_state` | – | SG-Ready-Zustand 1–4, den die Regelung anwendet | wird aufgezeichnet |
+| `sens_heat_power` | W (Loxone: kW) | Wärmeleistung des Erzeugers (Wärmemengenzähler) | wird aufgezeichnet |
+| `sens_temperature_source` | °C | Quellentemperatur (Sole, Grundwasser) | wird aufgezeichnet |
+| `sens_temperature_dhw` | °C | Getrennter Warmwasserspeicher, falls vorhanden | wird aufgezeichnet |
+| `get_temperature_dhw_min` | °C | Komfort-Minimum für Warmwasser | wird aufgezeichnet |
+| `sens_temperature_room` | °C | Referenzraum oder Mittel mehrerer Räume | wird aufgezeichnet |
+| `get_temperature_room_setpoint` | °C | Wirksame Raum-Solltemperatur | wird aufgezeichnet |
+
+- **Betriebsart ist eine Anforderung:** Ob der Verdichter läuft, liest Earnie weiter aus der elektrischen Leistung. Eine Wärmepumpe mit eigener Regelung kann eine Anforderung verzögern.
+- **Aufzeichnung:** Earnie liest die zugeordneten Signale in jedem Optimierungslauf. Die Werte stehen in `optimization_history.jsonl` unter `thermal_observability[].feedback` und im Zyklus-Recorder bei den gelesenen Push-Werten. Ein zugeordnetes Signal ohne Wert steht dort als `null`.
+- **Nicht zugeordnet:** Das Signal fehlt in der Aufzeichnung. Earnie setzt keinen Ersatzwert ein.
+
+Entwickler-Spec: [thermals-p2.md](../dev/done/thermals-p2.md), [heat-control-sg-ready.md](../dev/heat-control-sg-ready.md).
 
 ## Heizsystem im Szenario (`heating_system_ids`)
 

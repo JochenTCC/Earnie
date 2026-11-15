@@ -122,6 +122,15 @@ _DECIMALS_BY_KIND = {
     "sens_temperature_water": 1,
     "sens_temperature_heat_storage": 1,
     "sens_temperature_heat_storage_low": 1,
+    "sens_temperature_heat_storage_top": 1,
+    "get_temperature_heat_storage_setpoint": 1,
+    "get_temperature_heat_storage_tolerance": 1,
+    "get_temperature_heat_storage_max": 1,
+    "sens_temperature_source": 1,
+    "sens_temperature_dhw": 1,
+    "get_temperature_dhw_min": 1,
+    "sens_temperature_room": 1,
+    "get_temperature_room_setpoint": 1,
 }
 
 

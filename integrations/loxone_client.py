@@ -373,6 +373,31 @@ def fetch_heat_storage_temps(
     }
 
 
+def fetch_heat_feedback(
+    consumer: dict,
+    *,
+    kinds: tuple[str, ...] | None = None,
+) -> dict[str, float | None]:
+    """Mapped heat pump / heat store reads in EHAL units; unmapped kinds are left out.
+
+    A mapped kind without a value is ``None``. Hub units come from the role file
+    (``ehal.field_registry``), e.g. ``sens_heat_power`` kW → W.
+    """
+    from ehal.field_registry import apply_loxone_read, loxone_spec
+    from ehal.heat_fields import HEAT_FEEDBACK_KINDS
+    from settings.ehal_marker_resolve import marker_thermal_annual_read
+
+    out: dict[str, float | None] = {}
+    for kind in kinds if kinds is not None else HEAT_FEEDBACK_KINDS:
+        address = marker_thermal_annual_read(consumer, kind)
+        if not address:
+            continue
+        raw = fetch_loxone_generic_value(address)
+        spec = loxone_spec(kind)
+        out[kind] = apply_loxone_read(raw, spec) if spec is not None else raw
+    return out
+
+
 def fetch_thermal_readings(
     consumer: dict,
     *,

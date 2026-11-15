@@ -333,6 +333,25 @@ Pool-Freigaben: Default `Earnie_Pool_Freigabe` / `Earnie_Pool_Filter_Freigabe` i
 
 Bei geschichteten Speichern muss `T_eq` der energieäquivalente (volumengewichtete) Mittelwert sein, nicht allein der obere Fühler. Anleitung: [waermespeicher-schichtung-teq.md](../konfiguration/waermespeicher-schichtung-teq.md).
 
+**Rückmeldesignale der Heizung (Live, optional, nur Lesen):** ebenfalls am Verbraucher `thermal_annual`. Wire-ID `heatpump.{slug}.<Feld>`. Bedeutung und Wirkung: [Rückmeldesignale der Heizung](../konfiguration/flexible-verbraucher.md#haus-wärme-rückmeldesignale).
+
+| EHAL-Feld | Wert | Default-Merker |
+| --- | --- | --- |
+| `get_temperature_heat_storage_setpoint` | °C, aktueller Speicher-Sollwert der Regelung | `Earnie_Waermespeicher_Soll` |
+| `get_temperature_heat_storage_tolerance` | K, Band unter dem Sollwert ohne Wärmeanforderung | `Earnie_Waermespeicher_Toleranz` |
+| `get_temperature_heat_storage_max` | °C, höchste zulässige Speichertemperatur | `Earnie_Waermespeicher_Temp_max` |
+| `sens_temperature_heat_storage_top` | °C, oberster Speicherfühler | `Earnie_Waermespeicher_Temp_top` |
+| `sens_operating_mode` | 0 aus, 1 Raumheizung, 2 Warmwasser, 3 Abtauen, 4 gesperrt, 5 Kühlen, 6 Störung | `Earnie_Waermepumpe_Betriebsart` |
+| `sens_sg_ready_state` | 1–4 | `Earnie_Waermepumpe_SG_Ready` |
+| `sens_heat_power` | kW (EHAL: W) | `Earnie_Waermepumpe_Waermeleistung` |
+| `sens_temperature_source` | °C | `Earnie_Waermepumpe_Temp_Quelle` |
+| `sens_temperature_dhw` | °C | `Earnie_Warmwasser_Temp` |
+| `get_temperature_dhw_min` | °C | `Earnie_Warmwasser_Temp_min` |
+| `sens_temperature_room` | °C | `Earnie_Raum_Temp` |
+| `get_temperature_room_setpoint` | °C | `Earnie_Raum_Temp_Soll` |
+
+Sind Sollwert und Toleranz beide zugeordnet, plant Live mit dem Speicherband der Regelung statt mit `heat_storage.setpoint_c` / `tolerance_c`.
+
 ### EV (Präfix `Earnie_EAuto_`)
 
 | EHAL-Feld                   | Richtung  | Default-Name                                                                                            | Wert                                                                                                                                                                                                               |

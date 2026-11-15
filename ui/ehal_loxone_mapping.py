@@ -17,6 +17,7 @@ from ehal.ess_fields import (
     ess_field,
     ess_field_kind,
 )
+from ehal.heat_fields import HEAT_FIELD_LABELS_DE
 from ehal.inverter_fields import INVERTER_MAPPING_KINDS, inv_field, inv_field_kind
 from ehal.pv_fields import PV_MAPPING_KINDS, pv_field, pv_field_kind
 from ehal.profiles import group_fields_by_role, role_field_labels, role_group_label
@@ -175,8 +176,7 @@ _EXTRA_LABELS: dict[str, str] = {
     "get_temperature_water_setpoint": "Pool Soll-Temperatur (°C)",
     "get_temperature_tolerance_c": "Temperatur-Toleranz (°C)",
     "sens_heating_active": "Heizung aktiv",
-    "sens_temperature_heat_storage": "Wärmespeicher T_eq (°C)",
-    "sens_temperature_heat_storage_low": "Wärmespeicher T_low (°C)",
+    **HEAT_FIELD_LABELS_DE,
     "sens_temperature_outside": "Außentemperatur (°C)",
     "sens_absent_mode": "Abwesend / Urlaub (0/1)",
 }

@@ -164,6 +164,114 @@
       "notes": "VO Title; lowest immersion sensor T_low (°C); Live WP-on hint."
     },
     {
+      "name": "Earnie_Waermespeicher_Temp_top",
+      "match": "exact",
+      "entity_kind": "heatpump",
+      "hk_type": "thermal_annual",
+      "ehal_field": "sens_temperature_heat_storage_top",
+      "group": "Earnie_Waermepumpe_",
+      "notes": "VO Title; level 3 feedback. Top store sensor (°C)."
+    },
+    {
+      "name": "Earnie_Waermespeicher_Soll",
+      "match": "exact",
+      "entity_kind": "heatpump",
+      "hk_type": "thermal_annual",
+      "ehal_field": "get_temperature_heat_storage_setpoint",
+      "group": "Earnie_Waermepumpe_",
+      "notes": "VO Title; level 3 feedback. Controller's present store setpoint (°C). Together with the tolerance: Live plans with the controller's band."
+    },
+    {
+      "name": "Earnie_Waermespeicher_Toleranz",
+      "match": "exact",
+      "entity_kind": "heatpump",
+      "hk_type": "thermal_annual",
+      "ehal_field": "get_temperature_heat_storage_tolerance",
+      "group": "Earnie_Waermepumpe_",
+      "notes": "VO Title; level 3 feedback. Band below the setpoint without heat request (K)."
+    },
+    {
+      "name": "Earnie_Waermespeicher_Temp_max",
+      "match": "exact",
+      "entity_kind": "heatpump",
+      "hk_type": "thermal_annual",
+      "ehal_field": "get_temperature_heat_storage_max",
+      "group": "Earnie_Waermepumpe_",
+      "notes": "VO Title; level 3 feedback. Highest store temperature the controller allows (°C)."
+    },
+    {
+      "name": "Earnie_Waermepumpe_Betriebsart",
+      "match": "exact",
+      "entity_kind": "heatpump",
+      "hk_type": "thermal_annual",
+      "ehal_field": "sens_operating_mode",
+      "group": "Earnie_Waermepumpe_",
+      "notes": "VO Title; level 3 feedback. 0 off, 1 space heating, 2 hot water, 3 defrost, 4 locked, 5 cooling, 6 fault (request of the controller)."
+    },
+    {
+      "name": "Earnie_Waermepumpe_SG_Ready",
+      "match": "exact",
+      "entity_kind": "heatpump",
+      "hk_type": "thermal_annual",
+      "ehal_field": "sens_sg_ready_state",
+      "group": "Earnie_Waermepumpe_",
+      "notes": "VO Title; level 3 feedback. SG-Ready state 1-4 the controller applies."
+    },
+    {
+      "name": "Earnie_Waermepumpe_Waermeleistung",
+      "match": "exact",
+      "entity_kind": "heatpump",
+      "hk_type": "thermal_annual",
+      "ehal_field": "sens_heat_power",
+      "group": "Earnie_Waermepumpe_",
+      "notes": "VO Title; level 3 feedback. Thermal power kW (heat meter)."
+    },
+    {
+      "name": "Earnie_Waermepumpe_Temp_Quelle",
+      "match": "exact",
+      "entity_kind": "heatpump",
+      "hk_type": "thermal_annual",
+      "ehal_field": "sens_temperature_source",
+      "group": "Earnie_Waermepumpe_",
+      "notes": "VO Title; level 3 feedback. Source temperature (brine, ground water) °C."
+    },
+    {
+      "name": "Earnie_Warmwasser_Temp",
+      "match": "exact",
+      "entity_kind": "heatpump",
+      "hk_type": "thermal_annual",
+      "ehal_field": "sens_temperature_dhw",
+      "group": "Earnie_Waermepumpe_",
+      "notes": "VO Title; level 3 feedback. Separate hot-water tank °C, if present."
+    },
+    {
+      "name": "Earnie_Warmwasser_Temp_min",
+      "match": "exact",
+      "entity_kind": "heatpump",
+      "hk_type": "thermal_annual",
+      "ehal_field": "get_temperature_dhw_min",
+      "group": "Earnie_Waermepumpe_",
+      "notes": "VO Title; level 3 feedback. Hot-water comfort minimum °C."
+    },
+    {
+      "name": "Earnie_Raum_Temp",
+      "match": "exact",
+      "entity_kind": "heatpump",
+      "hk_type": "thermal_annual",
+      "ehal_field": "sens_temperature_room",
+      "group": "Earnie_Waermepumpe_",
+      "notes": "VO Title; level 3 feedback. Reference room or mean of the participating rooms °C."
+    },
+    {
+      "name": "Earnie_Raum_Temp_Soll",
+      "match": "exact",
+      "entity_kind": "heatpump",
+      "hk_type": "thermal_annual",
+      "ehal_field": "get_temperature_room_setpoint",
+      "group": "Earnie_Waermepumpe_",
+      "notes": "VO Title; level 3 feedback. Effective room setpoint °C."
+    },
+    {
       "name": "Earnie_WP_P_act",
       "match": "exact",
       "entity_kind": "heatpump",

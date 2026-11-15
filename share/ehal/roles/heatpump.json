@@ -1,7 +1,7 @@
 {
   "role_id": "heatpump",
-  "label": "Wärmepumpe (Stub)",
-  "description": "Forward-looking template. Not in M1 EHAL plant wire; live as thermal_annual flex + heat-storage temps. Today: enable freigabe, optional power, T_eq / T_low.",
+  "label": "Wärmepumpe / Wärmespeicher (Stub)",
+  "description": "Not in M1 EHAL plant wire; live as thermal_annual flex + heat-store signals, exchanged as heatpump.{hk_id}.<field>. Level 0: enable, optional power, T_eq / T_low. Level 3 (HeatControl P1): read-only feedback of the controller; all optional. Design: docs/dev/heat-control-sg-ready.md § 6.",
   "status": "stub",
   "ehal_fields": [
     {
@@ -27,7 +27,86 @@
       "required": false,
       "kind": "stub",
       "notes": "Heat storage bottom sensor T_low (°C). HA: map lowest immersion sensor entity."
+    },
+    {
+      "field": "sens_temperature_heat_storage_top",
+      "required": false,
+      "kind": "stub",
+      "notes": "Level 3. Top store sensor (°C): hot-water comfort and upper charge limit."
+    },
+    {
+      "field": "get_temperature_heat_storage_setpoint",
+      "required": false,
+      "kind": "stub",
+      "notes": "Level 3. Controller's present store setpoint (°C). With the tolerance mapped too, Live plans with this band instead of heat_storage.setpoint_c / tolerance_c."
+    },
+    {
+      "field": "get_temperature_heat_storage_tolerance",
+      "required": false,
+      "kind": "stub",
+      "notes": "Level 3. Band below the setpoint in which the controller does not yet request heat (K, >= 0)."
+    },
+    {
+      "field": "get_temperature_heat_storage_max",
+      "required": false,
+      "kind": "stub",
+      "notes": "Level 3. Highest store temperature the controller allows (°C). Recorded only until HeatControl P3/P5."
+    },
+    {
+      "field": "sens_operating_mode",
+      "required": false,
+      "kind": "stub",
+      "notes": "Level 3. Enum 0 off, 1 space heating, 2 hot water, 3 defrost, 4 locked, 5 cooling, 6 fault: what the controller requests; whether the compressor runs comes from the electric power."
+    },
+    {
+      "field": "sens_sg_ready_state",
+      "required": false,
+      "kind": "stub",
+      "notes": "Level 3. SG-Ready state 1-4 the controller applies (differs from the request while it overrides)."
+    },
+    {
+      "field": "sens_heat_power",
+      "required": false,
+      "kind": "stub",
+      "notes": "Level 3. Thermal power of the generator (heat meter), W on the EHAL wire.",
+      "loxone": {
+        "unit": "kW",
+        "ehal_unit": "W",
+        "factor": 1000,
+        "sign": 1,
+        "read_required": false
+      }
+    },
+    {
+      "field": "sens_temperature_source",
+      "required": false,
+      "kind": "stub",
+      "notes": "Level 3. Source temperature (brine, ground water) in °C."
+    },
+    {
+      "field": "sens_temperature_dhw",
+      "required": false,
+      "kind": "stub",
+      "notes": "Level 3. Separate hot-water tank (°C), if present."
+    },
+    {
+      "field": "get_temperature_dhw_min",
+      "required": false,
+      "kind": "stub",
+      "notes": "Level 3. Hot-water comfort minimum (°C)."
+    },
+    {
+      "field": "sens_temperature_room",
+      "required": false,
+      "kind": "stub",
+      "notes": "Level 3. Reference room or mean of the participating rooms (°C)."
+    },
+    {
+      "field": "get_temperature_room_setpoint",
+      "required": false,
+      "kind": "stub",
+      "notes": "Level 3. Effective room setpoint (°C)."
     }
   ],
-  "unit_sign_notes": "Stub only — not part of M1 plant wire. See docs/referenz/loxone-signals.md and Thermals 2.7.b."
+  "unit_sign_notes": "Stub only — not part of M1 plant wire. Temperatures °C, tolerance K, sens_heat_power W (Loxone kW). See docs/referenz/ehal.md and docs/referenz/loxone-signals.md."
 }

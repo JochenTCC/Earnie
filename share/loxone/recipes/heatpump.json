@@ -1,7 +1,7 @@
 {
   "role_id": "heatpump",
   "label": "Wärmepumpe",
-  "baustein_notes": "Greenfield prefix Earnie_Waermepumpe_* (+ Earnie_Waermespeicher_* temps). HK type thermal_annual (id wp_heating). Prefer EFM Load Bezeichnung for flex.wp_heating.sens_power_act. T_eq/T_low: SM supplies volume-weighted T_eq; T_low = raw bottom sensor.",
+  "baustein_notes": "Greenfield prefix Earnie_Waermepumpe_* (+ Earnie_Waermespeicher_* temps). HK type thermal_annual (id wp_heating). Prefer EFM Load Bezeichnung for flex.wp_heating.sens_power_act. T_eq/T_low: SM supplies volume-weighted T_eq; T_low = raw bottom sensor. Level 3 feedback (HeatControl P1) is optional and read-only; Soll + Toleranz together switch Live to the controller's store band.",
   "recommended_markers": [
     {
       "ehal_field": "flex.sens_power_act",
@@ -28,6 +28,78 @@
       "notes": "Lowest immersion sensor T_low (°C); Live WP-on hint when below band floor."
     },
     {
+      "ehal_field": "sens_temperature_heat_storage_top",
+      "loxone_blocks_key": "ehal_bindings.sens_temperature_heat_storage_top",
+      "suggested_name": "Earnie_Waermespeicher_Temp_top",
+      "notes": "Level 3 feedback, optional. Top store sensor (°C)."
+    },
+    {
+      "ehal_field": "get_temperature_heat_storage_setpoint",
+      "loxone_blocks_key": "ehal_bindings.get_temperature_heat_storage_setpoint",
+      "suggested_name": "Earnie_Waermespeicher_Soll",
+      "notes": "Level 3 feedback, optional. Controller's present store setpoint (°C). Together with the tolerance: Live plans with the controller's band."
+    },
+    {
+      "ehal_field": "get_temperature_heat_storage_tolerance",
+      "loxone_blocks_key": "ehal_bindings.get_temperature_heat_storage_tolerance",
+      "suggested_name": "Earnie_Waermespeicher_Toleranz",
+      "notes": "Level 3 feedback, optional. Band below the setpoint without heat request (K)."
+    },
+    {
+      "ehal_field": "get_temperature_heat_storage_max",
+      "loxone_blocks_key": "ehal_bindings.get_temperature_heat_storage_max",
+      "suggested_name": "Earnie_Waermespeicher_Temp_max",
+      "notes": "Level 3 feedback, optional. Highest store temperature the controller allows (°C)."
+    },
+    {
+      "ehal_field": "sens_operating_mode",
+      "loxone_blocks_key": "ehal_bindings.sens_operating_mode",
+      "suggested_name": "Earnie_Waermepumpe_Betriebsart",
+      "notes": "Level 3 feedback, optional. 0 off, 1 space heating, 2 hot water, 3 defrost, 4 locked, 5 cooling, 6 fault (request of the controller)."
+    },
+    {
+      "ehal_field": "sens_sg_ready_state",
+      "loxone_blocks_key": "ehal_bindings.sens_sg_ready_state",
+      "suggested_name": "Earnie_Waermepumpe_SG_Ready",
+      "notes": "Level 3 feedback, optional. SG-Ready state 1-4 the controller applies."
+    },
+    {
+      "ehal_field": "sens_heat_power",
+      "loxone_blocks_key": "ehal_bindings.sens_heat_power",
+      "suggested_name": "Earnie_Waermepumpe_Waermeleistung",
+      "notes": "Level 3 feedback, optional. Thermal power kW (heat meter)."
+    },
+    {
+      "ehal_field": "sens_temperature_source",
+      "loxone_blocks_key": "ehal_bindings.sens_temperature_source",
+      "suggested_name": "Earnie_Waermepumpe_Temp_Quelle",
+      "notes": "Level 3 feedback, optional. Source temperature (brine, ground water) °C."
+    },
+    {
+      "ehal_field": "sens_temperature_dhw",
+      "loxone_blocks_key": "ehal_bindings.sens_temperature_dhw",
+      "suggested_name": "Earnie_Warmwasser_Temp",
+      "notes": "Level 3 feedback, optional. Separate hot-water tank °C, if present."
+    },
+    {
+      "ehal_field": "get_temperature_dhw_min",
+      "loxone_blocks_key": "ehal_bindings.get_temperature_dhw_min",
+      "suggested_name": "Earnie_Warmwasser_Temp_min",
+      "notes": "Level 3 feedback, optional. Hot-water comfort minimum °C."
+    },
+    {
+      "ehal_field": "sens_temperature_room",
+      "loxone_blocks_key": "ehal_bindings.sens_temperature_room",
+      "suggested_name": "Earnie_Raum_Temp",
+      "notes": "Level 3 feedback, optional. Reference room or mean of the participating rooms °C."
+    },
+    {
+      "ehal_field": "get_temperature_room_setpoint",
+      "loxone_blocks_key": "ehal_bindings.get_temperature_room_setpoint",
+      "suggested_name": "Earnie_Raum_Temp_Soll",
+      "notes": "Level 3 feedback, optional. Effective room setpoint °C."
+    },
+    {
       "ehal_field": "heatpump.wp_heating_heating_rod.set_enable",
       "loxone_blocks_key": "heating_rod_ehal_bindings.heatpump.wp_heating_heating_rod.set_enable",
       "suggested_name": "Earnie_Heizstab_Freigabe",
@@ -40,5 +112,5 @@
       "notes": "Optional heating rod power kW, or sens_consumer_active as run state; Live plans the rod only with one of them."
     }
   ],
-  "reference": "docs/referenz/loxone-signals.md; docs/konfiguration/waermespeicher-schichtung-teq.md"
+  "reference": "docs/referenz/loxone-signals.md; docs/konfiguration/waermespeicher-schichtung-teq.md; docs/dev/heat-control-sg-ready.md"
 }

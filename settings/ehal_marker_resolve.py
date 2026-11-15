@@ -232,6 +232,23 @@ def marker_sens_temperature_heat_storage_low(consumer: dict) -> str:
     return resolve_lox_marker(consumer, "sens_temperature_heat_storage_low")
 
 
+def marker_thermal_annual_read(consumer: dict, kind: str) -> str:
+    """Read address of one heat pump / heat store kind (``ehal.heat_fields``)."""
+    from ehal.heat_fields import THERMAL_ANNUAL_READ_KINDS
+
+    if kind not in THERMAL_ANNUAL_READ_KINDS:
+        raise ValueError(f"Unknown heat pump read kind '{kind}'.")
+    return resolve_lox_marker(consumer, kind)
+
+
+def marker_get_temperature_heat_storage_setpoint(consumer: dict) -> str:
+    return resolve_lox_marker(consumer, "get_temperature_heat_storage_setpoint")
+
+
+def marker_get_temperature_heat_storage_tolerance(consumer: dict) -> str:
+    return resolve_lox_marker(consumer, "get_temperature_heat_storage_tolerance")
+
+
 def marker_get_temperature_water_setpoint(consumer: dict) -> str:
     return resolve_lox_marker(consumer, "get_temperature_water_setpoint")
 

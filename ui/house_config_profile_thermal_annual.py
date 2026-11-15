@@ -395,6 +395,9 @@ def _render_reference_system_fields(
     )
     if storage is not None:
         item["heat_storage"] = storage
+        from ui.house_config_live_band import render_live_band_override
+
+        render_live_band_override(consumer)
         parts = _render_heating_rod_fields(consumer, index, session_scope=session_scope)
         if parts:
             item["parts"] = parts

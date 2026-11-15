@@ -1,6 +1,7 @@
 """EHAL Live-Lesen / Live-Schreiben field tables (pure data, split from ``ehal_debug_mapping``)."""
 from __future__ import annotations
 
+from ehal.heat_fields import THERMAL_ANNUAL_READ_KINDS
 from ehal.field_catalog import (
     SETPOINT_FIELDS,
     TELEMETRY_OPTIONAL_STATIC_HUB as TELEMETRY_OPTIONAL,
@@ -129,10 +130,8 @@ THERMAL_LIVE_READ_FIELDS: tuple[str, ...] = (
     "sens_heating_active",
 )
 
-THERMAL_ANNUAL_LIVE_READ_FIELDS: tuple[str, ...] = (
-    "sens_temperature_heat_storage",
-    "sens_temperature_heat_storage_low",
-)
+# Store temperatures (level 0) + feedback signals (level 3, HeatControl P1).
+THERMAL_ANNUAL_LIVE_READ_FIELDS: tuple[str, ...] = THERMAL_ANNUAL_READ_KINDS
 
 NETWORK_LIVE_READ_FIELDS: tuple[str, ...] = TELEMETRY_REQUIRED + TELEMETRY_OPTIONAL
 NETWORK_LIVE_WRITE_FIELDS: tuple[str, ...] = SETPOINT_FIELDS

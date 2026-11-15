@@ -84,6 +84,15 @@ EHAL_FUNCTIONS: tuple[EhalFunction, ...] = (
         ("set_ess_source_select",),
         "Ohne Quellenwahl kann Earnie angeschlossene Dauerläufer nicht zwischen Netz und Powerstation umschalten.",
     ),
+    EhalFunction(
+        "heat_storage_band",
+        "Speicherband der Regelung (Live plant mit Soll und Toleranz des Backends)",
+        (
+            "get_temperature_heat_storage_setpoint",
+            "get_temperature_heat_storage_tolerance",
+        ),
+        "Mit nur einem der beiden Werte plant Live weiter mit dem konfigurierten Speicherband.",
+    ),
 )
 
 FUNCTIONS_BY_ID = {f.id: f for f in EHAL_FUNCTIONS}

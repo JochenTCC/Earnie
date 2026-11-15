@@ -187,8 +187,6 @@ def _consumer_has_live_read_marker(consumer: dict) -> bool:
         marker_sens_evcs_active_power,
         marker_sens_evcs_connected,
         marker_sens_heating_active,
-        marker_sens_temperature_heat_storage,
-        marker_sens_temperature_heat_storage_low,
         marker_sens_temperature_water,
     )
 
@@ -205,11 +203,17 @@ def _consumer_has_live_read_marker(consumer: dict) -> bool:
         or marker_sens_heating_active(consumer)
     ):
         return True
-    if marker_sens_temperature_heat_storage(
-        consumer
-    ) or marker_sens_temperature_heat_storage_low(consumer):
-        return True
-    return False
+    return _has_thermal_annual_read_marker(consumer)
+
+
+def _has_thermal_annual_read_marker(consumer: dict) -> bool:
+    """True when any heat pump / heat store read kind has an address."""
+    from ehal.heat_fields import THERMAL_ANNUAL_READ_KINDS
+    from settings.ehal_marker_resolve import marker_thermal_annual_read
+
+    return any(
+        marker_thermal_annual_read(consumer, kind) for kind in THERMAL_ANNUAL_READ_KINDS
+    )
 
 
 def _consumers_for_live_reads() -> list[dict]:
@@ -301,12 +305,4 @@ def _is_thermal_annual_consumer(consumer: dict) -> bool:
     """True for heat-pump thermal_annual (or heat-storage EHAL bindings)."""
     if str(consumer.get("type") or "") == "thermal_annual":
         return True
-    from settings.ehal_marker_resolve import (
-        marker_sens_temperature_heat_storage,
-        marker_sens_temperature_heat_storage_low,
-    )
-
-    return bool(
-        marker_sens_temperature_heat_storage(consumer)
-        or marker_sens_temperature_heat_storage_low(consumer)
-    )
+    return _has_thermal_annual_read_marker(consumer)

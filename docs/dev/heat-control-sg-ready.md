@@ -1,6 +1,7 @@
 # Predictive heat control: generic EHAL signal set (SG-Ready and beyond)
 
-Status: **draft (2026-11-14)**. Concept only, nothing is implemented.
+Status: **draft (2026-11-14)**. Concept; implemented so far: **P1 Feedback** (2026-11-15,
+level 3 without the ready-by signals, see section 6 "Implementation of P1").
 
 This document is the **generic** part: the signal set, its levels and the model. It names no
 individual plant. The first plant it is applied to is described in
@@ -235,6 +236,22 @@ configurator, as the pool does with `get_temperature_water_setpoint` and
 
 A missing optional signal switches the function that needs it off; it is not replaced by a
 default (rule `no-implicit-fallbacks`).
+
+**Implementation of P1 (2026-11-15).**
+
+- **Names:** as proposed above. All twelve kinds are stored on the `thermal_annual`
+  consumer's `ehal_bindings` and exchange as `heatpump.<id>.<kind>`, the store and room
+  kinds too, like `sens_temperature_heat_storage` already does. One list:
+  `ehal/heat_fields.py`. The ready-by signals are not part of it (P8).
+- **Units:** temperatures °C, the tolerance K, `sens_heat_power` W (Loxone kW through the
+  `loxone` block of `share/ehal/roles/heatpump.json`).
+- **Band:** function `heat_storage_band` in `ehal/functions.py`, resolved in
+  `optimizer/thermal_live_band.py`. Both signals mapped: the backend's band. One of the
+  two: the configured band and a warning. Both mapped but a value missing: error, the
+  configured band does not step in.
+- **Recording:** the mapped kinds are read in the planning path of every cycle, so the
+  cycle recorder stores them with its push reads; `thermal_observability[]` carries
+  `band_source` and `feedback` in `optimization_history.jsonl`.
 
 ### Fail-safe
 

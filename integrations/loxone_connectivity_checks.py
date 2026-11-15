@@ -205,22 +205,16 @@ def _append_thermal_annual_read_checks(
     checks: list[tuple[str, str, dict]],
     consumer: dict,
 ) -> None:
+    from ehal.heat_fields import THERMAL_ANNUAL_READ_KINDS
     from integrations.ehal_debug_mapping import live_read_consumer_field
-    from settings.ehal_marker_resolve import (
-        marker_sens_temperature_heat_storage,
-        marker_sens_temperature_heat_storage_low,
-    )
+    from settings.ehal_marker_resolve import marker_thermal_annual_read
 
-    _append_io_check(
-        checks,
-        live_read_consumer_field(consumer, "sens_temperature_heat_storage"),
-        marker_sens_temperature_heat_storage(consumer),
-    )
-    _append_io_check(
-        checks,
-        live_read_consumer_field(consumer, "sens_temperature_heat_storage_low"),
-        marker_sens_temperature_heat_storage_low(consumer),
-    )
+    for kind in THERMAL_ANNUAL_READ_KINDS:
+        _append_io_check(
+            checks,
+            live_read_consumer_field(consumer, kind),
+            marker_thermal_annual_read(consumer, kind),
+        )
 
 
 def _append_plant_energy_read_checks(
