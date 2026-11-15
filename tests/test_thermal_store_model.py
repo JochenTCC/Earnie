@@ -152,7 +152,7 @@ def _plan(start_c: float, hours: int = 24) -> LiveStorePlan:
     )
 
 
-def _solve_live(plan: LiveStorePlan):
+def _solve_live(plan: LiveStorePlan, matrix: list[dict] | None = None):
     from house_config.planning_flex_bridge import planning_thermal_to_milp
     from optimizer.cbc_solver import solve_with_strict_fallback
     from optimizer.milp import _add_milp_objective
@@ -161,7 +161,7 @@ def _solve_live(plan: LiveStorePlan):
     from optimizer.thermal_flex_context import LIVE_STORE_PLAN_KEY, add_thermal_flex_constraints
 
     consumer = planning_thermal_to_milp(_source())
-    matrix = _matrix()
+    matrix = _matrix() if matrix is None else matrix
     n = len(matrix)
     contexts = {_CID: {"forced_indices": [], LIVE_STORE_PLAN_KEY: plan}}
     remaining = {_CID: max(plan.charge_room_electric_kwh, 1e-3)}
@@ -225,8 +225,30 @@ def test_the_partial_last_hour_uses_the_last_plan_hour_and_beyond_fails_loud():
 
     matrix = _matrix(3)[:9]  # 2 h 15 min: the plan has floor(9 × 0.25) = 2 hours
     assert _slot_hours(matrix, 2) == [0] * 4 + [1] * 4 + [1]
-    with pytest.raises(ValueError, match="reicht nur 1 h"):
-        _slot_hours(matrix, 1)
+    longer = _matrix(4)[:13]  # 3 h 15 min against a 1-hour plan: hour 3 is beyond the hold
+    with pytest.raises(ValueError, match="reicht nur 1 h, Matrix-Slot 12 liegt in Stunde 3"):
+        _slot_hours(longer, 1)
+
+
+def test_a_matrix_starting_inside_an_hour_holds_the_last_plan_hour():
+    """Live cycle at 22:45 (2026-11-15 NAS): 131 slots span 34 wall-clock hours, plan has 32."""
+    from optimizer.thermal_live_store import _slot_hours
+
+    matrix = _matrix(40)[3:134]  # 00:45 start, 131 slots, ends 09:15 next day
+    assert len(matrix) == 131
+    hours = _slot_hours(matrix, 32)
+    assert hours[:2] == [0, 1]  # 00:45 is plan hour 0, 01:00 plan hour 1
+    assert hours[-1] == 31 and hours.count(31) == 4 + 4 + 2  # 07:xx, 08:xx, 09:00-09:15
+    with pytest.raises(ValueError, match="reicht nur 31 h, Matrix-Slot 129 liegt in Stunde 33"):
+        _slot_hours(matrix, 31)
+
+
+def test_live_solves_a_matrix_starting_inside_an_hour():
+    plan = _plan(42.5)
+    model, matrix = _solve_live(plan, _matrix(25)[3:99])  # 00:45 start, 96 slots, 24-hour plan
+    store, level = model.live_store_levels[_CID]
+    assert len(level.levels) == len(matrix)
+    assert level.slack_kwh() == pytest.approx(0.0, abs=1e-3)
 
 
 # --- closed loop with the HouseSim controller -----------------------------------------

@@ -474,12 +474,14 @@ does not depend on where in a charge cycle the simulation happens to end (design
 
 
 def _slot_hours(matrix: list, n_hours: int) -> list[int]:
-    """Hour of the plan for every matrix slot (offset from the horizon start).
+    """Wall-clock hour of the plan for every matrix slot (offset from the start's full hour).
 
-    The plan has ``floor(slots × Δt)`` hours (``thermal_horizon_hours_from_slots``), and the
-    recorded forecasts of the regression cases have exactly as many. Slots in the partial hour
-    after the last full one therefore use the last hour of the plan; this is the only hold, a
-    slot further out fails loud.
+    Plan hour 0 is the full hour of the first slot, as for the baseload and gains
+    (``matrix_hourly_kw``). The plan has ``floor(slots × Δt)`` hours
+    (``thermal_horizon_hours_from_slots``), and the recorded forecasts of the regression cases have
+    exactly as many. A matrix that starts inside an hour (Live at :15/:30/:45) and ends with a
+    partial hour spans up to two wall-clock hours more; those slots use the last hour of the
+    plan. This is the only hold, a slot further out fails loud.
     """
     from optimizer.charging_context import matrix_slot_datetime
 
@@ -489,8 +491,8 @@ def _slot_hours(matrix: list, n_hours: int) -> list[int]:
     hours: list[int] = []
     for index in range(len(matrix)):
         hour = int((matrix_slot_datetime(matrix, index) - start).total_seconds() // 3600)
-        if hour == n_hours:
-            hour = n_hours - 1  # partial last hour of the matrix
+        if n_hours <= hour <= n_hours + 1:
+            hour = n_hours - 1  # partial first and last hour of the matrix
         if not 0 <= hour < n_hours:
             raise ValueError(
                 f"Speicherplan reicht nur {n_hours} h, Matrix-Slot {index} liegt in Stunde {hour}."
