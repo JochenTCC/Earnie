@@ -60,6 +60,11 @@ Mehrere manuelle Geräte können dieselbe virtuelle Powerstation nutzen. Sie tei
 
 Solange ein Gerät aktiv ist, gibt Earnie die gehaltene Reserve frei, der SoC-Floor der Hausbatterie sinkt also. Nach dem Lauf bucht Earnie den Restvorrat weiter ab. Danach lädt Earnie **preisoptimal** nach, mit einer harten Frist von **24 h**.
 
+**Schutz der gehaltenen Reserve:** Der SoC-Floor ist der Mindest-SoC der Hausbatterie plus der Carve-out (z. B. 5 % + 1,1 kWh von 15 kWh = 12,3 %).
+
+- Im Modus **Automatik** begrenzt Earnie das geschriebene Entladelimit auf die Energie über diesem Floor, die in einer Viertelstunde abfließen darf. Bei 13 % SoC sind das rund 0,4 kW. So kann ein großer Verbraucher (z. B. SwimSpa) die Reserve nicht innerhalb eines Slots leeren, die danach aus dem Netz nachgeladen werden müsste. Weiter über dem Floor bleibt das volle Entladelimit.
+- Die Anlage meldet den SoC in ganzen Prozent. Liegt die Anzeige höchstens 1 % unter dem Floor (z. B. 12 % bei 12,3 %), nimmt Earnie die Anzeige als Floor und lädt nicht sofort nach. Liegt der SoC weiter darunter, lädt Earnie die Reserve wie bisher nach.
+
 Einige Felder sind ausgeblendet: Max. Lade-/Entladeleistung, Wirkungsgrad, SoC-Grenzen, Leistungsschwelle, Standby, Steuerbarkeit, `limits_from_live` und Verschleiß. Beim Speichern bzw. Normalisieren übernimmt Earnie diese Werte von der Hausbatterie. Ohne Hausbatterie gelten feste Defaults.
 
 - Die Entladeleistung der virtuellen Powerstation ist immer `0`.

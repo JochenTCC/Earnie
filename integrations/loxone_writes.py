@@ -68,6 +68,8 @@ def map_ess_setpoints(
     target_power_kw: float,
     max_charge_power_kw: float,
     max_discharge_power_kw: float | None = None,
+    *,
+    automatik_discharge_cap_kw: float | None = None,
 ) -> tuple[float | None, float, float, int]:
     """Design C1: (active_power_kw|None, charge_limit_kw, discharge_limit_kw, mode_hint).
 
@@ -77,7 +79,8 @@ def map_ess_setpoints(
     Battery-only: export caps travel on ``set_grid_export_power_limit`` (2.7.a).
 
     ``max_discharge_power_kw`` defaults to ``max_charge_power_kw`` for legacy single-max
-    callers (pre-2.7.j).
+    callers (pre-2.7.j). ``automatik_discharge_cap_kw`` caps the discharge limit in
+    Automatik only (virtual reserve floor, ``reserve_floor_discharge_cap_kw``).
     """
     max_charge = max(0.0, abs(float(max_charge_power_kw)))
     if max_discharge_power_kw is None:
@@ -91,6 +94,8 @@ def map_ess_setpoints(
         return None, max_charge, 0.0, 1
     if mode == 3:  # MODE_ZWANGS_ENTLADEN
         return target, 0.0, max_discharge, 2
+    if automatik_discharge_cap_kw is not None:
+        max_discharge = min(max_discharge, max(0.0, float(automatik_discharge_cap_kw)))
     return None, max_charge, max_discharge, 0
 
 
@@ -406,11 +411,16 @@ def build_sent_loxone_snapshot(
     consumer_pv_follow: dict[str, int] | None = None,
     *,
     export_cap_kw: float | None | object = _OMIT_EXPORT_CAP,
+    automatik_discharge_cap_kw: float | None = None,
 ) -> dict[str, float]:
     """Alle an Loxone gesendeten Steuerwerte: Merkername → Zahl."""
     max_charge, max_discharge = _battery_max_powers_kw(config.get_battery_params())
     active_kw, charge_kw, discharge_kw, control_cmd = map_ess_setpoints(
-        mode, target_power_kw, max_charge, max_discharge
+        mode,
+        target_power_kw,
+        max_charge,
+        max_discharge,
+        automatik_discharge_cap_kw=automatik_discharge_cap_kw,
     )
     contexts = charging_contexts or {}
     snapshot: dict[str, float] = {}
@@ -484,6 +494,7 @@ def send_huawei_modbus_states(
     target_soc: float,
     *,
     export_cap_kw: float | None | object = _OMIT_EXPORT_CAP,
+    automatik_discharge_cap_kw: float | None = None,
 ) -> list[LoxoneWriteRecord]:
     """Übersetzt Optimierungsmodi und schreibt ESS-Steuerwerte (Design C1) an Loxone."""
     from house_config.battery_control import (
@@ -503,7 +514,11 @@ def send_huawei_modbus_states(
         mode = 0
         target_power_kw = 0.0
     active_kw, charge_kw, discharge_kw, control_cmd = map_ess_setpoints(
-        mode, target_power_kw, max_charge, max_discharge
+        mode,
+        target_power_kw,
+        max_charge,
+        max_discharge,
+        automatik_discharge_cap_kw=automatik_discharge_cap_kw,
     )
     if control == BATTERY_CONTROL_LIMITS_ONLY:
         active_kw = None

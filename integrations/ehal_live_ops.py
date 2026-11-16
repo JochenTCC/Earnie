@@ -149,11 +149,16 @@ def write_huawei_modbus_states(
     target_soc: float,
     *,
     export_cap_kw: float | None | object = OMIT_EXPORT_CAP,
+    automatik_discharge_cap_kw: float | None = None,
 ) -> list[LoxoneWriteRecord]:
     from integrations.loxone_writes import send_huawei_modbus_states
 
     return send_huawei_modbus_states(
-        mode, target_power_kw, target_soc, export_cap_kw=export_cap_kw
+        mode,
+        target_power_kw,
+        target_soc,
+        export_cap_kw=export_cap_kw,
+        automatik_discharge_cap_kw=automatik_discharge_cap_kw,
     )
 
 
@@ -166,6 +171,7 @@ def build_sent_loxone_snapshot(
     consumer_pv_follow: dict[str, int] | None = None,
     *,
     export_cap_kw: float | None | object = OMIT_EXPORT_CAP,
+    automatik_discharge_cap_kw: float | None = None,
 ) -> dict[str, float]:
     from integrations.loxone_writes import build_sent_loxone_snapshot as _impl
 
@@ -177,6 +183,7 @@ def build_sent_loxone_snapshot(
         charging_contexts,
         consumer_pv_follow,
         export_cap_kw=export_cap_kw,
+        automatik_discharge_cap_kw=automatik_discharge_cap_kw,
     )
 
 
@@ -196,11 +203,17 @@ def map_ess_setpoints(
     target_power_kw: float,
     max_charge_power_kw: float,
     max_discharge_power_kw: float | None = None,
+    *,
+    automatik_discharge_cap_kw: float | None = None,
 ) -> tuple[float | None, float, float, int]:
     from integrations.loxone_writes import map_ess_setpoints as _impl
 
     return _impl(
-        mode, target_power_kw, max_charge_power_kw, max_discharge_power_kw
+        mode,
+        target_power_kw,
+        max_charge_power_kw,
+        max_discharge_power_kw,
+        automatik_discharge_cap_kw=automatik_discharge_cap_kw,
     )
 
 
