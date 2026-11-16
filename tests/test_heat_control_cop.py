@@ -394,24 +394,80 @@ def test_a_steep_curve_keeps_the_plan_out_of_the_hot_segments():
     assert top_c(flat) > steep_top + 2.0
 
 
-def test_collector_forecast_closes_the_band_above_the_setpoint_for_the_generator():
+def test_a_charge_limit_at_the_capacity_is_none():
+    """Start above the band: the limit applies below the capacity only, not to the drifted bound."""
+    prob = pulp.LpProblem("toy", pulp.LpMinimize)
+    on = pulp.LpVariable("on", cat=pulp.LpBinary)
+    store = StoreLevelModel(
+        capacity_kwh=10.0, start_kwh=14.0, efficiency=1.0, drain_kwh=[0.0, 0.0],
+        charge_limit_kwh=[10.0, 6.0],
+    )
+    add_store_level(
+        SimpleNamespace(prob=prob), "s", store, [0, 1], lambda t: 0.0,
+        generator_on_at=lambda t: on,
+    )
+    rows = [name for name in prob.constraints if name.startswith("s_charge_limit")]
+    assert rows == ["s_charge_limit_1"]
+
+
+def _collector_plan(collector_kw: float, hours: int = 24):
+    """Collector heat from 10:00 to 14:00 beside a draw of 1 kW (net draw = draw − collector)."""
+    collector = [0.0] * 10 + [collector_kw] * 4 + [0.0] * (hours - 14)
+    return replace(
+        _plan(44.0, hours),
+        collector_kw_by_hour=collector,
+        draw_kw_by_hour=[1.0 - kw for kw in collector],
+    )
+
+
+def test_collector_surplus_closes_the_band_above_the_setpoint_for_the_generator():
     from optimizer.thermal_live_store import live_store_level_model
 
-    hours = 24
-    collector = [0.0] * 10 + [4.0] * 4 + [0.0] * 10  # 16 kWh from 10:00 to 14:00
-    plan = replace(_plan(44.0), collector_kw_by_hour=collector)
-    store = live_store_level_model(_matrix(hours), plan, 0.25)
-    normal = _C * (_BAND.setpoint_c - _BAND.min_c)
-    assert store.charge_limit_kwh[0] == pytest.approx(max(normal, store.capacity_kwh - 16.0))
-    assert store.charge_limit_kwh[4 * 14] == pytest.approx(store.capacity_kwh)
-    assert live_store_level_model(_matrix(hours), _plan(44.0), 0.25).charge_limit_kwh == []
+    plan = _collector_plan(4.0)  # 3 kW beyond the draw for 4 h: 12 kWh surplus
+    store = live_store_level_model(_matrix(), plan, 0.25)
+    capacity = store.capacity_kwh
+    assert capacity == pytest.approx(_C * 15.0)
+    # 00:00: the house draws 9.75 kWh before the collector heat comes, 2.25 kWh need room.
+    assert store.charge_limit_kwh[0] == pytest.approx(capacity - 2.25)
+    # 09:45: the whole surplus lies ahead. 11:45: half of it.
+    assert store.charge_limit_kwh[4 * 10 - 1] == pytest.approx(capacity - 12.0)
+    assert store.charge_limit_kwh[4 * 12 - 1] == pytest.approx(capacity - 6.0)
+    assert store.charge_limit_kwh[4 * 14] == pytest.approx(capacity)
     # In the MILP: no generator run ends above the limit before the collector heat.
-    draw = [1.0 - kw for kw in collector]
-    model, matrix = _solve_live(replace(plan, draw_kw_by_hour=draw))
+    model, matrix = _solve_live(plan)
     _store_model, levels = model.live_store_levels[_CID]
-    for slot in range(4 * 10):
+    assert any(_power(model, slot) > 1e-3 for slot in range(4 * 10))
+    for slot in range(4 * 14):
         if _power(model, slot) > 1e-3:
             assert levels.level_kwh(slot) <= store.charge_limit_kwh[slot] + 1e-6
+
+
+def test_the_limit_never_goes_below_the_setpoint():
+    from optimizer.thermal_live_store import live_store_level_model
+
+    store = live_store_level_model(_matrix(), _collector_plan(12.0), 0.25)  # 44 kWh surplus
+    normal = _C * (_BAND.setpoint_c - _BAND.min_c)
+    assert store.charge_limit_kwh[4 * 10 - 1] == pytest.approx(normal)
+
+
+def test_collector_heat_the_house_uses_up_needs_no_room():
+    from optimizer.thermal_live_store import live_store_level_model
+
+    assert live_store_level_model(_matrix(), _collector_plan(0.8), 0.25).charge_limit_kwh == []
+    assert live_store_level_model(_matrix(), _plan(44.0), 0.25).charge_limit_kwh == []
+
+
+def test_the_terminal_level_does_not_ask_for_more_than_the_last_limit():
+    """Book to 10:00, surplus right after: normal operation's mean level lies above the limit."""
+    from optimizer.thermal_live_store import live_store_terminal_kwh
+
+    plan = replace(_collector_plan(4.0), store_temp_c=[53.0] * 24)
+    book_slots = 4 * 10
+    model, matrix = _solve_live(plan, book_slots=book_slots)
+    store, _levels = model.live_store_levels[_CID]
+    limit = store.charge_limit_kwh[book_slots - 1]
+    assert live_store_terminal_kwh(matrix, plan, book_slots - 1, 0.25) > limit + 1.0
+    assert store.terminal_min_kwh == pytest.approx(limit)
 
 
 # --- forced charge (SG-Ready state 4) ---------------------------------------------------

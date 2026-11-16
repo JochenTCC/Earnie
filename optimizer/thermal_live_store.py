@@ -553,21 +553,22 @@ def live_store_level_model(matrix: list, plan: LiveStorePlan, dt_h: float) -> St
     draw = plan.hourly_draw_at_min_kw()
     hours = _slot_hours(matrix, len(draw))
     capacity = c * (plan.charge_max_c - t_min)
+    drain = [draw[hour] * dt_h for hour in hours]
     return StoreLevelModel(
         capacity_kwh=capacity,
         start_kwh=c * (float(plan.start_temp_c) - t_min),
         efficiency=float(plan.jaz),
-        drain_kwh=[draw[hour] * dt_h for hour in hours],
+        drain_kwh=drain,
         leak_per_slot=dt_h * float(plan.heat_loss_kw_per_k) / c,
         leak_ref_kwh=0.0,
         spill_max_kwh=[max(0.0, -float(plan.draw_kw_by_hour[hour])) * dt_h for hour in hours],
         segments=_live_store_segments(plan, hours, capacity),
-        charge_limit_kwh=_collector_charge_limits(plan, hours, dt_h, capacity),
+        charge_limit_kwh=_collector_charge_limits(plan, drain, dt_h, capacity),
     )
 
 
 COLLECTOR_LOOKAHEAD_H = 24.0
-"""The generator leaves the room above the setpoint free for the collector heat forecast for
+"""The generator leaves the room above the setpoint free for the collector surplus forecast for
 this time ahead (design § 4: no boost ahead of forecast collector heat)."""
 
 
@@ -589,12 +590,19 @@ def _live_store_segments(
 
 
 def _collector_charge_limits(
-    plan: LiveStorePlan, hours: list[int], dt_h: float, capacity_kwh: float
+    plan: LiveStorePlan, drain_kwh: list[float], dt_h: float, capacity_kwh: float
 ) -> list[float]:
-    """Level per slot up to which the generator may charge: the capacity minus the collector
-    heat forecast for the following ``COLLECTOR_LOOKAHEAD_H``, never below the setpoint.
+    """Level per slot up to which the generator may charge: the capacity minus the room the
+    collector surplus of the following ``COLLECTOR_LOOKAHEAD_H`` needs, never below the setpoint.
 
-    Empty without a band above the setpoint or without forecast collector heat.
+    The surplus is the collector heat the draw does not use up. From a slot on, the net heat
+    into the store (``−drain``) adds up slot by slot; the largest sum is the room that must be
+    free at the end of the slot so that the store takes it all. Collector heat that the house
+    draws before or while it arrives needs no room: a charge that is used up before the
+    collector heat comes stays allowed.
+
+    Empty without a band above the setpoint, without forecast collector heat, or when no slot
+    gets a limit below the capacity.
     """
     normal = float(plan.capacity_kwh_per_k) * (float(plan.band.setpoint_c) - float(plan.band.min_c))
     collector = plan.collector_kw_by_hour
@@ -602,12 +610,16 @@ def _collector_charge_limits(
         return []
     if len(collector) < len(plan.draw_kw_by_hour):
         raise ValueError("Speicherplan: Kollektorprognose kürzer als die Wärmeentnahme.")
-    per_slot = [max(0.0, float(collector[hour])) * dt_h for hour in hours]
     window = int(round(COLLECTOR_LOOKAHEAD_H / dt_h))
     limits: list[float] = []
-    for slot in range(len(per_slot)):
-        ahead = sum(per_slot[slot + 1 : slot + 1 + window])
-        limits.append(max(normal, capacity_kwh - ahead))
+    for slot in range(len(drain_kwh)):
+        surplus = room = 0.0
+        for drain in drain_kwh[slot + 1 : slot + 1 + window]:
+            surplus -= drain
+            room = max(room, surplus)
+        limits.append(max(normal, capacity_kwh - room))
+    if not any(limit < capacity_kwh - 1e-9 for limit in limits):
+        return []
     return limits
 
 

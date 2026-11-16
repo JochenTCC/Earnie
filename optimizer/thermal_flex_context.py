@@ -814,6 +814,10 @@ def _add_live_store_consumer(
     book = list(range(min(schedule_indices), max(schedule_indices) + 1))
     store = live_store_level_model(matrix, plan, float(model.dt_h))
     terminal = live_store_terminal_kwh(matrix, plan, book[-1], float(model.dt_h))
+    if book[-1] < len(store.charge_limit_kwh):
+        # The generator may not charge above the last slot's limit, so the plan cannot ask
+        # for a higher level at the end: it could only pay slack for it.
+        terminal = min(terminal, store.charge_limit_kwh[book[-1]])
     store = replace(store, terminal_min_kwh=terminal)
     for rod in rods:
         rod_covered.setdefault(str(rod["id"]), set()).update(

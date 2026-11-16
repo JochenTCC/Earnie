@@ -317,7 +317,7 @@ Eine Wärmepumpe arbeitet schlechter, je heißer sie laden muss und je kälter i
 - **Vereinfachung:** Ein heißer Speicher kühlt von oben ab. Im Plan darf eine heiße Stufe nie voller sein als die darunter; damit rechnet Earnie das Nachladen eines teilweise entladenen heißen Speichers etwas zu günstig, aber nie so, als wäre der Speicher kalt.
 - **Historie:** `optimization_history.jsonl` nennt je Lauf unter `thermal_observability[].efficiency`, womit geplant wurde (`source`: `jaz`, `cop_source_signal`, `cop_outside_forecast` oder `jaz_no_source_value`) und mit welcher Quellentemperatur.
 
-**Solarthermie:** Erwartet die Prognose Kollektorwärme, hält Earnie den Platz dafür über dem Sollwert frei: Die Wärmepumpe lädt nur so weit, dass die Kollektorwärme der nächsten 24 Stunden noch in den Speicher passt. Bis zum Sollwert lädt sie unverändert. Das gilt mit und ohne COP-Punkte.
+**Solarthermie:** Erwartet die Prognose mehr Kollektorwärme, als das Haus in derselben Zeit verbraucht, hält Earnie den Platz für diesen Überschuss über dem Sollwert frei: Die Wärmepumpe lädt nur so weit, dass der Überschuss der nächsten 24 Stunden noch in den Speicher passt. Kollektorwärme, die das Haus bis dahin oder gleichzeitig verbraucht, braucht keinen Platz. Bis zum Sollwert lädt die Wärmepumpe unverändert. Das gilt mit und ohne COP-Punkte.
 
 <a id="haus-wärme-heizstab-im-wärmespeicher-parts"></a>
 

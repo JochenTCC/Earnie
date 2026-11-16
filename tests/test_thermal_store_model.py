@@ -152,7 +152,10 @@ def _plan(start_c: float, hours: int = 24) -> LiveStorePlan:
     )
 
 
-def _solve_live(plan: LiveStorePlan, matrix: list[dict] | None = None):
+def _solve_live(
+    plan: LiveStorePlan, matrix: list[dict] | None = None, book_slots: int | None = None
+):
+    """Solve the Live MILP; ``book_slots`` books the heat pump on the first slots only."""
     from house_config.planning_flex_bridge import planning_thermal_to_milp
     from optimizer.cbc_solver import solve_with_strict_fallback
     from optimizer.milp import _add_milp_objective
@@ -175,7 +178,9 @@ def _solve_live(plan: LiveStorePlan, matrix: list[dict] | None = None):
     planned = filter_feasible_consumers([consumer], remaining, matrix, list(range(n)), False, {}, {})
     model = _build_milp_model(matrix, n, battery, 10.0, planned, 0.0, remaining, {})
     _add_milp_objective(model, matrix, 0.0, {}, wear_cent_per_kwh=0.0)
-    add_thermal_flex_constraints(model, matrix, list(range(n)), contexts)
+    add_thermal_flex_constraints(
+        model, matrix, list(range(n if book_slots is None else book_slots)), contexts
+    )
     model.live_store_plans = {_CID: plan}
     assert solve_with_strict_fallback(model.prob, msg=False) == "Optimal"
     return model, matrix

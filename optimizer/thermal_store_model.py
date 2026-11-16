@@ -15,7 +15,8 @@ Per slot ``t`` of the book the level ``x`` [kWh] follows
 - Optional terminal level: ``x[end] ≥ terminal_min`` (slack at the same price).
 - Optional charge limit per slot below the capacity: the generator may not run on a slot whose
   level ends above it (room kept free for forecast collector heat). It uses the generator's
-  existing on-variable, so it adds no binary.
+  existing on-variable, so it adds no binary. A limit at or above the capacity is none: the
+  band's upper end holds as without it.
 
 Sink segments (HeatControl P5, design § 8.2): with ``segments`` the band is split bottom-up
 into parts with their own COP per slot, falling with the temperature. The generator's
@@ -71,7 +72,8 @@ class StoreLevelModel:
     # efficiency for the whole band (``efficiency``).
     segments: tuple[StoreSegment, ...] = ()
     # Level per matrix slot up to which the generator may charge (below the capacity); other
-    # heat and the content already there may lie above it. Empty = the capacity.
+    # heat and the content already there may lie above it. Empty, or an entry at or above the
+    # capacity = no limit on that slot.
     charge_limit_kwh: list[float] = field(default_factory=list)
 
     def __post_init__(self) -> None:
@@ -328,7 +330,10 @@ def add_store_level(
         above = pulp.LpVariable(f"{name}_above_{slot}", lowBound=0.0)
         model.prob += next_level >= lower - below, f"{name}_floor_{slot}"
         model.prob += next_level <= upper + above, f"{name}_cap_{slot}"
-        if slot < len(store.charge_limit_kwh) and store.charge_limit_kwh[slot] < upper - 1e-9:
+        if (
+            slot < len(store.charge_limit_kwh)
+            and store.charge_limit_kwh[slot] < store.capacity_kwh - 1e-9
+        ):
             limit = float(store.charge_limit_kwh[slot])
             # Generator on → the level ends at or below the limit; off → the band's upper end.
             model.prob += (

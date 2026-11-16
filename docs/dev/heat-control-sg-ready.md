@@ -423,10 +423,19 @@ balance, so it needs no separate model.
   with the curve. The store target is then the upper end of the band.
   `milp_plan["heat_forced_charge"]` → `main.py` → flex writes.
 - **Collector** (section 4): the generator may not run on a slot whose level ends above the
-  capacity minus the collector heat forecast for the following 24 h, never below the
-  setpoint (`StoreLevelModel.charge_limit_kwh`, on the generator's on-variable). Collector
-  heat itself and the content already there may lie above the line. Applies with and
-  without COP points.
+  capacity minus the room the collector surplus of the following 24 h needs, never below the
+  setpoint (`StoreLevelModel.charge_limit_kwh`, on the generator's on-variable). The surplus
+  is the collector heat the draw does not use up: from the slot on, the net heat into the
+  store is summed slot by slot, and the largest sum is the room
+  (`thermal_live_store._collector_charge_limits`). Collector heat that the house draws
+  before or while it arrives needs no room, so a charge that is used up before it comes
+  stays allowed. A slot without such a surplus ahead has no limit and no row. The terminal
+  level asks for no more than the limit of the book's last slot. Collector heat itself and
+  the content already there may lie above the line. Applies with and without COP points.
+  (First version, 2.8.0-dev.23: the room was the whole collector heat of the following
+  24 h. Beside a draw larger than the collector heat that closed the band a day ahead for
+  heat the store never has to take; with the pulse limit the plan then left the band and
+  the solve ran into its time limits.)
 - **Recorded:** `thermal_observability[].efficiency` (source of the efficiency, source
   temperature, number of points).
 - **Open:** the curve by the flow temperature the controller asks for instead of the mean
