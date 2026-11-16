@@ -81,11 +81,32 @@ def timestamp_in_window(ts: datetime, window: TimeWindow) -> bool:
 
 
 def indices_in_window(timestamps: list[str], window: TimeWindow) -> list[int]:
+    if window.kind == PeriodKind.ISO_WEEK and window.iso_year is not None:
+        # Membership depends on the calendar day only: parse each day once, not
+        # each of its 24 hours (8760 → 365 parses per chart render).
+        day_hits: dict[str, bool] = {}
+        out: list[int] = []
+        for index, ts_raw in enumerate(timestamps):
+            day = _day_prefix(ts_raw)
+            hit = day_hits.get(day)
+            if hit is None:
+                hit = timestamp_in_window(parse_period_timestamp(ts_raw), window)
+                day_hits[day] = hit
+            if hit:
+                out.append(index)
+        return out
     return [
         index
         for index, ts_raw in enumerate(timestamps)
         if timestamp_in_window(parse_period_timestamp(ts_raw), window)
     ]
+
+
+def _day_prefix(ts_raw: str) -> str:
+    """Calendar-day part of an ISO timestamp; the whole string when not ISO-shaped."""
+    if len(ts_raw) >= 10 and ts_raw[4] == "-" and ts_raw[7] == "-" and ts_raw[:4].isdigit():
+        return ts_raw[:10]
+    return ts_raw
 
 
 def format_window_label(window: TimeWindow) -> str:

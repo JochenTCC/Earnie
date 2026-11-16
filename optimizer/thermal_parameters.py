@@ -50,6 +50,7 @@ def house_thermal_parameters(
         _planning_timezone_for_thermal,
         collector_surface_from_thermal,
     )
+    from data.heating_need import heating_params_from_thermal
     from data.open_meteo_solar_archive import last_full_archive_year
     from optimizer.thermal_year_cache import THERMAL_PARAMETERS_CACHE, fingerprint_json
 
@@ -61,9 +62,13 @@ def house_thermal_parameters(
     surface = collector_surface_from_thermal(
         geo, {**profile, "latitude": geo["latitude"], "longitude": geo["longitude"]}
     )
+    # Key on what the derivation reads (the year-model parameters incl. geo and
+    # solar gains), not on the whole consumer dict: ``label``, ``id``,
+    # ``ehal_bindings``, ``timezone_name`` … differ between the HK form, the
+    # saved profile and Live, and would derive the same numbers three times.
     key = (
         "house",
-        fingerprint_json(geo),
+        fingerprint_json(heating_params_from_thermal(geo)),
         _planning_timezone_for_thermal(geo, profile),
         (surface.tilt_deg, surface.azimuth_deg),
         year,

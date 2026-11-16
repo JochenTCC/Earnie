@@ -978,3 +978,44 @@ def test_thermal_rc_returns_hourly_temps():
     assert len(kw) == 24
     assert len(temps) == 24
     assert all(t >= 28.0 for t in temps)
+
+
+def test_month_keys_fast_path_matches_parsing():
+    from datetime import datetime
+
+    from ui.consumption_display.aggregation import month_keys, parse_timestamp
+
+    timestamps = [
+        "2025-01-31 23:00:00",
+        "2025-02-01T00:00:00",
+        "2025-12-31 23:00:00+01:00",
+        "2024-02-29 12:00",
+    ]
+    expected = [f"{parse_timestamp(ts).year}-{parse_timestamp(ts).month:02d}" for ts in timestamps]
+    assert month_keys(timestamps) == expected
+    assert datetime.fromisoformat("2025-02-01T00:00:00").month == 2
+
+
+def test_indices_in_iso_week_window_match_hourly_parsing():
+    from datetime import datetime, timedelta
+
+    from ui.consumption_display.period import (
+        indices_in_window,
+        iso_week_time_window,
+        parse_period_timestamp,
+        timestamp_in_window,
+    )
+
+    start = datetime(2025, 12, 22)  # ISO week 52/2025 → week 1/2026 boundary inside
+    timestamps = [
+        (start + timedelta(hours=i)).strftime("%Y-%m-%d %H:%M:%S") for i in range(24 * 21)
+    ]
+    for iso_year, iso_week in ((2025, 52), (2026, 1), (2026, 2)):
+        window = iso_week_time_window(iso_year, iso_week)
+        naive = [
+            i
+            for i, ts in enumerate(timestamps)
+            if timestamp_in_window(parse_period_timestamp(ts), window)
+        ]
+        assert indices_in_window(timestamps, window) == naive
+        assert len(naive) == 24 * 7
