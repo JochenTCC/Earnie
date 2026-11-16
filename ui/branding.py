@@ -8,6 +8,8 @@ import streamlit as st
 _ASSETS = Path(__file__).resolve().parent / "assets"
 _LOGO_LIGHT = _ASSETS / "Earnie-Logo-Simple-Light.png"
 _LOGO_DARK = _ASSETS / "Earnie-Logo-Simple_Dark.png"
+# Browser tab icon (favicon) for st.set_page_config(page_icon=...).
+APP_PAGE_ICON = str(_LOGO_LIGHT)
 
 
 def _active_theme_type() -> str:

@@ -43,7 +43,7 @@ if not _migration_mode:
     reinit_config_or_exit(config)
     refuse_shadow_startup_or_exit()
 
-from ui.branding import render_app_logo
+from ui.branding import APP_PAGE_ICON, render_app_logo
 from runtime_store.shadow.mode import is_shadow_mode
 
 logger = logging.getLogger("app")
@@ -51,7 +51,7 @@ logger = logging.getLogger("app")
 
 st.set_page_config(
     page_title="Monitor" if not _migration_mode else "Konfigurations-Migration",
-    page_icon="🔋",
+    page_icon=APP_PAGE_ICON,
     layout="wide",
 )
 render_app_logo()
