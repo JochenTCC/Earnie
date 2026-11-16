@@ -3,9 +3,10 @@
 Design: docs/dev/heat-control-sg-ready.md § 6 (level 2), § 7 and § 8.6. Where the plan runs
 the heat pump in the present slot, the target is the store temperature at the end of that
 run, read from the store level of the MILP (HeatControl P4): band minimum + level / C. The
-target stays inside the band of levels 0 and 1 until P5: at least the setpoint, at most
-setpoint + boost, capped by the reported maximum. ``0`` means "no target" (the plan does not
-run the generator now).
+target stays inside the charge band: at least the setpoint, at most
+``LiveStorePlan.charge_max_c`` (setpoint + boost capped by the reported maximum; with the
+COP curve of HeatControl P5 and the target mapped, the reported maximum). ``0`` means "no
+target" (the plan does not run the generator now).
 
 The deviation check compares the plan with the operating mode the controller reports.
 """
@@ -60,8 +61,31 @@ def planned_run_kw(model: Any, cid: str) -> list[float]:
     return run
 
 
-def heat_storage_targets(model: Any) -> dict[str, float]:
-    """Charge target per heat pump with a Live store plan (empty outside Live)."""
+def forced_charge_ids(model: Any, matrix: list, curtail_kw: float) -> list[str]:
+    """Heat pumps whose present run is a forced charge (SG-Ready state 4, HeatControl P5).
+
+    Design § 7: the generator runs now while the buy price of the slot is negative or the
+    plan curtails PV surplus in it. Only with the COP curve: without it the energy above the
+    setpoint is not priced, and state 4 would let the controller charge beyond the plan.
+    """
+    plans = getattr(model, "live_store_plans", None) or {}
+    if not matrix or not plans:
+        return []
+    if float(matrix[0]["k_act"]) >= 0.0 and float(curtail_kw) <= _RUN_EPS_KW:
+        return []
+    planned = {str(c["id"]) for c in model.planned_consumers}
+    return sorted(
+        cid
+        for cid, plan in plans.items()
+        if cid in planned and plan.efficiency.by_temperature and planned_run_kw(model, cid)
+    )
+
+
+def heat_storage_targets(model: Any, forced: tuple[str, ...] | list[str] = ()) -> dict[str, float]:
+    """Charge target per heat pump with a Live store plan (empty outside Live).
+
+    A heat pump in ``forced`` (state 4) gets the upper end of its band as the target.
+    """
     plans = getattr(model, "live_store_plans", None) or {}
     levels = getattr(model, "live_store_levels", None) or {}
     planned = {str(c["id"]) for c in model.planned_consumers}
@@ -80,6 +104,8 @@ def heat_storage_targets(model: Any) -> dict[str, float]:
                 raise ValueError(f"Ladeziel {cid}: kein Speicherstand für Slot {last_slot}.")
             level_after = level_vars.level_kwh(last_slot)
         target = store_charge_target_c(plan, len(run), level_after)
+        if run and cid in forced:
+            target = round(float(plan.charge_max_c), 1)
         out[cid] = target
         if target > 0:
             logger.info(

@@ -21,7 +21,15 @@ from optimizer.thermal_live_band import (  # noqa: F401  (re-exported)
     resolve_live_store_band,
 )
 from optimizer.thermal_model import ThermalBand, capacity_kwh_per_k_from_volume, heat_content_kwh
-from optimizer.thermal_store_model import StoreLevelModel
+from optimizer.thermal_live_cop import (
+    EFFICIENCY_JAZ_NO_SOURCE_VALUE,
+    LiveEfficiency,
+    efficiency_observability,
+    resolve_live_efficiency,
+    segment_cops,
+    segment_edges_c,
+)
+from optimizer.thermal_store_model import StoreLevelModel, StoreSegment
 from optimizer.thermal_live_solar import (  # noqa: F401  (re-exported)
     SOLAR_SOURCE_ARCHIVE_FALLBACK,
     SOLAR_SOURCE_FORECAST,
@@ -86,14 +94,38 @@ class LiveStorePlan:
     jaz: float = 0.0
     ambient_c: list[float] = field(default_factory=list)
     draw_kw_by_hour: list[float] = field(default_factory=list)
+    # Forecast collector heat into the store per hour [kW] (already part of the net draw).
+    collector_kw_by_hour: list[float] = field(default_factory=list)
+    # HeatControl P5: JAZ, or the COP curve with its source temperature.
+    efficiency: LiveEfficiency = field(default_factory=LiveEfficiency)
+    # The store target signal (level 2) is mapped: Earnie doses the charge itself.
+    target_mapped: bool = False
 
     @property
     def charge_max_c(self) -> float:
-        """Upper end of an Earnie charge: setpoint + boost, capped by the reported maximum."""
-        upper = self.band.setpoint_c + self.boost_k
+        """Upper end of an Earnie charge.
+
+        Levels 0 and 1: setpoint + boost, capped by the reported maximum. With the COP curve
+        and the store target mapped (HeatControl P5) the band reaches the reported maximum;
+        without a reported maximum it stays at setpoint + boost. COP points whose source
+        signal sent no value: the setpoint, the cost above it is unknown in this cycle.
+        """
+        setpoint = float(self.band.setpoint_c)
+        if self.efficiency.source == EFFICIENCY_JAZ_NO_SOURCE_VALUE:
+            return setpoint
+        if self.band_released:
+            return max(float(self.store_max_c), setpoint)
+        upper = setpoint + self.boost_k
         if self.store_max_c is not None:
             upper = min(upper, float(self.store_max_c))
-        return max(upper, self.band.setpoint_c)
+        return max(upper, setpoint)
+
+    @property
+    def band_released(self) -> bool:
+        """The band above the setpoint reaches ``get_temperature_heat_storage_max`` (P5)."""
+        return (
+            self.efficiency.by_temperature and self.target_mapped and self.store_max_c is not None
+        )
 
     def hourly_draw_at_min_kw(self) -> list[float]:
         """Net draw per hour [kW] plus the store's loss at the band minimum (store level model)."""
@@ -267,6 +299,7 @@ def plan_live_store_horizon(
         jaz=jaz_f,
         ambient_c=[float(v) for v in ambient_forecast_c],
         draw_kw_by_hour=draw_kw,
+        collector_kw_by_hour=[float(v) for v in solar[:horizon]],
     )
 
 
@@ -368,11 +401,15 @@ def plan_live_store_for_thermal_consumer(
         boost_k=float(storage["boost_k"]),
         store_max_c=feedback.get(KIND_STORE_MAX),
     )
+    from settings.ehal_marker_resolve import marker_set_store_target
+
     return replace(
         plan,
         solar_source=solar_source,
         band_source=live_band.source,
         feedback=feedback,
+        efficiency=resolve_live_efficiency(consumer, feedback),
+        target_mapped=bool(marker_set_store_target(consumer)),
     )
 
 
@@ -515,15 +552,63 @@ def live_store_level_model(matrix: list, plan: LiveStorePlan, dt_h: float) -> St
     t_min = float(plan.band.min_c)
     draw = plan.hourly_draw_at_min_kw()
     hours = _slot_hours(matrix, len(draw))
+    capacity = c * (plan.charge_max_c - t_min)
     return StoreLevelModel(
-        capacity_kwh=c * (plan.charge_max_c - t_min),
+        capacity_kwh=capacity,
         start_kwh=c * (float(plan.start_temp_c) - t_min),
         efficiency=float(plan.jaz),
         drain_kwh=[draw[hour] * dt_h for hour in hours],
         leak_per_slot=dt_h * float(plan.heat_loss_kw_per_k) / c,
         leak_ref_kwh=0.0,
         spill_max_kwh=[max(0.0, -float(plan.draw_kw_by_hour[hour])) * dt_h for hour in hours],
+        segments=_live_store_segments(plan, hours, capacity),
+        charge_limit_kwh=_collector_charge_limits(plan, hours, dt_h, capacity),
     )
+
+
+COLLECTOR_LOOKAHEAD_H = 24.0
+"""The generator leaves the room above the setpoint free for the collector heat forecast for
+this time ahead (design § 4: no boost ahead of forecast collector heat)."""
+
+
+def _live_store_segments(
+    plan: LiveStorePlan, hours: list[int], capacity_kwh: float
+) -> tuple[StoreSegment, ...]:
+    """Sink segments of the band with their COP per slot (HeatControl P5); none with the JAZ."""
+    if not plan.efficiency.by_temperature or capacity_kwh <= 0:
+        return ()
+    c = float(plan.capacity_kwh_per_k)
+    edges = segment_edges_c(float(plan.band.min_c), float(plan.band.setpoint_c), plan.charge_max_c)
+    held = plan.efficiency.source_temp_c
+    source = [float(plan.ambient_c[hour]) if held is None else float(held) for hour in hours]
+    cops = segment_cops(plan.efficiency, edges, source)
+    return tuple(
+        StoreSegment(capacity_kwh=c * (edges[index + 1] - edges[index]), cop=cops[index])
+        for index in range(len(edges) - 1)
+    )
+
+
+def _collector_charge_limits(
+    plan: LiveStorePlan, hours: list[int], dt_h: float, capacity_kwh: float
+) -> list[float]:
+    """Level per slot up to which the generator may charge: the capacity minus the collector
+    heat forecast for the following ``COLLECTOR_LOOKAHEAD_H``, never below the setpoint.
+
+    Empty without a band above the setpoint or without forecast collector heat.
+    """
+    normal = float(plan.capacity_kwh_per_k) * (float(plan.band.setpoint_c) - float(plan.band.min_c))
+    collector = plan.collector_kw_by_hour
+    if capacity_kwh <= normal + 1e-9 or not any(kw > 1e-9 for kw in collector):
+        return []
+    if len(collector) < len(plan.draw_kw_by_hour):
+        raise ValueError("Speicherplan: Kollektorprognose kürzer als die Wärmeentnahme.")
+    per_slot = [max(0.0, float(collector[hour])) * dt_h for hour in hours]
+    window = int(round(COLLECTOR_LOOKAHEAD_H / dt_h))
+    limits: list[float] = []
+    for slot in range(len(per_slot)):
+        ahead = sum(per_slot[slot + 1 : slot + 1 + window])
+        limits.append(max(normal, capacity_kwh - ahead))
+    return limits
 
 
 def live_store_terminal_kwh(matrix: list, plan: LiveStorePlan, last_slot: int, dt_h: float) -> float:
@@ -672,6 +757,8 @@ def build_heat_storage_observability(
         # "backend": Live planned with the band the backend reports, not the configured one.
         "band_source": plan.band_source,
         "feedback": dict(plan.feedback),
+        # HeatControl P5: JAZ or COP curve, and where the source temperature comes from.
+        "efficiency": efficiency_observability(plan.efficiency, plan.jaz),
         "heat_content_kwh": {
             "q_meas": round(q_meas, 3),
             "q_sim": round(q_sim, 3),

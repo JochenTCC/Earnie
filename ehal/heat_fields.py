@@ -53,22 +53,26 @@ THERMAL_ANNUAL_READ_KINDS: tuple[str, ...] = HEAT_STORE_TEMP_KINDS + HEAT_FEEDBA
 # as ``heatpump.<Kennung>.set_sg_ready_state``; optional next to ``set_enable``.
 KIND_SET_SG_READY_STATE = "set_sg_ready_state"
 
-# SG-Ready states Earnie sends in P2. 1 (lock) waits for decision O2, 4 (forced charge)
-# for HeatControl P5 (the energy above setpoint + boost is not planned before).
+# SG-Ready states Earnie sends. 1 (lock) waits for decision O2. 4 (forced charge, HeatControl
+# P5): the plan runs the generator on a negative price or on surplus that would be curtailed.
 SG_READY_NORMAL = 2
 SG_READY_CHARGE = 3
+SG_READY_FORCED_CHARGE = 4
 
 # Level 2: store charge target (HeatControl P3), °C; 0 = no target. Written on the
 # consumer's ``ehal_bindings`` as ``heatpump.<Kennung>.set_temperature_heat_storage_target``.
 KIND_SET_STORE_TARGET = "set_temperature_heat_storage_target"
 
 
-def sg_ready_state_for_plan(charges: bool) -> int:
+def sg_ready_state_for_plan(charges: bool, *, forced: bool = False) -> int:
     """State for one slot: 3 where the plan runs the generator, otherwise 2.
 
     Level 1 is today's enable in SG-Ready terms: enable 1 ↔ state 3, enable 0 ↔ state 2.
+    ``forced``: a planned run on a negative price or on curtailed surplus is state 4.
     """
-    return SG_READY_CHARGE if charges else SG_READY_NORMAL
+    if not charges:
+        return SG_READY_NORMAL
+    return SG_READY_FORCED_CHARGE if forced else SG_READY_CHARGE
 
 
 # ``sens_operating_mode``: what the controller requests (not whether the compressor runs).

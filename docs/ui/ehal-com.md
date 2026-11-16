@@ -214,7 +214,7 @@ Role template: `share/ehal/roles/heatpump.json`. Greenfield prefix `Earnie_Waerm
 | ------------------------------ | --------------- | -------------------------------- | ------- | ---- | ------- | ----------------------------------------------- |
 | Heat pump power               | Measurement   | `heatpump.{slug}.sens_power_act` |        |      |         | HA power entity / `Earnie_Waermepumpe_Leistung` or EFM |
 | Heat pump enable              | Control value | `heatpump.{slug}.set_enable`    |         |      |         | HA switch/input_boolean / `Earnie_Waermepumpe_Freigabe` |
-| SG-Ready state requested (2/3) | Control value | `heatpump.{slug}.set_sg_ready_state` |    |      |         | HA input_number/number / `Earnie_Waermepumpe_SG_Ready_Soll` |
+| SG-Ready state requested (2/3/4) | Control value | `heatpump.{slug}.set_sg_ready_state` |    |      |         | HA input_number/number / `Earnie_Waermepumpe_SG_Ready_Soll` |
 | Store charge target (°C, 0 = none) | Control value | `heatpump.{slug}.set_temperature_heat_storage_target` | | |   | HA input_number/number / `Earnie_Waermespeicher_Ladeziel` |
 | Heat storage `T_eq`           | Measurement   | `sens_temperature_heat_storage` |         |      |         | HA °C sensor / `Earnie_Waermespeicher_Temp_eq` |
 | Heat storage `T_low`          | Measurement   | `sens_temperature_heat_storage_low` |     |      |         | HA °C sensor (bottom) / `Earnie_Waermespeicher_Temp_low` |
@@ -225,18 +225,20 @@ Role template: `share/ehal/roles/heatpump.json`. Greenfield prefix `Earnie_Waerm
 | Operating mode (0–6)          | Measurement   | `sens_operating_mode`           |         |      |         | HA sensor / `Earnie_Waermepumpe_Betriebsart` |
 | SG-Ready state applied (1–4)  | Measurement   | `sens_sg_ready_state`           |         |      |         | HA sensor / `Earnie_Waermepumpe_SG_Ready` |
 | Thermal power                 | Measurement   | `sens_heat_power`               |         |      |         | HA power entity / `Earnie_Waermepumpe_Waermeleistung` (kW) |
-| Source temperature            | Measurement   | `sens_temperature_source`       |         |      |         | HA °C sensor / `Earnie_Waermepumpe_Temp_Quelle` |
+| Source temperature during operation (held by the backend at standstill) | Measurement | `sens_temperature_source` |  |      |         | HA °C sensor / `Earnie_Waermepumpe_Temp_Quelle` |
 | Hot-water tank / comfort minimum | Measurement / Parameter | `sens_temperature_dhw` / `get_temperature_dhw_min` | | | | HA °C sensors / `Earnie_Warmwasser_Temp` / `_min` |
 | Room temperature / setpoint   | Measurement / Parameter | `sens_temperature_room` / `get_temperature_room_setpoint` | | | | HA °C sensors / `Earnie_Raum_Temp` / `_Soll` |
 
 
 Notes: entity-scoped — VI = enable from Earnie (`flex.{hk_id}.…` in the check); VO = optional push `flex.{hk_id}.sens_power_act` plus store temps. Outside temperature only on the plant (`sens_temperature_outside`, see C.1) — not on the heat-pump VO. There is no target-kW Merker for the heat pump. Recipe: `share/loxone/recipes/heatpump.json`; VO: `VO_Earnie_Heatpump.xml`.
 
-**Operating state (HeatControl P2):** `set_sg_ready_state` is an optional write next to the required enable: `3` where the plan runs the heat pump (charge to setpoint + `heat_storage.boost_k`), else `2`. The HA package's watchdog sets it to `2` when `status.json` is unreachable; Loxone needs the same in its fallback logic.
+**Operating state (HeatControl P2):** `set_sg_ready_state` is an optional write next to the required enable: `3` where the plan runs the heat pump (charge to setpoint + `heat_storage.boost_k`), else `2`. With COP points in the heating system (HeatControl P5) a planned run on a negative buy price or on curtailed PV surplus is sent as `4` (forced charge up to the maximum). The HA package's watchdog sets it to `2` when `status.json` is unreachable; Loxone needs the same in its fallback logic.
 
 **Store charge target (HeatControl P3):** `set_temperature_heat_storage_target` is an optional write: the planned end temperature of the present run (between setpoint and setpoint + boost, capped by the reported maximum), `0` when the plan does not run the heat pump now. The HA watchdog sets it to `0`.
 
 **Feedback (HeatControl P1):** the rows from the top sensor down are optional and read-only; Live-Lesen lists them for every `thermal_annual` consumer as `heatpump.{slug}.<field>`. With setpoint and tolerance both mapped, Live plans with the controller's store band instead of `heat_storage.setpoint_c` / `tolerance_c`; the mapping page warns when only one of the two is mapped. The other fields are recorded (`thermal_observability[].feedback`).
+
+**Source temperature:** `sens_temperature_source` is the source temperature (brine, ground water) while the compressor runs. With COP points in the heating system, Live uses it for the efficiency of the heat pump, held over the horizon. A sensor in the source circuit shows the source only during operation, so the backend sends the mean over the run after a settling time, freezes it at the stop and holds it until the next valid run ("running" = electric power above a threshold, not the controller's request). Earnie uses the value as reported and does not filter it. Details: [Rückmeldesignale der Heizung](../konfiguration/flexible-verbraucher.md#haus-wärme-rückmeldesignale).
 
 **Heat storage:** stratified tanks must expose energy-equivalent `T_eq` (volume-weighted mean) as `sens_temperature_heat_storage`, plus raw bottom sensor `T_low` as `sens_temperature_heat_storage_low`. Do not bind a single top-layer sensor as the RC state. On HA, activate both fields on the `thermal_annual` consumer (same entity-scoped activation keys as Loxone) and fill the two temperature entities into the matching `ENTITY_*` placeholders of the YAML package. Operator guide: [waermespeicher-schichtung-teq.md](../konfiguration/waermespeicher-schichtung-teq.md); physics in [thermals-p2.md](../dev/done/thermals-p2.md).
 

@@ -348,7 +348,7 @@ Pool enables: default `Earnie_Pool_Freigabe` / `Earnie_Pool_Filter_Freigabe` in 
 | `sens_temperature_heat_storage` | Energy-equivalent `T_eq` (°C) | `Earnie_Waermespeicher_Temp_eq` |
 | `get_temperature_heat_storage_setpoint` / `_tolerance` | Controller's store band (°C / K); both mapped: Live plans with it | `Earnie_Waermespeicher_Soll` / `_Toleranz` |
 | `get_temperature_heat_storage_max`, `sens_temperature_heat_storage_top` | Maximum and top sensor (°C), recorded | `Earnie_Waermespeicher_Temp_max` / `_top` |
-| `sens_operating_mode`, `sens_sg_ready_state`, `sens_heat_power`, `sens_temperature_source` | Generator feedback (enum 0–6, state 1–4, kW, °C), recorded | `Earnie_Waermepumpe_Betriebsart` / `_SG_Ready` / `_Waermeleistung` / `_Temp_Quelle` |
+| `sens_operating_mode`, `sens_sg_ready_state`, `sens_heat_power`, `sens_temperature_source` | Generator feedback (enum 0–6, state 1–4, kW, °C), recorded. The source temperature is the value during operation, held by Loxone at standstill (recipe note) | `Earnie_Waermepumpe_Betriebsart` / `_SG_Ready` / `_Waermeleistung` / `_Temp_Quelle` |
 | `sens_temperature_dhw`, `get_temperature_dhw_min`, `sens_temperature_room`, `get_temperature_room_setpoint` | Hot water and room (°C), recorded | `Earnie_Warmwasser_Temp` / `_min`, `Earnie_Raum_Temp` / `_Soll` |
 | `sens_temperature_heat_storage_low` | Lowest immersion sensor `T_low` (°C) — WP-on hint when bottom is cold | `Earnie_Waermespeicher_Temp_low` |
 

@@ -703,6 +703,28 @@ def _store_heat_expr(
     efficiency: float,
 ):
     """Heat [kWh] into the store per slot: generator × efficiency plus its rods (η = 1)."""
+    generator_at, rod_heat_at = _store_inflow_exprs(model, matrix, schedule_indices, consumer, rods)
+
+    def heat_at(slot: int):
+        generator = generator_at(slot)
+        heat = generator * efficiency if not isinstance(generator, float) else 0.0
+        rod_heat = rod_heat_at(slot)
+        return heat if isinstance(rod_heat, float) else heat + rod_heat
+
+    return heat_at
+
+
+def _store_inflow_exprs(
+    model: MilpHorizonModel,
+    matrix: list,
+    schedule_indices: list[int],
+    consumer: dict,
+    rods: list[dict],
+):
+    """Per slot: the generator's electricity [kWh] and its rods' heat (η = 1) [kWh].
+
+    Each is the float ``0.0`` on a slot where nothing of it may run.
+    """
     from optimizer.milp_consumers import _delivery_energy_expr
 
     eligible = set(consumer_thermal_eligible_indices(matrix, consumer, schedule_indices))
@@ -711,18 +733,17 @@ def _store_heat_expr(
         for rod in rods
     }
 
-    def heat_at(slot: int):
-        heat = (
-            _delivery_energy_expr(model, consumer, [slot]) * efficiency
-            if slot in eligible
-            else 0.0
-        )
+    def generator_at(slot: int):
+        return _delivery_energy_expr(model, consumer, [slot]) if slot in eligible else 0.0
+
+    def rod_heat_at(slot: int):
+        heat = 0.0
         for rod in rods:
             if slot in rod_eligible[str(rod["id"])]:
                 heat = heat + _rod_energy_expr(model, rod, [slot])
         return heat
 
-    return heat_at
+    return generator_at, rod_heat_at
 
 
 def _hp_drain_scaled_to_days(
@@ -794,12 +815,27 @@ def _add_live_store_consumer(
     store = live_store_level_model(matrix, plan, float(model.dt_h))
     terminal = live_store_terminal_kwh(matrix, plan, book[-1], float(model.dt_h))
     store = replace(store, terminal_min_kwh=terminal)
-    heat_at = _store_heat_expr(model, matrix, schedule_indices, consumer, rods, store.efficiency)
     for rod in rods:
         rod_covered.setdefault(str(rod["id"]), set()).update(
             consumer_thermal_eligible_indices(matrix, rod, schedule_indices)
         )
-    level = add_store_level(model, f"{cid}_store", store, book, heat_at)
+    on_at = (lambda slot: on_vars[slot]) if store.charge_limit_kwh else None
+    if store.segments:
+        # HeatControl P5: COP by temperature, the generator's electricity goes to segments.
+        generator_at, rod_heat_at = _store_inflow_exprs(
+            model, matrix, schedule_indices, consumer, rods
+        )
+        level = add_store_level(
+            model, f"{cid}_store", store, book, rod_heat_at,
+            generator_kwh_at=generator_at, generator_on_at=on_at,
+        )
+    else:
+        heat_at = _store_heat_expr(
+            model, matrix, schedule_indices, consumer, rods, store.efficiency
+        )
+        level = add_store_level(
+            model, f"{cid}_store", store, book, heat_at, generator_on_at=on_at
+        )
     if model.live_store_levels is None:
         model.live_store_levels = {}
     model.live_store_levels[cid] = (store, level)

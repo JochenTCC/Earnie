@@ -653,6 +653,7 @@ def write_flex_enables_for_ha(
     consumer_pv_follow: dict[str, int] | None = None,
     *,
     heat_storage_targets: dict[str, float] | None = None,
+    heat_forced_charge: frozenset[str] | None = None,
 ) -> list[dict[str, Any]]:
     """Publish the flex ``set_enable`` (heat pump, pool, generic) for the HA backend,
     plus the heat pump's SG-Ready state and store charge target (HeatControl P2/P3).
@@ -665,6 +666,7 @@ def write_flex_enables_for_ha(
         charging_contexts,
         consumer_pv_follow,
         heat_storage_targets=heat_storage_targets,
+        heat_forced_charge=heat_forced_charge,
     )
     return [
         {

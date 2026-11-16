@@ -480,6 +480,21 @@
           "type": "number",
           "exclusiveMinimum": 0
         },
+        "cop_points": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Nur bei type heat_pump, optional (HeatControl P5): COP nach Quellen- und Senkentemperatur (Vorlauf), z. B. aus dem Datenblatt (B0/W35 → source_c 0, sink_c 35). Die Punkte bilden ein Raster: jede Quellentemperatur mit jeder Senkentemperatur. Dazwischen interpoliert Earnie linear, außerhalb gilt der Randwert. Ohne Punkte plant Earnie mit der JAZ (efficiency).",
+          "items": {
+            "type": "object",
+            "required": ["source_c", "sink_c", "cop"],
+            "additionalProperties": false,
+            "properties": {
+              "source_c": { "type": "number" },
+              "sink_c": { "type": "number" },
+              "cop": { "type": "number", "exclusiveMinimum": 0 }
+            }
+          }
+        },
         "fuel_price": {
           "type": "number",
           "exclusiveMinimum": 0

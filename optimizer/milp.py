@@ -78,6 +78,8 @@ _AUTOMATIK_FALLBACK = (0, 0.0, 99.0, {}, {}, EMPTY_MILP_PLAN, {})
 # ``milp_plan`` key: heat pump id → store charge target °C, 0 = none (HeatControl P3).
 HEAT_STORAGE_TARGETS_KEY = "heat_storage_targets"
 HEAT_STORAGE_LEVELS_KEY = "heat_storage_levels"
+# ``milp_plan`` key: ids of the heat pumps in a forced charge now (HeatControl P5).
+HEAT_FORCED_CHARGE_KEY = "heat_forced_charge"
 
 
 def _add_virtual_reserve_refill(
@@ -643,10 +645,19 @@ def milp_optimizer(
             model, matrix, import_caps, remaining
         )
     if model.live_store_plans:
-        from optimizer.heat_storage_target import heat_storage_targets, store_level_report
+        from optimizer.heat_storage_target import (
+            forced_charge_ids,
+            heat_storage_targets,
+            store_level_report,
+        )
 
-        # HeatControl P3/P4: charge target and planned store level per heat pump.
-        controls.milp_plan[HEAT_STORAGE_TARGETS_KEY] = heat_storage_targets(model)
+        # HeatControl P3/P4: charge target and planned store level per heat pump; P5: forced
+        # charge (SG-Ready state 4) on a negative price or curtailed surplus.
+        forced = forced_charge_ids(
+            model, matrix, float(controls.milp_plan.get("p_pv_curtail") or 0.0)
+        )
+        controls.milp_plan[HEAT_FORCED_CHARGE_KEY] = forced
+        controls.milp_plan[HEAT_STORAGE_TARGETS_KEY] = heat_storage_targets(model, forced)
         controls.milp_plan[HEAT_STORAGE_LEVELS_KEY] = store_level_report(model)
     urgent_observability = _collect_urgent_rule_observability(
         model, matrix, remaining, schedule_indices, contexts, filters

@@ -3,7 +3,8 @@
 Stored shape on the consumer (flat, next to ``heat_storage``)::
 
     "heat_source": {"type": "heat_pump", "heat_pump_type": "erde",
-                    "efficiency": 4.3, "fuel_price": 10.43},
+                    "efficiency": 4.3, "fuel_price": 10.43,
+                    "cop_points": [{"source_c": 0, "sink_c": 35, "cop": 4.5}, ...]},
     "parts": [{"id": "heating_rod", "type": "heating_rod", "nominal_power_kw": 3.0,
                "internal_gain_factor": 0.0}]
 
@@ -11,7 +12,8 @@ Stored shape on the consumer (flat, next to ``heat_storage``)::
 ``share/config/heat_source_defaults.json`` (documented source per value). Efficiency is
 the seasonal performance factor (JAZ) for heat pumps and the annual efficiency
 (Nutzungsgrad) for every other type. ``fuel_price`` is in the carrier's own unit
-(``fuel_unit``). The heating rod charges the heat storage with η = 1, so it exists only
+(``fuel_unit``). ``cop_points`` (heat pumps only, optional) is the COP by source and sink
+temperature (``optimizer.heat_pump_cop``, HeatControl P5). The heating rod charges the heat storage with η = 1, so it exists only
 together with ``heat_storage`` (data-model decision D1: a part, not a sibling consumer).
 """
 from __future__ import annotations
@@ -97,6 +99,15 @@ def normalize_heat_source(raw: Any, *, label: str) -> dict[str, Any]:
                 f"(erlaubt: {', '.join(HEAT_PUMP_TYPES)})."
             )
         out["heat_pump_type"] = hp_type
+        allowed.add("cop_points")
+        if raw.get("cop_points") is not None:
+            from optimizer.heat_pump_cop import cop_curve_from_points
+
+            # Stored sorted and validated (HeatControl P5); an empty list is an error, the
+            # field is left out where there are no points.
+            out["cop_points"] = cop_curve_from_points(
+                raw["cop_points"], label=f"{label}: heat_source"
+            ).points()
     if not _type_defaults(source_type)["electric"]:
         allowed.add("fuel_price")
         price = raw.get("fuel_price")
@@ -123,6 +134,19 @@ def heat_source_efficiency(heat_source: dict[str, Any]) -> float:
     if heat_source.get("efficiency") is not None:
         return float(heat_source["efficiency"])
     return default_efficiency(heat_source)
+
+
+def heat_source_cop_curve(heat_source: dict[str, Any]):
+    """COP curve of a heat pump with ``cop_points`` (HeatControl P5); None without points.
+
+    Without points the planned efficiency stays the JAZ (``heat_source_efficiency``).
+    """
+    points = heat_source.get("cop_points")
+    if points is None:
+        return None
+    from optimizer.heat_pump_cop import cop_curve_from_points
+
+    return cop_curve_from_points(points, label="heat_source")
 
 
 def default_efficiency(heat_source: dict[str, Any]) -> float:

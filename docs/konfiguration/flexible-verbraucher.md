@@ -258,6 +258,7 @@ Jedes Heizsystem hat eine Hauptwärmequelle `heat_source` (Pflicht). Im Hauskonf
 | `heat_source.heat_pump_type` | Nur bei `heat_pump`, Pflicht: `luft`, `erde` (Sole) oder `grundwasser` |
 | `heat_source.efficiency` | Optional. Jahresarbeitszahl (JAZ) der Wärmepumpe bzw. Jahresnutzungsgrad der übrigen Quellen. Ohne Angabe gilt der Standardwert der Tabelle unten. |
 | `heat_source.fuel_price` | Optional, nur bei Brennstoffen. Preis in der Einheit des Energieträgers. Ohne Angabe gilt der Standardpreis der Tabelle unten. |
+| `heat_source.cop_points` | Optional, nur bei `heat_pump`. COP nach Quellen- und Senkentemperatur, siehe [Wirkungsgrad nach Temperatur](#haus-wärme-cop-punkte). |
 
 **Standardwerte** (Datei `share/config/heat_source_defaults.json`, mit Quellenangabe je Wert):
 
@@ -279,6 +280,44 @@ Quellen: Nutzungsgrade und Energieinhalte aus SUSI, Brennstoffpreise aus dem Hei
 - **Brennstoffe:** Brennstoffbedarf (Endenergie) = gelieferte Wärme / Nutzungsgrad. Die Heizung bezieht keinen Strom und ist kein flexibler Verbraucher in der Optimierung. `heating_power_kw` begrenzt die Wärme je Stunde.
 
 Verteilverluste rechnet Earnie nicht zusätzlich ein. Der Wärmeverlust des Gebäudes ist auf den HWB kalibriert, der Speicherverlust ist eigens modelliert.
+
+<a id="haus-wärme-cop-punkte"></a>
+
+#### Wirkungsgrad nach Temperatur (`cop_points`)
+
+Eine Wärmepumpe arbeitet schlechter, je heißer sie laden muss und je kälter ihre Quelle ist. Mit COP-Punkten im Heizsystem rechnet die Live-Optimierung den Wärmespeicher mit diesem Zusammenhang statt mit der festen JAZ. Heißer laden hat dann einen Preis, und Earnie kann das Band über dem Sollwert nutzen.
+
+```json
+"heat_source": {
+  "type": "heat_pump", "heat_pump_type": "erde", "efficiency": 4.3,
+  "cop_points": [
+    {"source_c": 0, "sink_c": 35, "cop": 4.5},
+    {"source_c": 0, "sink_c": 55, "cop": 2.8},
+    {"source_c": 5, "sink_c": 35, "cop": 5.2},
+    {"source_c": 5, "sink_c": 55, "cop": 3.2}
+  ]
+}
+```
+
+- **Woher die Punkte kommen:** aus dem Datenblatt der Wärmepumpe (Normpunkte wie B0/W35: Sole 0 °C, Vorlauf 35 °C; bei Luft A2/W35) oder aus eigenen Messungen mit einem Wärmemengenzähler. `source_c` ist die Quellentemperatur, `sink_c` die Vorlauftemperatur.
+- **Raster:** Jede Quellentemperatur braucht jede Senkentemperatur. Eine einzige Quellentemperatur mit mehreren Senkentemperaturen ist erlaubt; dann hängt der Wirkungsgrad nur von der Ladetemperatur ab.
+- **Zwischen den Punkten** rechnet Earnie linear, außerhalb gilt der Randwert. Earnie rechnet nicht über die Punkte hinaus.
+- **Absolute Werte:** Earnie nimmt die Punkte, wie sie eingetragen sind, und gleicht sie nicht an die JAZ an. Datenblattwerte sind oft etwas besser als der Betrieb; zeigt die Historie, dass der Speicher weniger Wärme bekommt als geplant, die Punkte entsprechend senken.
+- **Prüfung beim Laden:** Lücken im Raster, doppelte Punkte, ein COP ≤ 0, ein COP, der mit der Senkentemperatur steigt oder mit der Quellentemperatur fällt, und `cop_points` an einer anderen Wärmequelle lehnt Earnie mit einer Fehlermeldung ab.
+- **Ohne Punkte** bleibt alles wie bisher: Earnie plant mit der JAZ, und das Band endet bei `Sollwert + boost_k`.
+- **Pflege:** in `components.json` am Heizsystem. Der Hauskonfigurator zeigt die Anzahl der Punkte an und behält sie beim Speichern; ein Eingabefeld gibt es noch nicht.
+- **Geltungsbereich:** die Live-Planung des Wärmespeichers. Jahressimulation, Szenarien-Explorer und die abgeleitete elektrische Leistung rechnen weiter mit der JAZ.
+
+**So rechnet Live mit den Punkten:**
+
+- **Quellentemperatur:** Ist `sens_temperature_source` zugeordnet (Sole, Grundwasser), gilt der gemeldete Wert über den ganzen Planungshorizont. Sonst nimmt Earnie je Viertelstunde die Außentemperatur-Prognose; bei einer Luft-Wärmepumpe lohnen sich damit die warmen Stunden des Tages.
+- **Ladetemperatur:** Earnie teilt das Speicherband in bis zu vier Stufen: von der Untergrenze bis zum Sollwert, darüber in Schritten von etwa 5 K. Für jede Stufe gilt der COP bei ihrer oberen Temperatur. Der Optimierer füllt die günstigen Stufen zuerst und lädt nur dann heißer, wenn der Preisvorteil den schlechteren COP und den Speicherverlust übersteigt.
+- **Band bis zur Maximaltemperatur:** Mit COP-Punkten, aktivem [Ladeziel](#haus-wärme-ladeziel) und gemeldeter Maximaltemperatur (`get_temperature_heat_storage_max`) reicht das Band bis zu dieser Maximaltemperatur statt bis `Sollwert + boost_k`. Fehlt das Ladeziel oder die Maximaltemperatur, bleibt es bei `Sollwert + boost_k`, bepreist mit den COP-Punkten.
+- **Quellensignal ohne Wert:** Ist `sens_temperature_source` zugeordnet, liefert aber in einem Lauf keinen Wert, plant Earnie diesen Lauf mit der JAZ und lädt nicht über den Sollwert. Das `earnie.log` warnt in jedem solchen Lauf.
+- **Vereinfachung:** Ein heißer Speicher kühlt von oben ab. Im Plan darf eine heiße Stufe nie voller sein als die darunter; damit rechnet Earnie das Nachladen eines teilweise entladenen heißen Speichers etwas zu günstig, aber nie so, als wäre der Speicher kalt.
+- **Historie:** `optimization_history.jsonl` nennt je Lauf unter `thermal_observability[].efficiency`, womit geplant wurde (`source`: `jaz`, `cop_source_signal`, `cop_outside_forecast` oder `jaz_no_source_value`) und mit welcher Quellentemperatur.
+
+**Solarthermie:** Erwartet die Prognose Kollektorwärme, hält Earnie den Platz dafür über dem Sollwert frei: Die Wärmepumpe lädt nur so weit, dass die Kollektorwärme der nächsten 24 Stunden noch in den Speicher passt. Bis zum Sollwert lädt sie unverändert. Das gilt mit und ohne COP-Punkte.
 
 <a id="haus-wärme-heizstab-im-wärmespeicher-parts"></a>
 
@@ -348,9 +387,9 @@ Jedes Fenster beginnt mit dem Pegel, mit dem das vorige endete; das erste Fenste
 **Live-Band:** Mit aktivem `heat_storage` führt die Live-Optimierung den Speicherstand selbst, Viertelstunde für Viertelstunde:
 
 - **Start:** die gemessene `T_eq`.
-- **Zufluss:** die geplante Wärme der Wärmepumpe (Strom × JAZ) und eines Heizstabs daneben.
+- **Zufluss:** die geplante Wärme der Wärmepumpe (Strom × JAZ, mit [COP-Punkten](#haus-wärme-cop-punkte) Strom × COP der jeweiligen Stufe) und eines Heizstabs daneben.
 - **Abfluss:** Wärmebedarf von Haus und Warmwasser abzüglich Kollektorertrag, aus der Prognose des Normalbetriebs (siehe **Live-Prognose**), dazu der Speicherverlust nach `heat_loss_kw_per_k`. Kollektorwärme, die in einen vollen Speicher nicht mehr passt, verfällt ohne Kosten.
-- **Band:** Der Speicher bleibt zwischen `setpoint − tolerance` und `setpoint + boost_k` (höchstens `get_temperature_heat_storage_max`). Wann und wie weit die Wärmepumpe lädt, entscheidet der Optimierer nach Preis und Verlust. Feste Zwangsstunden gibt es nicht mehr.
+- **Band:** Der Speicher bleibt zwischen `setpoint − tolerance` und `setpoint + boost_k` (höchstens `get_temperature_heat_storage_max`). Mit COP-Punkten und Ladeziel reicht das Band bis `get_temperature_heat_storage_max`. Vor erwarteter Kollektorwärme bleibt der Platz dafür über dem Sollwert frei. Wann und wie weit die Wärmepumpe lädt, entscheidet der Optimierer nach Preis und Verlust. Feste Zwangsstunden gibt es nicht mehr.
 - **Ende des Horizonts:** Der Speicher endet mindestens auf dem mittleren Stand, den der Normalbetrieb am letzten Tag des Horizonts hätte. Earnie leert ihn also nicht auf Kosten der Zeit danach.
 - **Band hält nicht:** Reicht die Leistung nicht, plant der Optimierer trotzdem, mit hohen Strafkosten für die Wärme außerhalb des Bands. Das `earnie.log` warnt dann („Plan hält den Speicher nicht im Band“).
 - **Unterster Fühler:** Liegt `T_low` unter `setpoint − tolerance`, erzwingt Earnie die Freigabe in der ersten Stunde wie bisher.
@@ -382,10 +421,12 @@ Statt oder neben der Freigabe kann Earnie der Wärmepumpe einen **SG-Ready-Zusta
 
 | Zustand | Wann Earnie ihn sendet | Was die Regelung tut |
 | ------- | ---------------------- | -------------------- |
-| 3 Laden | wo der Plan die Wärmepumpe laufen lässt (wie Freigabe 1) | hebt das Soll um den festen Boost an und lädt bis `Sollwert + boost_k` |
+| 4 Zwangsladung | wo der Plan die Wärmepumpe jetzt laufen lässt **und** der Bezugspreis der Viertelstunde negativ ist oder der Plan in ihr PV-Überschuss abregelt; nur mit [COP-Punkten](#haus-wärme-cop-punkte) | lädt bis zu ihren Maximaltemperaturen, ohne auf eine Hysterese zu warten |
+| 3 Laden | wo der Plan die Wärmepumpe sonst laufen lässt (wie Freigabe 1) | hebt das Soll um den festen Boost an und lädt bis `Sollwert + boost_k` |
 | 2 Normal | sonst (wie Freigabe 0) | arbeitet mit ihren eigenen Sollwerten |
 
-- **Zustände 1 und 4:** Earnie sendet sie noch nicht. Die Sperre (1) kommt erst, wenn entschieden ist, ob Earnie sie überhaupt nutzt; die Zwangsladung bis zur Maximaltemperatur (4) erst, wenn Earnie das Laden über den Boost hinaus mit seinem Wirkungsgrad plant.
+- **Zustand 4:** Ohne COP-Punkte sendet Earnie ihn nicht, weil die Wärme über dem Sollwert dann nicht bepreist ist. Das Ladeziel ist in Zustand 4 das obere Ende des Bands. Den Heizstab gibt Zustand 4 nicht frei; er hat seine eigene Freigabe. Koppelt eine Wärmepumpe ihren Heizstab intern an Zustand 4, den Zustand im Backend auf 3 begrenzen.
+- **Zustand 1:** Earnie sendet die Sperre noch nicht. Sie kommt erst, wenn entschieden ist, ob Earnie sie überhaupt nutzt.
 - **Optional:** Das Signal ist ein optionales Schreibsignal am `thermal_annual`-Verbraucher. Aktivieren in EHAL-Com unter **Optionale Signale aktivieren**. Die Freigabe `set_enable` bleibt Pflicht und wird weiter gesendet; ein Backend, das nur den Zustand braucht, ignoriert sie.
 - **Boost:** Der Boost der Wärmepumpe gehört in `heat_storage.boost_k` des Heizsystems (Hauskonfigurator, **Wärmespeicher Boost (K)**). Bei einer SG-Ready-Wärmepumpe steht er in deren Einstellungen für Zustand 3.
 - **Rückfallebene:** Ist Earnie nicht erreichbar, muss das Backend auf Zustand 2 zurückfallen. Das Home-Assistant-Paket aus EHAL-Com enthält dafür einen Watchdog, der den Zustand nach dem Timeout auf 2 setzt. Für Loxone: [Rückfallebene in Loxone Config](../referenz/loxone-signals.md#earnie-dead-fallback-in-loxone-config).
@@ -397,7 +438,7 @@ Statt oder neben der Freigabe kann Earnie der Wärmepumpe einen **SG-Ready-Zusta
 Mit dem Ladeziel `heatpump.<Kennung>.set_temperature_heat_storage_target` (°C) sagt Earnie der Regelung, **wie weit** sie den Speicher laden soll, statt nur ob. Die Ladung wird dosiert und nicht mehr zwischen Soll und Soll + Boost umgeschaltet.
 
 - **Berechnung:** Wo der Plan die Wärmepumpe jetzt laufen lässt, ist das Ziel die Speichertemperatur am Ende dieses Laufs. Earnie liest sie aus dem Speicherstand, den der Optimierer für diese Viertelstunde plant (siehe **Live-Band**).
-- **Grenzen:** Das Ziel liegt mindestens beim Sollwert und höchstens bei `Sollwert + boost_k`. Meldet die Regelung `get_temperature_heat_storage_max`, begrenzt Earnie zusätzlich darauf. Diese Grenze gilt auch für die Ladung auf Vorrat. Ein Laden über den Boost hinaus kommt erst, wenn Earnie den Wirkungsgrad der Wärmepumpe nach Temperatur kennt.
+- **Grenzen:** Das Ziel liegt mindestens beim Sollwert und höchstens bei `Sollwert + boost_k`. Meldet die Regelung `get_temperature_heat_storage_max`, begrenzt Earnie zusätzlich darauf. Diese Grenze gilt auch für die Ladung auf Vorrat. Kennt Earnie den Wirkungsgrad der Wärmepumpe nach Temperatur ([COP-Punkte](#haus-wärme-cop-punkte)), reicht das Ziel bis zur gemeldeten Maximaltemperatur.
 - **0 = kein Ziel:** Läuft die Wärmepumpe im Plan jetzt nicht oder gibt es keinen Plan (Automatik, Start), sendet Earnie 0. Die Regelung arbeitet dann mit ihren eigenen Sollwerten. Ein Backend kann das Ziel deshalb auch ohne Freigabe- oder Zustandseingang nutzen: Ziel > 0 heißt bis zum Ziel laden, 0 heißt Normalbetrieb.
 - **Schaltdifferenz:** Die Regelung startet erst, wenn der Speicher um ihre Schaltdifferenz unter dem Ziel liegt. Ein Ziel knapp über der aktuellen Temperatur startet die Wärmepumpe daher nicht.
 - **Optional:** Aktivieren in EHAL-Com unter **Optionale Signale aktivieren**. Merker-Vorschlag für Loxone: `Earnie_Waermespeicher_Ladeziel`.
@@ -415,18 +456,24 @@ Zusätzlich zu `T_eq` und `T_low` kann das Smarthome-Backend weitere Werte der H
 | ------ | ------- | --------- | ----------------- |
 | `get_temperature_heat_storage_setpoint` | °C | Aktueller Speicher-Sollwert der Regelung | Mit der Toleranz zusammen: Live plant mit diesem Band (siehe oben) |
 | `get_temperature_heat_storage_tolerance` | K | Band unter dem Sollwert, in dem die Regelung noch keine Wärme anfordert | wie oben |
-| `get_temperature_heat_storage_max` | °C | Höchste Speichertemperatur, die die Regelung zulässt | begrenzt Ladung auf Vorrat und Ladeziel |
+| `get_temperature_heat_storage_max` | °C | Höchste Speichertemperatur, die die Regelung zulässt | begrenzt Ladung auf Vorrat und Ladeziel; mit COP-Punkten und Ladeziel das obere Ende des Bands |
 | `sens_temperature_heat_storage_top` | °C | Oberster Speicherfühler (Warmwasser-Komfort, obere Ladegrenze) | wird aufgezeichnet |
 | `sens_operating_mode` | – | Betriebsart, die die Regelung anfordert: 0 aus, 1 Raumheizung, 2 Warmwasser, 3 Abtauen, 4 gesperrt, 5 Kühlen, 6 Störung | wird aufgezeichnet |
 | `sens_sg_ready_state` | – | SG-Ready-Zustand 1–4, den die Regelung anwendet | wird aufgezeichnet |
 | `sens_heat_power` | W (Loxone: kW) | Wärmeleistung des Erzeugers (Wärmemengenzähler) | wird aufgezeichnet |
-| `sens_temperature_source` | °C | Quellentemperatur (Sole, Grundwasser) | wird aufgezeichnet |
+| `sens_temperature_source` | °C | Quellentemperatur (Sole, Grundwasser) im Betrieb; im Stillstand hält das Backend den letzten gültigen Wert (siehe unten) | mit [COP-Punkten](#haus-wärme-cop-punkte): Quellentemperatur für den Wirkungsgrad; sonst wird aufgezeichnet |
 | `sens_temperature_dhw` | °C | Getrennter Warmwasserspeicher, falls vorhanden | wird aufgezeichnet |
 | `get_temperature_dhw_min` | °C | Komfort-Minimum für Warmwasser | wird aufgezeichnet |
 | `sens_temperature_room` | °C | Referenzraum oder Mittel mehrerer Räume | wird aufgezeichnet |
 | `get_temperature_room_setpoint` | °C | Wirksame Raum-Solltemperatur | wird aufgezeichnet |
 
 - **Betriebsart ist eine Anforderung:** Ob der Verdichter läuft, liest Earnie weiter aus der elektrischen Leistung. Eine Wärmepumpe mit eigener Regelung kann eine Anforderung verzögern.
+- **Quellentemperatur nur im Betrieb gültig:** Ein Fühler im Sole- oder Grundwasserkreis zeigt die Quelle nur, solange die Wärmepumpe läuft. Im Stillstand nimmt die Flüssigkeit in den Leitungen die Temperatur der Umgebung an. `sens_temperature_source` ist deshalb die Quellentemperatur im Betrieb, und das Backend hält sie:
+  - „Läuft“ heißt: Der Verdichter läuft (elektrische Leistung über einer Schwelle). Die Anforderung der Regelung reicht nicht, sie kommt vor der Anlaufverzögerung.
+  - Werte zählen erst nach einer Einschwingzeit ab dem Start (einige Minuten, aus den Kurven der Anlage abgelesen).
+  - Gesendet wird der Mittelwert über den Lauf nach der Einschwingzeit. Beim Stopp friert das Backend ihn ein und hält ihn bis zum nächsten gültigen Lauf. Einfachere Variante: der letzte Wert nach der Einschwingzeit.
+
+  Earnie verwendet den Wert so, wie er gemeldet wird, und filtert nicht selbst. Wer den rohen Fühler zuordnet, meldet im Stillstand eine falsche Quellentemperatur.
 - **Aufzeichnung:** Earnie liest die zugeordneten Signale in jedem Optimierungslauf. Die Werte stehen in `optimization_history.jsonl` unter `thermal_observability[].feedback` und im Zyklus-Recorder bei den gelesenen Push-Werten. Ein zugeordnetes Signal ohne Wert steht dort als `null`.
 - **Nicht zugeordnet:** Das Signal fehlt in der Aufzeichnung. Earnie setzt keinen Ersatzwert ein.
 

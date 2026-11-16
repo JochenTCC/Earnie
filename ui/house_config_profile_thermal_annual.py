@@ -81,6 +81,13 @@ def _render_heat_source_fields(thermal: dict, index: int, *, session_scope: str)
             format_func=lambda key: _HEAT_PUMP_LABELS.get(key, key),
             key=_scoped_key(session_scope, f"hc_wp_{index}"),
         )
+        # COP points (HeatControl P5) have no editor yet: they are kept as stored.
+        if existing.get("cop_points"):
+            heat_source["cop_points"] = [dict(point) for point in existing["cop_points"]]
+            st.caption(
+                f"COP-Kennlinie: {len(heat_source['cop_points'])} Punkte aus `components.json` "
+                "(`heat_source.cop_points`). Live plant den Wärmespeicher damit statt mit der JAZ."
+            )
     same_type = existing.get("type") == source_type
     default_eff = default_efficiency(heat_source)
     eff_label = "JAZ" if source_type == "heat_pump" else "Nutzungsgrad"
@@ -614,6 +621,7 @@ def _overlay_thermal_annual_fields(
         heat_source.pop("fuel_price", None)
     if heat_source.get("type") != "heat_pump":
         heat_source.pop("heat_pump_type", None)
+        heat_source.pop("cop_points", None)
     preview["heat_source"] = heat_source
     _overlay_session_fields(
         preview, session_scope, (("heating_power_kw", f"hc_heat_power_{index}", float),)

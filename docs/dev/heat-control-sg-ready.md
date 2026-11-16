@@ -1,7 +1,8 @@
 # Predictive heat control: generic EHAL signal set (SG-Ready and beyond)
 
 Status: **draft (2026-11-14)**. Concept; implemented so far: **P1 Feedback** (2026-11-15,
-level 3 without the ready-by signals, see section 6 "Implementation of P1").
+level 3 without the ready-by signals, see section 6 "Implementation of P1"), P2 to P4
+(sections 6 and 8.6) and **P5 COP by temperature** (2026-11-16, section 8.2).
 
 This document is the **generic** part: the signal set, its levels and the model. It names no
 individual plant. The first plant it is applied to is described in
@@ -216,7 +217,7 @@ realised by switching a heating circuit off.
 | `get_temperature_heat_storage_ready` | read | °C | Minimum temperature required at that time |
 | `get_dhw_ready_by_time`, `get_temperature_dhw_ready` | read | time, °C | The same for hot water |
 | `heatpump.<id>.sens_heat_power` | read | W | Thermal power (heat meter), optional |
-| `heatpump.<id>.sens_temperature_source` | read | °C | Source temperature (brine, ground water), optional; replaces the outside temperature in the COP |
+| `heatpump.<id>.sens_temperature_source` | read | °C | Source temperature (brine, ground water) **while the generator runs**, optional; replaces the outside temperature in the COP. The backend holds the last valid value while it is off (section 8.2) |
 
 The operating mode reports what the controller requests. Whether the compressor runs is
 taken from the electric power, because a heat pump with its own controller may delay a
@@ -359,11 +360,79 @@ balance, so it needs no separate model.
 - **Source side:** the outside temperature forecast gives one factor per slot; it is known
   before the solve and costs no variables. With a measured source temperature
   (`sens_temperature_source`) the factor is that value held over the horizon.
+- **Source temperature at standstill** (from the reference plant): a sensor in the brine or
+  ground-water circuit shows the source only while the generator runs; at standstill the
+  fluid in the pipes takes the temperature of its surroundings. The signal is therefore
+  defined as the source temperature **during operation**, and the backend holds it:
+  - "running" is taken from the compressor (electric power above a threshold), not from the
+    request, which comes before the start delay;
+  - values count only after a settling time from the start (a few minutes, read from the
+    plant's curves), when the fluid from the pipes has passed the sensor;
+  - the value sent is the mean over the run after the settling time, frozen at the stop and
+    held until the next valid run. The source drops during a run and recovers at standstill,
+    so the last value before the stop underestimates the next run; the run mean matches what
+    the COP sees over a whole run. The last value after the settling time is an acceptable
+    simpler variant, since the source drifts slowly.
+
+  Earnie uses the value as reported and does not filter it itself; a backend that maps the
+  raw sensor gives the planner a wrong source factor.
 - **Sink side:** the store band is split into segments with falling COP, like tariff tiers.
   Cost minimisation fills the efficient segments first, so no binaries are needed.
 - **Data:** the heating system stores a few COP points (manufacturer data or measured with
   the heat meter). Without them the planned efficiency stays the JAZ and the charge band
   above the setpoint stays off, because its cost would be unknown.
+
+**Implementation of P5 (2026-11-16).**
+
+- **COP points:** `heat_source.cop_points` in the heating system (`source_c`, `sink_c`,
+  `cop`; heat pumps only, optional, no migration step: nothing is reshaped and absence keeps
+  the old behaviour). The points form a grid, every source temperature with every sink
+  temperature; one source temperature alone means no source dependence.
+  `optimizer/heat_pump_cop.py` (`CopCurve.cop_at`) interpolates linearly in both directions
+  and holds the edge value outside the grid. A gap in the grid, a point given twice, a COP
+  that rises with the sink or falls with the source temperature, and points on another heat
+  source fail loud. The values are absolute, not scaled to the JAZ.
+- **Common form with SUSI P7:** the same points and the same function. SUSI's two-piece
+  curve over the outside temperature is three points per sink temperature, "constant above
+  12 °C" is the held edge value. P7 adds default points per heat pump type and its scale to
+  the age table on top; whether default points release the band in Live is decided there.
+  Until P7 the year model, the Scenario Explorer and the derived electric power keep the JAZ.
+- **Source per slot** (`optimizer/thermal_live_cop.py`): `sens_temperature_source` held over
+  the horizon where it is mapped, else the outside temperature forecast per slot. Mapped but
+  without a value in a cycle: a warning, the JAZ for that cycle and no charge above the
+  setpoint (`efficiency.source = "jaz_no_source_value"`).
+- **Sink segments:** band minimum to setpoint, above it steps of 5 K, at most four segments
+  (wider steps above the setpoint when the band is larger). The sink temperature of a
+  segment is its upper edge; there is no parameter for the spread between flow and store.
+- **No binaries, with a bound instead of exactness** (`optimizer/thermal_store_model.py`).
+  "Cost minimisation fills the efficient segments first" holds for filling only. When the
+  store is drained, cost minimisation would keep the hot segments full and cycle the cheap
+  ones, so a hot store would be recharged at the COP of a cold one. Each segment therefore
+  has its own balance in two steps per slot (drain, then charge), and a segment may never be
+  fuller than the one below it, after the drain and at the end of the slot. The plan can
+  then hold at most the same fill fraction in a hot segment as in the one below. Recharging
+  a partly drained hot store is priced somewhat too low, never as if the store were cold.
+  The exact order needs one binary per slot and segment boundary, which the solve times of
+  the Live MILP do not allow at present.
+- **Band:** without COP points nothing changes (setpoint + `boost_k`, JAZ). With points, the
+  store target mapped and `get_temperature_heat_storage_max` read, the band reaches the
+  reported maximum (`LiveStorePlan.band_released`); without the target or the maximum it
+  stays at setpoint + `boost_k`, priced with the curve.
+- **State 4** (`heat_storage_target.forced_charge_ids`): the plan runs the heat pump in the
+  present slot and the buy price of the slot is negative or the plan curtails PV in it; only
+  with the curve. The store target is then the upper end of the band.
+  `milp_plan["heat_forced_charge"]` → `main.py` → flex writes.
+- **Collector** (section 4): the generator may not run on a slot whose level ends above the
+  capacity minus the collector heat forecast for the following 24 h, never below the
+  setpoint (`StoreLevelModel.charge_limit_kwh`, on the generator's on-variable). Collector
+  heat itself and the content already there may lie above the line. Applies with and
+  without COP points.
+- **Recorded:** `thermal_observability[].efficiency` (source of the efficiency, source
+  temperature, number of points).
+- **Open:** the curve by the flow temperature the controller asks for instead of the mean
+  store level (a charge pump controlled to a flow temperature runs the whole charge at the
+  target's COP; check with recorded flow temperatures); an editor for the points in the
+  house configurator; the Scenario Explorer with the curve (SUSI P7).
 
 ### 8.3 Hot water
 

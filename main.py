@@ -765,6 +765,8 @@ def _main_cycle(
         plant_curtail_kw = float((milp_plan or {}).get("p_pv_curtail") or 0.0)
         # HeatControl P3: store charge target per heat pump; none planned → 0 (no target).
         heat_storage_targets = dict((milp_plan or {}).get("heat_storage_targets") or {})
+        # HeatControl P5: heat pumps in a forced charge now (SG-Ready state 4).
+        heat_forced_charge = frozenset((milp_plan or {}).get("heat_forced_charge") or ())
         from optimizer.heat_storage_target import attach_targets_to_observability
 
         attach_targets_to_observability(
@@ -883,6 +885,7 @@ def _main_cycle(
                     charging_contexts,
                     consumer_pv_follow,
                     heat_storage_targets=heat_storage_targets,
+                    heat_forced_charge=heat_forced_charge,
                 )
             if err_ess is None and err_evcs is None and err_inv is None:
                 ehal_live.clear_write_error()
@@ -908,6 +911,7 @@ def _main_cycle(
                 charging_contexts,
                 consumer_pv_follow,
                 heat_storage_targets=heat_storage_targets,
+                heat_forced_charge=heat_forced_charge,
             )
             logger.info("📤 Sende WR-AC-Limits an Loxone...")
             _err_inv, inv_rows = ehal_live.write_inv_ac_limits_from_plan(

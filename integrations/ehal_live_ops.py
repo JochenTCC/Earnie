@@ -125,6 +125,7 @@ def write_flexible_consumer_states(
     consumer_pv_follow: dict[str, int] | None = None,
     *,
     heat_storage_targets: dict[str, float] | None = None,
+    heat_forced_charge: frozenset[str] | None = None,
 ) -> list[LoxoneWriteRecord]:
     from integrations.loxone_writes import send_flexible_consumer_states
 
@@ -133,6 +134,7 @@ def write_flexible_consumer_states(
         charging_contexts,
         consumer_pv_follow,
         heat_storage_targets=heat_storage_targets,
+        heat_forced_charge=heat_forced_charge,
     )
 
 
@@ -142,6 +144,7 @@ def write_flexible_consumer_enables(
     consumer_pv_follow: dict[str, int] | None = None,
     *,
     heat_storage_targets: dict[str, float] | None = None,
+    heat_forced_charge: frozenset[str] | None = None,
 ) -> list[LoxoneWriteRecord]:
     from integrations.loxone_writes import send_flexible_consumer_enables
 
@@ -150,6 +153,7 @@ def write_flexible_consumer_enables(
         charging_contexts,
         consumer_pv_follow,
         heat_storage_targets=heat_storage_targets,
+        heat_forced_charge=heat_forced_charge,
     )
 
 

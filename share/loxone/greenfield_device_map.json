@@ -233,7 +233,7 @@
       "hk_type": "thermal_annual",
       "ehal_field": "sens_temperature_source",
       "group": "Earnie_Waermepumpe_",
-      "notes": "VO Title; level 3 feedback. Source temperature (brine, ground water) °C."
+      "notes": "VO Title; level 3 feedback. Source temperature (brine, ground water) °C during operation, held at standstill."
     },
     {
       "name": "Earnie_Warmwasser_Temp",

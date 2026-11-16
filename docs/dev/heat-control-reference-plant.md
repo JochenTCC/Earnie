@@ -310,7 +310,7 @@ from them. Only the store setpoint needs a change in the controller.
 | `sens_temperature_heat_storage_low` | S5, analog output 10 (lowest sensor, not the bottom of the store) |
 | `sens_temperature_heat_storage` (`T_eq`) | weighted mean of S3, S4, S5 in the smart home |
 | `heatpump.<id>.sens_operating_mode` | cooling if Loxone's own cooling enable is set, else hot water if digital output 7, else heating if digital output 3, else off; "locked" while the lock bit is set. No new output. |
-| `heatpump.<id>.sens_temperature_source` | S13 (brine flow); probably one of the analog outputs 2–7, to be identified |
+| `heatpump.<id>.sens_temperature_source` | S13 (brine flow), one of the analog outputs 2–7. Valid only while the heat pump runs (at standstill the brine in the pipes is influenced by other temperatures), so Loxone holds it as in section 8.2 of the generic design: running = electric power above a threshold, settling time after the start, mean over the run frozen at the stop. |
 | `get_temperature_heat_storage_setpoint` | result of `MAX(An)2`. Exported from the controller, not rebuilt in Loxone: a copy of the heating curves would drift from the original. **All 16 analog outputs are in use, so one has to be freed for it** (Q8). |
 | `sens_temperature_room`, `get_temperature_room_setpoint` | already in the smart home |
 | `get_heat_storage_ready_by_time`, `get_temperature_heat_storage_ready` | Loxone schedule of the wall heating and its flow setpoint from the controller |
@@ -336,7 +336,7 @@ from them. Only the store setpoint needs a change in the controller.
 | Source temperature | Exists (S13, S14). |
 | Thermal power of the heat pump | **Missing.** Flow and return temperature exist (S11, S12) but no flow meter, and the charge pump is speed-controlled. A flow sensor in the heat pump circuit would give the measured COP. |
 | Solar heat | Exists (heat meter). |
-| Electric power of the heat pump | Not part of the controller; to be confirmed. |
+| Electric power of the heat pump | Exists in the smart home (confirmed 2026-11-16); not part of the controller. Also the "running" condition for the held source temperature. |
 | Controller setpoints | Parameters, not on the print. |
 
 ## 7. Model parameters (to be measured)
@@ -413,7 +413,7 @@ Nothing in this table is specific to the wall heating.
 | HeatControl P2 Operating state | State 3 sends today's high value, state 2 the low one. No lock bit. | None. | Q2 (the two values), Q5 (network timeout). |
 | HeatControl P3 Store target | Sends Earnie's target on network analog input 5, limited to a fixed maximum; the low value while the state is 2. | None in the first step; optional minimum function against a fixed maximum. | Maximum flow temperature of the heat pump (Q3). |
 | HeatControl P4 Two leaky stores | None. | None. | `τ_store` and `τ_house` from the recording of P1. The new `T_eq` weights (section 6) entered in the smart home before the recording starts. |
-| HeatControl P5 COP by temperature | None. | None. | COP points from the data sheet of the heat pump; the brine temperature comes from P1. Collector forecast against the solar heat meter. |
+| HeatControl P5 COP by temperature | Holds the brine temperature for `sens_temperature_source` (section 5, level 3). | None. | COP points from the data sheet of the heat pump; the brine temperature comes from P1. Collector forecast against the solar heat meter. |
 | HeatControl P6 Building as a store | Adds the offset to the setpoints of the participating rooms. | None in the first step (section 5, level 2). | Which rooms take part. |
 
 ### 9.2 Wall heating

@@ -20,7 +20,7 @@
       "field": "heatpump.{hk_id}.set_sg_ready_state",
       "required": false,
       "kind": "stub",
-      "notes": "Level 1 (HeatControl P2). SG-Ready operating state: 3 where the plan runs the generator (charge up to setpoint + boost), otherwise 2. States 1 and 4 are not sent yet. Fail-safe: the backend falls back to 2 when status.json is stale."
+      "notes": "Level 1 (HeatControl P2). SG-Ready operating state: 3 where the plan runs the generator (charge up to setpoint + boost), otherwise 2. 4 (HeatControl P5, only with COP points in the heating system): a planned run on a negative buy price or on curtailed surplus. State 1 is not sent yet. Fail-safe: the backend falls back to 2 when status.json is stale."
     },
     {
       "field": "heatpump.{hk_id}.set_temperature_heat_storage_target",
@@ -93,7 +93,7 @@
       "field": "sens_temperature_source",
       "required": false,
       "kind": "stub",
-      "notes": "Level 3. Source temperature (brine, ground water) in °C."
+      "notes": "Level 3. Source temperature (brine, ground water) in °C during operation; the backend holds the last valid value at standstill."
     },
     {
       "field": "sens_temperature_dhw",

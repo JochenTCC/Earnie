@@ -345,10 +345,14 @@ def _sg_ready_state_output_values(
     consumer: dict,
     consumer_powers: dict[str, float],
     charging_contexts: dict[str, dict],
+    *,
+    forced: bool = False,
 ) -> dict[str, float]:
     """Heat pump operating state (HeatControl P2): 3 where the plan runs it, else 2.
 
-    Sent next to ``set_enable`` when the key is mapped; it never replaces it.
+    ``forced`` (HeatControl P5): the plan runs it on a negative price or on surplus that
+    would be curtailed, the state is 4. Sent next to ``set_enable`` when the key is mapped;
+    it never replaces it.
     """
     from ehal.heat_fields import sg_ready_state_for_plan
 
@@ -358,7 +362,7 @@ def _sg_ready_state_output_values(
     power_kw = _effective_consumer_power_kw(
         consumer, consumer_powers, charging_contexts, consumer["id"]
     )
-    state = sg_ready_state_for_plan(power_kw > 1e-3)
+    state = sg_ready_state_for_plan(power_kw > 1e-3, forced=forced)
     logger.info(
         "Flex consumer %s -> SG-Ready-Zustand=%s (optimiert %.2f kW, Loxone: %s)",
         consumer["name"],
@@ -399,6 +403,7 @@ def _flexible_consumer_output_values(
     charging_contexts: dict[str, dict],
     consumer_pv_follow: dict[str, int] | None = None,
     heat_storage_targets: dict[str, float] | None = None,
+    heat_forced_charge: frozenset[str] | None = None,
 ) -> dict[str, float]:
     """Berechnet Loxone-Merker → Wert für einen flexiblen Verbraucher (ohne HTTP)."""
     if _skip_flexible_consumer_output(consumer, charging_contexts):
@@ -423,7 +428,12 @@ def _flexible_consumer_output_values(
             )
         )
     values.update(
-        _sg_ready_state_output_values(consumer, consumer_powers, charging_contexts)
+        _sg_ready_state_output_values(
+            consumer,
+            consumer_powers,
+            charging_contexts,
+            forced=str(consumer["id"]) in (heat_forced_charge or ()),
+        )
     )
     values.update(_store_target_output_values(consumer, heat_storage_targets))
     return values
@@ -487,6 +497,7 @@ def _write_flexible_consumer_output(
     send: bool,
     publish_kinds: frozenset[str] | None = None,
     heat_storage_targets: dict[str, float] | None = None,
+    heat_forced_charge: frozenset[str] | None = None,
 ) -> list[LoxoneWriteRecord]:
     """Publishes Freigabe/Strom-Sollwert/Modus via status.json and/or snapshot."""
     values = _flexible_consumer_output_values(
@@ -495,6 +506,7 @@ def _write_flexible_consumer_output(
         charging_contexts,
         consumer_pv_follow,
         heat_storage_targets=heat_storage_targets,
+        heat_forced_charge=heat_forced_charge,
     )
     records: list[LoxoneWriteRecord] = []
     if send:
@@ -776,6 +788,7 @@ def send_flexible_consumer_states(
     consumer_pv_follow: dict[str, int] | None = None,
     *,
     heat_storage_targets: dict[str, float] | None = None,
+    heat_forced_charge: frozenset[str] | None = None,
 ) -> list[LoxoneWriteRecord]:
     """Sendet Freigabe (0/1), set_evcs_max_current (A) und set_evcs_mode an Loxone.
 
@@ -794,6 +807,7 @@ def send_flexible_consumer_states(
                 consumer_pv_follow,
                 send=True,
                 heat_storage_targets=heat_storage_targets,
+                heat_forced_charge=heat_forced_charge,
             )
         )
     return records
@@ -805,6 +819,7 @@ def send_flexible_consumer_enables(
     consumer_pv_follow: dict[str, int] | None = None,
     *,
     heat_storage_targets: dict[str, float] | None = None,
+    heat_forced_charge: frozenset[str] | None = None,
 ) -> list[LoxoneWriteRecord]:
     """Publish only the flex ``set_enable`` (heat pump, pool, generic consumers), the
     heat pump's ``set_sg_ready_state`` (HeatControl P2) and its store charge target (P3).
@@ -828,6 +843,7 @@ def send_flexible_consumer_enables(
                     {"set_enable", "set_sg_ready_state", "set_temperature_heat_storage_target"}
                 ),
                 heat_storage_targets=heat_storage_targets,
+                heat_forced_charge=heat_forced_charge,
             )
         )
     return records

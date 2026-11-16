@@ -19,7 +19,7 @@
       "ehal_field": "heatpump.wp_heating.set_sg_ready_state",
       "loxone_blocks_key": "ehal_bindings.heatpump.wp_heating.set_sg_ready_state",
       "suggested_name": "Earnie_Waermepumpe_SG_Ready_Soll",
-      "notes": "Level 1 (HeatControl P2), optional. SG-Ready state Earnie requests: 3 = charge up to setpoint + boost, 2 = normal. 1 and 4 are not sent yet. Timeout: set 2 when heartbeat_earnie is older than 2-3 x the VI poll time (docs/referenz/loxone-signals.md, Rückfallebene). Two relay contacts: state 3 = contact 2 on, contact 1 off; state 2 = both off."
+      "notes": "Level 1 (HeatControl P2), optional. SG-Ready state Earnie requests: 3 = charge up to setpoint + boost, 2 = normal, 4 = forced charge up to the maximum (HeatControl P5, only with COP points in the heating system: a planned run on a negative buy price or on curtailed surplus). 1 is not sent yet. Timeout: set 2 when heartbeat_earnie is older than 2-3 x the VI poll time (docs/referenz/loxone-signals.md, Rückfallebene). Two relay contacts: state 3 = contact 2 on, contact 1 off; state 4 = both on; state 2 = both off. A heat pump that couples its electric heater to state 4: limit the state to 3 in Loxone."
     },
     {
       "ehal_field": "heatpump.wp_heating.set_temperature_heat_storage_target",
@@ -85,7 +85,7 @@
       "ehal_field": "sens_temperature_source",
       "loxone_blocks_key": "ehal_bindings.sens_temperature_source",
       "suggested_name": "Earnie_Waermepumpe_Temp_Quelle",
-      "notes": "Level 3 feedback, optional. Source temperature (brine, ground water) °C."
+      "notes": "Level 3 feedback, optional. Source temperature (brine, ground water) °C during operation. Do not send the raw sensor: running = electric power above a threshold, values count after a settling time, send the mean over the run and hold it from the stop until the next valid run."
     },
     {
       "ehal_field": "sens_temperature_dhw",

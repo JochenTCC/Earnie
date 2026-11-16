@@ -346,13 +346,22 @@ Bei geschichteten Speichern muss `T_eq` der energieäquivalente (volumengewichte
 | `sens_operating_mode` | 0 aus, 1 Raumheizung, 2 Warmwasser, 3 Abtauen, 4 gesperrt, 5 Kühlen, 6 Störung | `Earnie_Waermepumpe_Betriebsart` |
 | `sens_sg_ready_state` | 1–4 | `Earnie_Waermepumpe_SG_Ready` |
 | `sens_heat_power` | kW (EHAL: W) | `Earnie_Waermepumpe_Waermeleistung` |
-| `sens_temperature_source` | °C | `Earnie_Waermepumpe_Temp_Quelle` |
+| `sens_temperature_source` | °C, Quellentemperatur im Betrieb, im Stillstand gehalten (siehe unten) | `Earnie_Waermepumpe_Temp_Quelle` |
 | `sens_temperature_dhw` | °C | `Earnie_Warmwasser_Temp` |
 | `get_temperature_dhw_min` | °C | `Earnie_Warmwasser_Temp_min` |
 | `sens_temperature_room` | °C | `Earnie_Raum_Temp` |
 | `get_temperature_room_setpoint` | °C | `Earnie_Raum_Temp_Soll` |
 
 Sind Sollwert und Toleranz beide zugeordnet, plant Live mit dem Speicherband der Regelung statt mit `heat_storage.setpoint_c` / `tolerance_c`.
+
+**Quellentemperatur halten:** Der Fühler im Sole- oder Grundwasserkreis zeigt die Quelle nur, solange die Wärmepumpe läuft. `Earnie_Waermepumpe_Temp_Quelle` bekommt deshalb nicht den rohen Fühler, sondern einen gehaltenen Wert. Aufbau in Loxone Config:
+
+1. **Läuft:** elektrische Leistung der Wärmepumpe über einer Schwelle (Schwellwertschalter), nicht die Anforderung der Regelung.
+2. **Einschwingzeit:** Einschaltverzögerung auf „Läuft“ (einige Minuten, aus den Kurven der Anlage abgelesen). Erst danach zählt der Fühlerwert.
+3. **Wert bilden:** Mittelwert des Fühlers, solange „Läuft“ nach der Einschwingzeit aktiv ist. Einfachere Variante: der aktuelle Fühlerwert.
+4. **Halten:** Mit der fallenden Flanke von „Läuft“ den Wert in einen Analogspeicher übernehmen und bis zum nächsten gültigen Lauf halten. Der Merker sendet den gehaltenen Wert.
+
+Earnie filtert den Wert nicht selbst.
 
 ### EV (Präfix `Earnie_EAuto_`)
 
