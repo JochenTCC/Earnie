@@ -15,9 +15,9 @@ from runtime_store.env_vars import is_truthy, read_env
 logger = logging.getLogger(__name__)
 
 DEFAULT_CBC_GAP_REL = 0.10
-DEFAULT_CBC_STRICT_TIME_LIMIT_SEC = 5.0
+DEFAULT_CBC_STRICT_TIME_LIMIT_SEC = 15.0
 # Wall clock. The solve runs in the live cycle, so a stage without a limit could block it for good.
-GAP_STAGE_TIME_LIMIT_SEC = 15.0
+GAP_STAGE_TIME_LIMIT_SEC = 30.0
 DEFAULT_MILP_SOLVER: Literal["cbc", "highs"] = "highs"
 VALID_MILP_SOLVERS = frozenset({"cbc", "highs"})
 

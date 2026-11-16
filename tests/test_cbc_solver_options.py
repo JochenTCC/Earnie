@@ -36,7 +36,7 @@ def test_default_gap_rel_is_ten_percent():
     assert resolve_cbc_strict_time_limit_sec() == DEFAULT_CBC_STRICT_TIME_LIMIT_SEC
     assert cbc_solver_settings_resolved() == {
         "gapRel": 0.10,
-        "strict_time_limit_sec": 5.0,
+        "strict_time_limit_sec": 15.0,
     }
 
 
@@ -89,7 +89,7 @@ def test_gap_stage_runs_with_its_own_time_limit(monkeypatch):
     prob = pulp.LpProblem("t", pulp.LpMinimize)
     prob += pulp.LpVariable("x", lowBound=0)
     assert solve_with_strict_fallback(prob, msg=False) == "Not Solved"
-    assert limits == [DEFAULT_CBC_STRICT_TIME_LIMIT_SEC, 15.0]
+    assert limits == [DEFAULT_CBC_STRICT_TIME_LIMIT_SEC, 30.0]
 
 
 def _infeasible_problem() -> pulp.LpProblem:
