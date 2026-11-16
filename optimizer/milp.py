@@ -182,6 +182,7 @@ def _add_flex_side_constraints(
         inputs.contexts,
         verbose,
         filter_contexts=inputs.filters,
+        book_indices=inputs.book_indices,
     )
     add_generic_flex_rolling_constraints(
         model,
