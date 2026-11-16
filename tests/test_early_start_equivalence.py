@@ -17,7 +17,9 @@ import pytest
 
 from tests.early_start_equivalence import diff, run_from_seed, seed_runtime, shift, strip_volatile
 
-pytest.importorskip("time_machine")
+# ImportError, not only ModuleNotFoundError: Windows Smart App Control may block
+# the native extension of an installed time-machine (see pyproject.toml).
+pytest.importorskip("time_machine", exc_type=ImportError)
 
 TZ = ZoneInfo("Europe/Vienna")
 LEADS_SEC = (15, 90)

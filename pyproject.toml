@@ -33,8 +33,13 @@ dev = [
     "pytest-xdist>=3.5.0",
     "vulture>=2.11",
     "pytest-deadfixtures>=2.2.1",
-    # EarlyStart equivalence test: freezes the wall clock globally.
+    # EarlyStart equivalence test: freezes the wall clock globally, with the local
+    # time zone (freezegun cannot). Its native extension is unsigned, so Windows
+    # Smart App Control may block it: the test then skips (importorskip) and the
+    # pytest plugin stays off (addopts below), otherwise pytest would not start.
     "time-machine>=3.0",
+    # Regression climate fixture: frozen clock, pure Python (no native extension).
+    "freezegun>=1.5",
     # Property-based storage roundtrip tests (tests/test_storage_roundtrip.py).
     # <6.156: later releases ship only an unsigned native extension (_native.pyd)
     # that Windows Smart App Control blocks; 6.155.7 is the last pure-Python wheel.
@@ -79,6 +84,10 @@ include = [
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
+# time-machine registers a pytest plugin that imports its native extension at
+# startup; blocked by Smart App Control, that would abort every run. No test
+# uses its fixture, the EarlyStart test imports it itself.
+addopts = ["-p", "no:time_machine"]
 # Regression cases are auto-deselected in tests/conftest.py unless -m regression
 # (or EARNIE_RUN_REGRESSION=1). Do not put -m "not regression" in addopts — that
 # would AND with -m regression and select nothing.
