@@ -109,8 +109,9 @@ def _ref_value_empty(settings: dict, key: str) -> bool:
 
 
 def _settings_incomplete(settings: dict) -> bool:
+    """A house without a battery is complete; a bootstrap config lacks the other refs too."""
     for key in _REF_KEYS:
-        if _ref_value_empty(settings, key):
+        if key != "battery_ids" and _ref_value_empty(settings, key):
             return True
     return False
 
