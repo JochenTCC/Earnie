@@ -6,6 +6,7 @@ import logging
 
 import streamlit as st
 
+from runtime_store.cloud_demo import is_cloud_demo
 from runtime_store.usage_ping import (
     is_kill_switch_off,
     load_state,
@@ -94,8 +95,9 @@ def maybe_prompt_consent_on_explorer() -> None:
     Idempotent per session for the activation milestone. Abbrechen leaves consent
     ``unset`` and does not record explorer activation this visit. Stage stays
     ``explorer`` (live comes later from a successful live cycle).
+    No dialog and no milestone in the cloud demo, which sends no install ping.
     """
-    if is_kill_switch_off():
+    if is_kill_switch_off() or is_cloud_demo():
         return
 
     choice = st.session_state.pop(_SESSION_DIALOG_CHOICE, None)
@@ -128,6 +130,9 @@ def maybe_prompt_consent_on_editor() -> None:
 def render_usage_ping_settings() -> None:
     """Toggle + payload expander on Optimierer-Dienst."""
     st.subheader("Nutzungsstatistik")
+    if is_cloud_demo():
+        st.caption("In der Online-Demo sendet Earnie keine Nutzungsstatistik.")
+        return
     kill = is_kill_switch_off()
     state = load_state()
     consent = str(state.get("consent") or "unset")
