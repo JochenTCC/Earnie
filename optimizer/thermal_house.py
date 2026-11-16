@@ -209,7 +209,10 @@ def _step_hour_direct_wp(
 def _house_year_cache_key(kwargs: dict) -> tuple:
     from optimizer.thermal_year_cache import call_key
 
-    key = call_key(kwargs)
+    # Callers pass different subsets of the keyword arguments (e.g. the chart path
+    # omits defaulted arguments); key on the effective call so the
+    # same simulation is shared between them.
+    key = call_key({**_SIMULATE_HOUSE_YEAR_DEFAULTS, **kwargs})
     uses_fixture = kwargs.get("hourly_temperature_c") is None and (
         kwargs.get("daily_temps") is None or kwargs.get("daily_radiation_mj") is None
     )
@@ -229,6 +232,16 @@ def _copy_house_year_result(result: HouseYearResult) -> HouseYearResult:
         hourly_house_temp_c=list(result.hourly_house_temp_c),
         hourly_store_temp_c=list(result.hourly_store_temp_c),
     )
+
+
+def _keyword_defaults(func) -> dict:
+    import inspect
+
+    return {
+        name: param.default
+        for name, param in inspect.signature(func).parameters.items()
+        if param.default is not inspect.Parameter.empty
+    }
 
 
 def house_year_result(**kwargs) -> HouseYearResult:
@@ -554,3 +567,6 @@ def _simulate_house_daily_climate(
             house_temps.append(house_temp)
         daily_out.append(round(day_electric, 3))
     return HouseYearResult(daily_out, house_temps, store_temps)
+
+
+_SIMULATE_HOUSE_YEAR_DEFAULTS = _keyword_defaults(_simulate_house_year)

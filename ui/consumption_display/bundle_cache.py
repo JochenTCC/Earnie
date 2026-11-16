@@ -52,7 +52,19 @@ def get_or_build_consumption_bundle(
     else:
         bundle = builder()
     memo[cache_key] = bundle
+    _evict_oldest(memo)
     return bundle
+
+
+# Every edit of the house profile changes the fingerprint; keep only the last few
+# bundles (≈ 8760 × consumers floats each) instead of one per keystroke.
+_MAX_SESSION_BUNDLES = 4
+
+
+def _evict_oldest(memo: MutableMapping[str, ConsumptionSeriesBundle]) -> None:
+    while len(memo) > _MAX_SESSION_BUNDLES:
+        oldest = next(iter(memo))
+        del memo[oldest]
 
 
 def modeled_profile_cache_key(profile: dict, *, extra: str = "") -> str:

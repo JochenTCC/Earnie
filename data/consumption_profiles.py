@@ -158,13 +158,17 @@ def _flat_annual_hourly_kw(consumer: dict, *, hours: int) -> list[float]:
 
 
 def _modeled_ev_hourly_kw(consumer: dict, *, hours: int) -> list[float]:
-    hourly = [0.0] * hours
+    return _tile_daily_profiles(lambda day: ev_hourly_kw_for_day(consumer, day), hours=hours)
+
+
+def _tile_daily_profiles(day_profile, *, hours: int) -> list[float]:
+    """Hour-of-year series from a per-day 24 h profile (each day computed once)."""
+    hourly: list[float] = []
     start_day = modeled_profile_ref_start().date()
-    for hour_index in range(hours):
-        day = start_day + timedelta(days=hour_index // 24)
-        day_hourly = ev_hourly_kw_for_day(consumer, day)
-        hourly[hour_index] = day_hourly[hour_index % 24]
-    return hourly
+    days = (hours + 23) // 24
+    for day_offset in range(days):
+        hourly.extend(day_profile(start_day + timedelta(days=day_offset)))
+    return hourly[:hours]
 
 
 def _pwm_or_weekly_thermal_profile(
@@ -287,13 +291,9 @@ def _modeled_thermal_rc_hourly_kw(consumer: dict, *, hours: int) -> list[float]:
 def _modeled_generic_schedule_hourly_kw(consumer: dict, *, hours: int) -> list[float]:
     from house_config.generic_schedule import generic_hourly_kw_for_day
 
-    hourly = [0.0] * hours
-    start_day = modeled_profile_ref_start().date()
-    for hour_index in range(hours):
-        day = start_day + timedelta(days=hour_index // 24)
-        day_hourly = generic_hourly_kw_for_day(consumer, day)
-        hourly[hour_index] = day_hourly[hour_index % 24]
-    return hourly
+    return _tile_daily_profiles(
+        lambda day: generic_hourly_kw_for_day(consumer, day), hours=hours
+    )
 
 
 def _modeled_consumer_hourly_kw(consumer: dict, *, hours: int) -> list[float]:

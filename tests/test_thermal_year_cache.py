@@ -74,6 +74,15 @@ def test_house_hit_equals_fresh_simulation():
     assert HOUSE_YEAR_CACHE.stats() == {"hits": 1, "misses": 1, "size": 1}
 
 
+def test_house_explicit_defaults_share_the_cache_entry():
+    """Callers that spell out signature defaults (``solar_thermal_area_m2=0.0``, ``building_mass=None``)
+    hit the entry of a caller that omits them — the HK page simulates once, not twice."""
+    house_year_result(**_house_kwargs())
+    again = house_year_result(**_house_kwargs(), solar_thermal_area_m2=0.0, building_mass=None)
+    assert HOUSE_YEAR_CACHE.stats() == {"hits": 1, "misses": 1, "size": 1}
+    assert again.daily_electric_kwh == house_year_result(**_house_kwargs()).daily_electric_kwh
+
+
 def test_house_hit_returns_isolated_copies():
     first = house_year_result(**_house_kwargs())
     expected = list(first.daily_electric_kwh)

@@ -76,6 +76,7 @@ def render_plant_export_limit() -> None:
         state_key="house_config_plant_export",
         payload={"enabled": enabled, "max_kw": max_kw},
         save=_persist,
+        rerun_follows=False,
     )
 
 
@@ -141,4 +142,5 @@ def render_plant_grid_meter_assertions() -> None:
             "single": bool(single),
         },
         save=_persist,
+        rerun_follows=False,
     )
