@@ -415,6 +415,7 @@ Nothing in this table is specific to the wall heating.
 | HeatControl P4 Two leaky stores | None. | None. | `τ_store` and `τ_house` from the recording of P1. The new `T_eq` weights (section 6) entered in the smart home before the recording starts. |
 | HeatControl P5 COP by temperature | Holds the brine temperature for `sens_temperature_source` (section 5, level 3). | None. | COP points from the data sheet of the heat pump; the brine temperature comes from P1. Collector forecast against the solar heat meter. |
 | HeatControl P6 Building as a store | Adds the offset to the setpoints of the participating rooms. | None in the first step (section 5, level 2). | Which rooms take part. |
+| HeatControl — hot-water level (follow-up item) | Sends the larger of its own hot-water setpoint and Earnie's target on network analog input 4 (section 5, level 2). Delaying a charge would use the enable of `WW_ANF` (network digital 4), which Loxone already sets. | None. | Comfort minimum at S3; share of the volume above the changeover port (zone split); whether Earnie may hold back a hot-water request at all. |
 
 ### 9.2 Wall heating
 
