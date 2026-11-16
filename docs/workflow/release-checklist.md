@@ -123,4 +123,5 @@ In-place pin on the live `earnie-productive` compose (NAS project folder; often 
   git push --force-with-lease origin streamlitcloud
   git checkout main
   ```
+- [ ] Reboot the Streamlit Cloud app (share.streamlit.io → app ⋮ → **Reboot app**), then hard-reload the demo and check that it shows `<version>`: the push alone often leaves the running process on the old `version.py`.
 - [ ] Backlog: release entry in `backlog/Backlog-Erledigt.md`
