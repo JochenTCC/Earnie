@@ -114,6 +114,8 @@ def _format_event_log(entry: dict[str, Any]) -> str:
         parts.append(f"{entry['strict_elapsed_sec']:.2f}s")
     if entry.get("time_limit_hit"):
         parts.append("Zeitlimit")
+    if entry.get("incumbent_gap") is not None:
+        parts.append(f"Gap am Limit={float(entry['incumbent_gap']) * 100:.2f}%")
     if entry.get("final_status") is not None:
         parts.append(f"final={entry['final_status']}")
     if entry.get("gap_rel") is not None:
@@ -132,7 +134,11 @@ def maybe_record_strict_timing(
     gap_rel: float,
     final_status: str | None = None,
     time_limit_hit: bool = False,
+    incumbent_gap: float | None = None,
+    incumbent_kept: bool = False,
 ) -> None:
+    """``strict_fallback`` when the gap stage decides; ``strict_slow`` for a strict plan that
+    took nearly the limit or is the solution at the limit (``incumbent_kept``)."""
     if strict_limit_sec <= 0:
         return
     base = {
@@ -144,6 +150,11 @@ def maybe_record_strict_timing(
     }
     if final_status is not None:
         base["final_status"] = final_status
+    if incumbent_gap is not None:
+        base["incumbent_gap"] = round(incumbent_gap, 5)
+    if incumbent_kept:
+        record_cbc_event("strict_slow", **base)
+        return
     if strict_status != "Optimal":
         record_cbc_event("strict_fallback", **base)
         return

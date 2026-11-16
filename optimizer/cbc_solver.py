@@ -1,11 +1,13 @@
-"""MILP solver options (CBC default; optional HiGHS). Two-stage: strict → gapRel."""
+"""MILP solver options (HiGHS default; optional CBC). Two-stage: strict → gapRel."""
 from __future__ import annotations
 
 import logging
+import math
 import os
 import time
+from contextlib import contextmanager
 from contextvars import ContextVar, Token
-from typing import Any, Literal
+from typing import Any, Iterator, Literal
 
 import pulp
 
@@ -15,9 +17,12 @@ from runtime_store.env_vars import is_truthy, read_env
 logger = logging.getLogger(__name__)
 
 DEFAULT_CBC_GAP_REL = 0.10
-DEFAULT_CBC_STRICT_TIME_LIMIT_SEC = 15.0
+DEFAULT_CBC_STRICT_TIME_LIMIT_SEC = 5.0
 # Wall clock. The solve runs in the live cycle, so a stage without a limit could block it for good.
-GAP_STAGE_TIME_LIMIT_SEC = 30.0
+GAP_STAGE_TIME_LIMIT_SEC = 15.0
+# Strict limit of the savings forecast (``optimizer.sim_costs``): its plan is only shown, the
+# cycle's setpoints are already sent.
+SAVINGS_STRICT_TIME_LIMIT_SEC = 3.0
 DEFAULT_MILP_SOLVER: Literal["cbc", "highs"] = "highs"
 VALID_MILP_SOLVERS = frozenset({"cbc", "highs"})
 
@@ -80,8 +85,34 @@ def stopped_at_limit(prob: pulp.LpProblem) -> bool:
     return prob.status == pulp.LpStatusOptimal and prob.sol_status == pulp.LpSolutionIntegerFeasible
 
 
+def incumbent_gap(prob: pulp.LpProblem, backend: str) -> float | None:
+    """Relative MIP gap of the solution a stopped solve left in ``prob``; None when unknown.
+
+    ``|objective − best bound| / |objective|`` from the HiGHS model, the measure HiGHS itself
+    stops on (``mip_rel_gap``). Unknown for CBC (PuLP does not hand its bound back) and for an
+    objective of 0 that the bound does not meet.
+    """
+    if backend != "highs":
+        return None
+    solver_model = getattr(prob, "solverModel", None)
+    if solver_model is None:
+        return None
+    info = solver_model.getInfo()
+    primal = float(info.objective_function_value)
+    bound = float(info.mip_dual_bound)
+    if not (math.isfinite(primal) and math.isfinite(bound)):
+        return None
+    if primal == bound:
+        return 0.0
+    if primal == 0.0:
+        return None
+    return abs(primal - bound) / abs(primal)
+
+
 # Strict-stage status of a solve stopped at its time limit (PuLP calls it ``Optimal``).
 STRICT_STATUS_TIME_LIMIT = "TimeLimit"
+# ``stage`` of a solve whose plan is the strict stage's solution at its time limit.
+STAGE_STRICT_INCUMBENT = "strict_incumbent"
 STATUS_INFEASIBLE = pulp.LpStatus[pulp.LpStatusInfeasible]
 
 
@@ -143,6 +174,22 @@ def set_cbc_strict_time_limit_override(seconds: float | None) -> Token:
 
 def reset_cbc_strict_time_limit_override(token: Token) -> None:
     _cbc_strict_time_limit_override.reset(token)
+
+
+@contextmanager
+def strict_time_limit_at_most(seconds: float) -> Iterator[None]:
+    """Cap the strict limit of the solves inside at ``seconds``; a shorter limit in force stays.
+
+    ``EARNIE_CBC_STRICT_TIME_LIMIT_SEC`` and strict mode (``EARNIE_CBC_STRICT``) take precedence,
+    as for every override of the strict limit.
+    """
+    token = set_cbc_strict_time_limit_override(
+        min(float(seconds), resolve_cbc_strict_time_limit_sec())
+    )
+    try:
+        yield
+    finally:
+        reset_cbc_strict_time_limit_override(token)
 
 
 def _normalize_milp_solver(raw: str) -> Literal["cbc", "highs"]:
@@ -301,12 +348,19 @@ def solve_with_strict_fallback(
     EARNIE_CBC_STRICT=1: nur Strict ohne Limit (Benchmarks).
     Backend: resolve_milp_solver() → highs (default) or cbc.
 
-    A strict stage stopped at its time limit counts as not optimal, although PuLP reports it as
-    ``Optimal`` (``stopped_at_limit``): its plan depends on CPU speed. The gap stage then solves
-    again with ``gapRel`` (``strict_fallback``, ``strict_status`` ``TimeLimit``) and its plan is
-    used; it ends on the gap, so the plan is reproducible unless the gap stage itself reaches
-    ``GAP_STAGE_TIME_LIMIT_SEC`` (``gap_time_limit_hit`` in the solve log). Without any solution
-    within that limit the status is not ``Optimal``.
+    A strict stage stopped at its time limit is not proven optimal, although PuLP reports it
+    as ``Optimal`` (``stopped_at_limit``). Its solution is used when its gap to the best bound
+    is within ``gapRel`` (``incumbent_gap``; stage ``strict_incumbent``, event ``strict_slow``):
+    that is the gap stage's own criterion, and the gap stage would start from nothing and
+    return the first solution inside it, usually a worse one. Such a plan depends on CPU speed
+    and load; the solve log marks it (``strict_time_limit_hit``, ``strict_incumbent_gap``).
+
+    Without a solution inside ``gapRel`` at the limit (none, a wider gap, or a gap that is not
+    known, as with CBC) the gap stage solves again with ``gapRel`` (``strict_fallback``,
+    ``strict_status`` ``TimeLimit``) and its plan is used; it ends on the gap, so the plan is
+    reproducible unless the gap stage itself reaches ``GAP_STAGE_TIME_LIMIT_SEC``
+    (``gap_time_limit_hit`` in the solve log). Without any solution within that limit the status
+    is not ``Optimal``.
 
     A strict stage that proves the model ``Infeasible`` ends the solve: the gap stage could not
     find a solution either.
@@ -344,12 +398,18 @@ def solve_with_strict_fallback(
         elapsed = time.perf_counter() - t0
         limit_hit = stopped_at_limit(prob)
         status = STRICT_STATUS_TIME_LIMIT if limit_hit else pulp.LpStatus[prob.status]
+        gap_at_limit = incumbent_gap(prob, backend) if limit_hit else None
+        keep_incumbent = gap_at_limit is not None and gap_at_limit <= gap_rel
         record.update(
             strict_limit_sec=strict_limit,
             strict_elapsed_sec=round(elapsed, 3),
             strict_status=status,
             strict_time_limit_hit=limit_hit,
         )
+        if limit_hit:
+            record["strict_incumbent_gap"] = (
+                None if gap_at_limit is None else round(gap_at_limit, 5)
+            )
         if status == STATUS_INFEASIBLE:
             # Proven: a wider gap cannot make the model feasible, a second solve only costs time.
             record.update(stage="strict", final_status=status, objective=None)
@@ -361,11 +421,22 @@ def solve_with_strict_fallback(
             strict_status=status,
             gap_rel=gap_rel,
             time_limit_hit=limit_hit,
+            incumbent_gap=gap_at_limit,
+            incumbent_kept=keep_incumbent,
         )
         if status == "Optimal":
             record.update(stage="strict", final_status=status, objective=_objective_value(prob))
             _append_solve_record(record)
             return status
+        if keep_incumbent:
+            final_status = pulp.LpStatus[prob.status]
+            record.update(
+                stage=STAGE_STRICT_INCUMBENT,
+                final_status=final_status,
+                objective=_objective_value(prob),
+            )
+            _append_solve_record(record)
+            return final_status
         if verbose:
             print(
                 f"{label} strict ({strict_limit:.1f} s) Status {status} "

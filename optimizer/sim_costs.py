@@ -315,10 +315,13 @@ def _run_savings_horizons(
         resolve_matched_baseline_horizon_targets,
     )
 
+    from optimizer.cbc_solver import SAVINGS_STRICT_TIME_LIMIT_SEC, strict_time_limit_at_most
     from runtime_store.cycle_timing import record_phase
 
-    # Open-loop: one CBC solve for the display horizon (not commit_hours=1 MPC).
-    with record_phase("savings_optimized"):
+    # Open-loop: one MILP solve for the display horizon (not commit_hours=1 MPC). The plan is
+    # only shown, so its strict stage gets a shorter time limit than the plan that is sent.
+    savings_limit = strict_time_limit_at_most(SAVINGS_STRICT_TIME_LIMIT_SEC)
+    with record_phase("savings_optimized"), savings_limit:
         optimized_rows = simulate_horizon(
             matrix,
             initial_soc,

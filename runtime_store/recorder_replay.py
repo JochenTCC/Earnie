@@ -1000,7 +1000,7 @@ def _entry_is_flagged(entry: dict[str, Any]) -> bool:
 
 def solve_hit_time_limit(record: dict[str, Any]) -> bool:
     """True when the plan of one solve record comes from a stage stopped at its time limit."""
-    if record.get("stage") == "strict":
+    if record.get("stage") in ("strict", "strict_incumbent"):
         return bool(record.get("strict_time_limit_hit"))
     if record.get("stage") == "gap":
         return bool(record.get("gap_time_limit_hit"))
