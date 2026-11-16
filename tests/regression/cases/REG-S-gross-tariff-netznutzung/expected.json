@@ -1,6 +1,6 @@
 {
   "engine": {
-    "earnie_version": "2.7.0-beta.1",
+    "earnie_version": "2.7.0",
     "solver": "highs",
     "solver_mode": "strict",
     "highspy": "1.15.1",
@@ -14,10 +14,10 @@
   "metrics": {
     "status_optimal": 1,
     "n_slots": 192,
-    "cost_euro": -0.15166249999999992,
-    "import_kwh": 5.3675,
-    "export_kwh": 31.9375,
-    "battery_throughput_kwh": 22.105,
+    "cost_euro": -0.22312499999999996,
+    "import_kwh": 4.9175,
+    "export_kwh": 31.665,
+    "battery_throughput_kwh": 21.4625,
     "plausibility_failures": 0.0
   },
   "plan": {
@@ -25,8 +25,8 @@
     "diff_slots": null
   },
   "baseline": {
-    "git_sha": "98b11d6b12a91c11fc5f31c9f696b3a71046dcba",
-    "recorded_at": "2026-10-28T05:33:35Z",
+    "git_sha": "6cc5144f4803cdc1db6aeb07d66b0f74ed2b1d76",
+    "recorded_at": "2026-11-16T08:26:17Z",
     "source": "update-golden"
   },
   "inputs": {
@@ -39,6 +39,7 @@
       "fixtures/open_meteo/47.4000_9.7000_2025-01-01_2025-12-31_Europe-Vienna_none.json": "cced3026b26261c3",
       "fixtures/open_meteo/47.4040_9.7430_2026-01-01_2026-10-17_Europe-Vienna_18.0_28.0.json": "ba5564dba8d71740",
       "fixtures/prices.csv": "57885d9ae16e27b0",
+      "fixtures/shadow_feed/feed-2026-10-30.jsonl": "957e47cc4cea873d",
       "fixtures/tariffs.json": "7885e56a4c22592a",
       "case.inputs": "bbb1d79301023441"
     },
