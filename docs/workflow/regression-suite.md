@@ -111,6 +111,7 @@ Existing `tests/fixtures/prod_dumps/<id>/` cases are migrated into this format i
 - The mapping from case to customer lives **only** in the private repo (`cases/REG-142/case.yaml` + a local alias, same stable aliases as `.cursor/rules/backlog-anonymize-users.mdc`). Real-name ↔ alias maps stay local and are never committed.
 - **Data minimisation:** intake a dump only when it adds a check (§3a minimum bar) — not every dump is archived.
 - Every report records the **commit SHA of the private repo** (and the public commit) so a release can later be traced to the exact data state. The SHA is taken from `HEAD` only: uncommitted case or golden changes are not visible in it, so the private repo must be clean and pushed before a release run.
+- **Release lines:** the private repo has a branch `release/x.y` per open Earnie release line; that line's clone checks it out, `main` holds the goldens of Earnie `main`. A golden re-recorded for main-only behaviour would otherwise fail the release line's pre-push hook. Cases that apply to both lines go to both branches; `git fetch` before a release run.
 
 ## 7. What is compared
 
