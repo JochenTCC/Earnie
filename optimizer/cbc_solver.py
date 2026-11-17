@@ -102,11 +102,13 @@ def incumbent_gap(prob: pulp.LpProblem, backend: str) -> float | None:
     bound = float(info.mip_dual_bound)
     if not (math.isfinite(primal) and math.isfinite(bound)):
         return None
-    if primal == bound:
+    # Finite floats: the difference is exactly 0 only when both are equal.
+    diff = abs(primal - bound)
+    if not diff:
         return 0.0
-    if primal == 0.0:
+    if not primal:
         return None
-    return abs(primal - bound) / abs(primal)
+    return diff / abs(primal)
 
 
 # Strict-stage status of a solve stopped at its time limit (PuLP calls it ``Optimal``).

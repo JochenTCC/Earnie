@@ -220,3 +220,47 @@ def test_build_cbc_solver_cmd_solves_with_gap():
     prob.solve(build_cbc_solver_cmd(msg=False, gap_rel=0.1))
     assert pulp.LpStatus[prob.status] == "Optimal"
     assert x.value() == pytest.approx(1.0)
+
+
+class _FakeHighsInfo:
+    def __init__(self, primal: float, bound: float) -> None:
+        self.objective_function_value = primal
+        self.mip_dual_bound = bound
+
+
+class _FakeHighsModel:
+    def __init__(self, primal: float, bound: float) -> None:
+        self._info = _FakeHighsInfo(primal, bound)
+
+    def getInfo(self) -> _FakeHighsInfo:  # noqa: N802 - mirrors the highspy API
+        return self._info
+
+
+class _FakeProb:
+    def __init__(self, primal: float, bound: float) -> None:
+        self.solverModel = _FakeHighsModel(primal, bound)
+
+
+@pytest.mark.parametrize(
+    ("primal", "bound", "expected"),
+    [
+        (10.0, 10.0, 0.0),
+        (0.0, 0.0, 0.0),
+        (-0.0, 0.0, 0.0),
+        (0.0, -1.0, None),
+        (10.0, 9.0, 0.1),
+        (-10.0, -11.0, 0.1),
+        (float("inf"), 1.0, None),
+        (1.0, float("nan"), None),
+    ],
+)
+def test_incumbent_gap_edge_cases(primal, bound, expected):
+    gap = cbc_solver.incumbent_gap(_FakeProb(primal, bound), "highs")
+    if expected is None:
+        assert gap is None
+    else:
+        assert gap == pytest.approx(expected)
+
+
+def test_incumbent_gap_unknown_for_cbc():
+    assert cbc_solver.incumbent_gap(_FakeProb(10.0, 9.0), "cbc") is None
