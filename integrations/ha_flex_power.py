@@ -11,6 +11,10 @@ Per flex consumer, the first that applies:
 - ``sens_power_act`` when bound;
 - a consumer without power setpoint (on/off): ``sens_consumer_active`` × nominal power.
 
+Units: the HA carrier pushes a field with an EHAL quantity in its canonical unit
+(``ehal_base_unit``: ``sens_evcs_active_power`` in W), converted here to kW. ``sens_power_act``
+has no EHAL unit: it is pushed as the entity's number and taken as kW, like on Loxone.
+
 A value counts only when it was measured: inbox state ``OK`` or an explicitly pushed 0
 (``0 (gehalten)``), and for the digital run state also the held edge (``Digital (gehalten)``).
 A missing, stale, last-known or assumed-zero value gives **no key**, never 0, so the ledger
@@ -29,6 +33,8 @@ from typing import Callable
 
 from ehal.push_signals import pilot_id
 from ehal.qualified_ids import field_kind
+from integrations.ha_carrier_yaml import ehal_base_unit
+from integrations.ha_units import from_ehal
 from optimizer.consumer_power import uses_power_setpoint
 from runtime_store.ehal_push_inbox import (
     STATE_DIGITAL_HELD,
@@ -52,6 +58,13 @@ ApplySign = Callable[[float, str], float]
 def _is_ev(consumer: dict) -> bool:
     schedule = consumer.get("charging_schedule") or {}
     return consumer.get("type") == "ev" or bool(schedule.get("enabled"))
+
+
+def pushed_power_kw(value: float, qid: str) -> float:
+    """Pushed power of ``qid`` in kW: from its EHAL base unit, or as is without one."""
+    if ehal_base_unit(qid) is None:
+        return value
+    return from_ehal(field_kind(qid), value, "kW")
 
 
 def _binding_qid(consumer: dict, kind: str) -> tuple[str, str] | None:
@@ -122,7 +135,7 @@ def read_ha_flex_chart_kw(
             continue
         if state not in MEASURED_POWER_STATES:
             continue
-        out[cid] = round(apply_sign(float(value), key), 3)
+        out[cid] = round(pushed_power_kw(apply_sign(float(value), key), qid), 3)
     return out
 
 

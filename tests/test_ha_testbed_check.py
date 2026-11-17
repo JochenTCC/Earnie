@@ -11,6 +11,7 @@ from ehal.push_signals import HEARTBEAT_ID, HUB_WRITE_FAILED_ID
 from ehal.qualified_ids import field_kind
 from house_sim.archetype_gen import generate_archetype, write_archetype
 from integrations.ha_carrier_yaml import _sanitize_id
+from integrations.ha_flex_power import pushed_power_kw
 from scripts import ha_testbed_check as chk
 from test_house_sim_archetype_gen import _full_pack
 
@@ -141,9 +142,9 @@ class World:
             (self.automations_off.add if service == "turn_off" else self.automations_off.discard)(data["entity_id"])
 
     def power_samples(self):
-        """The sampler books every consumer power read the inbox holds (kW) — Ledger P9e."""
+        """The sampler books every consumer power read the inbox holds, in kW — Ledger P9e."""
         flex = {
-            ehal_id: float(row["value"])
+            ehal_id: pushed_power_kw(float(row["value"]), ehal_id)
             for ehal_id, row in self.rows.items()
             if field_kind(ehal_id) in ("sens_power_act", "sens_evcs_active_power")
             and ehal_id not in self.silent
@@ -484,6 +485,31 @@ def test_consumer_power_missing_from_the_samples_fails(archetype):
     result = _by_name(chk.run_checks(world.bench(timeout_s=20.0), negative=False))[POWER_CHECK]
     assert result.status == chk.FAIL
     assert "flex_kw {}" in result.detail
+
+
+def _wallbox_only_pushes_power(world: World) -> str:
+    """Every consumer power read pushes 0 except one wallbox at 7400 W; returns its EHAL ID."""
+    reads = [i for i in world.arch.reads() if field_kind(i) in ("sens_power_act", "sens_evcs_active_power")]
+    evcs = next(i for i in reads if field_kind(i) == "sens_evcs_active_power")
+    for ehal_id in reads:
+        world.rows[ehal_id]["value"] = 7400.0 if ehal_id == evcs else 0.0
+    return evcs
+
+
+def test_wallbox_power_in_w_matches_the_sample_in_kw(archetype):
+    world = World(archetype)
+    evcs = _wallbox_only_pushes_power(world)
+    world.power_samples = lambda: [{"ts": "2026-01-01T00:00:00", "flex_kw": {"auto": 7.4}}]
+    result = _by_name(chk.run_checks(world.bench(timeout_s=20.0), negative=False))[POWER_CHECK]
+    assert (result.status, result.detail) == (chk.PASS, evcs)
+
+
+def test_wallbox_power_booked_in_w_fails(archetype):
+    world = World(archetype)
+    _wallbox_only_pushes_power(world)
+    world.power_samples = lambda: [{"ts": "2026-01-01T00:00:00", "flex_kw": {"auto": 7400.0}}]
+    result = _by_name(chk.run_checks(world.bench(timeout_s=20.0), negative=False))[POWER_CHECK]
+    assert result.status == chk.FAIL
 
 
 def test_consumer_power_check_skips_without_samples(archetype):

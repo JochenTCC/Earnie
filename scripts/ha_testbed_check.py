@@ -34,6 +34,7 @@ from ehal.push_signals import HEARTBEAT_ID, HUB_WRITE_FAILED_ID
 from ehal.qualified_ids import field_kind
 from house_sim.archetype_gen import pack_sha256
 from integrations.ha_carrier_yaml import _sanitize_id
+from integrations.ha_flex_power import pushed_power_kw
 from integrations.ha_units import UnitMismatchError, field_quantity, from_ehal, to_ehal
 from runtime_store.ehal_push_inbox import (
     STATE_ZERO_ASSUMED_NEVER,
@@ -560,8 +561,9 @@ _CONSUMER_POWER_KINDS = ("sens_power_act", "sens_evcs_active_power")
 def check_consumer_power_sampled(bench: Bench) -> list[Result]:
     """A consumer power entity reaches the power sampler's ``flex_kw`` (the savings ledger's slot log).
 
-    The newest sample must hold a consumer value equal to the pushed one (kW, 0.01 tolerance).
-    The sample is keyed by consumer, the push by its EHAL ID, so the check matches by value.
+    The newest sample must hold a consumer value equal to the pushed one in kW (0.01
+    tolerance; a wallbox pushes W). The sample is keyed by consumer, the push by its EHAL ID,
+    so the check matches by value.
     """
     name = "consumer power reaches the power sampler (flex_kw)"
     reads = [i for i in bench.archetype.reads() if field_kind(i) in _CONSUMER_POWER_KINDS]
@@ -573,9 +575,12 @@ def check_consumer_power_sampled(bench: Bench) -> list[Result]:
 
     def sampled() -> bool:
         pushed = _last_value(bench.load_inbox().get(ehal_id))
+        if pushed is None:
+            return False
+        pushed_kw = pushed_power_kw(pushed, ehal_id)
         samples = bench.load_power_samples()
         flex = (samples[-1].get("flex_kw") or {}) if samples else {}
-        return pushed is not None and any(abs(float(v) - pushed) <= 0.01 for v in flex.values())
+        return any(abs(float(v) - pushed_kw) <= 0.01 for v in flex.values())
 
     if bench.wait_until(sampled):
         return [Result(name, PASS, ehal_id)]

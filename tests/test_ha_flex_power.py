@@ -108,10 +108,21 @@ def test_run_state_counts_only_for_on_off_consumers():
 
 def test_two_evs_on_one_wallbox_get_no_key(caplog):
     second = EV | {"id": "auto2"}
-    values = {EV_POWER: (7.0, inbox.STATE_OK)}
+    values = {EV_POWER: (7000.0, inbox.STATE_OK)}
     out = hfp.read_ha_flex_chart_kw([EV, second], read_value=_read(values), apply_sign=_no_sign)
     assert out == {}
     assert "share one push signal" in caplog.text
+
+
+def test_wallbox_power_is_pushed_in_w_and_logged_in_kw():
+    """The carrier pushes ``sens_evcs_active_power`` in its EHAL unit W; flex_kw is kW."""
+    from integrations.ha_carrier_yaml import ehal_base_unit
+
+    assert ehal_base_unit(EV_POWER) == "W"
+    values = {EV_POWER: (7400.0, inbox.STATE_OK), HP_POWER: (2.4, inbox.STATE_OK)}
+    out = hfp.read_ha_flex_chart_kw([EV, HP], read_value=_read(values), apply_sign=_no_sign)
+    # sens_power_act has no EHAL unit: pushed as the entity's number, taken as kW
+    assert out == {"auto": 7.4, "wp": 2.4}
 
 
 def test_sign_is_applied_with_the_binding_key():
