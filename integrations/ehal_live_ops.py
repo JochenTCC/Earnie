@@ -86,6 +86,21 @@ def fetch_flexible_consumers_live_kw(
     )
 
 
+def fetch_network_flex_live_kw(consumers: list) -> dict[str, float]:
+    """Measured flex power on a network backend: the heating rods on HA, nothing on OpenEMS.
+
+    Only measured consumers get a key (no fallback). Every other consumer keeps zero power
+    in the planning snapshot and ``cons_data`` on network backends.
+    """
+    from integrations.ehal_live import is_ha_backend
+
+    if not is_ha_backend():
+        return {}
+    from integrations.ha_flex_power import read_ha_heating_rod_kw_live
+
+    return read_ha_heating_rod_kw_live(list(consumers))
+
+
 def fetch_live_power() -> dict | None:
     """Plant live power dict from Loxone push meters (legacy plant-flat path)."""
     from integrations.loxone_live_power import fetch_loxone_live_power

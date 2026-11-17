@@ -428,7 +428,10 @@ def _main_cycle(
         flex_kw_for_matrix: dict[str, float] = {}
         if live_power:
             if ehal_live.is_ehal_network_backend():
-                flex_kw_for_matrix = {}
+                # HA: only the heating rod is measured here; it leaves the base load.
+                flex_kw_for_matrix = ehal_live.fetch_network_flex_live_kw(
+                    config.get_flexible_consumers()
+                )
             else:
                 flex_kw_for_matrix = ehal_live.fetch_flexible_consumers_live_kw()
             matrix_snapshot = live_consumption.build_consumption_snapshot(
@@ -930,9 +933,10 @@ def _main_cycle(
         from optimizer.charging_context import matrix_slot_datetime
 
         if ehal_live.is_ehal_network_backend():
-            flex_kw = {c["id"]: 0.0 for c in live_consumers}
+            measured_flex = ehal_live.fetch_network_flex_live_kw(live_consumers)
+            flex_kw = {c["id"]: measured_flex.get(c["id"], 0.0) for c in live_consumers}
             flex_chart_kw = dict(flex_kw)
-            live_flex_measured: set[str] = set()
+            live_flex_measured: set[str] = set(measured_flex)
         else:
             live_flex = ehal_live.resolve_flexible_consumers_live_power(
                 fallbacks=consumer_powers,

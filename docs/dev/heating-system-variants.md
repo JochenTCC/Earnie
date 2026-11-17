@@ -168,7 +168,12 @@ Live control of the heating rod*). Those bindings stay on the house consumer, no
 entry, in `heating_rod_ehal_bindings` (`house_config/heating_rod_bindings.py`). It is a map of its
 own: in `ehal_bindings`, `canonicalize_consumer_bindings` would rewrite the rod's `set_enable` to
 the heat source's own and `marker_flex_enable` would pick it for the parent. Live caps the rod with
-the store plan (`opp_cap` × efficiency, first calendar day only); the SE has a balance of its own
+the store plan, first calendar day only: beside a fuel source the room up to the charge maximum
+plus the store's draw and loss until midnight (`LiveStorePlan.charge_room_heat_kwh_within`; the
+rod displaces the boiler's heat, so the boiler's normal operation is no floor to subtract — it was
+until 2026-11-17 and left a cap of 0 on every heating day); beside a heat pump the store level of
+the MILP. On HA the rod's measured power leaves the base load like on Loxone
+(`integrations/ha_flex_power.py::read_ha_heating_rod_kw_live`). The SE has a balance of its own
 over the book (`optimizer/rod_store.py`). No Earnie-side fail-safe for the rod (decided 2026-11-05):
 over-temperature and outage behaviour belong to the smart home.
 

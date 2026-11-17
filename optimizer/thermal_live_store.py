@@ -141,8 +141,25 @@ class LiveStorePlan:
     def charge_room_heat_kwh(self) -> float:
         """Heat [kWh] the store can take over the horizon: room up to the charge maximum plus
         the net draw and loss at the band minimum (HeatControl P4; gates whether Live plans)."""
+        return self.charge_room_heat_kwh_within(float(len(self.draw_kw_by_hour)))
+
+    def charge_room_heat_kwh_within(self, hours: float) -> float:
+        """``charge_room_heat_kwh`` over the first ``hours`` of the horizon only.
+
+        A fractional last hour counts with its share. Beside a fuel source this is what a
+        heating rod may add on the first day: the room plus the heat the boiler would
+        otherwise deliver in that time (the rod displaces it).
+        """
+        if hours < 0.0:
+            raise ValueError(f"Speicherplan: Stunden dürfen nicht negativ sein (ist {hours:g}).")
         room = self.capacity_kwh_per_k * (self.charge_max_c - float(self.start_temp_c))
-        return max(0.0, room + sum(self.hourly_draw_at_min_kw()))
+        draw = 0.0
+        for hour, kw in enumerate(self.hourly_draw_at_min_kw()):
+            share = min(1.0, hours - hour)
+            if share <= 0.0:
+                break
+            draw += float(kw) * share
+        return max(0.0, room + draw)
 
     @property
     def charge_room_electric_kwh(self) -> float:

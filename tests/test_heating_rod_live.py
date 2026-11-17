@@ -344,6 +344,64 @@ def test_gas_house_rod_is_capped_by_the_free_store_heat(live):
     assert all(10 <= slot < 14 for slot in _on_slots(model, _ROD_ID))
 
 
+def _drawing_store_plan(start_c: float, *, horizon: int = 24):
+    """A store that loses heat: the boiler would deliver it, the rod may replace it."""
+    from optimizer.thermal_coupled import capacity_kwh_per_k_from_volume
+    from optimizer.thermal_live_store import ThermalBand, plan_live_store_horizon
+
+    return plan_live_store_horizon(
+        start_temp_c=start_c,
+        ambient_forecast_c=[5.0] * horizon,
+        band=ThermalBand(50.0, 5.0),
+        capacity_kwh_per_k=capacity_kwh_per_k_from_volume(500.0),
+        heat_loss_kw_per_k=0.01,
+        wp_electric_kw=15.0,
+        jaz=0.95,
+        persons=2,
+    )
+
+
+def test_gas_house_rod_cap_counts_the_boilers_heat_of_the_first_day(live):
+    """Regression (HA Lab 2026-11-17): the boiler's normal operation was subtracted as a floor,
+    so a store that draws heat left the rod a cap of 0 in every heating day."""
+    from optimizer.thermal_flex_context import live_rod_heat_cap_kwh
+
+    plan = _drawing_store_plan(45.0)
+    profile = _profile(_consumer(_GAS, rod_bindings=_BOUND))
+    live(plan, profile)
+    room = plan.capacity_kwh_per_k * (50.0 - 45.0)
+    draw = sum(plan.hourly_draw_at_min_kw())
+    assert plan.floor_electric_kwh > room  # the old cap: max(0, room - floor) = 0
+    parent = profile["consumers"][0]
+    assert live_rod_heat_cap_kwh(parent, profile, _matrix([30.0] * 24)) == pytest.approx(
+        room + draw, abs=1e-3
+    )
+
+
+def test_gas_house_rod_cap_counts_only_the_draw_until_midnight(live):
+    from optimizer.thermal_flex_context import live_rod_heat_cap_kwh
+
+    plan = _drawing_store_plan(45.0)
+    profile = _profile(_consumer(_GAS, rod_bindings=_BOUND))
+    live(plan, profile)
+    room = plan.capacity_kwh_per_k * (50.0 - 45.0)
+    draw_7h = sum(plan.hourly_draw_at_min_kw()[:7])
+    matrix = _matrix([30.0] * 24, start=17)  # 17:00 … 16:00 next day, one calendar date here
+    for row in matrix[7:]:
+        row["slot_datetime"] = row["slot_datetime"].replace(day=16)
+        row["date"] = date(2024, 1, 16)
+    parent = profile["consumers"][0]
+    assert live_rod_heat_cap_kwh(parent, profile, matrix) == pytest.approx(room + draw_7h, abs=1e-3)
+
+
+def test_gas_house_rod_runs_although_the_boiler_heats_today(live):
+    profile = _profile(_consumer(_GAS, rod_bindings=_BOUND))
+    live(_drawing_store_plan(45.0), profile)
+    model, remaining, _contexts = _solve(_matrix(_CHEAP_NOON), profile)
+    assert remaining[_ROD_ID] > 0.75
+    assert _rod_kwh(model) > 0.0
+
+
 def test_free_heat_below_one_slot_leaves_the_binary_rod_off(live):
     profile = _profile(_consumer(_GAS, rod_bindings=_BOUND))
     live(_store_plan(49.0, jaz=0.95), profile)  # about 0.6 kWh free, one slot delivers 0.75

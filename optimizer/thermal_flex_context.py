@@ -331,15 +331,12 @@ def live_rod_heat_cap_kwh(parent: dict, house_profile: dict, matrix: list) -> fl
 
     Beside an electric source the store level of the MILP caps the rod (HeatControl P4); this
     is only the store's room over the horizon, so the rod gets planned at all. Beside a fuel
-    source it is the cap itself: the store's free capacity beyond the floor. Same plan and same
-    absent-mode setback as the heat source itself. The store plan counts in input energy of the
-    heat source (power or fuel), so × efficiency is its heat.
+    source it is the cap itself, for the first calendar day of the matrix: the room up to the
+    charge maximum plus the store's draw (and loss) until midnight. The rod's heat displaces
+    the boiler's, so that draw is no floor to subtract but heat the rod may deliver. Same plan
+    and same absent-mode setback as the heat source itself.
     """
-    from house_config.heat_source import (
-        consumer_heat_source,
-        heat_source_efficiency,
-        heat_source_is_electric,
-    )
+    from house_config.heat_source import consumer_heat_source, heat_source_is_electric
     from optimizer.absent_mode import resolve_absent_status, thermal_source_with_live_absent
     from optimizer.thermal_live_store import live_store_plan_for_matrix
 
@@ -355,8 +352,16 @@ def live_rod_heat_cap_kwh(parent: dict, house_profile: dict, matrix: list) -> fl
         )
     if heat_source_is_electric(consumer_heat_source(parent)):
         return round(float(plan.charge_room_heat_kwh), 3)
-    efficiency = heat_source_efficiency(consumer_heat_source(parent))
-    return round(float(plan.opp_cap_electric_kwh) * efficiency, 3)
+    return round(float(plan.charge_room_heat_kwh_within(_hours_to_first_midnight(matrix))), 3)
+
+
+def _hours_to_first_midnight(matrix: list) -> float:
+    """Hours from the matrix start to the end of its first calendar day."""
+    from datetime import datetime, time, timedelta
+
+    start = matrix_slot_datetime(matrix, 0)
+    midnight = datetime.combine(start.date() + timedelta(days=1), time(0, 0), tzinfo=start.tzinfo)
+    return (midnight - start).total_seconds() / 3600.0
 
 
 def _live_rod_context(matrix: list, rod: dict, parent: dict, house_profile: dict) -> dict:

@@ -171,3 +171,58 @@ def test_openems_logs_no_consumer_power(tmp_path, monkeypatch):
         read_soc=lambda: 50.0,
     )
     assert sampler.finalize_closed_interval(start, state_path=str(state))["flex_kw"] == {}
+
+
+# --- heating rod: planning snapshot and cons_data on HA (HA Lab 2026-11-17) ------------
+
+ROD_ID = "wp_heating_rod"
+ROD_POWER = f"heatpump.{ROD_ID}.sens_power_act"
+ROD_ACTIVE = f"heatpump.{ROD_ID}.sens_consumer_active"
+ROD = {
+    "id": ROD_ID,
+    "type": "heating_rod",
+    "parent_id": "wp",
+    "nominal_power_kw": 3.0,
+    "signal_type": "binary",
+    "daily_target_source": "heating_rod",
+    "ehal_bindings": {f"heatpump.{ROD_ID}.set_enable": "", ROD_POWER: "", ROD_ACTIVE: ""},
+}
+
+
+def test_rod_qids_are_its_qualified_bindings():
+    assert _qid(ROD, ROD_POWER) == ROD_POWER
+    assert _qid(ROD, ROD_ACTIVE) == ROD_ACTIVE
+
+
+def test_rod_power_is_read_and_other_consumers_are_left_out():
+    values = {ROD_POWER: (3.0, inbox.STATE_OK), HP_POWER: (2.4, inbox.STATE_OK)}
+    out = hfp.read_ha_heating_rod_kw([HP, ROD], read_value=_read(values), apply_sign=_no_sign)
+    assert out == {ROD_ID: 3.0}
+
+
+def test_rod_without_a_meter_counts_run_state_times_nominal_power():
+    rod = ROD | {"ehal_bindings": {f"heatpump.{ROD_ID}.set_enable": "", ROD_ACTIVE: ""}}
+    on = hfp.read_ha_heating_rod_kw(
+        [rod], read_value=_read({ROD_ACTIVE: (1.0, inbox.STATE_OK)}), apply_sign=_no_sign
+    )
+    off = hfp.read_ha_heating_rod_kw(
+        [rod], read_value=_read({ROD_ACTIVE: (0.0, inbox.STATE_ZERO_HELD)}), apply_sign=_no_sign
+    )
+    assert on == {ROD_ID: 3.0}
+    assert off == {ROD_ID: 0.0}
+
+
+def test_unmeasured_rod_gets_no_key_and_a_warning(caplog):
+    out = hfp.read_ha_heating_rod_kw([ROD], read_value=_read({}), apply_sign=_no_sign)
+    assert out == {}
+    assert f"Heizstab '{ROD_ID}'" in caplog.text
+
+
+def test_network_flex_live_kw_reads_rods_on_ha_only(monkeypatch):
+    from integrations import ehal_live, ehal_live_ops
+
+    monkeypatch.setattr(hfp, "read_ha_heating_rod_kw_live", lambda consumers: {ROD_ID: 3.0})
+    monkeypatch.setattr(ehal_live, "is_ha_backend", lambda: True)
+    assert ehal_live_ops.fetch_network_flex_live_kw([ROD]) == {ROD_ID: 3.0}
+    monkeypatch.setattr(ehal_live, "is_ha_backend", lambda: False)
+    assert ehal_live_ops.fetch_network_flex_live_kw([ROD]) == {}

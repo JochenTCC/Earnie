@@ -57,6 +57,7 @@ from integrations.ehal_live_ops import (  # noqa: F401 — façade re-exports
     fetch_heat_feedback,
     fetch_heat_storage_temps,
     fetch_live_power,
+    fetch_network_flex_live_kw,
     fetch_ready_by_time,
     fetch_thermal_readings,
     format_ready_by_display,
