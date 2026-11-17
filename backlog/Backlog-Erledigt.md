@@ -2,6 +2,12 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Ledger v2 — live check on the maintainer's install (2026-11-17)
+
+- [x] **Ledger v2 — live check on the maintainer's install** `[feat]` *(Ledger P9, P10 and the heating rod are merged to `main`, `6d0e6ea9`, 2026-11-11; details in [Erledigt](Backlog-Erledigt.md))*: check the tile „Mit Earnie gespart“ with `savings_v: 2` on the productive install. Tracker row.
+  - **Note:** no heating rod in the maintainer's productive log, so the check has no fuel day.
+  - **Verified (2026-11-17, maintainer):** first full `savings_v: 2` row of 2026-11-13 checked on the productive install; tracker row closed.
+
 ### Bugfix — HeatControl P5: collector charge limit kept the plan out of the band (2026-11-16)
 
 - [x] **HeatControl P5: collector charge limit closed the band for heat the store never has to take** `[fix]` *(found 2026-11-16 in the live check of 2.8.0-dev.23; fixed 2026-11-16 on `main`, `825eb1af`)*: the limit of P5 took the whole collector heat forecast of the following 24 h as room. On the reference plant 0.9 kWh of forecast collector heat closed the band above 4.25 of 5.16 kWh for the night and the next morning, although the house draws about 19 kWh in that time, and the rows capped the generator at the capacity on every slot of a store that starts above its band. With 1.5–1.9 kWh of heat per slot and at most four pulses a day the plan left the band (Live 09:15: 0.8 kWh, warning "Plan hält den Speicher nicht im Band"; savings run up to 3.4 kWh) and `savings_optimized` took 19 s instead of about 3 s (strict stage outside the 10 % gap, gap stage to its 15 s limit). Control was not affected: the Live solves were proven optimal and the setpoints went out.

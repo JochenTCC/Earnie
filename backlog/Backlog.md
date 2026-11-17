@@ -52,9 +52,6 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - [ ] **Tracker:** publish the Sponsors profile before the 2.8 release.
   - **Note (2026-11-02):** 2.7.0 shipped without it; moved from Version 2.7 when the chapter was closed with the official release.
 
-- [ ] **Ledger v2 — live check on the maintainer's install** `[feat]` *(Ledger P9, P10 and the heating rod are merged to `main`, `6d0e6ea9`, 2026-11-11; details in [Erledigt](Backlog-Erledigt.md))*: check the tile „Mit Earnie gespart“ with `savings_v: 2` on the productive install. Tracker row.
-  - **Note:** no heating rod in the maintainer's productive log, so the check has no fuel day.
-
 - [ ] **Horizon simulation: SoC chain per house battery** `[qual]` *(code review of `optimizer/`, 2026-11-11)*: the horizon simulation carries one plant SoC and books it with `aggregate_battery_params_for_load`, that is the capacity of the first house battery and the summed power of all. With several house batteries the plant SoC, the battery action and the grid power of the chart rows therefore belong to a different plant; only the per-battery chart columns follow the MILP's own plan. **Done when:** the simulation keeps a SoC per house battery in both paths and the plant SoC is their capacity-weighted value.
   - **Note — state (2026-11-12):** `commit_hours=1` (slot re-solve) raises with more than one house battery (`simulate_horizon`, `_reject_slot_resolve_with_several_house_batteries`), because that path also gave the MILP the aggregate instead of the battery list. Open loop plans each battery and stays allowed.
   - [ ] **Open loop:** per-battery SoC step in `_chart_row_from_schedule_slot` / `finalize_chart_row_energy` instead of the aggregate; the plant SoC column becomes the capacity-weighted SoC.
