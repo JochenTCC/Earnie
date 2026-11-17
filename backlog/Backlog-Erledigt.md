@@ -2,6 +2,16 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix — Cloud demo inflates the usage ping install counters (2026-11-17)
+
+- [x] **Bugfix — Cloud demo inflates the usage ping install counters** *(found 2026-11-09; fixed 2026-11-09, released in 2.7.1)*: with `EARNIE_CLOUD_DEMO=1` every browser session gets its own temp workspace, so `runtime/` (incl. the usage ping state) starts empty. A visitor who agrees in the consent dialog gets a new `install_id` per session, which counts as a new install (`installs_total`, `explorer`) on `earnie-server`. `runtime_store/usage_ping.py` and `ui/usage_ping_consent.py` do not look at `is_cloud_demo()`.
+  - **Fix (decided 2026-11-09, maintainer):** in the cloud demo show no consent dialog (explorer and editor fallback), hide the toggle on Optimierer-Dienst and send no install ping (`maybe_send_ping` no-op). Demo visits are counted by the session counter instead (**Cloud demo session counter** in `Backlog.md`).
+  - **Done when:** tests for the three paths with `EARNIE_CLOUD_DEMO=1`; German docs (`betrieb.md` § Nutzungsstatistik, `private-env.md`) say the demo sends no install ping.
+  - **Landed (2026-11-09, `main`):** `maybe_send_ping` returns early under `is_cloud_demo()` (also with `force`); consent dialog (explorer + editor fallback) skipped; settings show a note instead of the toggle. Tests in `tests/test_usage_ping.py` and `tests/test_usage_ping_consent.py`; docs `betrieb.md`, `private-env.md`, `docs/workflow/usage-ping.md`.
+  - **Verify:** after the next Community Cloud deploy, open the demo, run a scenario: no consent dialog; no new `explorer` installs from the demo in the dashboard.
+  - **Note:** past demo installs stay in `usage_daily.csv`; they cannot be told apart from real installs afterwards.
+  - **Verified (2026-11-17, Community Cloud on 2.7.1 after a restart):** the welcome hint names the anonymous session count; a Scenario Explorer run on a fresh demo house started without the consent dialog. Dashboard: `demo_sessions` 10 on 2026-11-16, `explorer` installs 5 → 4 → 3 (14.–16.11.), so the demo adds no installs.
+
 ### Ledger v2 — live check on the maintainer's install (2026-11-17)
 
 - [x] **Ledger v2 — live check on the maintainer's install** `[feat]` *(Ledger P9, P10 and the heating rod are merged to `main`, `6d0e6ea9`, 2026-11-11; details in [Erledigt](Backlog-Erledigt.md))*: check the tile „Mit Earnie gespart“ with `savings_v: 2` on the productive install. Tracker row.
