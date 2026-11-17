@@ -154,6 +154,9 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 - [ ] Make a review for Chart1 implementation on Monitor page and check if code related to simulated trajectories might be substituted by results from main.py (to prevent drift / misalignment / code duplication). **Order note:** before the Kumulierte-Kosten review and the pan-to-load spike (both depend on how the charts get their data)
 
+- [ ] **Chart legends — rework the concept** `[feat]` *(2026-11-17)*: the legends take too much room. Today the cockpit charts (Chart 1, Chart 2 and the account view on the analysis page) switch the Plotly legend off and show a collapsible HTML list below the chart (`ui/chart_legend_mobile.py`); other charts (backtesting, consumer cost analysis, price forecast, import check) configure their own Plotly legend. Find one concept for all charts. Options to check: shorter trace labels, legend position by device (phone / tablet / desktop, `ui/s2_viewport.py`), labels directly at the lines instead of a legend, grouping of related traces.
+  - **Done:** concept decided and recorded here; applied to the cockpit charts first; German user docs (`docs/ui/charts.md`) updated where they describe the legend.
+
 - [ ] **Monitor charts — pan-to-load spike** (feasibility + usability → go/no-go; independent of **2.7.a–c** / **2.7.g–h**; after the Chart1 review)
   - **Today:** display range depends on device (`ui/s2_viewport.py`: phone = 24 h segments, desktop/tablet = SA₀→SA₂). Charts get only the data of that default range. Panning with the Plotly drag/pan tool beyond it shows an empty chart. Navigation is via buttons / date picker (`ui/history_navigation.py`, `ui/s2_navigation.py`).
   - **Option A — pan-driven lazy loading:** panning replaces the nav buttons. Data for newly visible ranges is fetched step by step and appended to the charts.
