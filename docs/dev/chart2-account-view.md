@@ -18,10 +18,10 @@ Chart 2 only shows "Ist bisher" left of *Jetzt*. Baseline and optimized trajecto
 - **Account view.** The y axis shows a balance: a falling line means paying, a rising line means earning (feed-in revenue). Value = −cumulative cost.
 - **Full trajectories.** Baseline and optimized cover the whole visible window, past and forecast.
 - **Anchoring, user's choice:**
-  - **"Ist bei Jetzt" (default).** Optimized stays as it is; the baseline is shifted as a whole so that both lines meet at *Jetzt*. The gap at the window start is the saving so far, the gap at the window end is the expected saving.
-  - **"Gemeinsamer Start".** Both lines start at the same balance at the window start. The gap at *Jetzt* is the saving so far, the gap at the window end is the total.
+  - **"Gemeinsamer Start" (default since 2026-11-17).** Both lines start at the same balance at the window start. The gap at *Jetzt* is the saving so far, the gap at the window end is the total.
+  - **"Ist bei Jetzt".** Optimized stays as it is; the baseline is shifted as a whole so that both lines meet at *Jetzt*. The gap at the window end is the expected saving. The gap at the window start has the size of the saving so far, with the baseline on top when Earnie saved.
 - **The switch needs no extra data.** The two modes differ by one constant: the saving so far in the window is added to the baseline. The state is kept for the session (`streamlit-ui-state.mdc`).
-- **Gap colouring.** Green = saving, red = loss, with labels "bisher gespart/Verlust" and "erwartet". In "Ist bei Jetzt" the line on top means opposite things left and right of *Jetzt*; colour and labels carry the meaning.
+- **Gap colouring (decided 2026-11-17).** One rule in both modes, left and right of *Jetzt*: green where the optimized line runs on top, red where it runs below. In "Gemeinsamer Start" green therefore means "saved since the window start". In "Ist bei Jetzt" green left of *Jetzt* means "saved more up to here than up to *Jetzt*": a day that saves steadily is red there, a day that saves early and gives part of it back is green. The first design coloured that side by the saving from the point to *Jetzt* (line on top = opposite meanings left and right); on the live system it read as a wrong colour and was dropped.
 
 - **Where it lives.** The Monitor shows two SA-days: the last closed one, the open one and the plan up to the end of the horizon. Longer periods belong on the page "Analyse Verbrauch & Kosten" (`ui/pages/page_consumer_analysis.py`), in the same presentation. "Ist bei Jetzt" suits this: more history only lengthens the lines to the left.
 
@@ -75,9 +75,9 @@ P7 is on `main` (`a68d2aec`): Chart 2 is visible again in the former presentatio
 - **Slot states** (`ui.chart_account_view.SLOT_*`): `counted`, `skipped` (ledger did not count it), `no_data` (no ledger record: chain not running, before the chain start, unreadable slot file), `pending` (open day after the last booked slot: the daemon books it once it closes), `plan`. `skipped` and `no_data` are orange and count zero on both sides; `pending` counts zero without a mark. A log slot without data (`SLOT_MISSING`) is orange too.
 - **Anchor** = the display's `history_slot_count`, a slot boundary: 0 for a window in the future, the slot count for one fully in the past.
 - **Consumption control** = remaining baseline minus optimized energy: `Σ_{i≥k}(base_i − opt_i)` plus the plan energy after the window (`hourly_*_consumption_after_window_kwh` in `savings_view`), so it is zero at the horizon end on a phone's 24 h segment too. Left of *Jetzt* both sides count zero (savings_v 1 reuses the logged load).
-- **Gap colouring:** the area between the lines is split where they cross; the sign of the gap (positive = saved, in both modes) picks green or red. 0,00 € is neither (`saving_color`).
-- **Labels:** "Bisher" (window start in "Ist bei Jetzt", *Jetzt* in "Gemeinsamer Start"), "Erwartet" / "Gesamt" at the window end, "Plan" for a window without past; closed days "Ergebnis" with "unvollständig"; the open day's SoC correction at *Jetzt*.
-- **Switch state:** `st.session_state["chart2_anchor_mode"]`, radio inside the Chart 2 fragment, default "Ist bei Jetzt".
+- **Gap colouring:** the area between the lines is split where they cross; the sign of the gap (optimized minus baseline as drawn, in both modes) picks green or red. Labels take their colour from their own amount; 0,00 € is neither (`saving_color`).
+- **Labels:** "Bisher" at *Jetzt* (on the gap in "Gemeinsamer Start"; at the top of the panel in "Ist bei Jetzt", where the lines meet), "Erwartet" / "Gesamt" at the window end, "Plan" for a window without past; closed days "Ergebnis" with "unvollständig"; the open day's SoC correction at *Jetzt*. No label is anchored at the window start: the Monitor window starts at the sunrise, inside the first slot, and Plotly drops a label anchored left of the x range.
+- **Switch state:** `st.session_state["chart2_anchor_mode"]`, radio inside the Chart 2 fragment, default "Gemeinsamer Start".
 
 ## 9. Analysis page (P3)
 

@@ -90,18 +90,18 @@ def test_with_ledger_state_the_chart_draws_the_booked_lines(tmp_path, monkeypatc
     assert "Mit Earnie (gebucht)" in _chart_spec(at)
     assert not any("Ersparnis-Buch" in text for text in _captions(at))
     assert "Bisher: 0,20 € gespart" in _labels(at)
-    assert "Erwartet: 0,04 € gespart" in _labels(at)
+    assert "Gesamt: 0,24 € gespart" in _labels(at)
 
 
-def test_anchor_switch_defaults_to_now_and_keeps_the_choice(tmp_path, monkeypatch):
+def test_anchor_switch_defaults_to_the_common_start_and_keeps_the_choice(tmp_path, monkeypatch):
     _with_ledger(tmp_path, monkeypatch)
     at = _run(tmp_path, monkeypatch)
-    assert at.session_state[SESSION_ANCHOR_MODE] == ANCHOR_NOW
+    assert at.session_state[SESSION_ANCHOR_MODE] == ANCHOR_START
 
-    at.radio(key=SESSION_ANCHOR_MODE).set_value(ANCHOR_START).run()
+    at.radio(key=SESSION_ANCHOR_MODE).set_value(ANCHOR_NOW).run()
     assert not at.exception
-    assert "Gesamt: 0,24 € gespart" in _labels(at)
+    assert "Erwartet: 0,04 € gespart" in _labels(at)
 
     at.run()
-    assert at.session_state[SESSION_ANCHOR_MODE] == ANCHOR_START
-    assert "Gesamt: 0,24 € gespart" in _labels(at)
+    assert at.session_state[SESSION_ANCHOR_MODE] == ANCHOR_NOW
+    assert "Erwartet: 0,04 € gespart" in _labels(at)

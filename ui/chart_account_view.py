@@ -3,7 +3,9 @@
 Spec ``docs/dev/chart2-account-view.md`` §§ 3–5. A balance is the negative cumulative
 cost: a falling line means paying. Both lines start at 0 € at the window start; the
 mode "Ist bei Jetzt" shifts the baseline by the saving so far, so both lines meet at
-*Jetzt*. The gap is signed like the ledger: positive = saved.
+*Jetzt*. The gap is optimized minus baseline as drawn: positive = the optimized line
+runs on top. In "Gemeinsamer Start" that is the saving since the window start; in
+"Ist bei Jetzt" it is that saving minus the saving so far.
 
 Slots left of *Jetzt* come from the savings ledger (optimized = ``cost_with``,
 baseline = ``cost_without``); slots right of it from the plan. Skipped slots and
@@ -131,14 +133,7 @@ def build_account_view(slots: AccountSlots, mode: str) -> AccountView:
     after = sum(savings[anchor:])
     shift = so_far if mode == ANCHOR_NOW else 0.0
     baseline = [value + shift for value in raw_baseline]
-    if mode == ANCHOR_NOW:
-        # Left of Jetzt: saved from here to Jetzt; right of it: saved from Jetzt to here.
-        gap = [
-            (baseline[k] - optimized[k]) if k < anchor else (optimized[k] - baseline[k])
-            for k in range(len(optimized))
-        ]
-    else:
-        gap = [optimized[k] - baseline[k] for k in range(len(optimized))]
+    gap = [optimized[k] - baseline[k] for k in range(len(optimized))]
     remaining = slots.baseline_after_window_kwh - slots.optimized_after_window_kwh
     consumption = [remaining]
     for base_kwh, opt_kwh in zip(reversed(slots.baseline_kwh), reversed(slots.optimized_kwh)):
@@ -161,7 +156,10 @@ def build_account_view(slots: AccountSlots, mode: str) -> AccountView:
 
 @dataclass(frozen=True)
 class GapRun:
-    """One stretch between the two lines with one sign; positions are fractional boundaries."""
+    """One stretch between the two lines with one sign; positions are fractional boundaries.
+
+    ``saving``: the optimized line runs on top there (drawn green).
+    """
 
     saving: bool
     positions: tuple[float, ...]

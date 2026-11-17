@@ -74,11 +74,11 @@ def test_period_shows_the_saving_of_the_window(tmp_path, monkeypatch):
 
 def test_period_switch_has_its_own_state(tmp_path, monkeypatch):
     at = _run(tmp_path, monkeypatch)
-    assert at.session_state[_KEY] == ANCHOR_NOW
+    assert at.session_state[_KEY] == ANCHOR_START
     assert SESSION_ANCHOR_MODE not in at.session_state
 
-    at.radio(key=_KEY).set_value(ANCHOR_START).run()
+    at.radio(key=_KEY).set_value(ANCHOR_NOW).run()
 
     assert not at.exception
-    assert at.session_state[_KEY] == ANCHOR_START
+    assert at.session_state[_KEY] == ANCHOR_NOW
     assert "Zeitraum: 0,25 € gespart" in _labels(at)

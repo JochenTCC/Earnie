@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 import pytest
 
+from data.planning_window import UiChartWindow
 from ui.chart_account_render import (
     account_slots,
     build_account_figure,
@@ -66,7 +67,8 @@ def test_lines_meet_at_jetzt_and_the_gaps_are_the_savings():
     start = build_account_view(_EXAMPLE, ANCHOR_START)
 
     assert now.optimized[2] == pytest.approx(now.baseline[2])
-    assert now.gap[0] == pytest.approx(0.3)  # saved from the window start to Jetzt
+    # The baseline is shifted up by the saving so far, so it starts above the optimized line.
+    assert now.gap[0] == pytest.approx(-0.3)
     assert now.gap[-1] == pytest.approx(0.1)  # expected from Jetzt to the end
     assert start.gap[0] == pytest.approx(0.0)
     assert start.gap[2] == pytest.approx(0.3)
@@ -112,7 +114,7 @@ def test_window_fully_in_the_past_is_anchored_at_its_end():
 
     assert not now.has_future
     assert now.optimized[-1] == pytest.approx(now.baseline[-1])
-    assert now.gap[0] == pytest.approx(0.1)
+    assert now.gap[0] == pytest.approx(-0.1)
     assert start.gap[-1] == pytest.approx(0.1)
     assert now.saving_after_eur == 0.0
     assert not now.flag_energy_difference
@@ -131,11 +133,16 @@ def test_gap_runs_split_where_the_lines_cross():
     assert runs[0].optimized[-1] == pytest.approx(runs[0].baseline[-1])
 
 
-def test_ist_bei_jetzt_colours_saving_on_both_sides():
-    runs = gap_runs(build_account_view(_EXAMPLE, ANCHOR_NOW))
+def test_gap_is_green_where_the_optimized_line_runs_on_top_in_both_modes():
+    # Decided 2026-11-17: one rule for the colour, left and right of Jetzt.
+    now = gap_runs(build_account_view(_EXAMPLE, ANCHOR_NOW))
+    start = gap_runs(build_account_view(_EXAMPLE, ANCHOR_START))
 
-    assert [run.saving for run in runs] == [True, True]
-    assert runs[0].positions[-1] == 2.0 and runs[1].positions[0] == 2.0
+    # "Ist bei Jetzt": the shifted baseline runs on top up to Jetzt, although Earnie saved there.
+    assert [run.saving for run in now] == [False, True]
+    assert now[0].positions[-1] == 2.0 and now[1].positions[0] == 2.0
+    assert all(o < b for o, b in zip(now[0].optimized[:-1], now[0].baseline[:-1]))
+    assert [run.saving for run in start] == [True]
 
 
 @pytest.mark.parametrize(
@@ -254,6 +261,29 @@ def test_window_without_past_reads_plan():
     fig = build_account_figure(_frame(), slots, view, ledger=None, chart_window=None)
 
     assert [a.text for a in fig.layout.annotations] == ["Plan: 0,10 € gespart"]
+
+
+@pytest.mark.parametrize("mode", [ANCHOR_NOW, ANCHOR_START])
+def test_bisher_label_stands_at_jetzt_inside_a_window_that_starts_within_the_first_slot(mode):
+    # The Monitor window starts at the sunrise; Plotly drops a label anchored left of the x range.
+    sunrise = _START + timedelta(minutes=1)
+    window = UiChartWindow(
+        start=sunrise, end=_START + _QUARTER * 4, sa0=sunrise, sa1=sunrise + timedelta(days=1),
+        sa2=sunrise + timedelta(days=2), segment_index=0, slot_datetimes=(), span="full",
+    )
+    view_data = _savings_view([SLOT_COUNTED, SLOT_PENDING, SLOT_PLAN, SLOT_PLAN])
+    slots = account_slots(view_data, history_slot_count=2, slot_count=4)
+    view = build_account_view(slots, mode)
+
+    fig = build_account_figure(
+        _frame(), slots, view, ledger=view_data["ledger_savings"], chart_window=window
+    )
+
+    label = next(a for a in fig.layout.annotations if a.text.startswith("Bisher"))
+    assert label.x == _START + _QUARTER * 2
+    assert fig.layout.xaxis.range[0] == sunrise < label.x
+    # "Ist bei Jetzt" has no gap at Jetzt to sit on: the label hangs at the top of the panel.
+    assert (label.yref == "paper") is (mode == ANCHOR_NOW)
 
 
 # --- Account view P3: the analysis page's 7 / 28-day window -----------------------------

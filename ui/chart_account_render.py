@@ -1,7 +1,8 @@
 """Chart 2 as an account view: Streamlit and Plotly (spec ``docs/dev/chart2-account-view.md``).
 
 The money panel shows two balances from 0 € at the window start, the gap between them
-coloured green (saved) or red (more spent), and labels without a sign. The panel below
+coloured green where the line with Earnie runs on top and red where it runs below, and
+labels without a sign. The panel below
 checks that both sides were costed with the same consumption. The Monitor offers the
 anchor switch; the Scenario Explorer window has no *Jetzt*, so both modes coincide
 there and the switch is not shown.
@@ -55,7 +56,7 @@ from ui.saving_text import saving_is_loss, saving_text, soc_correction_text
 
 CHART2_TITLE = "Kontostand: mit und ohne Earnie"
 SESSION_ANCHOR_MODE = "chart2_anchor_mode"
-ANCHOR_LABELS = {ANCHOR_NOW: "Ist bei Jetzt", ANCHOR_START: "Gemeinsamer Start"}
+ANCHOR_LABELS = {ANCHOR_START: "Gemeinsamer Start", ANCHOR_NOW: "Ist bei Jetzt"}
 
 CHART2_HELP = (
     "Die Linien zeigen den **Kontostand seit Fensterstart**: Stromkosten und "
@@ -64,11 +65,14 @@ CHART2_HELP = (
     "aus dem Ersparnis-Buch: mit Earnie und ohne Earnie (Batterie im Herstellermodus, "
     "gleicher Verbrauch, gleiche PV, gleiche Preise). **Rechts von Jetzt** steht der Plan: "
     "optimiert und BL Ziel, das ab dem Speicherstand der Vergleichsbatterie rechnet. Die "
-    "Vergleichslinie ändert bei Jetzt also ihre Bedeutung. **Ist bei Jetzt** verschiebt sie so, dass sich "
-    "beide Linien bei Jetzt treffen: Der Abstand am Fensterstart ist das bisher Gesparte, "
-    "der Abstand am Fensterende das Erwartete. **Gemeinsamer Start** lässt beide bei 0 € "
-    "beginnen: Der Abstand bei Jetzt ist das bisher Gesparte, am Ende das Gesamte. Grün "
-    "heißt gespart, rot mehr ausgegeben; Beträge stehen ohne Vorzeichen. Die "
+    "Vergleichslinie ändert bei Jetzt also ihre Bedeutung. **Gemeinsamer Start** lässt beide "
+    "Linien bei 0 € beginnen: Der Abstand bei Jetzt ist das bisher Gesparte, am Ende das "
+    "Gesamte. **Ist bei Jetzt** verschiebt die Vergleichslinie so, dass sich beide bei Jetzt "
+    "treffen: Der Abstand am Fensterende ist das Erwartete, das bisher Gesparte steht als "
+    "Label bei Jetzt. Die Fläche ist grün, wo die Linie mit Earnie oben liegt, sonst rot. "
+    "Bei Gemeinsamer Start heißt grün: seit Fensterstart gespart. Bei Ist bei Jetzt heißt "
+    "grün links von Jetzt: bis dahin mehr gespart als bis Jetzt. Beträge stehen ohne "
+    "Vorzeichen. Die "
     "**SoC-Korrektur** (Speicherstand gegenüber der Vergleichsbatterie, bewertet) steckt "
     "in keinem Abstand und steht als eigenes Label, für den Plan als **SoC am Ende**. "
     "Orange Slots hat das Buch nicht "
@@ -258,7 +262,13 @@ def _add_gap_labels(
         return
     so_far = f"{so_far_name}: {saving_text(view.saving_so_far_eur)}"
     if view.mode == ANCHOR_NOW:
-        _gap_label(fig, times, view, 0, so_far, view.saving_so_far_eur, xanchor="left")
+        # The lines meet at Jetzt, so the saving so far has no gap of its own colour to sit on:
+        # the gap at the window start is red when Earnie saved. It stands at Jetzt, above the lines.
+        fig.add_annotation(
+            x=times[view.anchor], y=1.0, xref="x", yref="paper", yanchor="top", xanchor="right",
+            text=so_far, showarrow=False,
+            font=dict(**_LABEL_FONT, color=saving_color(view.saving_so_far_eur)),
+        )
         if view.has_future:
             _gap_label(fig, times, view, n, f"Erwartet: {saving_text(view.saving_after_eur)}",
                        view.saving_after_eur, xanchor="right")
@@ -499,7 +509,7 @@ def _anchor_mode(view_has_past: bool, key_prefix: str) -> str:
         return ANCHOR_START
     key = f"{key_prefix}{SESSION_ANCHOR_MODE}"
     if st.session_state.get(key) not in ANCHOR_LABELS:
-        st.session_state[key] = ANCHOR_NOW
+        st.session_state[key] = ANCHOR_START
     return st.radio(
         "Verankerung",
         options=list(ANCHOR_LABELS),
@@ -557,9 +567,10 @@ PERIOD_HELP = (
     "Kontostand seit Fensterstart aus dem Ersparnis-Buch: gebuchte Stromkosten und "
     "Einspeiseerlöse mit Earnie und ohne Earnie (Batterie im Herstellermodus, gleicher "
     "Verbrauch, gleiche PV, gleiche Preise), ohne Grund- und Netzgebühren. Fällt die Linie, "
-    "wird bezahlt. **Ist bei Jetzt** lässt beide Linien am Fensterende enden, der Abstand am "
-    "Fensterstart ist die Ersparnis des Zeitraums; **Gemeinsamer Start** lässt beide bei 0 € "
-    "beginnen. Das Panel darunter zeigt die Ersparnis seit Fensterstart allein, auf eigener "
+    "wird bezahlt. **Gemeinsamer Start** lässt beide Linien bei 0 € beginnen, der Abstand am "
+    "Fensterende ist die Ersparnis des Zeitraums; **Ist bei Jetzt** lässt beide am Fensterende "
+    "enden. Die Fläche ist grün, wo die Linie mit Earnie oben liegt, sonst rot. "
+    "Das Panel darunter zeigt die Ersparnis seit Fensterstart allein, auf eigener "
     "Skala: grün gespart, rot mehr ausgegeben. Die SoC-Korrekturen der abgeschlossenen Tage "
     "stecken in keinem Abstand, die Zeile unter dem Chart nennt ihre Summe. Orange Slots hat "
     "das Buch nicht gezählt, sie zählen auf beiden Seiten null; unvollständige Tage sind "
