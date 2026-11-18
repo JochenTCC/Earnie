@@ -2,6 +2,13 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### 2.7.2 official release (2026-11-18)
+
+- [x] **2.7.2 official release** `[dev]`: `version.py` **2.7.2** and release notes [`.github/release-notes/v2.7.2.md`](../.github/release-notes/v2.7.2.md) (baseline 2.7.1, maintainer-approved): support package in the sidebar "Sichern & Übertragen", config-pack import rejects unloadable packs, example configs load as a set.
+  - First run (tag on `701b3eee`) failed in the deploy tariff gate before any image or release was published (see the bugfix entry below). Tag `v2.7.2` deleted and re-created on the fix `7d685ada` (maintainer decision, deliberate exception to the playbook's no-rewrite rule: no image or release existed for the first tag).
+  - Second run (Actions run 44354916231): `release`, `addon_smoke` (amd64, aarch64), `addon_lint`, `qemu_smoke` green; `promote` approved, `publish_ha_addon` green; GitHub Release "Earnie 2.7.2" published as Latest (2026-11-18).
+  - Open: reset `streamlitcloud` to the tag and reboot the Streamlit Cloud app; live verification of the two config-pack items in `Backlog-Bugfixes.md` § Verifications Pending in the demo.
+
 ### Bugfix deploy tariff gate vs example scenarios (2026-11-18)
 
 - [x] **Bugfix — Release build fails in the deploy tariff gate** `[dev]` *(found 2026-11-18, first `v2.7.2` run)*: `scripts/build_container.py::_run_deploy_tariff_gate` validated `backtesting_scenarios.example.json` against the catalog `tariffs.json`, but the example-config fix `d7903efe` points the example scenarios at `fixed_37ct` / `monthly_sunny` from `tariffs.example.json` (so the example pack loads as a set). The gate now checks the catalog (schema + DACH coverage) and the example set (example scenarios against `tariffs.example.json`) separately. Tests in `tests/test_build_container.py` run the gate on the shipped files, so a red gate shows up in the suite instead of CI. No image or release was published by the failed run; tag `v2.7.2` was moved to the fixed commit (maintainer decision). Same gate on `main` (tracker).
