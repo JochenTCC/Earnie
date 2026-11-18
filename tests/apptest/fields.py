@@ -220,7 +220,6 @@ SCENARIO_FIELDS = [
     _scen("text_input", "scenario_label", "label", "Neu Ünï – 日本 🏠"),
     _scen("text_input", "scenario_label", "label", "S"),
     _scen("checkbox", "scenario_enabled", "enabled", False),
-    _scen("checkbox", "scenario_own_reference", "own_reference", True),
     _scen("selectbox", "scenario_import", "settings.import_tariff_id",
           "aWATTar Österreich", stored="awattar_at"),
     _scen("selectbox", "scenario_profile", "settings.house_profile_id",

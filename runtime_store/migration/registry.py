@@ -45,6 +45,9 @@ from runtime_store.migration.steps.deviation_energy_shortfall import (
 from runtime_store.migration.steps.forced_charge_hint import STEP as FORCED_CHARGE_HINT
 from runtime_store.migration.steps.netznutzung_split import STEP as NETZNUTZUNG_SPLIT
 from runtime_store.migration.steps.scenario_feed_in import STEP as SCENARIO_FEED_IN
+from runtime_store.migration.steps.scenario_own_reference_removal import (
+    STEP as SCENARIO_OWN_REFERENCE_REMOVAL,
+)
 from runtime_store.migration.steps.se_conf_defaults import STEP as SE_CONF_DEFAULTS
 from runtime_store.migration.steps.tariff_format import STEP as TARIFF_FORMAT
 from runtime_store.migration.steps.topology import STEP as TOPOLOGY
@@ -88,6 +91,7 @@ STEPS: tuple[MigrationStep, ...] = (
     HOUSE_COOLING,
     WALLBOXES,
     DEBUG_DUMP_FLAG_REMOVAL,
+    SCENARIO_OWN_REFERENCE_REMOVAL,
     CONSUMER_BARE_BINDINGS,
     TARIFF_FORMAT,
     GRID_AREA_LEVIES,

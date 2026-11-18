@@ -315,7 +315,6 @@ def write_pack(house: DerivedHouse, params: dict, root: Path, *, annual_kwh: flo
         {
             "id": sid,
             "label": f"{house.id} {sid}",
-            "own_reference": True,
             "settings": {
                 "battery_ids": battery_ids,
                 "pv_system_ids": pv_ids,

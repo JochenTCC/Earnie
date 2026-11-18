@@ -97,20 +97,3 @@ def test_fingerprint_ignores_unrelated_private_keys():
     fp_a = compute_backtesting_fingerprint(["live"], {"live": scenario_a})
     fp_b = compute_backtesting_fingerprint(["live"], {"live": scenario_b})
     assert fp_a == fp_b
-
-
-def test_fingerprint_changes_when_own_reference_changes():
-    settings = {"live": {"battery_capacity_kwh": 5.0, "pv_kwp": 10.0}}
-    fp_auto = compute_backtesting_fingerprint(["live"], settings)
-    fp_forced = compute_backtesting_fingerprint(
-        ["live"],
-        settings,
-        own_reference_by_id={"live": True},
-    )
-    fp_off = compute_backtesting_fingerprint(
-        ["live"],
-        settings,
-        own_reference_by_id={"live": False},
-    )
-    assert fp_auto != fp_forced
-    assert fp_forced != fp_off

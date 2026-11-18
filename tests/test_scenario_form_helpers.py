@@ -164,7 +164,6 @@ def test_new_scenario_template_clones_last_selected_not_live():
             "label": "Live",
             "enabled": True,
             "settings": {"battery_ids": ["bat_live"]},
-            "own_reference": False,
         },
         {
             "id": "ohne_pv",
@@ -174,7 +173,6 @@ def test_new_scenario_template_clones_last_selected_not_live():
                 "battery_ids": ["bat1"],
                 "pv_system_ids": ["pv1", "pv2"],
             },
-            "own_reference": True,
         },
     ]
     template = new_scenario_template(
@@ -182,7 +180,7 @@ def test_new_scenario_template_clones_last_selected_not_live():
     )
     assert template["label"] == "Ohne PV copy"
     assert template["enabled"] is False
-    assert template["own_reference"] is True
+    assert "own_reference" not in template
     assert template["settings"]["battery_ids"] == ["bat1"]
     assert template["settings"]["pv_system_ids"] == ["pv1", "pv2"]
 
@@ -440,15 +438,11 @@ def test_normalize_scenario_form_snapshot_keeps_enabled_false():
     assert snapshot["enabled"] is False
 
 
-def test_normalize_scenario_form_snapshot_keeps_own_reference():
+def test_normalize_scenario_form_snapshot_has_no_own_reference():
     snapshot = normalize_scenario_form_snapshot(
-        {
-            "label": "Ref",
-            "own_reference": True,
-            "settings": {"battery_ids": ["bat1"]},
-        },
+        {"label": "Ref", "settings": {"battery_ids": ["bat1"]}},
     )
-    assert snapshot["own_reference"] is True
+    assert "own_reference" not in snapshot
 
 
 def test_ordered_user_scenario_ids_live_first_then_file_order():

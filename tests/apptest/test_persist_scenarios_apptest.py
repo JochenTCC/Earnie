@@ -124,7 +124,7 @@ def test_t5_several_fields_changed_are_all_persisted() -> None:
     by_key = {}
     for spec in SCENARIO_FIELDS:
         by_key.setdefault(spec.suffix, spec)
-    picks = ["scenario_enabled", "scenario_own_reference", "scenario_battery"]
+    picks = ["scenario_enabled", "scenario_battery"]
     at = _new_session()
     for suffix in picks:
         _widget(at, by_key[suffix]).set_value(by_key[suffix].valid)
@@ -143,3 +143,14 @@ def test_t8_second_session_sees_value_saved_by_first() -> None:
 def test_live_scenario_label_is_locked() -> None:
     at = AppTest.from_file(str(_SCRIPT)).run(timeout=_TIMEOUT_S)
     assert at.text_input(key="live__scenario_label").disabled
+
+
+def test_live_scenario_is_always_active_for_the_scenario_explorer() -> None:
+    """Live always runs in the SE: its box is ticked and locked, no own-reference box."""
+    at = _new_session("Live")
+    box = at.checkbox(key="live__scenario_enabled")
+    assert box.value is True
+    assert box.disabled is True
+    assert not [w for w in at.checkbox if str(w.key).endswith("scenario_own_reference")]
+    other = _widget(_new_session(), next(s for s in SCENARIO_FIELDS if s.suffix == "scenario_enabled"))
+    assert other.disabled is False

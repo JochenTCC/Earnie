@@ -56,7 +56,7 @@ def run_house(root: Path, args: argparse.Namespace) -> float:
     command = [
         "-m", "scripts.run_reference_ladder", "--workers", str(args.workers), "--output-dir", str(out_dir),
         "--start-month", str(args.start_month), "--end-month", str(args.end_month),
-        "--skip-historical-reference",
+        "--references", "l0",
     ]
     if not args.sensitivity:
         command.append("--skip-sensitivity")

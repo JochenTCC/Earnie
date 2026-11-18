@@ -19,6 +19,7 @@ from simulation.booked_consumption import BOOKED_CONSUMPTION_KEY
 from simulation.capacity_charge import CAPACITY_KEY, SE_CAUSE_LABELS_DE
 from simulation.reference_costs import LADDER_L2
 from simulation.jahres_verbrauch import jahres_standby_kwh, jahres_verbrauch_kwh
+from ui.backtesting_baseline import SeBaseline
 from ui.consumption_validation_charts import cons_data_monthly_kwh
 from ui.number_format import format_decimal, format_euro
 from ui.saving_text import saving_text, soc_correction_text
@@ -269,11 +270,11 @@ def build_scenario_consumption_rows(
             {
                 "Szenario": label,
                 "Ohne PV und Speicher [kWh]": _format_kwh(historical_kwh),
-                "Reference (Live) - ohne Optimierung [kWh]": _format_kwh(live_ref_kwh),
+                "Referenz ohne Speicher (Live) [kWh]": _format_kwh(live_ref_kwh),
                 "Soll Fenster [kWh]": _format_kwh(totals.get("historical_kwh")),
                 "Geplant MILP [kWh]": _format_kwh(totals.get("optimized_kwh")),
                 "Optimiert (kWh)": _format_kwh(booked_kwh),
-                "Δ kWh (Ref. ohne Optimierung)": _format_delta_kwh(delta),
+                "Δ kWh (Referenz ohne Speicher)": _format_delta_kwh(delta),
                 "Hinweis": _timing_shift_note(
                     scenario_id,
                     totals,
@@ -296,17 +297,6 @@ def _resolve_live_scenario_id(meta: dict) -> str | None:
         return str(config.get_live_scenario_id())
     except Exception:
         return None
-
-
-def _live_reference_total_eur(meta: dict, totals: dict[str, float]) -> float | None:
-    """€ total of the Live scenario reference row (Referenz Live)."""
-    live_id = _resolve_live_scenario_id(meta)
-    if not live_id:
-        return None
-    live_ref = scenario_reference_id(live_id)
-    if live_ref not in totals:
-        return None
-    return float(totals[live_ref])
 
 
 def _annual_cost_row_order(meta: dict, totals: dict[str, float]) -> list[str]:
@@ -557,8 +547,32 @@ def capacity_skipped_text(meta: dict) -> str | None:
     return ", ".join(f"{cid} (Status {status})" for cid, status in sorted(skipped.items()))
 
 
-def build_annual_cost_rows(meta: dict) -> list[dict]:
-    """Gesamtkosten rows; Jahres Verbrauch / Standby from the booked series of every row."""
+_DELTA_COLUMN_WITHOUT_BASELINE = "Δ [€]"
+
+
+def _baseline_delta_cell(
+    meta: dict,
+    scenario_id: str,
+    total_eur: float,
+    totals: dict,
+    baseline: SeBaseline | None,
+    live_id: str | None,
+) -> str:
+    """Booked cost of the scenario minus its baseline's; dash without one or against itself."""
+    if baseline is None:
+        return _DASH
+    base_id = baseline.result_id(meta, scenario_id, live_id)
+    if base_id is None or base_id == scenario_id or base_id not in totals:
+        return _DASH
+    return format_euro(total_eur - float(totals[base_id]), signed=True)
+
+
+def build_annual_cost_rows(meta: dict, baseline: SeBaseline | None) -> list[dict]:
+    """Gesamtkosten rows; Jahres Verbrauch / Standby from the booked series of every row.
+
+    ``baseline``: what the Δ column compares every optimized scenario with
+    (``ui.backtesting_baseline``); ``None`` leaves it empty.
+    """
     summary = meta.get("summary", {})
     totals = _totals_with_fuel(meta, summary.get("total_eur", {}))
     show_fuel = any(
@@ -568,9 +582,9 @@ def build_annual_cost_rows(meta: dict) -> list[dict]:
     labels = meta.get("labels", {})
     ref_id = meta.get("reference_id", HISTORICAL_REFERENCE_ID)
     booked = _booked(meta)
-    live_ref_total = _live_reference_total_eur(meta, totals)
     live_id = _resolve_live_scenario_id(meta)
     live_ref_kwh = _live_reference_kwh(meta)
+    delta_column = baseline.column if baseline is not None else _DELTA_COLUMN_WITHOUT_BASELINE
     # Hidden switch: without ``rule_reference`` the table has no Standard-Regeln column.
     rule_reference = is_rule_reference_enabled()
 
@@ -606,15 +620,13 @@ def build_annual_cost_rows(meta: dict) -> list[dict]:
                     **_heat_fuel_cells(meta, scenario_id, show_fuel=show_fuel),
                     "Jahres Kosten [€]": format_euro(total_eur),
                     **({_STANDARD_RULES_COLUMN: _DASH} if rule_reference else {}),
-                    "Δ vs Referenz [€]": _DASH,
+                    delta_column: _DASH,
                     "Hinweis": hinweis,
                 }
             )
             continue
 
-        delta_cell = _DASH
-        if live_ref_total is not None:
-            delta_cell = format_euro(total_eur - live_ref_total, signed=True)
+        delta_cell = _baseline_delta_cell(meta, scenario_id, total_eur, totals, baseline, live_id)
         rows.append(
             {
                 "Szenario": label,
@@ -628,7 +640,7 @@ def build_annual_cost_rows(meta: dict) -> list[dict]:
                     if rule_reference
                     else {}
                 ),
-                "Δ vs Referenz [€]": delta_cell,
+                delta_column: delta_cell,
                 "Hinweis": hinweis,
             }
         )

@@ -293,8 +293,6 @@ def new_scenario_template(
         "enabled": source.get("enabled", True) is not False,
         "settings": copy.deepcopy(dict(source.get("settings") or {})),
     }
-    if "own_reference" in source:
-        out["own_reference"] = bool(source.get("own_reference"))
     return out
 
 
@@ -420,8 +418,6 @@ def normalize_scenario_form_snapshot(scenario: dict) -> dict:
         "enabled": scenario.get("enabled", True) is not False,
         "settings": settings,
     }
-    if "own_reference" in scenario:
-        out["own_reference"] = bool(scenario.get("own_reference"))
     return out
 
 
@@ -563,9 +559,6 @@ def read_scenario_form_snapshot(
         ),
         "settings": settings,
     }
-    own_ref_key = scoped_widget_key(session_scope, "scenario_own_reference")
-    if own_ref_key in session_state:
-        snapshot_src["own_reference"] = bool(session_state.get(own_ref_key))
     return normalize_scenario_form_snapshot(snapshot_src)
 
 

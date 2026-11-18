@@ -188,9 +188,8 @@ def _render_scenario_identity_fields(ctx: dict) -> str:
     is_live = bool(existing) and str(existing.get("id", "")).strip() == live_id
     label_key = scoped_widget_key(session_scope, "scenario_label")
     enabled_key = scoped_widget_key(session_scope, "scenario_enabled")
-    own_ref_key = scoped_widget_key(session_scope, "scenario_own_reference")
 
-    label_col, enabled_col, own_ref_col = st.columns(3)
+    label_col, enabled_col = st.columns(2)
     label = label_col.text_input(
         "Bezeichnung",
         key=label_key,
@@ -198,22 +197,18 @@ def _render_scenario_identity_fields(ctx: dict) -> str:
     )
     if is_live and existing:
         label = str(existing.get("label") or existing.get("id") or "").strip()
+    if is_live:
+        # Live always runs in the SE: every other scenario is compared with it.
+        st.session_state[enabled_key] = True
     enabled_col.checkbox(
         "Aktiv für Szenario-Explorer",
         key=enabled_key,
+        disabled=is_live,
         help=(
-            "Deaktivierte Szenarien erscheinen nicht in der SE-Berechnung. "
-            "Änderungen machen vorhandene SE-Ergebnisse ungültig."
-        ),
-    )
-    own_ref_col.checkbox(
-        "Eigene Referenz ohne Optimierung",
-        key=own_ref_key,
-        help=(
-            "Berechnet eine eigene Nicht-Opt-Referenz (Tarif + PV) für dieses Szenario. "
-            "Ohne gespeicherten Wert vorbelegt aus Earnies Heuristik "
-            "(eigene Referenz nur bei abweichendem Tarif/PV; Batterie-Varianten teilen "
-            "die Live-Referenz). Aus = Live-Referenz bzw. Historisch teilen. "
+            "Das Live-Szenario läuft im Szenario-Explorer immer, alle anderen werden mit ihm "
+            "verglichen."
+            if is_live
+            else "Deaktivierte Szenarien erscheinen nicht in der SE-Berechnung. "
             "Änderungen machen vorhandene SE-Ergebnisse ungültig."
         ),
     )
@@ -442,12 +437,6 @@ def _scenario_persist_payload(
         "label": str(label or "").strip() or save_id,
         "enabled": bool(
             st.session_state.get(scoped_widget_key(session_scope, "scenario_enabled"), True)
-        ),
-        "own_reference": bool(
-            st.session_state.get(
-                scoped_widget_key(session_scope, "scenario_own_reference"),
-                False,
-            )
         ),
         "settings": settings,
     }

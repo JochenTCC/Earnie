@@ -95,6 +95,7 @@ def test_build_backtesting_command_includes_month_and_progress(tmp_path):
         start_month=6,
         end_month=6,
         progress_file=str(tmp_path / "progress.json"),
+        references=("historical", "l0"),
     )
     assert "--start-month" in cmd
     assert "6" in cmd
@@ -106,8 +107,18 @@ def test_build_backtesting_command_includes_fixed_24h_horizon_mode(tmp_path):
     cmd = build_backtesting_command(
         output_dir=str(tmp_path),
         horizon_mode="fixed_24h",
+        references=(),
     )
-    assert cmd[-2:] == ["--horizon-mode", "fixed_24h"]
+    assert cmd[-4:] == ["--horizon-mode", "fixed_24h", "--references", "none"]
+
+
+@pytest.mark.parametrize(
+    ("references", "value"),
+    [(("historical", "l0", "l1"), "historical,l0,l1"), (("l1",), "l1"), ((), "none")],
+)
+def test_build_backtesting_command_passes_the_reference_boxes(tmp_path, references, value):
+    cmd = build_backtesting_command(output_dir=str(tmp_path), references=references)
+    assert cmd[cmd.index("--references") + 1] == value
 
 
 def test_auto_backtesting_workers_single_task():
@@ -137,7 +148,7 @@ def test_sort_progress_snapshot_keys_live_reference_second():
             "Mit 10 kWh Speicher",
             HISTORICAL_REFERENCE_LABEL,
             "Live",
-            "Referenz (Fixed) — ohne Optimierung",
+            "Referenz ohne Speicher (Fixed)",
         ],
         historical_reference_label=HISTORICAL_REFERENCE_LABEL,
         live_scenario_label="Live",
@@ -145,7 +156,7 @@ def test_sort_progress_snapshot_keys_live_reference_second():
     assert ordered == [
         HISTORICAL_REFERENCE_LABEL,
         live_ref,
-        "Referenz (Fixed) — ohne Optimierung",
+        "Referenz ohne Speicher (Fixed)",
         "Live",
         "Mit 10 kWh Speicher",
     ]
@@ -205,49 +216,52 @@ def test_reorder_results_by_ids_appends_unknown():
     ]
 
 
-@pytest.mark.parametrize(
-    ("ui_modes", "expected"),
-    [("scenario_explorer,rule_reference", 6), ("scenario_explorer", 4)],
-)
-def test_count_backtesting_parallel_tasks_includes_reference(monkeypatch, ui_modes, expected):
-    """L1 / L2 count only with the hidden switch ``rule_reference``."""
-    monkeypatch.setenv("EARNIE_UI_MODES", ui_modes)
-    monkeypatch.setattr(
-        "simulation.engine.plan_per_scenario_reference_tasks",
-        lambda scenarios, *, live_scenario_id, scenario_labels=None, own_reference_by_scenario=None: (
-            {},
-            {},
-            [("ref:pv", {}, "Referenz (PV)")],
-        ),
+def test_count_backtesting_parallel_tasks_counts_computed_references_only(monkeypatch):
+    """Rebooked series (same flows, other tariff) need no task of their own."""
+    from simulation.reference_dedup import SharedReferencePlan
+    from simulation.reference_selection import ReferencePlan
+
+    plan = ReferencePlan(
+        references=("historical", "l0"),
+        rule_reference=False,
+        reference_by_scenario={},
+        l0_specs=[("historical_reference", None, "H"), ("ref:a", {}, "A"), ("ref:b", {}, "B")],
+        l1_by_scenario={},
+        ladder_by_scenario={},
+        l0_sharing=SharedReferencePlan(["historical_reference", "ref:a"], {"ref:b": "ref:a"}),
     )
-    monkeypatch.setattr(
-        "simulation.reference_ladder.plan_ladder_reference_tasks",
-        lambda scenarios: ({}, ["l1:a", "l2:a"]),
-    )
+    seen: dict = {}
+
+    def fake_plan(scenarios, *, live_scenario_id, references, scenario_labels=None):
+        seen["references"] = references
+        return plan
+
+    monkeypatch.setattr("ui.backtesting_runner.plan_run_references", fake_plan)
     assert (
         count_backtesting_parallel_tasks(
-            {"a": {}, "b": {}},
-            live_scenario_id="a",
-            own_reference_by_scenario={},
+            {"a": {}, "b": {}}, live_scenario_id="a", references=("historical", "l0")
         )
-        == expected
+        == 4
     )
+    assert seen["references"] == ("historical", "l0")
 
 
 @pytest.mark.parametrize(("enabled", "present"), [(True, True), (False, False)])
 def test_build_backtesting_command_rule_reference_flag(tmp_path, enabled, present):
-    cmd = build_backtesting_command(output_dir=str(tmp_path), rule_reference=enabled)
+    cmd = build_backtesting_command(
+        output_dir=str(tmp_path), references=("l0",), rule_reference=enabled
+    )
     assert ("--rule-reference" in cmd) is present
 
 
 def test_build_backtesting_command_includes_workers_when_parallel(tmp_path):
-    cmd = build_backtesting_command(output_dir=str(tmp_path), workers=4)
+    cmd = build_backtesting_command(output_dir=str(tmp_path), workers=4, references=())
     assert "--workers" in cmd
     assert "4" in cmd
 
 
 def test_build_backtesting_command_omits_workers_when_sequential(tmp_path):
-    cmd = build_backtesting_command(output_dir=str(tmp_path), workers=1)
+    cmd = build_backtesting_command(output_dir=str(tmp_path), workers=1, references=())
     assert "--workers" not in cmd
 
 

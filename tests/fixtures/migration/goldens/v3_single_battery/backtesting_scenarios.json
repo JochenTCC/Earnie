@@ -9,7 +9,6 @@
             "id": "live",
             "label": "Live",
             "enabled": true,
-            "own_reference": true,
             "settings": {
                 "pv_system_ids": [
                     "dach_sued",
@@ -27,7 +26,6 @@
             "id": "mein_szenario_4",
             "label": "Live VKW - Dynamischer Export",
             "enabled": true,
-            "own_reference": false,
             "settings": {
                 "pv_system_ids": [
                     "dach_sued"
@@ -44,7 +42,6 @@
             "id": "15_kwh_mit_pv_auf_nordseite_copy",
             "label": "5 kWh mit PV Auf Nordseite",
             "enabled": true,
-            "own_reference": false,
             "settings": {
                 "pv_system_ids": [
                     "dach_sued",
@@ -62,7 +59,6 @@
             "id": "mein_szenario",
             "label": "15 kWh ohne zweite PV",
             "enabled": true,
-            "own_reference": false,
             "settings": {
                 "pv_system_ids": [
                     "dach_sued"
@@ -79,7 +75,6 @@
             "id": "15_kwh_ohne_zweite_pv_copy",
             "label": "15 kWh mit PV Auf Nordseite",
             "enabled": true,
-            "own_reference": false,
             "settings": {
                 "pv_system_ids": [
                     "dach_sued",

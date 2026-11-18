@@ -26,7 +26,7 @@ Befehle laufen im Repo-Root in PowerShell; vorher einmal `$env:PYTHONUTF8='1'` s
 - `run_houses` legt je Haus `results/<Lauf>/` an, mit SE-Log, `run.log` und den CSVs der Referenzleiter. `--start-month`/`--end-month`
   wählen den Zeitraum, `--sensitivity` rechnet die 8 Regel-Sätze zusätzlich.
 - `--forecast-price-strategy mirror` rechnet einen zweiten Lauf im Forecast-Modus (Untergrenze von L2 − L3, Spalten `*_forecast`, doppelte Laufzeit). Beim ersten Mal braucht er `--allow-network` für die archivierten PV-Prognosen. Für Januar muss die Preisdatei etwa 8 Tage vor dem Jahresanfang beginnen: `python -m studies.poc_cloud.fetch_prices --start 2024-12-20 --end 2026-01-04`.
-- `run_houses` rechnet die Referenz ohne PV und Batterie (`historical_reference`) nicht mit, die Studie nutzt sie nicht. L0 bleibt. Ein Szenario ohne `own_reference` bricht deshalb ab.
+- `run_houses` rechnet nur die Referenz ohne Speicher (L0) mit (`--references l0`), nicht Historisch (Live ohne PV und Batterie); die Studie nutzt Historisch nicht. Ein Szenario ohne PV auf dem Tarif von Live bucht L0 auf Historisch, das dann trotzdem mitläuft.
 - Mehr Häuser gleichzeitig nutzen die Kerne besser als mehr Worker je Haus: Die Referenzen sind schnell fertig, danach rechnet
   ein Haus nur noch einen MILP-Prozess je Szenario.
 - Ohne `--allow-network` ist das Netz blockiert und ein fehlender Wetter-Cache bricht ab. Mit dem Schalter landen neue

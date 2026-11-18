@@ -71,7 +71,7 @@ def test_cancelled_subprocess_ends_with_the_cancel_exit_code(progress_dir, monke
         "sys.exit(1)\n"
     )
     _fake_command(monkeypatch, code)
-    run = runner.start_backtesting_subprocess(progress_file=progress_dir, output_dir=progress_dir)
+    run = runner.start_backtesting_subprocess(progress_file=progress_dir, output_dir=progress_dir, references=())
     assert run.running()
     runner.cancel_backtesting_run(run)
     assert run.cancel_requested is True
@@ -85,7 +85,7 @@ def test_start_clears_a_stale_cancel_marker(progress_dir, monkeypatch):
     bp.request_cancel(progress_dir)
     marker = Path(progress_dir) / bp.CANCEL_MARKER_NAME
     _fake_command(monkeypatch, f"import os, sys; sys.exit(130 if os.path.exists({str(marker)!r}) else 0)")
-    run = runner.start_backtesting_subprocess(progress_file=progress_dir, output_dir=progress_dir)
+    run = runner.start_backtesting_subprocess(progress_file=progress_dir, output_dir=progress_dir, references=())
     assert runner.finish_backtesting_run(run) == (0, "")
 
 
@@ -93,7 +93,7 @@ def test_run_backtesting_subprocess_still_blocks_and_reports(progress_dir, monke
     _fake_command(monkeypatch, "print('fertig')")
     seen: list[dict] = []
     exit_code, output = runner.run_backtesting_subprocess(
-        progress_file=progress_dir, output_dir=progress_dir, on_progress=seen.append
+        progress_file=progress_dir, output_dir=progress_dir, references=(), on_progress=seen.append
     )
     assert exit_code == 0
     assert "fertig" in output

@@ -14,7 +14,7 @@ from simulation.engine import (
     scenario_reference_label,
 )
 
-_SCENARIO_REFERENCE_SUFFIX = " — ohne Optimierung"
+_SCENARIO_REFERENCE_PREFIX = "Referenz ohne Speicher ("
 _ETA_MIN_ELAPSED_SEC = 5.0
 
 T = TypeVar("T")
@@ -268,10 +268,7 @@ def sort_progress_snapshot_keys(
             return (0, label)
         if live_reference_label and label == live_reference_label:
             return (1, label)
-        if (
-            label.startswith("Referenz (")
-            and label.endswith(_SCENARIO_REFERENCE_SUFFIX)
-        ):
+        if label.startswith(_SCENARIO_REFERENCE_PREFIX):
             return (2, label)
         if live_scenario_label and label == live_scenario_label:
             return (3, label)

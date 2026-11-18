@@ -549,13 +549,8 @@ def test_plan_per_scenario_reference_tasks_battery_variant_uses_live_ref():
     assert extra_labels[live_ref_id] == scenario_reference_label("Live")
 
 
-def test_plan_per_scenario_reference_tasks_force_own_reference_battery_twin():
-    from simulation.engine import (
-        plan_per_scenario_reference_tasks,
-        scenario_reference_id,
-    )
-
-    shared = {
+def _shared_tariff_pv() -> dict:
+    return {
         "_import_tariff_spec": {"id": "awattar_at", "type": "spot_hourly", "land": "AT"},
         "_export_tariff_spec": {"id": "monthly_sunny", "type": "fixed", "k_push_cent": 0.0},
         "feed_in_mode": "fixed",
@@ -563,55 +558,47 @@ def test_plan_per_scenario_reference_tasks_force_own_reference_battery_twin():
         "import_tariff_type": "spot_hourly",
         "pv_kwp": 6.0,
     }
+
+
+def test_plan_per_scenario_reference_tasks_battery_twin_shares_live_ref():
+    """L0 has no storage: a scenario that differs from Live only in the battery shares its L0."""
+    from simulation.engine import plan_per_scenario_reference_tasks, scenario_reference_id
+
     scenarios = {
-        "mit_10_kwh_speicher": {**shared, "battery_capacity_kwh": 10.0},
-        "live": {**shared, "battery_capacity_kwh": 5.0},
+        "mit_10_kwh_speicher": {**_shared_tariff_pv(), "battery_capacity_kwh": 10.0},
+        "live": {**_shared_tariff_pv(), "battery_capacity_kwh": 5.0},
     }
     ref_by, _labels, extra_specs = plan_per_scenario_reference_tasks(
         scenarios,
         live_scenario_id="live",
         scenario_labels={"live": "Live", "mit_10_kwh_speicher": "Mit 10 kWh"},
-        own_reference_by_scenario={
-            "live": None,
-            "mit_10_kwh_speicher": True,
-        },
     )
     live_ref_id = scenario_reference_id("live")
-    twin_ref_id = scenario_reference_id("mit_10_kwh_speicher")
-    assert ref_by["live"] == live_ref_id
-    assert ref_by["mit_10_kwh_speicher"] == twin_ref_id
-    assert {spec[0] for spec in extra_specs} == {live_ref_id, twin_ref_id}
+    assert ref_by == {"mit_10_kwh_speicher": live_ref_id, "live": live_ref_id}
+    assert [spec[0] for spec in extra_specs] == [live_ref_id]
 
 
-def test_plan_per_scenario_reference_tasks_force_off_shares_live_ref():
-    from simulation.engine import (
-        plan_per_scenario_reference_tasks,
-        scenario_reference_id,
-    )
+def test_plan_per_scenario_reference_tasks_other_pv_gets_its_own_ref():
+    from simulation.engine import plan_per_scenario_reference_tasks, scenario_reference_id
 
-    live = {
-        "_import_tariff_spec": {"id": "awattar_at", "type": "spot_hourly", "land": "AT"},
-        "_export_tariff_spec": {"id": "monthly_sunny", "type": "fixed", "k_push_cent": 0.0},
-        "feed_in_mode": "fixed",
-        "k_push_cent": 0.0,
-        "import_tariff_type": "spot_hourly",
-        "pv_kwp": 6.0,
-    }
-    other = {
-        **live,
-        "pv_kwp": 12.0,
-    }
-    scenarios = {"live": live, "big_pv": other}
+    scenarios = {"live": _shared_tariff_pv(), "big_pv": {**_shared_tariff_pv(), "pv_kwp": 12.0}}
     ref_by, _labels, extra_specs = plan_per_scenario_reference_tasks(
         scenarios,
         live_scenario_id="live",
         scenario_labels={"live": "Live", "big_pv": "Big PV"},
-        own_reference_by_scenario={"live": None, "big_pv": False},
     )
-    live_ref_id = scenario_reference_id("live")
-    assert ref_by["live"] == live_ref_id
-    assert ref_by["big_pv"] == live_ref_id
-    assert [spec[0] for spec in extra_specs] == [live_ref_id]
+    assert ref_by == {"live": scenario_reference_id("live"), "big_pv": scenario_reference_id("big_pv")}
+    assert [spec[0] for spec in extra_specs] == [
+        scenario_reference_id("live"),
+        scenario_reference_id("big_pv"),
+    ]
+
+
+def test_plan_per_scenario_reference_tasks_needs_live():
+    from simulation.engine import plan_per_scenario_reference_tasks
+
+    with pytest.raises(ValueError, match="Live-Szenario 'live' fehlt"):
+        plan_per_scenario_reference_tasks({"other": _shared_tariff_pv()}, live_scenario_id="live")
 
 
 def _pv_scenario(systems: list[tuple[float, float, float]]) -> dict:

@@ -249,8 +249,9 @@ Typische Vergleiche:
 
 **Pro Szenario einstellbar:**
 
-- **Aktiv für Szenario-Explorer:** Deaktivierte Varianten überspringt der Szenario-Explorer. Vorhandene Ergebnisse werden dadurch ungültig.
-- **Eigene Referenz ohne Optimierung:** Legt fest, ob Earnie für die Variante eine eigene Referenz berechnet, in der die Earnie-Optimierung nicht aktiv ist. Die Vorbelegung folgt einer Heuristik nach Tarif und PV; reine Batterie-Varianten teilen standardmäßig die Live-Referenz.
+- **Aktiv für Szenario-Explorer:** Deaktivierte Varianten überspringt der Szenario-Explorer. Vorhandene Ergebnisse werden dadurch ungültig. Das Live-Szenario ist immer aktiv, weil der Szenario-Explorer alle Varianten mit ihm vergleicht.
+
+Welche Referenzen der Szenario-Explorer rechnet, wird dort für den ganzen Lauf gewählt, nicht je Szenario (siehe [Szenario-Explorer ausführen](#szenario-explorer-ausführen)).
 
 **Tarife:** Bezugs- und Einspeisetarif kommen aus dem Tarifkatalog oder werden als **Eigener Festpreis** mit eigenem Wert in Cent/kWh eingetragen (der Wert gehört dann zum Szenario, nicht zum Katalog).
 
@@ -293,11 +294,12 @@ Technik: [Benutzertarife](../konfiguration/preise.md#benutzertarife-usertariffsj
 
 Der Szenario-Explorer steht unter **Konfiguration → Szenario-Explorer**, sobald die Planungs-Konfiguration vollständig genug ist.
 
-Er vergleicht Referenzen und eigene Szenarien über einen langen Zeitraum, typischerweise 12 Monate (für Tests auch kürzer, z. B. nur März):
+Er vergleicht eigene Szenarien mit dem Live-Szenario und mit Referenzen über einen langen Zeitraum, typischerweise 12 Monate (für Tests auch kürzer, z. B. nur März):
 
-- **Historisch:** das „nackte Haus“ ohne PV und ohne Speicher, mit den Tarifen des Live-Szenarios und ohne Lastverschiebung. Earnie berechnet diese Zeile automatisch.
-- **Referenzen ohne Optimierung:** die Live-Referenz und – je nach Szenario-Einstellung und Heuristik – eigene Referenzen bei abweichendem Tarif oder abweichender PV.
-- **Optimierte Szenarien:** mit Earnie-Planung (Batterie und flexible Verbraucher, sofern im Szenario vorhanden).
+- **Optimierte Szenarien:** mit Earnie-Planung (Batterie und flexible Verbraucher, sofern im Szenario vorhanden). Das Live-Szenario ist immer dabei.
+- **Historisch** (wählbar): das „nackte Haus“ ohne PV und ohne Speicher, mit den Tarifen des Live-Szenarios und ohne Lastverschiebung.
+- **Referenz ohne Speicher** (wählbar, je Szenario): Tarif und PV des Szenarios, ohne Speicher und ohne Lastverschiebung.
+- **Wechselrichter-Eigenverbrauch** (wählbar, je Szenario): der Speicher des Szenarios im Eigenverbrauchsmodus des Wechselrichters, ohne Preislogik und ohne Lastverschiebung.
 
 Der Szenario-Explorer ist kein tägliches Cockpit und ändert keine Steuerwerte an der Anlage.
 
@@ -320,20 +322,21 @@ Die erzeugten Verbrauchsverläufe lassen sich im Explorer prüfen (Plausibilitä
 
 1. Die Auswahl der Szenarien prüfen und ggf. im Szenarienkonfigurator anpassen.
 2. Optional **Verbrauchsdaten auf letzten Kalendermonat spiegeln (aktuelle Tarife)** aktivieren: Earnie legt die Verbrauchsmuster je Kalendermonat auf die letzten 12 vollständigen Monate, damit aktuelle Spot- und Tarifpreise gelten. Die CSV-Datei bleibt unverändert; die Auswahl wird in `scenario_explorer_conf` gespeichert.
-3. Rechnung starten. Je nach Umfang kann das länger dauern.
-4. Warten, bis die Auswertung fertig ist. Die Ergebnisse legt Earnie in der Laufzeitablage des Explorers ab.
+3. Unter **Referenzen berechnen** ankreuzen, welche Vergleichsreihen der Lauf rechnen soll: **Historisch**, **Referenz ohne Speicher**, **Wechselrichter-Eigenverbrauch (L1)**. Die Auswahl gilt für alle aktiven Szenarien. Ohne Kreuz vergleicht der Explorer die Szenarien nur mit Live. Jede Referenz kostet Rechenzeit; Szenarien, die sich nur im Tarif unterscheiden, teilen sich die Rechnung.
+4. Rechnung starten. Je nach Umfang kann das länger dauern.
+5. Warten, bis die Auswertung fertig ist. Die Ergebnisse legt Earnie in der Laufzeitablage des Explorers ab.
 
 **Lauf abbrechen:** Während der Rechnung steht im Fortschrittsblock die Schaltfläche **Abbrechen**. Earnie stoppt dann nach der gerade gerechneten Stunde und speichert nichts; die Ergebnisse des letzten vollständigen Laufs bleiben unverändert. Wer während der Rechnung eine andere Seite öffnet oder etwas anklickt, unterbricht nur die Anzeige: Die Rechnung läuft weiter, und beim nächsten Aufruf des Szenario-Explorers erscheinen Fortschritt und **Abbrechen** wieder. Nach einem Neuladen des Browser-Tabs ist der laufende Lauf nicht mehr sichtbar; er rechnet trotzdem zu Ende und speichert sein Ergebnis.
 
 > **Rechenzeit:** Earnie startet für jedes Szenario einen eigenen Prozess auf einem eigenen Prozessorkern. Auf Rechnern mit wenigen Kernen dauert die Rechnung entsprechend länger. Den Szenario-Explorer daher besser nicht auf der Hardware ausführen, die später den Live-Betrieb übernimmt.
 
-**Was rechnet die Zeile „Historisch“?** Die zuvor erzeugte Last mit den Tarifen des Live-Szenarios, **ohne** PV und **ohne** Batterie. Weitere Referenzen ohne Optimierung entstehen per Heuristik bzw. über die Einstellung **Eigene Referenz ohne Optimierung** (bei PV-Szenarien mit dem PV-Ertrag des jeweiligen Szenarios). Batterie und Lastverschiebung gehören zur **optimierten** Variante, nicht zur Zeile Historisch.
+**Was rechnet die Zeile „Historisch“?** Die zuvor erzeugte Last mit den Tarifen des Live-Szenarios, **ohne** PV und **ohne** Batterie. Die **Referenz ohne Speicher** rechnet dieselbe Last mit Tarif und PV-Ertrag des jeweiligen Szenarios; ein Szenario ohne PV mit dem Tarif von Live nimmt dafür die Zeile Historisch. Batterie und Lastverschiebung gehören zur **optimierten** Variante, nicht zu diesen Zeilen.
 
 #### Ergebnisse des Szenario-Explorers
 
 Die Auswertung umfasst unter anderem:
 
-- **Gesamtkosten und -Verbrauch:** Tabelle mit Jahres Verbrauch, Speicher-Standby, Gesamtverbrauch, Jahres Kosten, Δ zur Live-Referenz und Hinweis
+- **Gesamtkosten und -Verbrauch:** Tabelle mit Jahres Verbrauch, Speicher-Standby, Gesamtverbrauch, Jahres Kosten, Δ und Hinweis. Über der Tabelle wählt **Vergleichsbasis**, womit Δ jedes Szenario vergleicht: Live oder eine der gerechneten Referenzen; bei Referenz ohne Speicher und Wechselrichter-Eigenverbrauch zusätzlich die eigene Reihe des Szenarios oder die von Live. Der Wechsel rechnet nichts neu.
 - **Kostenvergleich** je Monat (Referenz und optimierte Szenarien)
 - **Monatsverläufe** und Plausibilitätsansichten
 - Charts zu Leistung, Verbrauch und PV, je nach gewählter Ansicht
@@ -352,7 +355,7 @@ Alle Zeilen zählen dasselbe: den **gebuchten Hausverbrauch** der jeweiligen Zei
 | Zeilentyp                            | Was die Spalte zählt                                                                               |
 | ------------------------------------ | -------------------------------------------------------------------------------------------------- |
 | **Historisch** (ohne Optimierung, …) | Last des Live-Hausprofils ohne PV und Batterie über dieselben Zeitfenster wie die Optimierung      |
-| **Referenz** (…) ohne Optimierung    | Last des Hausprofils des Szenarios über dieselben Zeitfenster wie die Optimierung                  |
+| **Referenz ohne Speicher** (…)       | Last des Hausprofils des Szenarios über dieselben Zeitfenster wie die Optimierung                  |
 | **Wechselrichter-Eigenverbrauch**, **Standard-Regeln** | Grundlast und flexible Verbraucher mit derselben Energie wie die Optimierung, ohne Speicher-Standby |
 | **Optimiertes Szenario**             | Gebuchte Last aus Grundlast und flexiblen Verbrauchern nach der Optimierung, ohne Speicher-Standby |
 

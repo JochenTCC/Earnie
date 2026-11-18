@@ -435,17 +435,18 @@ def test_study_runs_skip_the_reference_without_pv_and_battery():
     from scripts.run_reference_ladder import _backtesting_argv
 
     parser = _build_arg_parser()
-    assert parser.parse_args(["--workers", "2"]).skip_historical_reference is False
-    assert parser.parse_args(["--workers", "2", "--skip-historical-reference"]).skip_historical_reference is True
+    assert parser.parse_args(["--workers", "2"]).references == "historical,l0"
+    assert parser.parse_args(["--workers", "2", "--references", "l0"]).references == "l0"
     ladder_args = argparse.Namespace(
         workers=2, scenario=None, start_month=None, end_month=None, allow_stale_cons_data=False,
-        skip_historical_reference=True,
+        references="l0",
     )
-    assert "--skip-historical-reference" in _backtesting_argv(ladder_args, "out")
+    argv = _backtesting_argv(ladder_args, "out")
+    assert argv[argv.index("--references") + 1] == "l0"
     # The ladder study needs L1 / L2, which run_backtesting computes only on request.
     assert parser.parse_args([]).rule_reference is False
-    assert "--rule-reference" in _backtesting_argv(ladder_args, "out")
-    assert '"--skip-historical-reference"' in (REPO_ROOT / "studies/viability/run_houses.py").read_text(encoding="utf-8")
+    assert "--rule-reference" in argv
+    assert '"--references", "l0"' in (REPO_ROOT / "studies/viability/run_houses.py").read_text(encoding="utf-8")
 
 
 def test_appliances_can_be_switched_off(params, tmp_path):

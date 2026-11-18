@@ -44,11 +44,9 @@ from house_config.entity_resolution import strip_assets_for_reference
 from simulation.engine import (
     HISTORICAL_REFERENCE_ID,
     HistoricalDataCache,
-    build_per_scenario_reference_costs,
     compute_historical_reference_costs,
     list_simulation_anchors,
     list_sunrise_step_anchors,
-    plan_per_scenario_reference_tasks,
     print_plausibility_report,
     run_simulation,
     window_anchor_for_date,
@@ -56,12 +54,20 @@ from simulation.engine import (
 )
 from simulation.reference_costs import LADDER_L2
 from simulation.forecast_mode import PLAN_PRICE, parse_plan_forecast
+from simulation.reference_dedup import fill_rebooked_results
 from simulation.reference_ladder import (
     LadderReferenceSpec,
     compute_ladder_reference,
     ladder_soc_correction,
-    plan_ladder_reference_tasks,
     rule_share,
+)
+from simulation.reference_selection import (
+    DEFAULT_REFERENCES,
+    NO_REFERENCES,
+    SELECTABLE_REFERENCES,
+    format_references,
+    parse_references,
+    plan_references,
 )
 from simulation.backtesting_progress import (
     EXIT_CANCELLED,
@@ -245,16 +251,22 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         description="Backtesting der Energie-Optimierung auf historischen Loxone-Daten.",
     )
     parser.add_argument(
-        "--skip-historical-reference",
-        action="store_true",
-        help="Referenz ohne PV und Batterie nicht rechnen (Studien). Jedes Szenario braucht dann own_reference.",
+        "--references",
+        default=format_references(DEFAULT_REFERENCES),
+        metavar="LISTE",
+        help=(
+            f"Referenzen neben den Szenarien, kommagetrennt aus {','.join(SELECTABLE_REFERENCES)} "
+            f"oder {NO_REFERENCES}: historical = Live ohne PV und Speicher, l0 = Referenz ohne "
+            "Speicher je Szenario, l1 = Batterie im Eigenverbrauchsmodus je Szenario "
+            f"(Standard: {format_references(DEFAULT_REFERENCES)})."
+        ),
     )
     parser.add_argument(
         "--rule-reference",
         action="store_true",
         help=(
-            "Referenzleiter L1/L2 (Standard-Regeln) mitrechnen (Dev). Die UI setzt das nur "
-            "mit rule_reference in EARNIE_UI_MODES."
+            "Standard-Regeln (L2) mitrechnen (Dev), dann laufen l0 und l1 immer mit. Die UI "
+            "setzt das nur mit rule_reference in EARNIE_UI_MODES."
         ),
     )
     parser.add_argument(
@@ -381,6 +393,13 @@ def _resolve_price_paths(args) -> tuple[Path | None, Path | None]:
     return dataset, model
 
 
+def _reference_feed_in_settings(scenario_params: dict | None):
+    """Feed-in settings an L0 series books with: its scenario's, else the global ones."""
+    if scenario_params is None:
+        return config.get_backtesting_feed_in_settings()
+    return config.get_backtesting_feed_in_settings(runtime_override=scenario_params)
+
+
 def _run_reference_worker(
     ref_id: str,
     start_iso: str,
@@ -402,11 +421,7 @@ def _run_reference_worker(
     mirror_window = (start, end) if is_season_mirror_enabled() else None
     cache = HistoricalDataCache(season_mirror_window=mirror_window)
     cache.load()
-    ref_settings = (
-        config.get_backtesting_feed_in_settings(runtime_override=scenario_params)
-        if scenario_params is not None
-        else config.get_backtesting_feed_in_settings()
-    )
+    ref_settings = _reference_feed_in_settings(scenario_params)
     worker_path = worker_progress_path(progress_file, worker_key)
     on_progress = (
         _make_progress_printer(
@@ -1122,71 +1137,56 @@ def main(argv: list[str] | None = None):
             f"(SOC_min am Sonnenaufgang)"
         )
 
-    ref_settings = config.get_backtesting_feed_in_settings()
-    if live_params is not None:
-        ref_settings = config.get_backtesting_feed_in_settings(
-            runtime_override=live_params
-        )
     reference_params = (
         strip_assets_for_reference(live_params) if live_params is not None else None
     )
     progress_file = args.progress_file
     total_hours = len(anchors) * 24
-    reference_by_scenario, extra_ref_labels, extra_ref_specs = (
-        plan_per_scenario_reference_tasks(
-            all_scenarios,
-            live_scenario_id=live_scenario_id,
-            scenario_labels=scenario_labels,
-            own_reference_by_scenario=config.get_own_reference_flags(),
-        )
+    try:
+        chosen_references = parse_references(args.references)
+    except ValueError as exc:
+        raise SystemExit(f"--references: {exc}") from exc
+    plan = plan_references(
+        all_scenarios,
+        scenarios,
+        live_scenario_id=live_scenario_id,
+        references=chosen_references,
+        rule_reference=args.rule_reference,
+        historical_params=reference_params,
+        historical_label=HISTORICAL_REFERENCE_LABEL,
+        scenario_labels=scenario_labels,
     )
-    reference_by_scenario = {sid: reference_by_scenario[sid] for sid in scenarios}
-    used_references = set(reference_by_scenario.values())
-    if args.skip_historical_reference and HISTORICAL_REFERENCE_ID in used_references:
-        raise SystemExit(
-            "--skip-historical-reference: Ein Szenario nutzt die Referenz ohne PV und Batterie "
-            "(own_reference fehlt): "
-            + ", ".join(sid for sid, ref in reference_by_scenario.items() if ref == HISTORICAL_REFERENCE_ID)
-        )
-    extra_ref_specs = [spec for spec in extra_ref_specs if spec[0] in used_references]
-    labels.update(extra_ref_labels)
-    ladder_by_scenario, ladder_specs = (
-        plan_ladder_reference_tasks(scenarios, scenario_labels=scenario_labels)
-        if args.rule_reference
-        else ({}, [])
-    )
-    labels.update({spec.ref_id: spec.label for spec in ladder_specs})
+    added = [name for name in plan.references if name not in chosen_references]
+    if added:
+        print(f"--rule-reference: rechne auch {', '.join(added)} (Standard-Regeln brauchen sie).")
+    print(f"Referenzen: {format_references(plan.references)}")
+    reference_by_scenario = plan.reference_by_scenario
+    ladder_by_scenario = plan.ladder_by_scenario
+    labels.update({ref_id: label for ref_id, _params, label in plan.l0_specs})
+    labels.update({spec.ref_id: spec.label for spec in plan.ladder_specs})
     # L0, L1 and L2 alike for what every result series needs (fees, fuel, invoices).
-    all_ref_specs = [
-        *extra_ref_specs,
-        *((spec.ref_id, spec.params, spec.label) for spec in ladder_specs),
-    ]
+    all_ref_specs = plan.all_ref_specs
+    params_by_ref_id = {
+        **{ref_id: params for ref_id, params, _label in plan.l0_specs},
+        **{spec.ref_id: spec.params for spec in plan.ladder_specs},
+    }
     # A gap in a grid area's capacity charge fails here, not after the run.
     for params in (
         *scenarios.values(),
         *(params for _ref_id, params, _label in all_ref_specs),
-        reference_params,
+        *((reference_params,) if plan.runs_historical else ()),
     ):
         check_capacity_coverage(params, start, end)
     ladder_report: dict[str, dict] = {}
+    # Only the series with flows of their own run; the others are booked from them afterwards.
     reference_specs: list[tuple[str, dict | None, str, str]] = [
-        *(
-            []
-            if args.skip_historical_reference
-            else [
-                (
-                    HISTORICAL_REFERENCE_ID,
-                    reference_params,
-                    HISTORICAL_REFERENCE_LABEL,
-                    "_reference",
-                )
-            ]
-        ),
-        *[
-            (ref_id, params, label, ref_id)
-            for ref_id, params, label in extra_ref_specs
-        ],
+        (ref_id, params, label, "_reference" if ref_id == HISTORICAL_REFERENCE_ID else ref_id)
+        for ref_id, params, label in plan.computed_l0_specs
     ]
+    ladder_specs = plan.computed_ladder_specs
+    shared = len(plan.l0_sharing.rebooked) + len(plan.l1_sharing.rebooked)
+    if shared:
+        print(f"{shared} Referenz(en) übernehmen die Energieflüsse eines Szenarios mit anderem Tarif.")
 
     if progress_file:
         prepare_progress_dir(progress_file)
@@ -1230,39 +1230,23 @@ def main(argv: list[str] | None = None):
     sim_results: dict[str, pd.DataFrame] = {}
 
     if args.workers == 1:
-        if not args.skip_historical_reference:
-            print(f"Berechne Referenz '{HISTORICAL_REFERENCE_LABEL}'...")
-            ref_progress_path = worker_progress_path(progress_file, "_reference")
-            ref_progress = _make_progress_printer(
-                HISTORICAL_REFERENCE_LABEL,
-                ref_progress_path,
-                phase="reference",
-                result_id=HISTORICAL_REFERENCE_ID,
-            )
-            sim_results[HISTORICAL_REFERENCE_ID] = compute_historical_reference_costs(
+        for ref_id, params, label, worker_key in reference_specs:
+            print(f"Berechne Referenz '{label}'...")
+            sim_results[ref_id] = compute_historical_reference_costs(
                 start,
                 end,
                 prices,
-                ref_settings,
+                _reference_feed_in_settings(params),
                 cache=cache,
-                scenario_params=reference_params,
+                scenario_params=params,
                 horizon_mode=horizon_mode,
-                on_progress=ref_progress,
+                on_progress=_make_progress_printer(
+                    label,
+                    worker_progress_path(progress_file, worker_key),
+                    phase="reference",
+                    result_id=ref_id,
+                ),
             )
-        extra_refs, _extra_labels, reference_by_scenario = (
-            build_per_scenario_reference_costs(
-                start,
-                end,
-                prices,
-                cache,
-                scenarios,
-                live_scenario_id=live_scenario_id,
-                scenario_labels=scenario_labels,
-                own_reference_by_scenario=config.get_own_reference_flags(),
-                horizon_mode=horizon_mode,
-            )
-        )
-        sim_results.update(extra_refs)
         for spec in ladder_specs:
             print(f"Berechne Referenz '{spec.label}'...")
             ladder = compute_ladder_reference(
@@ -1335,6 +1319,10 @@ def main(argv: list[str] | None = None):
         )
         for name in scenarios:
             print_plausibility_report(plausibility_by_scenario[name])
+    fill_rebooked_results(sim_results, plan.l0_sharing, params_by_ref_id, prices)
+    fill_rebooked_results(sim_results, plan.l1_sharing, params_by_ref_id, prices)
+    for ref_id, source_id in plan.l1_sharing.rebooked.items():
+        ladder_report[ref_id] = ladder_report[source_id]
 
     ordered_ids = ordered_backtesting_result_ids(
         scenarios,
@@ -1370,7 +1358,9 @@ def main(argv: list[str] | None = None):
         "price_source": price_source,
         "price_strategy": price_strategy,
         "season_mirror_to_last_month": is_season_mirror_enabled(),
+        "references": list(plan.references),
         "reference_by_scenario": reference_by_scenario,
+        "l1_by_scenario": plan.l1_by_scenario,
         "ladder_by_scenario": ladder_by_scenario,
         "ladder_report": ladder_report,
         "live_scenario_id": live_scenario_id,

@@ -322,17 +322,6 @@ Deferred from the **2.6** HA-coupling cycle. Prefer after southbound mapping UX 
   - Decide: Earnie runs Edibert's `Publisher` with its own MQTT link and market data, or uses only the payload functions; topic prefix and HA device (one Earnie device or Edibert's own)
   - Edibert's catalog exchange jobs (`exchange` in `publish.json`: report use, status, package import) only with Earnie's own consent, the same consent as for sharing at the Edibert pin bump
   - Needs: Edibert pin with `0.1.d` S2 (exchange in the publisher loop)
-- [ ] **SE references selectable, baseline switchable after the run** `[feat]` *(spec agreed 2026-11-18, maintainer; follows the epic **RuleRef** under Version 2.+1)*: the SE computes the references the user ticks, and the evaluation switches the baseline without a new run.
-  - **Rename:** L0 becomes **"Referenz ohne Speicher"** everywhere, today "Ohne Steuerung" (`ui/backtesting_ladder.py`) and "Referenz (X) — ohne Optimierung" (`simulation/reference_costs.py::scenario_reference_label`). User docs follow (`docs/ui/betriebsmodi.md` and wherever the SE references appear).
-  - **Before the run:** three global checkboxes on the SE page, valid for every active scenario: **Historisch** (Live without battery and PV, one series), **Referenz ohne Speicher** (per scenario), **L1** (vendor-mode battery, per scenario). L2 stays behind the hidden switch `rule_reference`; when it is on, L2 always runs and L0 and L1 run with it, since the ladder box needs L0, L2 and L3. No box ticked: only the scenarios run, compared with Live.
-  - **Per scenario:** "Aktiv für Szenario-Explorer" (`enabled`) stays the master switch for whether a scenario runs. It is locked on for Live. "Eigene Referenz ohne Optimierung" (`own_reference`) and its heuristic (`default_own_reference`) go away; the scenario JSON field needs a config migration step (`config-migration.mdc`).
-  - **Evaluation:** Live is always the scenario the others are compared with. A selector picks the baseline for all scenarios among the references that ran (Historisch, Referenz ohne Speicher, L1). For L0 and L1 a second selector picks the scenario's own series or Live's. Live always runs, so both exist without extra runs. Both selectors work after the run, from the stored series.
-  - **CLI:** the UI starts `scripts/run_backtesting.py` as a subprocess and passes the run settings as flags, so the boxes need a flag too. Proposal: `--references historical,l0,l1` replaces `--skip-historical-reference`; `--rule-reference` then means "add L2" only.
-  - **Deduplication** (all three references book energy flows that do not depend on prices: L0 has no control, L1 is the pure self-consumption mode and does not curtail at negative prices, only L2 does):
-    - Compute flows once per physical setup (load profile, heating variants, PV, battery, flex consumers) and book them per tariff. Today `reference_fingerprint` and `ladder_reference_fingerprint` include the tariff, so a scenario that differs only in tariff runs L0 and L1 again.
-    - Scenario without battery: L1 takes the L0 series. A test first proves both are identical (L1 takes the flex timing through the MILP preparation's targets, L0 from the reference load).
-    - Scenario without PV on Live's tariff: L0 takes Historisch (already so today); on another tariff the flows are Historisch's and only the booking differs.
-    - Battery without PV is not merged: L1 discharges the start SoC once and carries the standby, so it is close to L0 but not equal.
 
 
 ### Version 2.+1

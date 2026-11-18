@@ -1,6 +1,10 @@
 """RuleRef P3b: end-SoC valuation and the SE window view on L2 (spec §§ 3.3, 5)."""
 from __future__ import annotations
 
+from ui.backtesting_baseline import SeBaseline
+
+LIVE_L0 = SeBaseline("l0", "live")
+
 import os
 from datetime import datetime, timedelta
 
@@ -142,7 +146,7 @@ def _meta(correction: float | None) -> dict:
 
 
 def _live_row(meta: dict) -> dict:
-    return next(row for row in build_annual_cost_rows(meta) if row["Szenario"] == "live")
+    return next(row for row in build_annual_cost_rows(meta, LIVE_L0) if row["Szenario"] == "live")
 
 
 def test_saving_column_includes_the_soc_term_and_names_it():

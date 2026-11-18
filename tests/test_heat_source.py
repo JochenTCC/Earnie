@@ -1,6 +1,10 @@
 """SUSI P1 — heat sources, fuel path, heating rod part and SE fuel / CO2 rows."""
 from __future__ import annotations
 
+from ui.backtesting_baseline import SeBaseline
+
+LIVE_L0 = SeBaseline("l0", "live")
+
 from datetime import date, datetime, time
 
 import pandas as pd
@@ -535,7 +539,7 @@ def test_annual_cost_rows_add_fuel_to_jahres_kosten():
             "historisch": {"fuel_kwh": 12000.0, "fuel_eur": 1250.0, "co2_kg": 4000.0}
         },
     }
-    row = build_annual_cost_rows(meta)[0]
+    row = build_annual_cost_rows(meta, LIVE_L0)[0]
     assert row["Jahres Kosten [€]"] == "2250,00 €"
     assert row["Brennstoffkosten [€]"] == "1250,00 €"
     assert row["CO2 [kg]"] == "4000"

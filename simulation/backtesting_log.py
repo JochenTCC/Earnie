@@ -579,8 +579,12 @@ def _attach_period_bounds(
         payload["period"]["first_ts"] = pd.Timestamp(min(all_ts)).isoformat()
         payload["period"]["last_ts"] = pd.Timestamp(max(all_ts)).isoformat()
         payload["period"]["hours"] = len(all_ts) // max(scenario_count, 1)
+    if "references" in period:
+        payload["references"] = list(period["references"])
     if period.get("reference_by_scenario"):
         payload["reference_by_scenario"] = period["reference_by_scenario"]
+    if period.get("l1_by_scenario"):
+        payload["l1_by_scenario"] = period["l1_by_scenario"]
     if period.get("ladder_by_scenario"):
         payload["ladder_by_scenario"] = period["ladder_by_scenario"]
         payload["ladder_report"] = period["ladder_report"]

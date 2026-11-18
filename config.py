@@ -486,14 +486,12 @@ class Config:
 
     def get_backtesting_scenarios(self) -> dict[str, dict]:
         """Alle aufgelösten Szenarien aus backtesting_scenarios.json."""
+        scenarios = self.get_scenarios()
+        live_scenario.ensure_live_scenario_enabled(scenarios, self.get_live_scenario_id())
         return live_scenario.get_backtesting_scenarios(
-            self.get_scenarios(),
+            scenarios,
             resolve_settings=self._resolve_scenario_settings_dict,
         )
-
-    def get_own_reference_flags(self) -> dict[str, bool | None]:
-        """own_reference overrides for enabled SE scenarios (None = Auto)."""
-        return live_scenario.get_own_reference_flags(self.get_scenarios())
 
     def get_value(self, name: str, default=None, cast=None):
         return self.get(name, default=default, cast=cast)
@@ -706,10 +704,6 @@ def get_live_scenario_id() -> str:
 
 def get_backtesting_scenarios() -> dict[str, dict]:
     return CONFIG.get_backtesting_scenarios()
-
-
-def get_own_reference_flags() -> dict[str, bool | None]:
-    return CONFIG.get_own_reference_flags()
 
 
 def get_batteries() -> list[dict]:

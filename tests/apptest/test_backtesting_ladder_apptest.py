@@ -29,7 +29,7 @@ def test_headline_and_expander_render(monkeypatch):
     assert len(at.expander) == 1
     assert not at.expander[0].proto.expanded
     assert list(at.expander[0].dataframe[0].value["Stufe"]) == [
-        "Ohne Steuerung",
+        "Referenz ohne Speicher",
         "Wechselrichter-Eigenverbrauch",
         "Standard-Regeln",
         "Earnie",

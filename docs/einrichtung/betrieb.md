@@ -68,6 +68,8 @@ Steht dasselbe E-Auto (gleiche Kennung) in mehreren Hausprofilen, legt der Schri
 
 Im selben Datenmodell entfernt **`dm6.debug_dump_flag_removal`** den Schalter `ui.chart_debug_capture_enabled` aus `config.json`: Das Support-Paket ist immer verfügbar (Seitenleiste → **Sichern & Übertragen**). Bleibt der Schlüssel stehen, lädt Earnie die Config nicht. Ein noch vorhandener Eintrag in `runtime/local_settings.json` oder die Umgebungsvariable `EARNIE_UI_CHART_DEBUG_CAPTURE_ENABLED` blockieren nichts; Earnie schreibt nur eine Warnung ins Log – beides bitte entfernen.
 
+Ebenfalls in Datenmodell 6 entfernt **`dm6.scenario_own_reference_removal`** den Szenario-Schalter `own_reference` („Eigene Referenz ohne Optimierung“) aus `backtesting_scenarios.json`: Welche Referenzen der Szenario-Explorer rechnet, wählen jetzt drei Kästchen je Lauf ([Referenzen wählen](../ui/betriebsmodi.md#referenzen-wählen)). Steht beim Live-Szenario `"enabled": false`, setzt der Schritt es auf `true`, weil das Live-Szenario im Szenario-Explorer immer läuft. Bleibt einer der beiden Einträge stehen, lädt Earnie die Szenarien nicht.
+
 Ohne die Wallbox-Migration lädt Earnie Hausprofile mit `nominal_power_kw` oder `min_power_kw` am E-Auto nicht; die Meldung verweist auf den Assistenten. Details: [E-Auto und Wallbox](../konfiguration/flexible-verbraucher.md#e-auto-und-wallbox-ladestrom).
 
 ### Loxone: alte Merkernamen behalten oder leeren

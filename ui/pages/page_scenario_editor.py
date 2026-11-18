@@ -143,7 +143,6 @@ from ui.pages.scenario_editor_session import (  # noqa: E402
     _ensure_active_scenario_select,
     _resolve_scenario_selection,
     _scenario_widget_state_missing,
-    _seed_own_reference_widget,
     _seed_scenario_widget_state,
     _sync_scenario_session,
 )

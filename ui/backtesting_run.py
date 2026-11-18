@@ -30,9 +30,16 @@ from simulation.backtesting_progress import (
     format_progress_bar_caption,
     ordered_backtesting_result_ids,
 )
-from simulation.engine import HISTORICAL_REFERENCE_ID, plan_per_scenario_reference_tasks
+from simulation.engine import HISTORICAL_REFERENCE_ID
 from runtime_store.env_vars import is_rule_reference_enabled
-from simulation.reference_ladder import plan_ladder_reference_tasks
+from simulation.reference_selection import (
+    DEFAULT_REFERENCES,
+    REF_HISTORICAL,
+    REF_L0,
+    REF_L1,
+    SELECTABLE_REFERENCES,
+    effective_references,
+)
 from simulation.horizon_mode import DEFAULT_HORIZON_MODE, FIXED_24H, SUNRISE_WINDOW
 from ui.backtesting_charts import scenario_monthly_cost_chart
 from ui.backtesting_cons_data import render_cons_data_section
@@ -53,6 +60,7 @@ from ui.backtesting_runner import (
     count_backtesting_parallel_tasks,
     default_progress_file_path,
     finish_backtesting_run,
+    plan_run_references,
     poll_backtesting_progress,
     start_backtesting_subprocess,
     suggest_test_month,
@@ -153,39 +161,28 @@ def _prepare_backtesting_run_context() -> dict | None:
     mark_se_simulation_started()
     scenarios, _ = try_get_backtesting_scenarios()
     live_scenario_id = config.get_live_scenario_id()
-    parallel_task_count = count_backtesting_parallel_tasks(
-        scenarios or {},
-        live_scenario_id=live_scenario_id,
-    )
     scenario_labels = config.get_scenario_labels()
-    own_ref_flags = config.get_own_reference_flags()
-    _, extra_ref_labels, extra_ref_specs = plan_per_scenario_reference_tasks(
+    references = selected_run_references()
+    plan = plan_run_references(
         scenarios or {},
         live_scenario_id=live_scenario_id,
+        references=references,
         scenario_labels=scenario_labels,
-        own_reference_by_scenario=own_ref_flags,
-    )
-    _, ladder_specs = (
-        plan_ladder_reference_tasks(scenarios or {}, scenario_labels=scenario_labels)
-        if is_rule_reference_enabled()
-        else ({}, [])
     )
     return {
-        "workers": auto_backtesting_workers(parallel_task_count),
+        "references": references,
+        "workers": auto_backtesting_workers(plan.parallel_task_count(len(scenarios or {}))),
         "progress_file": default_progress_file_path(),
         "labels_for_order": {
             HISTORICAL_REFERENCE_ID: HISTORICAL_REFERENCE_LABEL,
             **scenario_labels,
-            **extra_ref_labels,
-            **{spec.ref_id: spec.label for spec in ladder_specs},
+            **{ref_id: label for ref_id, _params, label in plan.l0_specs},
+            **{spec.ref_id: spec.label for spec in plan.ladder_specs},
         },
         "preferred_progress_ids": ordered_backtesting_result_ids(
             scenarios or {},
             live_scenario_id=live_scenario_id,
-            extra_ref_ids=[
-                *(ref_id for ref_id, _params, _label in extra_ref_specs),
-                *(spec.ref_id for spec in ladder_specs),
-            ],
+            extra_ref_ids=[ref_id for ref_id, _params, _label in plan.all_ref_specs],
         ),
         "eta_tracker": ProgressEtaTracker(),
     }
@@ -255,6 +252,7 @@ def _execute_backtesting_run(
             progress_file=ctx["progress_file"],
             horizon_mode=horizon_mode,
             workers=ctx["workers"],
+            references=ctx["references"],
         )
     except FileNotFoundError as exc:
         st.error(str(exc))
@@ -370,6 +368,66 @@ def _render_season_mirror_toggle() -> None:
         )
 
 
+_REFERENCE_BOX_KEYS = {
+    REF_HISTORICAL: "backtesting_reference_historical",
+    REF_L0: "backtesting_reference_l0",
+    REF_L1: "backtesting_reference_l1",
+}
+_REFERENCE_BOX_LABELS = {
+    REF_HISTORICAL: "Historisch",
+    REF_L0: "Referenz ohne Speicher",
+    REF_L1: "Wechselrichter-Eigenverbrauch (L1)",
+}
+_REFERENCE_BOX_HELP = {
+    REF_HISTORICAL: (
+        "Live-Szenario ohne PV und ohne Speicher, mit dem Tarif von Live. Eine Reihe für alle "
+        "Szenarien."
+    ),
+    REF_L0: (
+        "Je Szenario: Tarif und PV des Szenarios, ohne Speicher, Verbraucher zu ihren üblichen "
+        "Zeiten."
+    ),
+    REF_L1: (
+        "Je Szenario: Speicher im Eigenverbrauchsmodus des Wechselrichters, ohne Preislogik, "
+        "Verbraucher zu ihren üblichen Zeiten."
+    ),
+}
+
+
+def selected_run_references() -> tuple[str, ...]:
+    """The ticked reference boxes of the run page (without what L2 adds)."""
+    return tuple(
+        ref for ref in SELECTABLE_REFERENCES if st.session_state.get(_REFERENCE_BOX_KEYS[ref])
+    )
+
+
+def _render_reference_boxes(meta: dict | None) -> None:
+    """Three global boxes for the references of the next run, seeded from the last run."""
+    if not all(key in st.session_state for key in _REFERENCE_BOX_KEYS.values()):
+        last = (meta or {}).get("references")
+        seed = tuple(last) if isinstance(last, list) else DEFAULT_REFERENCES
+        for ref, key in _REFERENCE_BOX_KEYS.items():
+            st.session_state.setdefault(key, ref in seed)
+    rule_reference = is_rule_reference_enabled()
+    forced = set(effective_references((), rule_reference=rule_reference))
+    st.markdown("**Referenzen berechnen** (für alle aktiven Szenarien)")
+    for column, ref in zip(st.columns(len(SELECTABLE_REFERENCES)), SELECTABLE_REFERENCES):
+        if ref in forced:
+            st.session_state[_REFERENCE_BOX_KEYS[ref]] = True
+        column.checkbox(
+            _REFERENCE_BOX_LABELS[ref],
+            key=_REFERENCE_BOX_KEYS[ref],
+            disabled=ref in forced,
+            help=_REFERENCE_BOX_HELP[ref],
+        )
+    if forced:
+        st.caption(
+            "Standard-Regeln sind eingeschaltet: Referenz ohne Speicher und L1 laufen immer mit."
+        )
+    if not selected_run_references() and not forced:
+        st.caption("Keine Referenz gewählt: Die Szenarien werden nur mit Live verglichen.")
+
+
 def _render_horizon_select(log_exists: bool, meta: dict | None) -> tuple[str, bool]:
     selectbox_index = [FIXED_24H, SUNRISE_WINDOW].index(DEFAULT_HORIZON_MODE)
     if "backtesting_horizon_mode" not in st.session_state:
@@ -453,6 +511,7 @@ def _render_worker_and_pv_notice() -> None:
     parallel_task_count = count_backtesting_parallel_tasks(
         scenarios,
         live_scenario_id=live_scenario_id,
+        references=selected_run_references(),
     )
     worker_count = auto_backtesting_workers(parallel_task_count)
     if worker_count > 1:
@@ -504,6 +563,7 @@ def render_backtesting_run_controls(
         sync_horizon_selectbox_from_log(meta)
     _render_season_mirror_toggle()
     horizon_mode, horizon_stale = _render_horizon_select(log_exists, meta)
+    _render_reference_boxes(meta)
     _render_worker_and_pv_notice()
     _render_run_buttons(
         label=label,

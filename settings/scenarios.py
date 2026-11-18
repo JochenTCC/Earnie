@@ -89,7 +89,12 @@ def normalize_scenario(raw: dict, index: int) -> dict:
         "settings": dict(settings),
     }
     if "own_reference" in raw:
-        out["own_reference"] = bool(raw.get("own_reference"))
+        raise ValueError(
+            f"Kritischer Konfigurationsfehler: Szenario '{scenario_id}' hat noch "
+            "'own_reference'. Die Referenzen wählt jetzt der Szenario-Explorer je Lauf. "
+            "Bitte die Konfig-Migration ausführen (Assistent in der App oder "
+            "python -m scripts.migrate_config)."
+        )
     return out
 
 

@@ -241,7 +241,6 @@ def _seed_scenario_widget_state(
     st.session_state[scoped_widget_key(session_scope, "scenario_enabled")] = (
         scenario.get("enabled", True) is not False
     )
-    _seed_own_reference_widget(session_scope, scenario)
     _seed_import_cap_widgets(session_scope, settings)
     from ui.scenario_heating_picks import seed_heating_picks
 
@@ -272,38 +271,6 @@ def _seed_import_cap_widgets(session_scope: str, settings: dict) -> None:
     st.session_state[scoped_widget_key(session_scope, "scenario_import_cap_mode")] = (
         str(saved_mode) if saved_mode is not None else MODE_PROPOSAL
     )
-
-def _seed_own_reference_widget(session_scope: str, scenario: dict) -> None:
-    key = scoped_widget_key(session_scope, "scenario_own_reference")
-    if "own_reference" in scenario:
-        st.session_state[key] = bool(scenario.get("own_reference"))
-        return
-    from simulation.engine import default_own_reference
-
-    live_id = str(config.get_live_scenario_id() or "").strip()
-    sid = str(scenario.get("id") or "").strip()
-    try:
-        params = config.CONFIG.resolve_scenario_settings_dict(
-            dict(scenario.get("settings") or {})
-        )
-        live_params = None
-        if live_id:
-            for entry in config.get_scenarios():
-                if str(entry.get("id") or "").strip() == live_id:
-                    live_params = config.CONFIG.resolve_scenario_settings_dict(
-                        dict(entry.get("settings") or {})
-                    )
-                    break
-            if live_params is None and sid == live_id:
-                live_params = params
-        st.session_state[key] = default_own_reference(
-            sid or live_id,
-            params,
-            live_scenario_id=live_id,
-            live_params=live_params if live_params is not None else params,
-        )
-    except (ValueError, KeyError, TypeError, AttributeError):
-        st.session_state[key] = False
 
 def _scenario_widget_state_missing(session_scope: str) -> bool:
     """True when sync metadata exists but scoped widget keys were dropped (e.g. page navigation)."""
@@ -342,17 +309,10 @@ def _sync_scenario_session(
             import_tariffs=import_tariffs,
             export_tariffs=export_tariffs,
         )
-        baseline_scenario = dict(scenario)
-        baseline_scenario["own_reference"] = bool(
-            st.session_state.get(
-                scoped_widget_key(session_scope, "scenario_own_reference"),
-                False,
-            )
-        )
         store_scenario_form_baseline(
             st.session_state,
             session_scope,
-            baseline_scenario,
+            dict(scenario),
         )
         st.session_state[_SESSION_SYNC_KEY] = session_scope
         st.session_state[_SESSION_FILE_STAMP_KEY] = file_stamp

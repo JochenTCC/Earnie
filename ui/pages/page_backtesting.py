@@ -9,7 +9,7 @@ from ui.help_hint import render_page_title_with_help
 
 _BACKTESTING_HELP = (
     "Szenario-Explorer: Berechnung aus der Konfiguration starten und Ergebnisse auswerten "
-    "(Referenz ohne Optimierung vs. optimierte Szenarien). "
+    "(optimierte Szenarien gegen Live und die gewählten Referenzen). "
     "Läuft offline via `scripts.run_backtesting`."
 )
 

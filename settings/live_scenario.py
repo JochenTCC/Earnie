@@ -204,20 +204,16 @@ def get_backtesting_scenarios(
     }
 
 
-def get_own_reference_flags(scenarios: list[dict]) -> dict[str, bool | None]:
-    """Per enabled scenario: True/False override, None = Auto heuristic."""
-    flags: dict[str, bool | None] = {}
+def ensure_live_scenario_enabled(scenarios: list[dict], live_scenario_id: str) -> None:
+    """The Live scenario always runs in the SE; ``enabled: false`` on it is a leftover."""
     for scenario in scenarios:
-        if scenario.get("enabled", True) is False:
-            continue
-        sid = str(scenario.get("id") or "").strip()
-        if not sid:
-            continue
-        if "own_reference" in scenario:
-            flags[sid] = bool(scenario.get("own_reference"))
-        else:
-            flags[sid] = None
-    return flags
+        if scenario.get("id") == live_scenario_id and scenario.get("enabled", True) is False:
+            raise ValueError(
+                f"Kritischer Konfigurationsfehler: Das Live-Szenario '{live_scenario_id}' ist "
+                "für den Szenario-Explorer deaktiviert, es läuft dort aber immer. Bitte die "
+                "Konfig-Migration ausführen (Assistent in der App oder "
+                "python -m scripts.migrate_config)."
+            )
 
 
 def get_planning_pv_systems(

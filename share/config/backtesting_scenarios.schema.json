@@ -70,11 +70,7 @@
         },
         "enabled": {
           "type": "boolean",
-          "description": "Wenn false, wird das Szenario im Szenario-Explorer nicht berechnet. Standard true wenn fehlend."
-        },
-        "own_reference": {
-          "type": "boolean",
-          "description": "Wenn true: eigene Nicht-Opt-Referenz. Wenn false: Live-Ref/Historisch teilen. Fehlt: Auto (Tarif+pv_kwp-Heuristik)."
+          "description": "Wenn false, wird das Szenario im Szenario-Explorer nicht berechnet. Standard true wenn fehlend. Das Live-Szenario läuft immer und darf nicht false sein."
         },
         "settings": {
           "type": "object",

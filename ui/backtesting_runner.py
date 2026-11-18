@@ -20,6 +20,7 @@ from simulation.backtesting_progress import (
     request_cancel,
 )
 from simulation.horizon_mode import DEFAULT_HORIZON_MODE
+from simulation.reference_selection import format_references
 
 _FAILURE_MARKERS = (
     "No module named scripts.run_backtesting",
@@ -58,33 +59,44 @@ def default_progress_file_path() -> str:
     return str(Path(default_backtesting_output_dir()) / ".backtesting_progress")
 
 
+def plan_run_references(
+    scenarios: dict[str, dict],
+    *,
+    live_scenario_id: str,
+    references: tuple[str, ...],
+    scenario_labels: dict[str, str] | None = None,
+):
+    """The references a UI run computes: the boxes, plus L2 with ``rule_reference``."""
+    from house_config.entity_resolution import strip_assets_for_reference
+    from scripts.run_backtesting import HISTORICAL_REFERENCE_LABEL
+    from simulation.reference_selection import plan_references
+
+    live_params = scenarios.get(live_scenario_id)
+    return plan_references(
+        scenarios,
+        scenarios,
+        live_scenario_id=live_scenario_id,
+        references=references,
+        rule_reference=is_rule_reference_enabled(),
+        historical_params=(
+            strip_assets_for_reference(live_params) if live_params is not None else None
+        ),
+        historical_label=HISTORICAL_REFERENCE_LABEL,
+        scenario_labels=scenario_labels,
+    )
+
+
 def count_backtesting_parallel_tasks(
     scenarios: dict[str, dict],
     *,
     live_scenario_id: str,
-    own_reference_by_scenario: dict[str, bool | None] | None = None,
+    references: tuple[str, ...],
 ) -> int:
-    """Parallele Tasks: Haupt-Referenz + L0-Referenzen + optimierte Szenarien.
-
-    L1 und L2 (Standard-Regeln) nur mit ``rule_reference`` in EARNIE_UI_MODES.
-    """
-    from simulation.engine import plan_per_scenario_reference_tasks
-    from simulation.reference_ladder import plan_ladder_reference_tasks
-
-    flags = own_reference_by_scenario
-    if flags is None:
-        import config
-
-        flags = config.get_own_reference_flags()
-    _, _, extra_specs = plan_per_scenario_reference_tasks(
-        scenarios,
-        live_scenario_id=live_scenario_id,
-        own_reference_by_scenario=flags,
+    """Parallel tasks: computed references (shared flows count once) + optimized scenarios."""
+    plan = plan_run_references(
+        scenarios, live_scenario_id=live_scenario_id, references=references
     )
-    _, ladder_specs = (
-        plan_ladder_reference_tasks(scenarios) if is_rule_reference_enabled() else ({}, [])
-    )
-    return 1 + len(extra_specs) + len(ladder_specs) + len(scenarios)
+    return plan.parallel_task_count(len(scenarios))
 
 
 def auto_backtesting_workers(parallel_task_count: int) -> int:
@@ -189,6 +201,7 @@ def build_backtesting_command(
     progress_file: str | None = None,
     horizon_mode: str = DEFAULT_HORIZON_MODE,
     workers: int = 1,
+    references: tuple[str, ...],
     rule_reference: bool = False,
 ) -> list[str]:
     script_path = backtesting_script_path()
@@ -209,6 +222,7 @@ def build_backtesting_command(
         cmd.extend(["--horizon-mode", horizon_mode])
     if workers > 1:
         cmd.extend(["--workers", str(workers)])
+    cmd.extend(["--references", format_references(references)])
     if rule_reference:
         cmd.append("--rule-reference")
     return cmd
@@ -237,6 +251,7 @@ def start_backtesting_subprocess(
     progress_file: str | None = None,
     horizon_mode: str = DEFAULT_HORIZON_MODE,
     workers: int = 1,
+    references: tuple[str, ...],
 ) -> BacktestingRun:
     """Start the SE subprocess and return at once. Raises ``FileNotFoundError`` without the script."""
     log_dir = default_backtesting_output_dir() if output_dir is None else output_dir
@@ -252,6 +267,7 @@ def start_backtesting_subprocess(
         progress_file=progress_file,
         horizon_mode=horizon_mode,
         workers=workers,
+        references=references,
         rule_reference=is_rule_reference_enabled(),
     )
     proc = subprocess.Popen(
@@ -317,6 +333,7 @@ def run_backtesting_subprocess(
     progress_file: str | None = None,
     horizon_mode: str = DEFAULT_HORIZON_MODE,
     workers: int = 1,
+    references: tuple[str, ...],
     on_progress: Callable[[dict[str, dict]], None] | None = None,
 ) -> tuple[int, str]:
     """Startet Backtesting offline und wartet; gibt (exit_code, kombiniertes stdout/stderr) zurück."""
@@ -328,6 +345,7 @@ def run_backtesting_subprocess(
             progress_file=progress_file,
             horizon_mode=horizon_mode,
             workers=workers,
+            references=references,
         )
     except FileNotFoundError as exc:
         return 1, str(exc)

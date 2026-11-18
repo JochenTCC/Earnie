@@ -9,7 +9,6 @@
             "id": "live",
             "label": "Live",
             "enabled": true,
-            "own_reference": true,
             "settings": {
                 "battery_ids": [
                     "15_kwh_speicher"

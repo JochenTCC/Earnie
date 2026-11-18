@@ -27,7 +27,7 @@ STEP_L0 = "l0"
 STEP_L3 = "l3"
 _STEPS = (STEP_L0, LADDER_L1, LADDER_L2, STEP_L3)
 _STEP_NAMES = {
-    STEP_L0: "Ohne Steuerung",
+    STEP_L0: "Referenz ohne Speicher",
     LADDER_L1: "Wechselrichter-Eigenverbrauch",
     LADDER_L2: "Standard-Regeln",
     STEP_L3: "Earnie",
@@ -42,9 +42,9 @@ _METRICS_PER_ROW = 3
 _HEADLINE_HELP = (
     "Kosten mit Standard-Regeln minus Kosten mit Earnie: das, was Earnie über Batterie und "
     "freie Regeln hinaus bringt. Der Anteil der Regeln sagt, wie viel der Gesamtersparnis "
-    "gegen „Ohne Steuerung“ man auch ohne Earnie erreicht. Die Standard-Regeln ersetzen die "
-    "frühere Referenz ohne Optimierung, deshalb ist dieser Wert kleiner als die frühere "
-    "Ersparnis. Das liegt an der Methode, nicht an einer schlechteren Optimierung."
+    "gegen die „Referenz ohne Speicher“ man auch ohne Earnie erreicht. Gegen die Standard-Regeln "
+    "ist die Ersparnis kleiner als gegen die Referenz ohne Speicher. Das liegt an der Methode, "
+    "nicht an einer schlechteren Optimierung."
 )
 _HEADLINE_CAPTION = (
     "Earnie plant im Szenario-Explorer mit bekannten PV-, Last- und Preisverläufen, die "
@@ -175,7 +175,7 @@ def render_ladder_headline(meta: dict) -> None:
     st.caption(_HEADLINE_CAPTION)
     if any(not summary.corrections for summary in summaries):
         st.caption(_NO_SOC_CAPTION)
-    with st.expander("Alle Stufen: von „Ohne Steuerung“ bis Earnie"):
+    with st.expander("Alle Stufen: von der Referenz ohne Speicher bis Earnie"):
         st.dataframe(
             pd.DataFrame(ladder_table_rows(summaries)), width="stretch", hide_index=True
         )
