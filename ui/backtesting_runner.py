@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, TextIO
 
+from runtime_store.env_vars import is_rule_reference_enabled
 from runtime_store.persist_paths import resolve_backtesting_log_dir
 from simulation.backtesting_progress import (
     clear_cancel_request,
@@ -63,7 +64,10 @@ def count_backtesting_parallel_tasks(
     live_scenario_id: str,
     own_reference_by_scenario: dict[str, bool | None] | None = None,
 ) -> int:
-    """Parallele Tasks: Haupt-Referenz + L0-, L1-, L2-Referenzen + optimierte Szenarien."""
+    """Parallele Tasks: Haupt-Referenz + L0-Referenzen + optimierte Szenarien.
+
+    L1 und L2 (Standard-Regeln) nur mit ``rule_reference`` in EARNIE_UI_MODES.
+    """
     from simulation.engine import plan_per_scenario_reference_tasks
     from simulation.reference_ladder import plan_ladder_reference_tasks
 
@@ -77,7 +81,9 @@ def count_backtesting_parallel_tasks(
         live_scenario_id=live_scenario_id,
         own_reference_by_scenario=flags,
     )
-    _, ladder_specs = plan_ladder_reference_tasks(scenarios)
+    _, ladder_specs = (
+        plan_ladder_reference_tasks(scenarios) if is_rule_reference_enabled() else ({}, [])
+    )
     return 1 + len(extra_specs) + len(ladder_specs) + len(scenarios)
 
 
@@ -183,6 +189,7 @@ def build_backtesting_command(
     progress_file: str | None = None,
     horizon_mode: str = DEFAULT_HORIZON_MODE,
     workers: int = 1,
+    rule_reference: bool = False,
 ) -> list[str]:
     script_path = backtesting_script_path()
     cmd = [
@@ -202,6 +209,8 @@ def build_backtesting_command(
         cmd.extend(["--horizon-mode", horizon_mode])
     if workers > 1:
         cmd.extend(["--workers", str(workers)])
+    if rule_reference:
+        cmd.append("--rule-reference")
     return cmd
 
 
@@ -243,6 +252,7 @@ def start_backtesting_subprocess(
         progress_file=progress_file,
         horizon_mode=horizon_mode,
         workers=workers,
+        rule_reference=is_rule_reference_enabled(),
     )
     proc = subprocess.Popen(
         cmd,

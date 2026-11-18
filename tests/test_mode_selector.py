@@ -92,3 +92,24 @@ def test_ui_price_forecast_page_from_config_json(tmp_path, monkeypatch):
         require_loxone_credentials=False,
     )
     assert cfg.get_ui_price_forecast_page_enabled() is True
+
+
+def test_rule_reference_is_off_by_default(monkeypatch):
+    from runtime_store.env_vars import is_rule_reference_enabled
+
+    monkeypatch.delenv("EARNIE_UI_MODES", raising=False)
+    assert is_rule_reference_enabled() is False
+    monkeypatch.setenv("EARNIE_UI_MODES", "sunset2sunset,scenario_explorer,live_environment")
+    assert is_rule_reference_enabled() is False
+
+
+def test_rule_reference_switch_keeps_the_pages(monkeypatch):
+    from runtime_store.env_vars import is_rule_reference_enabled
+    from ui.mode_selector import get_enabled_ui_mode_keys
+
+    monkeypatch.setenv("EARNIE_UI_MODES", "scenario_explorer,rule_reference")
+    assert is_rule_reference_enabled() is True
+    assert get_enabled_ui_mode_keys() == ["scenario_explorer", "rule_reference"]
+    # Alone it has no page, so the default page stays.
+    monkeypatch.setenv("EARNIE_UI_MODES", "rule_reference")
+    assert get_enabled_ui_mode_keys() == ["sunset2sunset", "rule_reference"]

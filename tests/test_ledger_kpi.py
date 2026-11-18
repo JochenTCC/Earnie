@@ -219,10 +219,12 @@ def test_help_states_the_counterfactual_limits_and_incomplete_days():
 
     for part in ("gleiche PV", "gleiche Preise", "gleiche Tagesverbrauch", "gewohnten Zeit",
                  "ab dem Einstecken", "Brennstoff", "Herstellermodus", "vorläufig",
-                 "Szenario-Analyse", "Powerstations", "Wirkungsgrad", "Unvollständige Tage: 3"):
+                 "Powerstations", "Wirkungsgrad", "Unvollständige Tage: 3"):
         assert part in text
     assert "Unvollständige Tage: keine" in tile_help(_help_kpi(0))
     assert "Ohne eigenen Zähler" not in text and "OpenEMS" not in text
+    # The Standard-Regeln comparison is a hidden dev switch, the tile does not point to it.
+    assert "Standard-Regeln" not in text
 
 
 def test_help_names_consumers_without_their_own_meter():

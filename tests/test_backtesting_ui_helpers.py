@@ -205,7 +205,13 @@ def test_reorder_results_by_ids_appends_unknown():
     ]
 
 
-def test_count_backtesting_parallel_tasks_includes_reference(monkeypatch):
+@pytest.mark.parametrize(
+    ("ui_modes", "expected"),
+    [("scenario_explorer,rule_reference", 6), ("scenario_explorer", 4)],
+)
+def test_count_backtesting_parallel_tasks_includes_reference(monkeypatch, ui_modes, expected):
+    """L1 / L2 count only with the hidden switch ``rule_reference``."""
+    monkeypatch.setenv("EARNIE_UI_MODES", ui_modes)
     monkeypatch.setattr(
         "simulation.engine.plan_per_scenario_reference_tasks",
         lambda scenarios, *, live_scenario_id, scenario_labels=None, own_reference_by_scenario=None: (
@@ -224,8 +230,14 @@ def test_count_backtesting_parallel_tasks_includes_reference(monkeypatch):
             live_scenario_id="a",
             own_reference_by_scenario={},
         )
-        == 6
+        == expected
     )
+
+
+@pytest.mark.parametrize(("enabled", "present"), [(True, True), (False, False)])
+def test_build_backtesting_command_rule_reference_flag(tmp_path, enabled, present):
+    cmd = build_backtesting_command(output_dir=str(tmp_path), rule_reference=enabled)
+    assert ("--rule-reference" in cmd) is present
 
 
 def test_build_backtesting_command_includes_workers_when_parallel(tmp_path):

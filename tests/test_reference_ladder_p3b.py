@@ -34,6 +34,12 @@ from ui.chart_baseline_label import (
 
 os.environ.setdefault("EARNIE_OFFLINE", "1")
 
+@pytest.fixture(autouse=True)
+def _rule_reference_switch(monkeypatch):
+    """The ladder UI shows only with the hidden switch ``rule_reference``."""
+    monkeypatch.setenv("EARNIE_UI_MODES", "scenario_explorer,rule_reference")
+
+
 _DAY = pd.Timestamp("2026-06-10")
 _BATTERY = {"battery_capacity_kwh": 10.0, "efficiency": 0.9}
 

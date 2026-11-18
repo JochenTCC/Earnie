@@ -250,6 +250,14 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         help="Referenz ohne PV und Batterie nicht rechnen (Studien). Jedes Szenario braucht dann own_reference.",
     )
     parser.add_argument(
+        "--rule-reference",
+        action="store_true",
+        help=(
+            "Referenzleiter L1/L2 (Standard-Regeln) mitrechnen (Dev). Die UI setzt das nur "
+            "mit rule_reference in EARNIE_UI_MODES."
+        ),
+    )
+    parser.add_argument(
         "--start-month",
         type=_parse_month,
         metavar="MONAT",
@@ -844,8 +852,10 @@ def print_ladder_summary(
     """Earnie gegen Standard-Regeln (L2 − L3 mit SoC-Bewertung) über den gebuchten Zeitraum.
 
     Dazu der Anteil der Regeln an der Gesamtersparnis; L0 hat keinen Speicher und bleibt
-    ohne SoC-Term.
+    ohne SoC-Term. Ohne ``--rule-reference`` gibt es keine Leiter und keinen Block.
     """
+    if not ladder_by_scenario:
+        return
     print("\n=== ERSPARNIS GEGEN STANDARD-REGELN ===")
     for scenario_id, steps in ladder_by_scenario.items():
         correction = soc_correction[scenario_id]["steps"][LADDER_L2]["correction_eur"]
@@ -1140,8 +1150,10 @@ def main(argv: list[str] | None = None):
         )
     extra_ref_specs = [spec for spec in extra_ref_specs if spec[0] in used_references]
     labels.update(extra_ref_labels)
-    ladder_by_scenario, ladder_specs = plan_ladder_reference_tasks(
-        scenarios, scenario_labels=scenario_labels
+    ladder_by_scenario, ladder_specs = (
+        plan_ladder_reference_tasks(scenarios, scenario_labels=scenario_labels)
+        if args.rule_reference
+        else ({}, [])
     )
     labels.update({spec.ref_id: spec.label for spec in ladder_specs})
     # L0, L1 and L2 alike for what every result series needs (fees, fuel, invoices).

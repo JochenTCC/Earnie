@@ -31,6 +31,23 @@ def is_device_detection_enabled() -> bool:
     return DEVICE_DETECTION_MODE in requested_ui_mode_keys()
 
 
+# Dev-only UI mode key: rule-based reference ladder (L1 / L2, "Standard-Regeln") in the SE.
+RULE_REFERENCE_MODE = "rule_reference"
+
+# UI mode keys without a page of their own; not offered to users.
+HIDDEN_UI_MODE_KEYS = frozenset({DEVICE_DETECTION_MODE, RULE_REFERENCE_MODE})
+
+
+def is_rule_reference_enabled() -> bool:
+    """True when ``EARNIE_UI_MODES`` lists ``rule_reference``.
+
+    Hidden switch for the SE comparison against the Standard-Regeln: the UI then computes
+    the ladder runs and shows the headline and the saving column. Off unless listed
+    explicitly; the default mode set without the variable never includes it.
+    """
+    return RULE_REFERENCE_MODE in requested_ui_mode_keys()
+
+
 def read_env_or(suffix: str, default: str) -> str:
     value = read_env(suffix)
     return value if value else default

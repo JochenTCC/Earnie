@@ -31,6 +31,7 @@ from simulation.backtesting_progress import (
     ordered_backtesting_result_ids,
 )
 from simulation.engine import HISTORICAL_REFERENCE_ID, plan_per_scenario_reference_tasks
+from runtime_store.env_vars import is_rule_reference_enabled
 from simulation.reference_ladder import plan_ladder_reference_tasks
 from simulation.horizon_mode import DEFAULT_HORIZON_MODE, FIXED_24H, SUNRISE_WINDOW
 from ui.backtesting_charts import scenario_monthly_cost_chart
@@ -164,8 +165,10 @@ def _prepare_backtesting_run_context() -> dict | None:
         scenario_labels=scenario_labels,
         own_reference_by_scenario=own_ref_flags,
     )
-    _, ladder_specs = plan_ladder_reference_tasks(
-        scenarios or {}, scenario_labels=scenario_labels
+    _, ladder_specs = (
+        plan_ladder_reference_tasks(scenarios or {}, scenario_labels=scenario_labels)
+        if is_rule_reference_enabled()
+        else ({}, [])
     )
     return {
         "workers": auto_backtesting_workers(parallel_task_count),

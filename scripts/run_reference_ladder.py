@@ -240,7 +240,7 @@ def _validate_forecast_args(args: argparse.Namespace) -> None:
 
 
 def _backtesting_argv(args: argparse.Namespace, output_dir: str) -> list[str]:
-    argv = ["--workers", str(args.workers), "--output-dir", output_dir]
+    argv = ["--workers", str(args.workers), "--output-dir", output_dir, "--rule-reference"]
     for scenario_id in args.scenario or []:
         argv += ["--scenario", scenario_id]
     if args.start_month:

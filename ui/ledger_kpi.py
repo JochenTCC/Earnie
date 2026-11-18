@@ -38,9 +38,7 @@ _METHOD_HELP = (
     "**Heute bisher** ist vorläufig: Es zählt nur die Batterie. Verschobene Geräte, E-Auto "
     "und Heizstab kommen beim Tagesabschluss dazu.\n\n"
     "**Grenzen:** Die gewohnte Zeit ist das Modell aus dem Hausprofil, nicht der tatsächliche "
-    "Tagesablauf. Die "
-    "Szenario-Analyse vergleicht strenger, mit Standard-Regeln wie Laden bei PV-Überschuss; "
-    "ihre Ersparnis ist deshalb meist kleiner. Was Powerstations aus ihrem Speicher liefern, "
+    "Tagesablauf. Was Powerstations aus ihrem Speicher liefern, "
     "ist nicht bewertet; ihr Laden zählt zur tatsächlichen Zeit. Das Ergebnis hängt vom "
     "eingestellten Batterie-Wirkungsgrad ab und ist keine Stromrechnung."
 )

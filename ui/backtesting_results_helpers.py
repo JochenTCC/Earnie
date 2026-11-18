@@ -14,6 +14,7 @@ from simulation.engine import (
     scenario_reference_id,
 )
 from optimizer.slot_duration import DEFAULT_DT_H
+from runtime_store.env_vars import is_rule_reference_enabled
 from simulation.booked_consumption import BOOKED_CONSUMPTION_KEY
 from simulation.capacity_charge import CAPACITY_KEY, SE_CAUSE_LABELS_DE
 from simulation.reference_costs import LADDER_L2
@@ -412,6 +413,9 @@ def _soc_correction_block(meta: dict, scenario_id: str) -> dict | None:
     return (meta.get("ladder_soc_correction") or {}).get(scenario_id)
 
 
+_STANDARD_RULES_COLUMN = "Ersparnis vs. Standard-Regeln [€]"
+
+
 def _standard_rules_saving_cell(meta: dict, scenario_id: str, totals: dict) -> str:
     """L2 − L3 of a scenario with the end-SoC term; logs without a ladder have no value."""
     steps = (meta.get("ladder_by_scenario") or {}).get(scenario_id)
@@ -567,6 +571,8 @@ def build_annual_cost_rows(meta: dict) -> list[dict]:
     live_ref_total = _live_reference_total_eur(meta, totals)
     live_id = _resolve_live_scenario_id(meta)
     live_ref_kwh = _live_reference_kwh(meta)
+    # Hidden switch: without ``rule_reference`` the table has no Standard-Regeln column.
+    rule_reference = is_rule_reference_enabled()
 
     rows: list[dict] = []
     for scenario_id in _annual_cost_row_order(meta, totals):
@@ -587,7 +593,7 @@ def build_annual_cost_rows(meta: dict) -> list[dict]:
             live_ref_kwh=live_ref_kwh,
             booked=booked,
             ladder_report=(meta.get("ladder_report") or {}).get(scenario_id),
-            soc_hint=_soc_correction_hint(meta, scenario_id),
+            soc_hint=_soc_correction_hint(meta, scenario_id) if rule_reference else [],
         )
         is_reference = scenario_id == ref_id or is_scenario_reference_id(scenario_id)
         if is_reference:
@@ -599,7 +605,7 @@ def build_annual_cost_rows(meta: dict) -> list[dict]:
                     "Gesamtverbrauch [kWh]": total_cell,
                     **_heat_fuel_cells(meta, scenario_id, show_fuel=show_fuel),
                     "Jahres Kosten [€]": format_euro(total_eur),
-                    "Ersparnis vs. Standard-Regeln [€]": _DASH,
+                    **({_STANDARD_RULES_COLUMN: _DASH} if rule_reference else {}),
                     "Δ vs Referenz [€]": _DASH,
                     "Hinweis": hinweis,
                 }
@@ -617,8 +623,10 @@ def build_annual_cost_rows(meta: dict) -> list[dict]:
                 "Gesamtverbrauch [kWh]": total_cell,
                 **_heat_fuel_cells(meta, scenario_id, show_fuel=show_fuel),
                 "Jahres Kosten [€]": format_euro(total_eur),
-                "Ersparnis vs. Standard-Regeln [€]": _standard_rules_saving_cell(
-                    meta, scenario_id, totals
+                **(
+                    {_STANDARD_RULES_COLUMN: _standard_rules_saving_cell(meta, scenario_id, totals)}
+                    if rule_reference
+                    else {}
                 ),
                 "Δ vs Referenz [€]": delta_cell,
                 "Hinweis": hinweis,

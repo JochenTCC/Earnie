@@ -31,6 +31,12 @@ from tests.fixtures.backtesting_fixtures import (
 os.environ.setdefault("EARNIE_OFFLINE", "1")
 
 
+@pytest.fixture(autouse=True)
+def _rule_reference_switch(monkeypatch):
+    """The ladder UI shows only with the hidden switch ``rule_reference``."""
+    monkeypatch.setenv("EARNIE_UI_MODES", "scenario_explorer,rule_reference")
+
+
 @pytest.fixture
 def ladder_env(monkeypatch):
     with activate_backtesting_fixtures(monkeypatch):
@@ -232,6 +238,13 @@ def test_saving_counts_fuel_on_both_sides():
 
 def test_log_without_a_ladder_shows_no_saving():
     assert _rows(_meta(ladder=False))["live"]["Ersparnis vs. Standard-Regeln [€]"] == "—"
+
+
+def test_saving_column_hidden_without_the_switch(monkeypatch):
+    """Without ``rule_reference`` the cost table has no Standard-Regeln column."""
+    monkeypatch.setenv("EARNIE_UI_MODES", "scenario_explorer")
+    rows = _rows(_meta())
+    assert all("Ersparnis vs. Standard-Regeln [€]" not in row for row in rows.values())
 
 
 def test_ladder_report_appears_as_a_hint():

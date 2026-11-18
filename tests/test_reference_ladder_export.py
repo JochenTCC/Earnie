@@ -434,7 +434,7 @@ def test_argv_reaches_the_se_run():
         ["--workers", "4", "--output-dir", "x", "--scenario", "a", "--scenario", "b", "--start-month", "10", "--end-month", "10"]
     )
     assert _backtesting_argv(args, args.output_dir) == [
-        "--workers", "4", "--output-dir", "x",
+        "--workers", "4", "--output-dir", "x", "--rule-reference",
         "--scenario", "a", "--scenario", "b",
         "--start-month", "10", "--end-month", "10",
     ]

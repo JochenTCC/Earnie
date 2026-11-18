@@ -9,6 +9,7 @@ EARNIE_UI_MODES=sunset2sunset,scenario_explorer,live_environment
 Ohne diese Variable stehen in der Entwicklung **Sunset-2-Sunset** (Seite **Monitor**), **Szenario-Explorer** und **Daemon Control** zur Verfügung, optional auch **Preis-Prognose (Dev)**.
 
 - **Gültige Keys:** `sunset2sunset`, `scenario_explorer`, `live_environment` und `price_forecast`. Die Aliase `live` und `historical` gibt es nicht.
+- **Entwickler-Schalter ohne eigene Seite:** `device_detection` (Phasen-Log der Geräteerkennung) und `rule_reference` (Vergleich mit Standard-Regeln im Szenario-Explorer, siehe unten). Beide sind standardmäßig aus und nur für die Entwicklung gedacht.
 - **Umbenannte Keys:** Die früheren Keys `backtesting` und `scenario_exploration` heißen inzwischen anders. Bei einer alten Env-Konfiguration erscheint ein Hinweis in der Sidebar.
 
 Details zum Deployment: [Betrieb](../einrichtung/betrieb.md).
@@ -154,6 +155,8 @@ Der Szenario-Explorer hat keine Sonnenaufgang-Navigation wie der Monitor und fü
 
 ### Ersparnis gegen Standard-Regeln
 
+> **Nur für die Entwicklung:** Der Vergleich mit den Standard-Regeln ist standardmäßig aus. Erst mit dem Key `rule_reference` in `EARNIE_UI_MODES` rechnet der Szenario-Explorer die Stufen **Wechselrichter-Eigenverbrauch** und **Standard-Regeln** mit und zeigt die Kennzahl, die Spalte `Ersparnis vs. Standard-Regeln [€]` und die Standard-Regeln in den Fenster-Charts. Ohne den Key fehlen diese Teile, und die Fenster-Charts vergleichen mit **BL Ziel**.
+
 Ganz oben in den Ergebnissen steht je Szenario, was Earnie über Batterie und freie Regeln hinaus bringt: die Kosten mit **Standard-Regeln** minus die Kosten mit Earnie. Darunter steht der **Anteil der Regeln**: (Ohne Steuerung − Standard-Regeln) / (Ohne Steuerung − Earnie). Er sagt, wie viel der gesamten Ersparnis man auch ohne Earnie erreicht. Spart Earnie gegen „Ohne Steuerung“ nichts, steht dort „keine Gesamtersparnis“.
 
 Der Bereich **Alle Stufen** zeigt die ganze Leiter. Jede Stufe ergänzt genau eine Sache:
@@ -173,9 +176,9 @@ Die Regeln sind großzügig angesetzt: Sie sehen den Überschuss am Zähler und 
 
 ### Gesamtkosten und -Verbrauch
 
-Die Tabelle **Gesamtkosten und -Verbrauch** hat die Spalten `Szenario`, `Jahres Verbrauch [kWh]`, `Speicher-Standby [kWh]`, `Gesamtverbrauch [kWh]` (= Jahres Verbrauch + Speicher-Standby), `CO2 [kg]`, `Jahres Kosten [€]`, `Ersparnis vs. Standard-Regeln [€]`, `Δ vs Referenz [€]` und `Hinweis`. Das Delta bezieht sich immer auf die Zeile der Live-Referenz.
+Die Tabelle **Gesamtkosten und -Verbrauch** hat die Spalten `Szenario`, `Jahres Verbrauch [kWh]`, `Speicher-Standby [kWh]`, `Gesamtverbrauch [kWh]` (= Jahres Verbrauch + Speicher-Standby), `CO2 [kg]`, `Jahres Kosten [€]`, `Δ vs Referenz [€]` und `Hinweis` (mit `rule_reference` zusätzlich `Ersparnis vs. Standard-Regeln [€]`, siehe oben). Das Delta bezieht sich immer auf die Zeile der Live-Referenz.
 
-Je Szenario kommen zwei Referenzzeilen dazu. **Wechselrichter-Eigenverbrauch** rechnet die Batterie im Eigenverbrauchsmodus des Wechselrichters, die flexiblen Verbraucher laufen zu ihren üblichen Zeiten. **Standard-Regeln** ergänzt freie Regeln: PV-Überschussladen, SG-Ready-Sperre bei hohen Preisen und „günstigste Stunden“ für Geräte mit Startfenster sowie einen Heizstab neben einer Brennstoffheizung, der mit seiner Nennleistung läuft, sobald nach Verbrauchern und Batterie so viel eingespeist würde und der Wärmebedarf des Tages es zulässt. Die Wärme des Heizstabs spart Brennstoff. Beide Zeilen liefern je Fenster und Verbraucher dieselbe Energie wie die Optimierung. Ein Heizstab hat kein Energieziel: In **Wechselrichter-Eigenverbrauch** läuft er nicht. Szenarien mit gleichem Haus, Speicher, Tarif und gleichen Verbrauchern teilen sich diese Zeilen.
+Mit `rule_reference` kommen je Szenario zwei Referenzzeilen dazu. **Wechselrichter-Eigenverbrauch** rechnet die Batterie im Eigenverbrauchsmodus des Wechselrichters, die flexiblen Verbraucher laufen zu ihren üblichen Zeiten. **Standard-Regeln** ergänzt freie Regeln: PV-Überschussladen, SG-Ready-Sperre bei hohen Preisen und „günstigste Stunden“ für Geräte mit Startfenster sowie einen Heizstab neben einer Brennstoffheizung, der mit seiner Nennleistung läuft, sobald nach Verbrauchern und Batterie so viel eingespeist würde und der Wärmebedarf des Tages es zulässt. Die Wärme des Heizstabs spart Brennstoff. Beide Zeilen liefern je Fenster und Verbraucher dieselbe Energie wie die Optimierung. Ein Heizstab hat kein Energieziel: In **Wechselrichter-Eigenverbrauch** läuft er nicht. Szenarien mit gleichem Haus, Speicher, Tarif und gleichen Verbrauchern teilen sich diese Zeilen.
 
 `Ersparnis vs. Standard-Regeln [€]` ist die Zeile **Standard-Regeln** des Szenarios minus seine optimierten Kosten, also das, was Earnie über freie Regeln hinaus bringt. Der Betrag steht ohne Vorzeichen, mit „gespart“ oder „mehr ausgegeben“ dabei; so auch die Kennzahl oben und die Spalte „Ersparnis zur Stufe davor“ in „Alle Stufen“. `Δ vs Referenz [€]` und der Ladestand am Periodenende behalten ihr Vorzeichen, weil sie Unterschiede sind. Dieser Wert ist kleiner als die Ersparnis gegen die Referenz ohne Optimierung. Das ist Absicht und kein Rückschritt: Die Batterie und einfache Regeln hätte man auch ohne Earnie. Earnie plant im Szenario-Explorer mit bekannten PV-, Last- und Preisverläufen, der Wert ist deshalb eine Obergrenze.
 

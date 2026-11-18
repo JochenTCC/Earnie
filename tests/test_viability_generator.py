@@ -442,6 +442,9 @@ def test_study_runs_skip_the_reference_without_pv_and_battery():
         skip_historical_reference=True,
     )
     assert "--skip-historical-reference" in _backtesting_argv(ladder_args, "out")
+    # The ladder study needs L1 / L2, which run_backtesting computes only on request.
+    assert parser.parse_args([]).rule_reference is False
+    assert "--rule-reference" in _backtesting_argv(ladder_args, "out")
     assert '"--skip-historical-reference"' in (REPO_ROOT / "studies/viability/run_houses.py").read_text(encoding="utf-8")
 
 

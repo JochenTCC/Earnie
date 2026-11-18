@@ -333,8 +333,7 @@ Die erzeugten Verbrauchsverläufe lassen sich im Explorer prüfen (Plausibilitä
 
 Die Auswertung umfasst unter anderem:
 
-- **Ersparnis gegen Standard-Regeln:** Was Earnie über Batterie und freie Regeln hinaus bringt, dazu der Anteil der Regeln an der Gesamtersparnis. Der Bereich **Alle Stufen** zeigt die Leiter von „Ohne Steuerung“ bis Earnie. Der Wert ist kleiner als die frühere Ersparnis gegen die Referenz ohne Optimierung, weil die Methode strenger ist. Details: [Betriebsmodi](../ui/betriebsmodi.md#ersparnis-gegen-standard-regeln)
-- **Gesamtkosten und -Verbrauch:** Tabelle mit Jahres Verbrauch, Speicher-Standby, Gesamtverbrauch, Jahres Kosten, Ersparnis gegen Standard-Regeln, Δ zur Live-Referenz und Hinweis
+- **Gesamtkosten und -Verbrauch:** Tabelle mit Jahres Verbrauch, Speicher-Standby, Gesamtverbrauch, Jahres Kosten, Δ zur Live-Referenz und Hinweis
 - **Kostenvergleich** je Monat (Referenz und optimierte Szenarien)
 - **Monatsverläufe** und Plausibilitätsansichten
 - Charts zu Leistung, Verbrauch und PV, je nach gewählter Ansicht
@@ -476,7 +475,7 @@ Der Monitor unter **Live-Cockpit → Monitor** (Sunset-2-Sunset) zeigt Vergangen
 
 - **Vergleich:** gleiche PV, gleiche Preise und je Gerät der gleiche Tagesverbrauch, aber zur gewohnten Zeit: Geräte so, wie das Hausprofil sie beschreibt (eingestellte Startzeit, Wärmemodell), der Poolfilter in seinem eigenen Fenster, das E-Auto ab dem Einstecken mit voller Leistung, ein Heizstab neben Gas, Öl oder Pellets aus und seine Wärme aus dem Brennstoff; eine Hausbatterie im Herstellermodus (Eigenverbrauch). Grundlage sind die gemessenen Werte, keine Planwerte.
 - **Laufender Tag:** Bis zum Tagesabschluss zählt nur die Batterie. Erst dann steht fest, wie viel Energie jedes Gerät bekommen hat; verschobene Geräte, E-Auto und Heizstab kommen dann dazu.
-- **Grenzen:** Die gewohnte Zeit ist das Modell aus dem Hausprofil, nicht der tatsächliche Tagesablauf. Gemessene Verbrauchsprofile nimmt das Buch bewusst nicht: Sie stammen aus der Zeit, in der Earnie die Geräte schon verschiebt. Geräte ohne eigenen Zähler zählen zur gemessenen Zeit, der Hilfetext der Kachel nennt sie. Die Szenario-Analyse vergleicht strenger, mit Standard-Regeln wie Laden bei PV-Überschuss; ihre Ersparnis ist deshalb meist kleiner. Was Powerstations aus ihrem Speicher liefern, ist nicht bewertet; ihr Laden zählt zur tatsächlichen Zeit.
+- **Grenzen:** Die gewohnte Zeit ist das Modell aus dem Hausprofil, nicht der tatsächliche Tagesablauf. Gemessene Verbrauchsprofile nimmt das Buch bewusst nicht: Sie stammen aus der Zeit, in der Earnie die Geräte schon verschiebt. Geräte ohne eigenen Zähler zählen zur gemessenen Zeit, der Hilfetext der Kachel nennt sie. Was Powerstations aus ihrem Speicher liefern, ist nicht bewertet; ihr Laden zählt zur tatsächlichen Zeit.
 - **Ohne Hausbatterie:** Das Buch läuft auch dann; die Vergleichsanlage hat keine Batterie und es gibt keine SoC-Korrektur.
 - **Genauigkeit:** Das Ergebnis hängt vom eingestellten Batterie-Wirkungsgrad ab und ist keine Stromrechnung. Einzelne Tage schwanken, aussagekräftig sind längere Zeiträume.
 - **Unvollständige Tage:** Tage mit weniger als 80 % gebuchten Viertelstunden zählen mit. Der Hilfetext der Kachel nennt ihre Anzahl, Chart 2 markiert sie mit „unvollständig“.

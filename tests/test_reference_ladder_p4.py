@@ -12,6 +12,12 @@ from ui.backtesting_results_helpers import build_annual_cost_rows
 from ui.saving_text import saving_text
 
 
+@pytest.fixture(autouse=True)
+def _rule_reference_switch(monkeypatch):
+    """The ladder UI shows only with the hidden switch ``rule_reference``."""
+    monkeypatch.setenv("EARNIE_UI_MODES", "scenario_explorer,rule_reference")
+
+
 def _meta() -> dict:
     return {
         "reference_id": "historical_reference",

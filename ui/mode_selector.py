@@ -3,7 +3,12 @@ from __future__ import annotations
 
 import config
 import streamlit as st
-from runtime_store.env_vars import DEVICE_DETECTION_MODE, read_env
+from runtime_store.env_vars import (
+    DEVICE_DETECTION_MODE,
+    HIDDEN_UI_MODE_KEYS,
+    RULE_REFERENCE_MODE,
+    read_env,
+)
 
 UI_MODE_KEYS = (
     "sunset2sunset",
@@ -11,6 +16,7 @@ UI_MODE_KEYS = (
     "live_environment",
     "price_forecast",
     DEVICE_DETECTION_MODE,
+    RULE_REFERENCE_MODE,
 )
 UI_MODE_LABELS = {
     "sunset2sunset": "Sunset-2-Sunset",
@@ -18,14 +24,15 @@ UI_MODE_LABELS = {
     "live_environment": "Daemon Control",
     "price_forecast": "Preis-Prognose (Dev)",
     DEVICE_DETECTION_MODE: "Geräteerkennung (Dev)",
+    RULE_REFERENCE_MODE: "Standard-Regeln (Dev)",
 }
 
 
 def _mode_keys_from_env(raw: str) -> list[str]:
     requested = {part.strip().lower() for part in raw.split(",") if part.strip()}
-    # device_detection has no page of its own; alone it must not empty the menu.
-    if not requested - {DEVICE_DETECTION_MODE}:
-        return ["sunset2sunset"] + ([DEVICE_DETECTION_MODE] if requested else [])
+    # Hidden keys have no page of their own; alone they must not empty the menu.
+    if not requested - HIDDEN_UI_MODE_KEYS:
+        return ["sunset2sunset"] + [k for k in UI_MODE_KEYS if k in requested]
     enabled = [k for k in UI_MODE_KEYS if k in requested]
     return enabled or ["sunset2sunset"]
 

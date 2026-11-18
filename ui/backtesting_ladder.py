@@ -11,6 +11,7 @@ from dataclasses import dataclass
 import pandas as pd
 import streamlit as st
 
+from runtime_store.env_vars import is_rule_reference_enabled
 from simulation.reference_costs import LADDER_L1, LADDER_L2
 from simulation.reference_ladder import rule_share
 from ui.backtesting_results_helpers import (
@@ -149,7 +150,12 @@ def ladder_table_rows(summaries: list[LadderSummary]) -> list[dict]:
 
 
 def render_ladder_headline(meta: dict) -> None:
-    """Saving L2 − L3 and rule share per scenario, the full ladder in an expander."""
+    """Saving L2 − L3 and rule share per scenario, the full ladder in an expander.
+
+    Only with the hidden switch ``rule_reference`` in ``EARNIE_UI_MODES``.
+    """
+    if not is_rule_reference_enabled():
+        return
     st.subheader("Ersparnis gegen Standard-Regeln")
     summaries = build_ladder_summaries(meta)
     if not summaries:
