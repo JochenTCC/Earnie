@@ -57,6 +57,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - [ ] **Open loop:** per-battery SoC step in `_chart_row_from_schedule_slot` / `finalize_chart_row_energy` instead of the aggregate; the plant SoC column becomes the capacity-weighted SoC.
   - [ ] **Slot re-solve:** carry the per-battery SoC from slot to slot, pass the battery list and `current_soc_by_id` to `milp_optimizer`, then remove the guard.
   - [ ] **Baselines and savings ledger:** decide whether `_baseline_battery_params` and the shadow battery keep the aggregate (`docs/dev/savings-ledger.md`, "Multi-ESS: v1 aggregates") or follow.
+    - **Note — finding (code review of `optimizer/`, 2026-11-18):** the savings path does not use the aggregate for the baselines. `_run_savings_horizons` (`optimizer/sim_costs.py`) calls `simulate_baseline_horizon` and `simulate_matched_baseline_horizon` without `battery_params`, so `_baseline_battery_params(None)` returns `config.get_battery_params()`: the first house battery alone (its power and standby). The optimized run uses the aggregate (power and standby of all). With several house batteries the baseline battery is weaker than the optimized one and the shown saving is too high. The ledger doc's "as the baseline does today" is wrong for this path. Same code on `release/2.7`.
   - [ ] **Tests:** two house batteries of different capacity, open loop and slot re-solve; golden-master cases with one battery unchanged.
 
 ### Version 2.+1 — epic **SUSI** prototype for the Energieinstitut (`feature/susi-prototyp`)
