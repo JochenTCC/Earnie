@@ -234,6 +234,9 @@ def test_startup_safe_push_sends_the_automatik_target_soc(monkeypatch) -> None:
     """The safe push at daemon start must not send target SoC 0 (seen on dev.12)."""
     calls: list[tuple] = []
     monkeypatch.setattr(
+        ehal_live.config, "get_battery_params", lambda: {"limits_from_live": False}
+    )
+    monkeypatch.setattr(
         ehal_live, "write_huawei_modbus_states", lambda *a, **kw: calls.append(a) or []
     )
     monkeypatch.setattr(ehal_live, "write_flexible_consumer_states", lambda *a, **kw: [])

@@ -604,7 +604,19 @@ def _push_safe_setpoints_network() -> None:
         "Startup: sende sichere EHAL-Sollwerte (ESS Automatik, EVCS 0 A) an %s...",
         backend,
     )
-    err_ess, _ess_records = write_ess_setpoints_from_control(0, 0.0)
+    err_ess: Any = None
+    try:
+        telemetry = _startup_ess_limit_telemetry(config.get_battery_params())
+    except StartupEssLimitsMissing as exc:
+        logger.error("Startup: ESS-Sollwerte an %s nicht gesendet: %s", backend, exc)
+        err_ess = {"message": str(exc)}
+    else:
+        if telemetry is None:
+            err_ess, _ess_records = write_ess_setpoints_from_control(0, 0.0)
+        else:
+            err_ess, _ess_records = write_ess_setpoints_from_control(
+                0, 0.0, telemetry=telemetry
+            )
     err_evcs, _evcs_records = write_evcs_max_current_from_consumers({})
     err_inv, _inv_records = write_inv_ac_limits_from_plan(plant_curtail_kw=0.0)
     if err_ess is None and err_evcs is None and err_inv is None:
@@ -632,7 +644,28 @@ def _push_safe_setpoints_loxone() -> None:
     )
     # Automatik target SoC is 99 like the optimizer's Automatik; 0 would ask the
     # inverter to discharge to empty where it honours set_ess_target_soc.
-    huawei = write_huawei_modbus_states(0, 0.0, 99.0)
+    battery_params = config.get_battery_params()
+    ess_failed = 0
+    try:
+        telemetry = _startup_ess_limit_telemetry(battery_params)
+    except StartupEssLimitsMissing as exc:
+        logger.error("Startup: ESS-Sollwerte an Loxone nicht gesendet: %s", exc)
+        huawei = []
+        ess_failed = 1
+    else:
+        if telemetry is None:
+            huawei = write_huawei_modbus_states(0, 0.0, 99.0)
+        else:
+            from settings.ess_limits_resolve import apply_effective_ess_limits
+
+            huawei = write_huawei_modbus_states(
+                0,
+                0.0,
+                99.0,
+                battery_params=apply_effective_ess_limits(
+                    battery_params, telemetry=telemetry
+                ),
+            )
     # Startup: no plan yet, so the store charge target is 0 (no target, HeatControl P3).
     flex = write_flexible_consumer_states({}, None, None, heat_storage_targets={})
     _inv_err, inv_rows = write_inv_ac_limits_from_plan(plant_curtail_kw=0.0)
@@ -642,13 +675,64 @@ def _push_safe_setpoints_loxone() -> None:
         if not getattr(row, "success", True)
     ]
     failed_inv = [row for row in inv_rows if not row.get("success")]
-    if not failed and not failed_inv:
+    if not failed and not failed_inv and not ess_failed:
         logger.info("Startup: sichere Loxone-Sollwerte gesendet.")
         return
     logger.error(
         "Startup: sichere Loxone-Sollwerte teilweise fehlgeschlagen (%s Feld(er)).",
-        len(failed) + len(failed_inv),
+        len(failed) + len(failed_inv) + ess_failed,
     )
+
+
+class StartupEssLimitsMissing(RuntimeError):
+    """The battery takes its limits from live values, but none are readable at startup."""
+
+
+_STARTUP_LIVE_POWER_KINDS: tuple[str, ...] = (
+    "get_ess_max_charge_power",
+    "get_ess_max_discharge_power",
+)
+
+
+def _missing_live_power_limits(
+    telemetry: dict[str, Any] | None, ess_id: str | None
+) -> list[str]:
+    from settings.ess_limits_resolve import _telemetry_power_kw, telemetry_for_ess
+
+    tel = telemetry_for_ess(telemetry, ess_id)
+    return [
+        kind
+        for kind in _STARTUP_LIVE_POWER_KINDS
+        if _telemetry_power_kw(tel, kind) is None
+    ]
+
+
+def _startup_ess_limit_telemetry(battery_params: dict) -> dict[str, Any] | None:
+    """Live ``get_ess_max_*`` for the startup push, like the cycle reads them.
+
+    ``None`` when the battery does not use ``limits_from_live`` (the HK limits apply).
+    Raises ``StartupEssLimitsMissing`` when a live power limit is not readable: the
+    startup push must not release more than the inverter allows (no HK fallback).
+    """
+    if not bool(battery_params.get("limits_from_live", False)):
+        return None
+    ess_id = str(battery_params.get("id") or "").strip() or None
+    telemetry = enrich_telemetry_with_ess_live_limits(None)
+    if not _missing_live_power_limits(telemetry, ess_id):
+        return telemetry
+    # Plant-flat get_ess_max_* (no entity-scoped binding) come only with the full read.
+    try:
+        telemetry = enrich_telemetry_with_ess_live_limits(get_adapter().read_telemetry())
+    except Exception as exc:  # noqa: BLE001 — reported as missing live limits below
+        raise StartupEssLimitsMissing(
+            f"Live-Limits der Batterie {ess_id or '?'} nicht lesbar ({exc})"
+        ) from exc
+    missing = _missing_live_power_limits(telemetry, ess_id)
+    if missing:
+        raise StartupEssLimitsMissing(
+            f"Live-Limits der Batterie {ess_id or '?'} fehlen: {', '.join(missing)}"
+        )
+    return telemetry
 
 
 def write_flex_enables_for_ha(

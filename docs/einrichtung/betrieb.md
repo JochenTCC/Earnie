@@ -129,6 +129,7 @@ Nur `main.py` steuert die Anlage im Produktivbetrieb (Schreibvorgänge über EHA
 ### Sichere Sollwerte und Silent / Loud
 
 - **Sichere Sollwerte beim Start:** Beim Daemon-Start schreibt Earnie **einmal** sichere Sollwerte (ESS Automatik / Freigabe und EVCS aus), bevor der erste Optimierungslauf beginnt. Das gilt für alle EHAL-Backends (Loxone, HA, OpenEMS).
+- **Lade-/Entladegrenzen beim Start:** Übernimmt die Batterie ihre Grenzen live vom Wechselrichter („Limits aus Live-Werten“), schreibt der Start dieselben Live-Grenzen wie der Optimierungslauf. Fehlt dabei die live gemeldete Lade- oder Entladegrenze, schreibt Earnie beim Start **keine** ESS-Sollwerte und meldet einen Fehler im Log; die übrigen sicheren Sollwerte werden trotzdem gesendet. Der erste Optimierungslauf schreibt die ESS-Sollwerte dann regulär.
 - **Silent:** Im Silent-Modus entfällt dieser Schreibvorgang.
 - **Umschalten:** Silent / Loud wird unter **Daemon Control → Optimierer-Dienst** umgestellt und in `runtime/local_settings.json` → `silent_mode` gespeichert. Ein Neustart von `main.py` ist dafür nicht nötig.
 - **Überspringen:** Mit `EARNIE_SKIP_SAFE_SETPOINTS_ON_START=1` entfallen die sicheren Sollwerte beim Start.
