@@ -150,11 +150,14 @@ def _add_virtual_reserve_deadline_charge(
 ) -> None:
     """Require primary ESS charge of refill kWh by deadline (price-optimal within window).
 
-    Sum of ``p_charge`` over the slots before the deadline (all of them when the deadline
-    lies beyond the horizon) must cover the AC kWh needed; the cost objective picks cheap
-    slots inside that window. A deadline at or before the first slot is overdue: the refill
-    goes into the first slots that can deliver it (as soon as possible, decided 2026-11-18),
-    with a warning. A missing deadline or matrix is an error, not "whole horizon".
+    Sum of ``p_charge`` over the slots that end by the deadline (all of them when the
+    deadline lies beyond the horizon) must cover the AC kWh needed; the cost objective picks
+    cheap slots inside that window. A slot counts only when it *ends* at or before the
+    deadline (exact slot start + ``dt_h``, never floored to the hour), so no refill is planned
+    after the deadline with quarter-hour slots or an unaligned deadline. A deadline before
+    the end of the first slot is overdue: the refill goes into the first slots that can
+    deliver it (as soon as possible, decided 2026-11-18), with a warning. A missing deadline
+    or matrix, a naive deadline or a row without a tz-aware ``slot_datetime`` is an error.
     """
     if refill_kwh <= 1e-9 or max_charge_kw <= 1e-9 or model.horizon < 1:
         return
@@ -163,19 +166,25 @@ def _add_virtual_reserve_deadline_charge(
             "Virtuelle Reserve: Nachlademenge ohne Nachlade-Deadline "
             "(_virtual_reserve_refill_deadline_utc fehlt)."
         )
+    if deadline.tzinfo is None:
+        raise ValueError(
+            "Virtuelle Reserve: Nachlade-Deadline ohne Zeitzone "
+            f"({deadline.isoformat()})."
+        )
     if not matrix:
         raise ValueError("Virtuelle Reserve: Nachlade-Deadline braucht die Planungsmatrix.")
-    from optimizer.charging_schedule import matrix_slot_datetime
+    from datetime import timedelta
 
+    slot_length = timedelta(hours=model.dt_h)
     eligible = [
         t
         for t in range(min(model.horizon, len(matrix)))
-        if matrix_slot_datetime(matrix, t) < deadline
+        if _exact_slot_start(matrix, t) + slot_length <= deadline
     ]
     if not eligible:
         logger.warning(
-            "Virtuelle Reserve: Nachlade-Deadline %s ist abgelaufen – Nachladung "
-            "(%.3f kWh) so früh wie möglich.",
+            "Virtuelle Reserve: Nachlade-Deadline %s ist abgelaufen (vor Ende des ersten "
+            "Slots) – Nachladung (%.3f kWh) so früh wie möglich.",
             deadline.isoformat(),
             float(refill_kwh),
         )
@@ -186,6 +195,24 @@ def _add_virtual_reserve_deadline_charge(
         efficiency=efficiency,
         slots=eligible or None,
     )
+
+
+def _exact_slot_start(matrix: list, index: int):
+    """Exact tz-aware start of matrix slot ``index`` (not floored, unlike ``matrix_slot_datetime``).
+
+    The reserve deadline window needs the real quarter-hour start; a row without a tz-aware
+    ``slot_datetime`` cannot be placed against the UTC deadline and fails loud.
+    """
+    from datetime import datetime
+
+    slot = matrix[index].get("slot_datetime")
+    if not isinstance(slot, datetime) or slot.tzinfo is None:
+        raise ValueError(
+            "Virtuelle Reserve: Matrix-Slot "
+            f"{index} hat keinen Zeitpunkt mit Zeitzone (slot_datetime={slot!r}); "
+            "Nachlade-Deadline nicht prüfbar."
+        )
+    return slot
 
 
 def _add_sunrise_soc_min_constraint(
