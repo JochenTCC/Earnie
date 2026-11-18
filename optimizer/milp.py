@@ -140,6 +140,35 @@ def _base_level_start(
     return 0, float(current_soc) / 100.0 * capacity
 
 
+def _wear_cent_per_kwh_by_ess(model: MilpHorizonModel) -> dict[str, float]:
+    """Wear [ct/kWh throughput] of each house battery in the model, from its own ``battery_wear``.
+
+    Battery params from the house config carry ``battery_wear`` (``battery_params_from_planning``).
+    A single battery without the key (legacy flat params) takes the live scenario's wear, as
+    before. With several batteries each needs its own: one battery's wear does not price another.
+    """
+    from .battery_wear import battery_wear_cent_per_kwh_from_config
+
+    ess_ids = list(model.ess_ids or [])
+    params_by_id = model.battery_params_by_id or {}
+    out: dict[str, float] = {}
+    for eid in ess_ids:
+        bat = params_by_id[eid]
+        capacity = float(bat.get("battery_capacity_kwh") or 0.0)
+        if capacity <= 0.0:
+            out[eid] = 0.0
+        elif "battery_wear" in bat:
+            out[eid] = battery_wear_cent_per_kwh_from_config(bat["battery_wear"], capacity)
+        elif len(ess_ids) == 1:
+            out[eid] = config.get_battery_wear_cent_per_kwh(capacity)
+        else:
+            raise ValueError(
+                f"Batterie '{eid}': battery_wear fehlt in den Speicherparametern; mit mehreren "
+                f"Hausbatterien braucht jede ihren eigenen Verschleiß ({ess_ids})."
+            )
+    return out
+
+
 def _build_milp_model_with_objective(
     matrix: list[dict[str, Any]],
     battery_params: dict | list[dict],
@@ -190,20 +219,15 @@ def _build_milp_model_with_objective(
         inverter_params=inv,
         pv_systems=pvs,
     )
-    wear_cent_per_kwh = 0.0
     primary = _primary_battery_params(battery_params)
     _add_virtual_reserve_refill(model, matrix, primary)
-    if float(primary.get("battery_capacity_kwh") or 0.0) > 0.0:
-        # Wear from primary ESS capacity (multi-ESS wear refinement later).
-        wear_cent_per_kwh = config.get_battery_wear_cent_per_kwh(
-            float(primary["battery_capacity_kwh"])
-        )
     _add_milp_objective(
         model,
         matrix,
         k_push,
         inputs.ev_milp_by_id,
-        wear_cent_per_kwh=wear_cent_per_kwh,
+        wear_cent_per_kwh=0.0,
+        wear_cent_per_kwh_by_ess=_wear_cent_per_kwh_by_ess(model),
         base_level_start=_base_level_start(
             battery_params, current_soc, soc_hold_index, soc_hold_percent
         ),

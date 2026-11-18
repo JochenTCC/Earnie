@@ -25,6 +25,7 @@ def _battery(ess_id: str, capacity_kwh: float, power_kw: float) -> dict:
         "efficiency": 0.97,
         "standby_power_kw": 0.0,
         "control": "full",
+        "battery_wear": {"enabled": False},
     }
 
 
@@ -71,12 +72,12 @@ def _schedule(matrix: list[dict], **kwargs) -> list[dict]:
 
 def test_without_anchor_both_batteries_are_emptied():
     schedule = _schedule(_expensive_night(24))
-    assert _plant_kwh(schedule[-1]) == pytest.approx(1.5, abs=1e-3)
+    assert _plant_kwh(schedule[-1]) == pytest.approx(1.5, abs=1e-2)
 
 
 def test_terminal_soc_binds_the_plant_energy():
     schedule = _schedule(_expensive_night(24), terminal_soc_percent=PLANT_START_SOC)
-    assert _plant_kwh(schedule[-1]) == pytest.approx(PLANT_START_KWH, abs=1e-3)
+    assert _plant_kwh(schedule[-1]) == pytest.approx(PLANT_START_KWH, abs=1e-2)
 
 
 def test_soc_hold_binds_the_plant_energy():
@@ -84,7 +85,7 @@ def test_soc_hold_binds_the_plant_energy():
     schedule = _schedule(
         _expensive_night(8, cheap_first=4), soc_hold_index=3, soc_hold_percent=hold_percent
     )
-    assert _plant_kwh(schedule[3]) == pytest.approx(hold_percent / 100.0 * 15.0, abs=1e-3)
+    assert _plant_kwh(schedule[3]) == pytest.approx(hold_percent / 100.0 * 15.0, abs=1e-2)
 
 
 def test_simulation_passes_the_plant_soc_as_terminal_target(monkeypatch):

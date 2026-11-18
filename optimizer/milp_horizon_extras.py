@@ -237,8 +237,14 @@ def _add_milp_objective(
     ev_milp_params_by_id: dict[str, dict[str, float]],
     *,
     wear_cent_per_kwh: float,
+    wear_cent_per_kwh_by_ess: dict[str, float] | None = None,
     base_level_start: tuple[int, float] | None = None,
 ) -> None:
+    """Objective: energy cost, battery wear, curtailment, tie-breaks and credits.
+
+    ``wear_cent_per_kwh`` prices the throughput of all batteries alike; ``wear_cent_per_kwh_by_ess``
+    prices each battery's own throughput (``ValueError`` when both are set).
+    """
     dt_h = validate_dt_h(model.dt_h)
     energy_cost = pulp.lpSum([
         (
@@ -249,12 +255,7 @@ def _add_milp_objective(
         * dt_h
         for t in range(model.horizon)
     ])
-    wear_cost = 0.0
-    if wear_cent_per_kwh > 0.0:
-        wear_cost = wear_cent_per_kwh * dt_h * pulp.lpSum(
-            model.p_charge[t] + model.p_discharge[t]
-            for t in range(model.horizon)
-        )
+    wear_cost = _wear_cost(model, dt_h, wear_cent_per_kwh, wear_cent_per_kwh_by_ess)
     # Prefer export over free curtail when k_push ≈ 0; still << real tariffs.
     curtail_cost = 0.0
     if model.p_pv_curtail:
@@ -279,6 +280,40 @@ def _add_milp_objective(
         - _heating_rod_fuel_credit(model)
         - _base_level_credit(model, matrix, base_level_start)
     )
+
+
+def _wear_cost(
+    model: MilpHorizonModel,
+    dt_h: float,
+    wear_cent_per_kwh: float,
+    wear_cent_per_kwh_by_ess: dict[str, float] | None,
+):
+    """Wear [ct] of the battery throughput (charge + discharge) over the horizon."""
+    if wear_cent_per_kwh_by_ess is None:
+        if wear_cent_per_kwh <= 0.0:
+            return 0.0
+        return wear_cent_per_kwh * dt_h * pulp.lpSum(
+            model.p_charge[t] + model.p_discharge[t] for t in range(model.horizon)
+        )
+    if wear_cent_per_kwh > 0.0:
+        raise ValueError("Verschleiß entweder für alle Speicher oder je Speicher angeben, nicht beides.")
+    ess_ids = list(model.ess_ids or [])
+    missing = [eid for eid in ess_ids if eid not in wear_cent_per_kwh_by_ess]
+    if missing:
+        raise ValueError(f"Verschleiß fehlt für Speicher {missing}.")
+    if len(ess_ids) == 1:
+        # One battery: its throughput is the aggregate (same objective as before per-ESS wear).
+        return _wear_cost(model, dt_h, float(wear_cent_per_kwh_by_ess[ess_ids[0]]), None)
+    wear_cost = 0.0
+    for eid in ess_ids:
+        cent = float(wear_cent_per_kwh_by_ess[eid])
+        if cent <= 0.0:
+            continue
+        wear_cost += cent * dt_h * pulp.lpSum(
+            model.p_charge_by_ess[eid][t] + model.p_discharge_by_ess[eid][t]
+            for t in range(model.horizon)
+        )
+    return wear_cost
 
 
 def _base_level_target_kwh(surplus_lookahead_kwh: float, e_min: float, e_max: float) -> float:

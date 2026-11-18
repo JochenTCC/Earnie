@@ -286,7 +286,8 @@ def test_tracking_starts_at_the_soc_hold(monkeypatch) -> None:
 
 def test_level_stops_with_several_batteries(monkeypatch) -> None:
     _set_switches(monkeypatch, "2", "1")
-    batteries = [{**_battery(), "id": "one"}, {**_battery(), "id": "two"}]
+    no_wear = {"battery_wear": {"enabled": False}}
+    batteries = [{**_battery(), **no_wear, "id": "one"}, {**_battery(), **no_wear, "id": "two"}]
 
     with pytest.raises(ValueError, match="nur einen Speicher"):
         _solve_milp_to_model(

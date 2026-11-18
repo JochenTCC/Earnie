@@ -152,8 +152,10 @@ def test_open_loop_books_the_plant_soc(monkeypatch):
 
     batteries = [
         _battery("a", battery_capacity_kwh=5.0, max_charge_power_kw=2.5,
-                 max_discharge_power_kw=2.5, max_power_kw=2.5, standby_power_kw=0.0),
-        _battery("b", battery_capacity_kwh=10.0, standby_power_kw=0.0),
+                 max_discharge_power_kw=2.5, max_power_kw=2.5, standby_power_kw=0.0,
+                 battery_wear={"enabled": False}),
+        _battery("b", battery_capacity_kwh=10.0, standby_power_kw=0.0,
+                 battery_wear={"enabled": False}),
     ]
     matrix = [
         {"expected_p_pv": 3.0, "expected_p_act": 1.0, "k_act": 20.0, "k_push_act": 5.0, "hour": 12},

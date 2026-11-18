@@ -359,6 +359,7 @@ def test_extract_horizon_schedule_emits_planned_soc_by_ess():
             "efficiency": 0.97,
             "standby_power_kw": 0.0,
             "control": "full",
+            "battery_wear": {"enabled": False},
         },
         {
             "id": "b",
@@ -372,6 +373,7 @@ def test_extract_horizon_schedule_emits_planned_soc_by_ess():
             "efficiency": 0.97,
             "standby_power_kw": 0.0,
             "control": "full",
+            "battery_wear": {"enabled": False},
         },
     ]
     matrix = [
@@ -424,6 +426,7 @@ def test_simulate_horizon_writes_per_ess_soc_columns(monkeypatch):
             "efficiency": 0.97,
             "standby_power_kw": 0.0,
             "control": "full",
+            "battery_wear": {"enabled": False},
         },
         {
             "id": "b",
@@ -437,6 +440,7 @@ def test_simulate_horizon_writes_per_ess_soc_columns(monkeypatch):
             "efficiency": 0.97,
             "standby_power_kw": 0.0,
             "control": "full",
+            "battery_wear": {"enabled": False},
         },
     ]
     matrix = [

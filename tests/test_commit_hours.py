@@ -181,7 +181,8 @@ def test_calculate_optimization_savings_uses_open_loop_commit():
 
 
 def _two_house_batteries() -> list[dict]:
-    return [{**_BATTERY, "id": "haus_1"}, {**_BATTERY, "id": "haus_2"}]
+    no_wear = {"battery_wear": {"enabled": False}}
+    return [{**_BATTERY, **no_wear, "id": "haus_1"}, {**_BATTERY, **no_wear, "id": "haus_2"}]
 
 
 def test_slot_resolve_rejects_several_house_batteries():

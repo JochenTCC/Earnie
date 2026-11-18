@@ -203,8 +203,8 @@ def test_battery_without_full_control_stays_solvable(control):
 def test_two_batteries_share_the_cap():
     rows = _rows([8.0] * 2 + [0.5] * 4)
     batteries = [
-        {**_battery(max_power_kw=3.0), "id": "a"},
-        {**_battery(max_power_kw=3.0), "id": "b"},
+        {**_battery(max_power_kw=3.0), "id": "a", "battery_wear": {"enabled": False}},
+        {**_battery(max_power_kw=3.0), "id": "b", "battery_wear": {"enabled": False}},
     ]
     solved = _solve_milp_to_model(
         rows, 80.0, batteries, 5.0, False, [], {}, None, None, {}, None, None, None, None, None,
