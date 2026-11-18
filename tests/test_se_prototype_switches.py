@@ -12,7 +12,7 @@ import pandas as pd
 import pytest
 
 import simulation.matrix_builder as matrix_builder
-from optimizer.milp import _solve_milp_to_model
+from optimizer.milp import _base_level_start, _solve_milp_to_model
 from optimizer.milp_horizon_extras import (
     BASE_LEVEL_ENV,
     LOOKAHEAD_ENV,
@@ -284,16 +284,91 @@ def test_tracking_starts_at_the_soc_hold(monkeypatch) -> None:
     assert _kwh(solved[0].e_batt[_SUNRISE]) == pytest.approx(5.0, abs=1e-6)
 
 
-def test_level_stops_with_several_batteries(monkeypatch) -> None:
-    _set_switches(monkeypatch, "2", "1")
-    no_wear = {"battery_wear": {"enabled": False}}
-    batteries = [{**_battery(), **no_wear, "id": "one"}, {**_battery(), **no_wear, "id": "two"}]
+# --- Several house batteries: the level is the plant's, like the SoC anchors
 
-    with pytest.raises(ValueError, match="nur einen Speicher"):
-        _solve_milp_to_model(
-            _matrix(), 50.0, batteries, 10.0, False, [], {}, None, None, None, None, None, None, None, None,
-            current_soc_by_id={"one": 50.0, "two": 50.0}, inverter_params=[], pv_systems=[],
-        )
+_NO_WEAR = {"battery_wear": {"enabled": False}}
+
+
+def _two_batteries(capacity_kwh: float = 10.0) -> list[dict]:
+    one = {**_battery(), **_NO_WEAR, "id": "one", "battery_capacity_kwh": capacity_kwh}
+    two = {**_battery(0.9), **_NO_WEAR, "id": "two", "battery_capacity_kwh": capacity_kwh}
+    return [one, two]
+
+
+def _solve_two(monkeypatch, matrix: list[dict], soc_by_id: dict[str, float], *, level: bool, capacity_kwh=10.0):
+    _set_switches(monkeypatch, "2", "1" if level else None)
+    solved = _solve_milp_to_model(
+        matrix, soc_by_id["one"], _two_batteries(capacity_kwh), 10.0, False, [], {}, None, None, None,
+        None, None, None, None, None, current_soc_by_id=soc_by_id, inverter_params=[], pv_systems=[],
+    )
+    assert solved is not None
+    return solved[0]
+
+
+def _plant_kwh(model, t: int) -> float:
+    return sum(_kwh(series[t]) for series in model.e_batt_by_ess.values())
+
+
+def test_two_batteries_hold_half_the_plant_at_sa2(monkeypatch) -> None:
+    """Target and held energy are the plant's: the full second battery counts, not only the first."""
+    soc = {"one": 10.0, "two": 100.0}
+
+    held = _solve_two(monkeypatch, _matrix(), soc, level=True)
+    sold = _solve_two(monkeypatch, _matrix(), soc, level=False)
+
+    assert _plant_kwh(held, _SUNRISE) == pytest.approx(10.0, abs=1e-6)
+    assert _plant_kwh(sold, _SUNRISE) == pytest.approx(2.0, abs=1e-6)
+
+
+def test_two_half_batteries_hold_what_one_battery_holds(monkeypatch) -> None:
+    one = _solve(monkeypatch, _matrix(), 100.0, level=True)
+    two = _solve_two(monkeypatch, _matrix(), {"one": 100.0, "two": 100.0}, level=True, capacity_kwh=5.0)
+
+    assert _plant_kwh(two, _SUNRISE) == pytest.approx(_kwh(one.e_batt[_SUNRISE]), abs=1e-6)
+
+
+def test_two_batteries_reach_the_level_from_pv(monkeypatch) -> None:
+    matrix = _matrix()
+    for row in matrix[:8]:
+        row["expected_p_pv"] = 10.0
+    soc = {"one": 10.0, "two": 10.0}
+
+    model = _solve_two(monkeypatch, matrix, soc, level=True)
+
+    assert _plant_kwh(model, _SUNRISE) == pytest.approx(10.0, abs=1e-6)
+    assert sum(_kwh(model.p_grid_buy[t]) for t in range(_SUNRISE + 1)) == pytest.approx(0.0, abs=1e-6)
+    assert _plant_kwh(_solve_two(monkeypatch, matrix, soc, level=False), _SUNRISE) == pytest.approx(2.0, abs=1e-6)
+
+
+def test_two_batteries_do_not_reach_the_level_from_the_grid(monkeypatch) -> None:
+    model = _solve_two(monkeypatch, _dark_morning(), {"one": 10.0, "two": 10.0}, level=True)
+
+    assert _charged_before_sa2(model) == pytest.approx(0.0, abs=1e-6)
+    assert _plant_kwh(model, _SUNRISE) == pytest.approx(2.0, abs=1e-6)
+
+
+def test_base_level_start_is_the_plant_energy(monkeypatch) -> None:
+    model = _solve_two(monkeypatch, _matrix(), {"one": 20.0, "two": 80.0}, level=False)
+    monkeypatch.setenv(BASE_LEVEL_ENV, "1")
+
+    assert _base_level_start(model, 20.0, {"one": 20.0, "two": 80.0}, None, None) == (0, pytest.approx(10.0))
+    assert _base_level_start(model, 20.0, None, 5, 60.0) == (6, pytest.approx(12.0))
+    with pytest.raises(ValueError, match="two"):
+        _base_level_start(model, 20.0, {"one": 20.0}, None, None)
+
+
+def test_base_level_start_of_one_battery_is_its_soc(monkeypatch) -> None:
+    model = _solve(monkeypatch, _matrix(), 30.0, level=False)
+    monkeypatch.setenv(BASE_LEVEL_ENV, "1")
+
+    assert _base_level_start(model, 30.0, None, None, None) == (0, pytest.approx(3.0))
+    assert _base_level_start(model, 30.0, None, 5, 60.0) == (6, pytest.approx(6.0))
+
+
+def test_base_level_start_is_none_when_the_level_is_off(monkeypatch) -> None:
+    model = _solve_two(monkeypatch, _matrix(), {"one": 20.0, "two": 80.0}, level=False)
+
+    assert _base_level_start(model, 20.0, None, None, None) is None
 
 
 def test_level_without_a_start_soc_stops(monkeypatch) -> None:

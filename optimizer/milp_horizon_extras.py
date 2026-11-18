@@ -23,6 +23,11 @@ BASE_LEVEL_MAX_SHARE = 0.5
 BASE_LEVEL_VALUE_SHARE = 0.9
 
 
+def base_level_enabled() -> bool:
+    """Whether the SoC base level prototype is on (``EARNIE_BASE_LEVEL`` set, off by default)."""
+    return bool(os.environ.get(BASE_LEVEL_ENV, "").strip())
+
+
 def lookahead_hours() -> float:
     """SE look-ahead past SA₂: ``DEFAULT_LOOKAHEAD_H`` unless ``EARNIE_SE_LOOKAHEAD_H`` is set."""
     raw = os.environ.get(LOOKAHEAD_ENV, "").strip()
@@ -329,24 +334,39 @@ def _base_level_pv_energy(
     last_slot: int,
     start: tuple[int, float],
 ):
-    """Energy [kWh] in the battery at ``last_slot`` that did not come from the grid since ``start``.
+    """Energy [kWh] in the house batteries at ``last_slot`` that did not come from the grid since ``start``.
 
-    It grows by what PV can charge beyond the load and falls with the SoC, so a discharge takes
-    grid energy first. Energy at ``start`` counts in full, its origin is not known.
+    It grows by what PV can charge beyond the load into any house battery (each with its own
+    efficiency) and falls with the plant energy (``_plant_energy_at``), so a discharge takes grid
+    energy first. Energy at ``start`` counts in full, its origin is not known.
     """
     first_slot, energy = start
-    ess_id = model.ess_ids[0]
-    efficiency = float(model.battery_params_by_id[ess_id].get("efficiency") or 1.0)
+    ess_ids = list(model.ess_ids)
+    single = len(ess_ids) == 1
+    efficiency_by_ess = {
+        eid: float(model.battery_params_by_id[eid].get("efficiency") or 1.0) for eid in ess_ids
+    }
     dt_h = float(model.dt_h)
     for t in range(first_slot, last_slot + 1):
         spare_kw = max(
             0.0, float(matrix[t].get("expected_p_pv") or 0.0) - float(matrix[t]["expected_p_act"])
         )
-        pv_charge = pulp.LpVariable(f"base_level_pv_charge_{t}", lowBound=0.0, upBound=spare_kw)
+        pv_gain = 0.0
+        pv_charges = []
+        for eid in ess_ids:
+            tag = f"{t}" if single else f"{eid.replace('-', '_')}_{t}"
+            pv_charge = pulp.LpVariable(f"base_level_pv_charge_{tag}", lowBound=0.0, upBound=spare_kw)
+            model.prob += (
+                pv_charge <= model.p_charge_by_ess[eid][t],
+                f"base_level_pv_charge_link_{tag}",
+            )
+            pv_charges.append(pv_charge)
+            pv_gain += pv_charge * efficiency_by_ess[eid]
+        if not single:
+            model.prob += pulp.lpSum(pv_charges) <= spare_kw, f"base_level_pv_spare_{t}"
         kept = pulp.LpVariable(f"base_level_pv_kwh_{t}", lowBound=0.0)
-        model.prob += pv_charge <= model.p_charge[t], f"base_level_pv_charge_link_{t}"
-        model.prob += kept <= energy + pv_charge * efficiency * dt_h, f"base_level_pv_gain_{t}"
-        model.prob += kept <= model.e_batt[t], f"base_level_pv_soc_{t}"
+        model.prob += kept <= energy + pv_gain * dt_h, f"base_level_pv_gain_{t}"
+        model.prob += kept <= _plant_energy_at(model, t), f"base_level_pv_soc_{t}"
         energy = kept
     return energy
 
@@ -361,14 +381,12 @@ def _base_level_credit(
     Needs the look-ahead: the slots past the book are tomorrow's first hours. The value is a bonus:
     the energy can still replace an import past SA₂, so value and use add up and a price below the
     buy price alone would not keep the grid out. Only energy that did not come from the grid earns
-    it (``_base_level_pv_energy``). ``start`` is the first tracked slot and the energy before it.
+    it (``_base_level_pv_energy``). ``start`` is the first tracked slot and the plant energy
+    before it (``optimizer.milp._base_level_start``). Target, held energy and PV energy are those
+    of all house batteries together, like the SoC anchors.
     """
-    if not os.environ.get(BASE_LEVEL_ENV, "").strip():
+    if not base_level_enabled():
         return 0.0
-    if len(model.ess_ids) != 1:
-        raise ValueError(
-            f"{BASE_LEVEL_ENV} kann bisher nur einen Speicher abbilden, gefunden: {model.ess_ids}."
-        )
     if start is None:
         raise ValueError(f"{BASE_LEVEL_ENV} braucht den Start-SoC des Plans (base_level_start).")
     lookahead_h = lookahead_hours()
@@ -392,7 +410,7 @@ def _base_level_credit(
         return 0.0
     value = max(0.0, BASE_LEVEL_VALUE_SHARE * min(float(row["k_act"]) for row in matrix[: model.horizon]))
     held = pulp.LpVariable("base_level_held_kwh", lowBound=0.0, upBound=target)
-    model.prob += held <= model.e_batt[sunrise], "base_level_held"
+    model.prob += held <= _plant_energy_at(model, sunrise), "base_level_held"
     model.prob += held <= _base_level_pv_energy(model, matrix, sunrise, start), "base_level_from_pv"
     return value * held
 

@@ -44,7 +44,7 @@ from .milp_horizon import (
     _build_milp_model,
     _terminal_soc_energy_kwh,
 )
-from .milp_horizon_extras import plant_capacity_kwh
+from .milp_horizon_extras import BASE_LEVEL_ENV, base_level_enabled, plant_capacity_kwh
 from .import_power_limit import ImportCaps
 from .milp_ev_pool import add_ev_pool_constraints
 from .milp_import_cap import add_import_cap_constraints
@@ -124,20 +124,39 @@ def _add_virtual_reserve_refill(
 
 
 def _base_level_start(
-    battery_params: dict | list[dict],
+    model: MilpHorizonModel,
     current_soc: float,
+    current_soc_by_id: dict[str, float] | None,
     soc_hold_index: int | None,
     soc_hold_percent: float | None,
-) -> tuple[int, float]:
-    """First slot the SoC base level tracks and the energy before it.
+) -> tuple[int, float] | None:
+    """First slot the SoC base level tracks and the plant energy before it (``None`` when off).
 
-    With a SoC hold the plan starts for real after the hold: the slots before it are not replayed
-    and only lead there.
+    The energy is that of all house batteries in the model, like the base level's target and held
+    energy. With a SoC hold the plan starts for real after the hold: the slots before it are not
+    replayed and only lead there; the hold percent is a plant SoC (``plant_capacity_kwh``). Without
+    a hold one battery starts at ``current_soc``; several need each one's SoC in
+    ``current_soc_by_id`` (``ValueError`` otherwise).
     """
-    capacity = float(_primary_battery_params(battery_params).get("battery_capacity_kwh") or 0.0)
+    if not base_level_enabled():
+        return None
     if soc_hold_index is not None and soc_hold_percent is not None:
-        return soc_hold_index + 1, float(soc_hold_percent) / 100.0 * capacity
-    return 0, float(current_soc) / 100.0 * capacity
+        return soc_hold_index + 1, float(soc_hold_percent) / 100.0 * plant_capacity_kwh(model)
+    ess_ids = list(model.ess_ids)
+    params_by_id = model.battery_params_by_id
+    if len(ess_ids) == 1:
+        capacity = float(params_by_id[ess_ids[0]].get("battery_capacity_kwh") or 0.0)
+        return 0, float(current_soc) / 100.0 * capacity
+    by_id = current_soc_by_id or {}
+    missing = [eid for eid in ess_ids if eid not in by_id]
+    if missing:
+        raise ValueError(
+            f"{BASE_LEVEL_ENV}: Start-SoC fehlt für Hausbatterie(n) {missing} (vorhanden: {sorted(by_id)})."
+        )
+    return 0, sum(
+        float(by_id[eid]) / 100.0 * float(params_by_id[eid].get("battery_capacity_kwh") or 0.0)
+        for eid in ess_ids
+    )
 
 
 def _wear_cent_per_kwh_by_ess(model: MilpHorizonModel) -> dict[str, float]:
@@ -229,7 +248,7 @@ def _build_milp_model_with_objective(
         wear_cent_per_kwh=0.0,
         wear_cent_per_kwh_by_ess=_wear_cent_per_kwh_by_ess(model),
         base_level_start=_base_level_start(
-            battery_params, current_soc, soc_hold_index, soc_hold_percent
+            model, current_soc, current_soc_by_id, soc_hold_index, soc_hold_percent
         ),
     )
     return model
