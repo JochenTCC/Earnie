@@ -2,6 +2,14 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix — SE single-window re-simulation showed one constant price (2026-11-18)
+
+- [x] **Bugfix — SE single-window re-simulation showed one constant price** *(found 2026-11-18 in the SE calendar, scenario Live, window 2026-03-19 07:00; fixed 2026-11-18 on `main`, `af4db43c`)*: a window without a stored snapshot is re-simulated on demand (`simulation/backtesting_single_window.py::simulate_window_snapshot`). It loaded prices for `backtesting_year` and the anchor's month, but `backtesting_year` is the year of the period start, so a period 2025-11 … 2026-10 gave a March-2026 window the prices of March 2025. `epex_prices_for_slots` filled every missing slot with the last sample, so Chart 1 showed one constant import and feed-in price; the year run's results were right.
+  - **Fix:** the single window loads the days around its own anchor and raises when the loaded prices do not cover the window. The shared lookup fails loud on missing prices since `a6b43272`.
+  - **Tests:** `tests/test_backtesting_single_window.py` (anchor dates instead of the period start year, uncovered window raises). Checked on a local run: the re-simulated window matches `backtesting.csv` in all 224 slots (import and feed-in price).
+  - **Verify:** open the window again in the SE (local run, scenario Live, 2026-03-19 07:00, Charts & Diagnose): Chart 1 shows varying import and feed-in prices.
+  - **Verified (2026-11-18, maintainer):** window Live 2026-03-19 07:00 re-opened in the SE, Chart 1 shows varying import and feed-in prices.
+
 ### SE references selectable, baseline switchable after the run (2026-11-18)
 
 - [x] **SE references selectable, baseline switchable after the run** `[feat]` *(spec agreed 2026-11-18, maintainer; done 2026-11-18 on `main`; follows the epic **RuleRef** under Version 2.+1)*: the SE computes the references the user ticks, and the evaluation switches the baseline without a new run.
