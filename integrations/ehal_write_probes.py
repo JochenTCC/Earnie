@@ -22,6 +22,14 @@ from integrations.ehal_write_test_bounds import (
 )
 
 
+class WriteTestBatchError(ValueError):
+    """The probe batch is invalid (unknown charger, unbound flex field).
+
+    Raised by the up-front validation in ``_dispatch_probe_writes`` before anything is
+    written, so callers know no restore is needed.
+    """
+
+
 def _openems_mapped_targets() -> dict[str, str]:
     from ehal.qualified_ids import qualified_charger_id
 
@@ -185,6 +193,17 @@ def _dispatch_probe_writes(clamped: dict[str, Any]) -> EhalWriteError | None:
             continue
         adapter_values[field] = value
 
+    # Validate the whole batch before the first publish: a bad charger id or an unbound
+    # flex field must fail before any (e.g. forced ESS) setpoint is on the wire.
+    try:
+        evcs_plan = _plan_evcs_probes(evcs_fields) if evcs_fields else None
+        if flex_fields:
+            _check_flex_bindings(flex_fields)
+    except WriteTestBatchError:
+        raise
+    except ValueError as exc:
+        raise WriteTestBatchError(str(exc)) from exc
+
     error: EhalWriteError | None = None
     if adapter_values:
         adapter = live.ehal_live.get_adapter()
@@ -203,8 +222,16 @@ def _dispatch_probe_writes(clamped: dict[str, Any]) -> EhalWriteError | None:
     if error is None and flex_fields:
         error = _write_flex_enable_probes(flex_fields)
     if error is None and evcs_fields:
-        error = _write_evcs_probes(evcs_fields)
+        error = _write_evcs_probes(evcs_fields, plan=evcs_plan)
     return error
+
+
+def _check_flex_bindings(fields: dict[str, float]) -> None:
+    """HA: every flex field needs an activated push binding (the rule of
+    ``write_published_fields``), checked before anything is written."""
+    if not live.ehal_live.is_ha_backend():
+        return
+    live.ehal_live.get_ha_adapter().check_published_bindings(fields)
 
 
 def _probe_charger_id(field: str) -> str:
@@ -226,23 +253,46 @@ def _probe_charger_id(field: str) -> str:
     )
 
 
-def _write_evcs_probes(fields: dict[str, Any]) -> EhalWriteError | None:
-    """One ``write_evcs_setpoints`` call per charger (network backends), else Loxone publish."""
+_EvcsPlan = list[tuple[str, dict, dict[str, Any]]]
+
+
+def _plan_evcs_probes(fields: dict[str, Any]) -> _EvcsPlan | None:
+    """Network backends: resolve every EVCS probe to (charger id, EV, values) or raise
+    ``ValueError``; writes nothing. ``None`` for Loxone (published by marker)."""
     if not live.ehal_live.is_ehal_network_backend():
-        return _write_loxone_mapped_probes(fields)
+        return None
     from ehal.qualified_ids import charger_id_of_ev
-    from settings.ev_power import ev_nominal_power_conversion
 
     by_charger: dict[str, dict[str, Any]] = {}
     for field, value in fields.items():
         by_charger.setdefault(_probe_charger_id(field), {})[probe_kind(field)] = value
     evs = {charger_id_of_ev(c): c for c in live.ehal_live.live_charger_consumers()}
-    adapter = live.ehal_live.get_network_adapter()
-    error: EhalWriteError | None = None
+    plan: _EvcsPlan = []
     for charger_id, values in by_charger.items():
         ev = evs.get(charger_id)
         if ev is None:
             raise ValueError(f"Schreibtest: kein E-Auto mit Ladepunkt {charger_id!r}.")
+        plan.append((charger_id, ev, values))
+    return plan
+
+
+def _write_evcs_probes(
+    fields: dict[str, Any], *, plan: _EvcsPlan | None = None
+) -> EhalWriteError | None:
+    """One ``write_evcs_setpoints`` call per charger (network backends), else Loxone publish.
+
+    ``plan`` is the result of ``_plan_evcs_probes`` when the caller validated up front.
+    """
+    if not live.ehal_live.is_ehal_network_backend():
+        return _write_loxone_mapped_probes(fields)
+    from settings.ev_power import ev_nominal_power_conversion
+
+    if plan is None:
+        plan = _plan_evcs_probes(fields)
+    assert plan is not None  # network backend always yields a plan
+    adapter = live.ehal_live.get_network_adapter()
+    error: EhalWriteError | None = None
+    for charger_id, ev, values in plan:
         voltage_v, phases = ev_nominal_power_conversion(ev)
         setpoint = build_probes_setpoint(values, adapter_id=str(adapter.cfg.adapter_id))
         result = adapter.write_evcs_setpoints(

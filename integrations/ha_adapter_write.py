@@ -6,6 +6,7 @@ Binding P5e: REST service writes and ``ha_ess_force`` Huawei REST are removed;
 """
 from __future__ import annotations
 
+from collections.abc import Iterable
 from typing import Any
 
 from ehal import (
@@ -268,13 +269,22 @@ class HaWriteMixin:
         Raises ``ValueError`` for a field that is not activated: the write-error document
         only names the fixed ESS / EVCS setpoint fields.
         """
+        bound = self.check_published_bindings(fields)
+        return self._write_bound_fields(fields, bound=bound)
+
+    def check_published_bindings(self, fields: Iterable[str]) -> set[str]:
+        """Raise ``ValueError`` unless every key has an activated push setpoint binding.
+
+        Writes nothing, so callers can validate a whole batch before the first publish.
+        Returns the set of bound qualified IDs.
+        """
         bound = set(self.cfg.setpoint_qids.values())
         missing = [key for key in fields if key not in bound]
         if missing:
             raise ValueError(
                 "Missing HA push setpoint binding for " + ", ".join(sorted(missing))
             )
-        return self._write_bound_fields(fields, bound=bound)
+        return bound
 
     def _write_bound_fields(
         self,

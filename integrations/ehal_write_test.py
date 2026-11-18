@@ -29,6 +29,7 @@ from integrations.ehal_write_test_bounds import (
     values_match,
 )
 from integrations.ehal_write_probes import (  # noqa: F401  (re-exported)
+    WriteTestBatchError,
     _dispatch_probe_writes,
     _ha_mapped_targets,
     _loxone_mapped_targets,
@@ -64,6 +65,7 @@ __all__ = [
     "BatchRoundtripResult",
     "RoundtripResult",
     "RoundtripStatus",
+    "WriteTestBatchError",
     "WriteTestClampError",
     "WriteTestSilentError",
     "allowed_probe_fields",
@@ -266,50 +268,36 @@ def roundtrip(
     )
 
 
-def _batch_write_phase(
+def _clamp_fail_result(values: dict[str, Any], exc: WriteTestClampError) -> BatchRoundtripResult:
+    return BatchRoundtripResult(
+        status=RoundtripStatus.FAIL,
+        written=dict(values),
+        echoes={},
+        message=str(exc),
+        field_results=(),
+    )
+
+
+def _write_wait_read_back(
     values: dict[str, Any],
     *,
     force_ess_active: bool,
-    restore: bool,
-    max_power_kw: float | None,
+    wait_s: float,
+    max_power_kw: float,
     ev_nominal_a: float | None,
-) -> dict[str, Any] | BatchRoundtripResult:
-    """Silent-Gate plus Setpoint-Schreiben.
+) -> BatchRoundtripResult:
+    """Clamp + write the batch → wait → per-field read-back (no restore).
 
-    Rückgabe: geklammerte Schreibwerte, oder ein Abbruch-``BatchRoundtripResult``
-    (Silent, Clamp-Fehler, Schreibfehler).
+    Raises ``WriteTestClampError`` / ``WriteTestBatchError`` before anything is written;
+    any other exception may come after a write.
     """
-    if not writes_allowed():
-        return BatchRoundtripResult(
-            status=RoundtripStatus.SILENT,
-            written=dict(values),
-            echoes={},
-            message="Silent-Modus aktiv — kein Schreibtest.",
-            field_results=(),
-        )
-    if max_power_kw is None:
-        max_power_kw = float(config.get_battery_params().get("max_power_kw") or 0.0)
-    if ev_nominal_a is None:
-        ev_nominal_a = default_ev_nominal_a()
-    try:
-        error, clamped = write_probes(
-            values,
-            force_ess_active=force_ess_active,
-            max_power_kw=float(max_power_kw),
-            ev_nominal_a=ev_nominal_a,
-        )
-    except WriteTestClampError as exc:
-        return BatchRoundtripResult(
-            status=RoundtripStatus.FAIL,
-            written=dict(values),
-            echoes={},
-            message=str(exc),
-            field_results=(),
-        )
-
+    error, clamped = write_probes(
+        values,
+        force_ess_active=force_ess_active,
+        max_power_kw=max_power_kw,
+        ev_nominal_a=ev_nominal_a,
+    )
     if error is not None:
-        if restore:
-            restore_safe_setpoints()
         return BatchRoundtripResult(
             status=RoundtripStatus.WRITE_ERROR,
             written=clamped,
@@ -318,7 +306,43 @@ def _batch_write_phase(
             field_results=(),
             write_error=error,
         )
-    return clamped
+
+    if wait_s > 0:
+        time.sleep(float(wait_s))
+
+    field_results: list[RoundtripResult] = []
+    echoes: dict[str, Any | None] = {}
+    for field, written in clamped.items():
+        echo, result = _roundtrip_read_back(field, written)
+        echoes[field] = echo
+        field_results.append(result)
+
+    parts = [row.message for row in field_results]
+    return BatchRoundtripResult(
+        status=_batch_overall_status(field_results),
+        written=clamped,
+        echoes=echoes,
+        message=" · ".join(parts) if parts else "Roundtrip ohne Felder.",
+        field_results=tuple(field_results),
+    )
+
+
+def _restore_after_abort(exc: BaseException) -> None:
+    """Restore safe setpoints while ``exc`` propagates; a failing restore never hides ``exc``."""
+    logger.warning(
+        "Write-test aborted (%s: %s) — restoring safe setpoints (Automatik / EVCS 0 A).",
+        type(exc).__name__,
+        exc,
+    )
+    try:
+        restore_safe_setpoints()
+    except Exception:  # noqa: BLE001 - original exception must propagate; logged loudly
+        logger.critical(
+            "Write-test restore FAILED after %s — forced write-test setpoints may still be "
+            "active on the plant. Check the plant and restore Automatik / EVCS 0 A by hand.",
+            type(exc).__name__,
+            exc_info=True,
+        )
 
 
 def _roundtrip_read_back(field: str, written: Any) -> tuple[Any | None, RoundtripResult]:
@@ -381,39 +405,45 @@ def roundtrip_batch(
     max_power_kw: float | None = None,
     ev_nominal_a: float | None = None,
 ) -> BatchRoundtripResult:
-    """Write many fields in one setpoint → wait → per-field read-back → optional restore."""
-    written_or_result = _batch_write_phase(
-        values,
-        force_ess_active=force_ess_active,
-        restore=restore,
-        max_power_kw=max_power_kw,
-        ev_nominal_a=ev_nominal_a,
-    )
-    if isinstance(written_or_result, BatchRoundtripResult):
-        return written_or_result
-    clamped = written_or_result
+    """Write many fields in one setpoint → wait → per-field read-back → optional restore.
 
-    if wait_s > 0:
-        time.sleep(float(wait_s))
-
-    field_results: list[RoundtripResult] = []
-    echoes: dict[str, Any | None] = {}
-    for field, written in clamped.items():
-        echo, result = _roundtrip_read_back(field, written)
-        echoes[field] = echo
-        field_results.append(result)
-
+    With ``restore=True`` the safe setpoints are restored once a write may have happened —
+    also when the write, the wait or the read-back raises (incl. Streamlit
+    ``StopException`` / ``RerunException``); that exception still propagates.
+    """
+    if not writes_allowed():
+        return BatchRoundtripResult(
+            status=RoundtripStatus.SILENT,
+            written=dict(values),
+            echoes={},
+            message="Silent-Modus aktiv — kein Schreibtest.",
+            field_results=(),
+        )
+    if max_power_kw is None:
+        max_power_kw = float(config.get_battery_params().get("max_power_kw") or 0.0)
+    if ev_nominal_a is None:
+        ev_nominal_a = default_ev_nominal_a()
+    try:
+        result = _write_wait_read_back(
+            values,
+            force_ess_active=force_ess_active,
+            wait_s=wait_s,
+            max_power_kw=float(max_power_kw),
+            ev_nominal_a=ev_nominal_a,
+        )
+    except WriteTestClampError as exc:
+        return _clamp_fail_result(values, exc)  # raised before any write: no restore
+    except WriteTestSilentError:
+        raise  # Silent switched on before the write: nothing written, restore must not write
+    except WriteTestBatchError:
+        raise  # batch rejected by up-front validation: nothing written, no restore
+    except BaseException as exc:
+        if restore:
+            _restore_after_abort(exc)
+        raise
     if restore:
         restore_safe_setpoints()
-
-    parts = [row.message for row in field_results]
-    return BatchRoundtripResult(
-        status=_batch_overall_status(field_results),
-        written=clamped,
-        echoes=echoes,
-        message=" · ".join(parts) if parts else "Roundtrip ohne Felder.",
-        field_results=tuple(field_results),
-    )
+    return result
 
 
 def restore_safe_setpoints() -> None:
