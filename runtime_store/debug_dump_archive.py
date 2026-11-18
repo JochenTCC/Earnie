@@ -4,9 +4,10 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import tempfile
 import zipfile
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Sequence
 
@@ -15,6 +16,11 @@ from runtime_store import optimization_history
 from runtime_store.debug_dump_inputs import collect_dump_context, write_inputs_to_zip
 from runtime_store.live_optimization_debug import _json_safe
 from runtime_store.persist_paths import runtime_dir, runtime_path
+from runtime_store.recorder_config_pack import (
+    PACK_ARCNAME,
+    build_config_pack,
+    expand_packed_configs,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +44,12 @@ _OPTIONAL_RUNTIME = (
     "main_stdio.log",
 )
 ATTACHMENTS_DIR = "anhaenge"
+_RECORDER_CONFIGS_PREFIX = "recorder/configs/"
+HISTORY_MODE_WINDOW = "window"
+HISTORY_MODE_FULL = "full"
+# ``written_at`` is written near the start of every history line (optimization_history.append).
+_WRITTEN_AT_RE = re.compile(rb'"written_at":\s*"(\d{4}-\d{2}-\d{2})')
+_WRITTEN_AT_SCAN_BYTES = 1024
 
 # Arcnames relative to ZIP root (validate/replay profiles).
 PROFILE_REQUIRED: dict[str, tuple[str, ...]] = {
@@ -135,7 +147,11 @@ def _readme_text() -> str:
         "optional recorder window\n"
         "inputs/* – aktive Konfigurationen fuer spaetere Reproduktion\n"
         "recorder/* – optional cycle-recorder ring buffer "
-        "(Lastprofile, nur an Maintainer weitergeben)\n"
+        "(Lastprofile, nur an Maintainer weitergeben); Config-Snapshots gepackt in "
+        "recorder/configs.pack.json, entpacken: "
+        "python -m runtime_store.recorder_config_pack <dump>/recorder\n"
+        "runtime/optimization_history.jsonl – Standard: nur das Recorder-Fenster "
+        "(manifest.history)\n"
         f"{ATTACHMENTS_DIR}/* – optional vom Benutzer beigelegte Dateien\n"
         f"Required runtime: {required}\n"
         f"Optional runtime: {optional}\n"
@@ -171,12 +187,15 @@ def write_debug_dump_zip(
     case_id: str = "",
     captured_at: datetime | None = None,
     attachments: Sequence[tuple[str, bytes]] = (),
+    full_history: bool = False,
 ) -> str:
     """
     Write a unified debug-dump ZIP (schema v3). Returns absolute path.
 
-    Always includes full ``runtime/optimization_history.jsonl`` plus any
-    monthly archive siblings ``optimization_history.jsonl.*``. Optional
+    ``runtime/optimization_history.jsonl`` (plus monthly archive siblings
+    ``optimization_history.jsonl.*``) holds only the lines of the recorder
+    window by default (``history_window_start``); ``full_history=True`` copies
+    the files unchanged. ``manifest.history`` records mode and counts. Optional
     ``chart_payload`` is stored under ``manifest.chart`` when provided;
     ``attachments`` (file name, bytes) land under ``anhaenge/``.
     """
@@ -213,12 +232,12 @@ def write_debug_dump_zip(
         input_files = write_inputs_to_zip(archive)
         manifest["included_input_files"] = input_files
 
-        archive.write(history_src, arcname="runtime/optimization_history.jsonl")
+        history_since = None if full_history else history_window_start(moment.date())
+        history_meta = _write_history(
+            archive, history_src, since=history_since, optional_present=optional_present
+        )
+        manifest["history"] = history_meta
         required_present.append("runtime/optimization_history.jsonl")
-        for archive_path in optimization_history.list_rotated_siblings(history_src):
-            arcname = f"runtime/{os.path.basename(archive_path)}"
-            archive.write(archive_path, arcname=arcname)
-            optional_present.append(arcname)
         for filename in _OPTIONAL_RUNTIME:
             written = _copy_runtime_file_if_present(
                 archive, filename, runtime_base=runtime_base
@@ -242,6 +261,116 @@ def write_debug_dump_zip(
         archive.writestr("README.txt", _readme_text())
 
     return zip_path
+
+
+def history_window_start(today: date) -> date:
+    """First day of the history kept in a dump: same window as the recorder segments."""
+    from runtime_store.cycle_recorder import retention_days
+
+    return today - timedelta(days=max(int(retention_days()), 1) - 1)
+
+
+def _copy_history_lines(
+    source: str,
+    archive: zipfile.ZipFile,
+    arcname: str,
+    *,
+    since: date,
+    keep_last_line: bool = False,
+) -> dict[str, int]:
+    """Copy lines with ``written_at`` on/after ``since``; lines without it are kept and counted.
+
+    ``keep_last_line``: when no line falls into the window, the newest line is
+    written anyway (counted as ``last_line_outside_window``), so a dump of an
+    install that has not optimized for days still shows its last run.
+    """
+    since_key = since.isoformat().encode("ascii")
+    counts = {"kept": 0, "dropped": 0, "without_written_at": 0, "last_line_outside_window": 0}
+    last_dropped: bytes | None = None
+    with open(source, "rb") as src, archive.open(arcname, "w", force_zip64=True) as dst:
+        for line in src:
+            match = _WRITTEN_AT_RE.search(line, 0, _WRITTEN_AT_SCAN_BYTES)
+            if match is None:
+                if line.strip():
+                    counts["without_written_at"] += 1
+                    counts["kept"] += 1
+                    dst.write(line)
+                continue
+            if match.group(1) >= since_key:
+                counts["kept"] += 1
+                dst.write(line)
+            else:
+                counts["dropped"] += 1
+                last_dropped = line
+        if keep_last_line and counts["kept"] == 0 and last_dropped is not None:
+            dst.write(last_dropped)
+            counts["dropped"] -= 1
+            counts["kept"] += 1
+            counts["last_line_outside_window"] = 1
+    return counts
+
+
+def _write_history(
+    archive: zipfile.ZipFile,
+    history_src: str,
+    *,
+    since: date | None,
+    optional_present: list[str],
+) -> dict[str, Any]:
+    """Write the live history and its rotated siblings; returns ``manifest.history``."""
+    sources = [(history_src, "runtime/optimization_history.jsonl")] + [
+        (path, f"runtime/{os.path.basename(path)}")
+        for path in optimization_history.list_rotated_siblings(history_src)
+    ]
+    if since is None:
+        for path, arcname in sources:
+            archive.write(path, arcname=arcname)
+            if path != history_src:
+                optional_present.append(arcname)
+        return {"mode": HISTORY_MODE_FULL, "files": [arc for _, arc in sources]}
+
+    totals = {"kept": 0, "dropped": 0, "without_written_at": 0, "last_line_outside_window": 0}
+    files: list[str] = []
+    for path, arcname in sources:
+        if path != history_src and not _has_line_since(path, since):
+            # Rotated month file the window does not reach into.
+            totals["dropped"] += _count_lines(path)
+            continue
+        counts = _copy_history_lines(
+            path, archive, arcname, since=since, keep_last_line=path == history_src
+        )
+        for key, value in counts.items():
+            totals[key] += value
+        files.append(arcname)
+        if path != history_src:
+            optional_present.append(arcname)
+    return {
+        "mode": HISTORY_MODE_WINDOW,
+        "since": since.isoformat(),
+        "files": files,
+        "lines_kept": totals["kept"],
+        "lines_dropped": totals["dropped"],
+        "lines_without_written_at": totals["without_written_at"],
+        "last_line_outside_window": bool(totals["last_line_outside_window"]),
+    }
+
+
+def _has_line_since(path: str, since: date) -> bool:
+    """True when a line is on/after ``since`` or carries no ``written_at`` (it would be kept)."""
+    since_key = since.isoformat().encode("ascii")
+    with open(path, "rb") as handle:
+        for line in handle:
+            if not line.strip():
+                continue
+            match = _WRITTEN_AT_RE.search(line, 0, _WRITTEN_AT_SCAN_BYTES)
+            if match is None or match.group(1) >= since_key:
+                return True
+    return False
+
+
+def _count_lines(path: str) -> int:
+    with open(path, "rb") as handle:
+        return sum(1 for line in handle if line.strip())
 
 
 def _attachment_arcname(name: str, used: set[str]) -> str:
@@ -275,7 +404,11 @@ def _write_recorder_to_zip(
     *,
     runtime_base: str,
 ) -> list[str]:
-    """Optional recorder ring buffer; never fails the dump."""
+    """Optional recorder ring buffer; a missing or unreadable recorder never fails the dump.
+
+    Config snapshots go into one ``recorder/configs.pack.json``
+    (``runtime_store.recorder_config_pack``); a packing error fails the dump.
+    """
     try:
         from runtime_store.cycle_recorder import collect_recorder_dump_payload
 
@@ -286,11 +419,23 @@ def _write_recorder_to_zip(
         logger.warning("debug_dump: recorder attachment failed: %s", exc)
         return []
     written: list[str] = []
+    snapshot_paths: list[str] = []
     for source_path, arcname in payload.get("files") or []:
-        if os.path.isfile(source_path):
-            archive.write(source_path, arcname=arcname)
-            written.append(arcname)
+        if not os.path.isfile(source_path):
+            continue
+        if arcname.startswith(_RECORDER_CONFIGS_PREFIX):
+            snapshot_paths.append(source_path)
+            continue
+        archive.write(source_path, arcname=arcname)
+        written.append(arcname)
     recorder_meta = payload.get("manifest")
+    if snapshot_paths:
+        # Packing errors fail the dump: a dump without its snapshots cannot be replayed.
+        pack_bytes, pack_summary = build_config_pack(snapshot_paths)
+        archive.writestr(PACK_ARCNAME, pack_bytes)
+        written.append(PACK_ARCNAME)
+        if recorder_meta is not None:
+            recorder_meta["configs_pack"] = pack_summary
     if recorder_meta:
         manifest["recorder"] = recorder_meta
     return written
@@ -328,7 +473,12 @@ def load_manifest_from_dir(root: str | Path) -> dict[str, Any]:
 
 
 def extract_dump_to_dir(source: str | Path, target: str | Path | None = None) -> Path:
-    """Extract a dump ZIP to ``target`` (or a temp dir). Returns the root path."""
+    """Extract a dump ZIP to ``target`` (or a temp dir). Returns the root path.
+
+    ``recorder/configs.pack.json`` is expanded into ``recorder/configs/<hash>.json``.
+    A directory is returned unchanged (expand it with
+    ``python -m runtime_store.recorder_config_pack <dir>/recorder``).
+    """
     source_path = Path(source)
     if source_path.is_dir():
         return source_path.resolve()
@@ -338,6 +488,7 @@ def extract_dump_to_dir(source: str | Path, target: str | Path | None = None) ->
     out.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(source_path, "r") as archive:
         archive.extractall(out)
+    expand_packed_configs(out / "recorder")
     return out.resolve()
 
 

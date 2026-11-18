@@ -24,3 +24,17 @@ def test_config_only_bundle_without_attachments():
     with zipfile.ZipFile(io.BytesIO(payload), "r") as archive:
         assert archive.namelist() == [CONFIG_PACK_ARCNAME]
         assert archive.read(CONFIG_PACK_ARCNAME) == b"pack"
+
+
+def test_full_support_package_passes_full_history_flag(monkeypatch):
+    from ui import support_package
+
+    calls = []
+    monkeypatch.setattr(
+        support_package, "write_debug_dump_zip", lambda **kwargs: calls.append(kwargs) or "x.zip"
+    )
+    support_package.save_full_support_package(title="t", symptom="s", attachments=[])
+    support_package.save_full_support_package(
+        title="t", symptom="s", attachments=[], full_history=True
+    )
+    assert [call["full_history"] for call in calls] == [False, True]

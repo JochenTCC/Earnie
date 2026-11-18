@@ -1,0 +1,182 @@
+"""Compact form of the recorder config snapshots inside a debug dump.
+
+Each snapshot ``recorder/configs/<hash>.json`` carries every input file in full,
+including ``inputs/cons_data.csv`` (~2 MB) that changes on every snapshot only at
+its end. A dump of 150 snapshots therefore held ~300 MB of nearly identical text.
+
+The dump stores one ``recorder/configs.pack.json`` instead: a shared table of
+unique lines and, per snapshot, its JSON skeleton plus runs of line indices per
+file. ``expand_packed_configs`` rebuilds byte-identical snapshot files (checked by
+SHA-256), so replays, case fingerprints and goldens see the same files as before.
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+from pathlib import Path
+from typing import Any, Iterable
+
+PACK_FILENAME = "configs.pack.json"
+PACK_ARCNAME = f"recorder/{PACK_FILENAME}"
+PACK_FORMAT = 1
+
+
+class ConfigPackError(ValueError):
+    """Pack cannot be built or expanded without losing bytes."""
+
+
+def _sha256(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def _serialize_snapshot(doc: dict[str, Any]) -> bytes:
+    # Same call as cycle_recorder._ensure_config_snapshot (json.dump, ensure_ascii=False).
+    return json.dumps(doc, ensure_ascii=False).encode("utf-8")
+
+
+class _LineTable:
+    def __init__(self) -> None:
+        self.lines: list[str] = []
+        self._index: dict[str, int] = {}
+
+    def runs_for(self, text: str) -> list[list[int]]:
+        runs: list[list[int]] = []
+        for line in text.splitlines(keepends=True):
+            idx = self._index.get(line)
+            if idx is None:
+                idx = len(self.lines)
+                self.lines.append(line)
+                self._index[line] = idx
+            if runs and runs[-1][0] + runs[-1][1] == idx:
+                runs[-1][1] += 1
+            else:
+                runs.append([idx, 1])
+        return runs
+
+
+def _text_from_runs(lines: list[str], runs: list[list[int]]) -> str:
+    parts: list[str] = []
+    for start, count in runs:
+        if start < 0 or count < 0 or start + count > len(lines):
+            raise ConfigPackError(f"line run out of range: {start}+{count} of {len(lines)}")
+        parts.extend(lines[start : start + count])
+    return "".join(parts)
+
+
+def build_config_pack(snapshot_paths: Iterable[Path | str]) -> tuple[bytes, dict[str, Any]]:
+    """Pack snapshot files; returns (pack JSON bytes, summary for the manifest).
+
+    A snapshot whose rebuild would not match its original bytes is stored
+    verbatim (``raw``) and counted in the summary, never altered.
+    """
+    table = _LineTable()
+    snapshots: dict[str, Any] = {}
+    raw_count = 0
+    original_bytes = 0
+    for path_like in sorted(Path(p) for p in snapshot_paths):
+        original = path_like.read_bytes()
+        original_bytes += len(original)
+        name = path_like.stem
+        entry: dict[str, Any] = {"sha256": _sha256(original)}
+        try:
+            doc = json.loads(original.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            doc = None
+        files = doc.get("files") if isinstance(doc, dict) else None
+        if isinstance(files, dict) and all(isinstance(v, str) for v in files.values()):
+            skeleton = dict(doc)
+            skeleton["files"] = {key: None for key in files}
+            entry["skeleton"] = skeleton
+            entry["runs"] = {key: table.runs_for(text) for key, text in files.items()}
+            if _serialize_snapshot(_rebuild_doc(entry, table.lines)) != original:
+                del entry["skeleton"], entry["runs"]
+        if "skeleton" not in entry:
+            entry["raw"] = original.decode("utf-8", errors="strict")
+            raw_count += 1
+        snapshots[name] = entry
+    pack = {"format": PACK_FORMAT, "lines": table.lines, "snapshots": snapshots}
+    data = json.dumps(pack, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    summary = {
+        "arcname": PACK_ARCNAME,
+        "format": PACK_FORMAT,
+        "snapshot_count": len(snapshots),
+        "raw_snapshot_count": raw_count,
+        "unique_lines": len(table.lines),
+        "original_bytes": original_bytes,
+        "packed_bytes": len(data),
+    }
+    return data, summary
+
+
+def _rebuild_doc(entry: dict[str, Any], lines: list[str]) -> dict[str, Any]:
+    doc = dict(entry["skeleton"])
+    doc["files"] = {
+        key: _text_from_runs(lines, entry["runs"][key]) for key in entry["skeleton"]["files"]
+    }
+    return doc
+
+
+def _rebuild_snapshot_bytes(name: str, entry: dict[str, Any], lines: list[str]) -> bytes:
+    if "raw" in entry:
+        data = str(entry["raw"]).encode("utf-8")
+    elif "skeleton" in entry and "runs" in entry:
+        data = _serialize_snapshot(_rebuild_doc(entry, lines))
+    else:
+        raise ConfigPackError(f"snapshot {name!r} has neither raw nor skeleton/runs")
+    if _sha256(data) != entry.get("sha256"):
+        raise ConfigPackError(f"snapshot {name!r}: rebuilt bytes do not match sha256")
+    return data
+
+
+def expand_packed_configs(recorder_root: Path | str) -> int:
+    """Rebuild ``configs/<hash>.json`` from ``configs.pack.json`` and remove the pack.
+
+    Returns the number of snapshots written; 0 when there is no pack. Raises
+    ``ConfigPackError`` on an unknown format, a checksum mismatch, or an existing
+    snapshot file with different content (nothing is overwritten).
+    """
+    root = Path(recorder_root)
+    pack_path = root / PACK_FILENAME
+    if not pack_path.is_file():
+        return 0
+    pack = json.loads(pack_path.read_text(encoding="utf-8"))
+    if not isinstance(pack, dict) or pack.get("format") != PACK_FORMAT:
+        raise ConfigPackError(
+            f"unsupported config pack format {pack.get('format') if isinstance(pack, dict) else None!r} "
+            f"in {pack_path} (expected {PACK_FORMAT})"
+        )
+    lines = pack.get("lines")
+    snapshots = pack.get("snapshots")
+    if not isinstance(lines, list) or not isinstance(snapshots, dict):
+        raise ConfigPackError(f"invalid config pack shape: {pack_path}")
+    rebuilt = {name: _rebuild_snapshot_bytes(name, entry, lines) for name, entry in snapshots.items()}
+    configs = root / "configs"
+    configs.mkdir(parents=True, exist_ok=True)
+    for name, data in rebuilt.items():
+        target = configs / f"{name}.json"
+        if target.is_file():
+            if target.read_bytes() != data:
+                raise ConfigPackError(f"{target} exists with different content")
+            continue
+        tmp = target.with_suffix(".json.tmp")
+        tmp.write_bytes(data)
+        tmp.replace(target)
+    pack_path.unlink()
+    return len(rebuilt)
+
+
+def main(argv: list[str] | None = None) -> int:
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="Expand recorder/configs.pack.json of an extracted debug dump into configs/<hash>.json."
+    )
+    parser.add_argument("recorder_dir", help="the dump's recorder/ folder")
+    args = parser.parse_args(argv)
+    count = expand_packed_configs(args.recorder_dir)
+    print(f"expanded {count} config snapshot(s)" if count else "no configs.pack.json found")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

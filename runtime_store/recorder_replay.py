@@ -84,9 +84,15 @@ def load_config_snapshot(recorder_root: Path | str, config_hash: str) -> dict[st
     root = Path(recorder_root)
     path = root / "configs" / f"{config_hash}.json"
     if not path.is_file():
+        hint = ""
+        if (root / "configs.pack.json").is_file():
+            hint = (
+                "; the snapshots are still packed: "
+                f"python -m runtime_store.recorder_config_pack {root}"
+            )
         raise FileNotFoundError(
             f"recorder config snapshot missing: {path} "
-            f"(config_hash={config_hash!r})"
+            f"(config_hash={config_hash!r}){hint}"
         )
     with path.open(encoding="utf-8") as handle:
         payload = json.load(handle)

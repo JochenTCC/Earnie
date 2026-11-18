@@ -287,8 +287,11 @@ def test_debug_dump_includes_recorder_window(tmp_path, monkeypatch):
     with zipfile.ZipFile(zip_path) as archive:
         names = set(archive.namelist())
         assert any(name.startswith("recorder/cycles_") for name in names)
-        assert any(name.startswith("recorder/configs/") for name in names)
+        assert "recorder/configs.pack.json" in names
+        assert not any(name.startswith("recorder/configs/") for name in names)
         manifest = json.loads(archive.read("manifest.json"))
+    assert manifest["recorder"]["configs_pack"]["snapshot_count"] == 1
+    assert manifest["recorder"]["configs_pack"]["raw_snapshot_count"] == 0
     assert manifest["schema_version"] == 3
     assert manifest["recorder"]["cycle_count"] == 1
     assert manifest["recorder"]["config_hashes"]

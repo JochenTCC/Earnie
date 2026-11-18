@@ -158,7 +158,8 @@ def test_write_capture_zip_contains_manifest(tmp_path, monkeypatch):
         assert "manifest.json" in names
         assert "README.txt" in names
         assert "runtime/optimization_history.jsonl" in names
-        assert "runtime/optimization_history.jsonl.2026-06-01_00-00-00" in names
+        # June month file lies outside the 7-day window of 2026-07-05.
+        assert "runtime/optimization_history.jsonl.2026-06-01_00-00-00" not in names
         assert "runtime/optimization_history_window.jsonl" not in names
         manifest = json.loads(archive.read("manifest.json"))
         assert manifest["schema_version"] == 3
@@ -172,9 +173,9 @@ def test_write_capture_zip_contains_manifest(tmp_path, monkeypatch):
         assert "runtime/optimization_history.jsonl" in manifest["files"][
             "required_present"
         ]
-        assert "runtime/optimization_history.jsonl.2026-06-01_00-00-00" in manifest[
-            "files"
-        ]["optional_present"]
+        assert manifest["history"]["mode"] == "window"
+        assert manifest["history"]["lines_kept"] == 1
+        assert manifest["history"]["lines_dropped"] == 1
         assert "inputs/config.json" in names
         assert "inputs/deviation_rules.json" in names
         assert "inputs/price_model_coefficients.json" in names

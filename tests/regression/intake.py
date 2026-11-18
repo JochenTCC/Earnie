@@ -11,6 +11,7 @@ import yaml
 
 from runtime_store.cycle_recorder import read_segment_cycles
 from runtime_store.debug_dump_archive import extract_dump_to_dir, validate_dump_layout
+from runtime_store.recorder_config_pack import expand_packed_configs
 from tests.regression.loader import resolve_private_cases_dir
 from tests.regression.schema import validate_case_meta
 
@@ -94,6 +95,8 @@ def intake_debug_dump(
             shutil.rmtree(case_dir)
         case_dir.mkdir(parents=True, exist_ok=False)
         shutil.copytree(recorder_src, case_dir / "recorder")
+        # Dump folders (not ZIPs) may still hold the packed config snapshots.
+        expand_packed_configs(case_dir / "recorder")
 
         meta = _build_case_yaml(
             case_id=case_id,
