@@ -8,11 +8,18 @@ from runtime_store.loxone_auth_error import load_loxone_auth_error
 
 
 def render_loxone_auth_error_banner() -> None:
-    """Show persisted Loxone auth failure from runtime/loxone_auth_error.json."""
+    """Show persisted Loxone auth failure from runtime/loxone_auth_error.json.
+
+    Only with ``live_environment`` in the UI modes: without it the UI does not run
+    the live operation, so a leftover auth-gate file from an earlier daemon run
+    is stale noise.
+    """
     from runtime_store.shadow.mode import is_shadow_mode
+    from ui.mode_selector import get_enabled_ui_mode_keys
 
     # Shadow never contacts the Miniserver; ignore leftover auth-gate files.
-    error = None if is_shadow_mode() else load_loxone_auth_error()
+    live_ui = "live_environment" in get_enabled_ui_mode_keys()
+    error = load_loxone_auth_error() if live_ui and not is_shadow_mode() else None
     conflict = loxone_dotenv_conflict()
     if not error and not conflict:
         return

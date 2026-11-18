@@ -87,6 +87,7 @@ def test_auth_banner_shows_when_not_shadow(runtime_dir, monkeypatch):
         source="startup_checks",
     )
     monkeypatch.delenv("EARNIE_SHADOW", raising=False)
+    monkeypatch.setenv("EARNIE_UI_MODES", "sunset2sunset,live_environment")
     with (
         patch("ui.loxone_auth_banner.loxone_dotenv_conflict", return_value=None),
         patch("ui.loxone_auth_banner.st") as st_mock,
@@ -94,3 +95,22 @@ def test_auth_banner_shows_when_not_shadow(runtime_dir, monkeypatch):
         render_loxone_auth_error_banner()
     st_mock.error.assert_called_once()
     assert "Loxone-Zugang verweigert" in st_mock.error.call_args.args[0]
+
+
+def test_auth_banner_suppressed_without_live_environment(runtime_dir, monkeypatch):
+    """UI without live_environment ignores a leftover auth-gate file."""
+    from ui.loxone_auth_banner import render_loxone_auth_error_banner
+
+    lae.persist_loxone_auth_error(
+        message="Loxone auth failed (HTTP 401)",
+        http_status=401,
+        source="startup_checks",
+    )
+    monkeypatch.delenv("EARNIE_SHADOW", raising=False)
+    monkeypatch.setenv("EARNIE_UI_MODES", "sunset2sunset,scenario_explorer")
+    with (
+        patch("ui.loxone_auth_banner.loxone_dotenv_conflict", return_value=None),
+        patch("ui.loxone_auth_banner.st") as st_mock,
+    ):
+        render_loxone_auth_error_banner()
+    st_mock.error.assert_not_called()
