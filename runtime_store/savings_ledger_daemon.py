@@ -35,6 +35,13 @@ _restart_reason: str | None = None
 _pending_without_chain: dict[str, Any] | None = None
 
 
+def _house_batteries() -> list[dict]:
+    """House-balance batteries of the live config: the shadow plant's (spec § 3)."""
+    from optimizer.sim_horizon_chart_soc import house_balance_batteries
+
+    return house_balance_batteries(config.get_battery_params_list())
+
+
 def reset() -> None:
     """Forget the in-memory state (tests; the next call reads the state file again)."""
     global _state, _loaded_path, _restart_reason, _pending_without_chain
@@ -93,7 +100,7 @@ def planning_shadow_soc(closed_interval: dict[str, Any] | None) -> float | None:
 
 
 def _planning_shadow_soc(closed_interval: dict[str, Any] | None) -> float | None:
-    batteries = config.get_battery_params_list()
+    batteries = _house_batteries()
     if not batteries:
         return None
     _ensure_loaded()
@@ -105,7 +112,9 @@ def _planning_shadow_soc(closed_interval: dict[str, Any] | None) -> float | None
     slot_start = _closed_slot_start(closed_interval, timezone_name)
     advanced, _row = sl.advance(
         _state,
-        store.ledger_input_from_pending(slot_start, closed_interval, _state.pending_slot),
+        store.ledger_input_from_pending(
+            slot_start, closed_interval, _state.pending_slot, batteries=batteries
+        ),
         sl.shadow_battery_params(batteries),
         store.sunrise_day_bounds(
             config.get("LATITUDE", cast=float),
@@ -158,7 +167,7 @@ def _on_cycle(
     now: datetime | None,
 ) -> dict[str, Any] | None:
     global _state, _pending_without_chain
-    batteries = config.get_battery_params_list()
+    batteries = _house_batteries()
     _ensure_loaded()
     timezone_name = config.get_planning_timezone()
     day_bounds = store.sunrise_day_bounds(
@@ -172,7 +181,9 @@ def _on_cycle(
     row = None
     if isinstance(closed_interval, dict) and closed_interval.get("interval_start"):
         slot_start = _closed_slot_start(closed_interval, timezone_name)
-        inp = store.ledger_input_from_pending(slot_start, closed_interval, pending)
+        inp = store.ledger_input_from_pending(
+            slot_start, closed_interval, pending, batteries=batteries
+        )
         if _state is None:
             _state = sl.start_chain(
                 inp,

@@ -41,6 +41,7 @@ from runtime_store.savings_ledger import (
     DayBounds,
     LedgerInput,
     LedgerState,
+    with_plant_soc,
 )
 from runtime_store.savings_ledger_flex import FlexDayInputs, consumer_windows
 from runtime_store.slot_ist_powers import index_closed_intervals_by_start
@@ -325,8 +326,15 @@ def ledger_input_from_pending(
     slot_start: datetime,
     closed: dict[str, Any] | None,
     pending: dict[str, Any] | None,
+    *,
+    batteries: list[dict],
 ) -> LedgerInput:
-    """``LedgerInput`` for a closed slot; prices only when ``pending`` belongs to that slot."""
+    """``LedgerInput`` for a closed slot; prices only when ``pending`` belongs to that slot.
+
+    ``batteries`` are the house-balance batteries: the slot's SoC becomes the plant SoC
+    (``savings_ledger.with_plant_soc``).
+    """
+    closed = with_plant_soc(closed, batteries)
     if pending is None or pending.get("slot_start") != slot_start.isoformat():
         return LedgerInput(slot_start, closed, None, None)
     return LedgerInput(
@@ -344,6 +352,8 @@ def ledger_input(
     slot_start: datetime,
     closed: dict[str, Any] | None,
     slot_entry: dict[str, Any] | None,
+    *,
+    batteries: list[dict],
 ) -> LedgerInput:
     """Pair a slot's ``closed_interval`` with the prices and plan of the slot's own entry.
 
@@ -353,22 +363,29 @@ def ledger_input(
     prices are ``None`` and the ledger skips the slot (``no_price``).
     """
     return ledger_input_from_pending(
-        slot_start, closed, pending_slot_from_entry(slot_start, slot_entry)
+        slot_start, closed, pending_slot_from_entry(slot_start, slot_entry), batteries=batteries
     )
 
 
 def ledger_inputs_from_entries(
     entries: Iterable[dict[str, Any]],
     timezone_name: str,
+    *,
+    batteries: list[dict],
 ) -> list[LedgerInput]:
-    """Every closed slot in ``entries`` as ``LedgerInput``, oldest first."""
+    """Every closed slot in ``entries`` as ``LedgerInput``, oldest first (``batteries``: see
+    ``ledger_input_from_pending``)."""
     entries = list(entries)
     closed_by = index_closed_intervals_by_start(entries)
     by_slot = _index_entries_by_slot(entries)
     inputs: list[LedgerInput] = []
     for naive_start in sorted(closed_by):
         slot_start = quarter_hour_slot_start(align_to_planning_timezone(naive_start, timezone_name))
-        inputs.append(ledger_input(slot_start, closed_by[naive_start], by_slot.get(slot_start)))
+        inputs.append(
+            ledger_input(
+                slot_start, closed_by[naive_start], by_slot.get(slot_start), batteries=batteries
+            )
+        )
     return inputs
 
 

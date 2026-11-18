@@ -191,7 +191,9 @@ def load_ledger_chart_savings(
         return _no_ledger(count, history_slot_count, HINT_UNREADABLE)
     if loaded.state is None:
         return _no_ledger(count, history_slot_count, HINT_NOT_RUNNING)
-    batteries = config.get_battery_params_list()
+    from optimizer.sim_horizon_chart_soc import house_balance_batteries
+
+    batteries = house_balance_batteries(config.get_battery_params_list())
     try:
         rows = store.read_rows()
         closed_slots, hint = _closed_slots_in_window(

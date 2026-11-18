@@ -373,7 +373,7 @@ def test_logged_filter_window_flows_from_the_entry_into_the_row(tmp_path):
     inputs = []
     for i in range(96):
         closed = _closed(flex={"pool": 0.2 if 12 <= i < 16 else 0.0})
-        inp = store.ledger_input_from_pending(DAY1 + i * STEP, closed, {**pending, "slot_start": (DAY1 + i * STEP).isoformat()})
+        inp = store.ledger_input_from_pending(DAY1 + i * STEP, closed, {**pending, "slot_start": (DAY1 + i * STEP).isoformat()}, batteries=[])
         inputs.append(inp)
     inputs.append(_closing_slot(DAY1 + timedelta(days=1)))
 

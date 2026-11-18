@@ -566,7 +566,16 @@ def calculate_optimization_savings(
     )
     filters = filter_contexts or resolve_filter_contexts(matrix, consumers)
     on_shadow_chain = baseline_initial_soc is not None
-    baseline_soc = float(baseline_initial_soc) if on_shadow_chain else initial_soc
+    if on_shadow_chain:
+        baseline_soc = float(baseline_initial_soc)
+    else:
+        # The baselines run the plant battery (``_baseline_battery_params``): with several
+        # house batteries they start at the plant SoC, as the open-loop run does.
+        from optimizer.sim_horizon_chart_soc import plant_start_soc
+
+        baseline_soc = plant_start_soc(
+            config.get_battery_params_list(), initial_soc, current_soc_by_id
+        )
     rows = _run_savings_horizons(
         matrix,
         initial_soc,

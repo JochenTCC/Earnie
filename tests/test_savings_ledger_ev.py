@@ -137,7 +137,7 @@ def test_plug_state_flows_from_the_entry_to_the_hand_computed_saving():
     for i, entry in enumerate(entries):
         start = DAY1 + i * STEP
         pending = store.pending_slot_from_entry(start, entry)
-        inputs.append(store.ledger_input_from_pending(start, _closed(11.0 if i in NIGHT else 0.0), pending))
+        inputs.append(store.ledger_input_from_pending(start, _closed(11.0 if i in NIGHT else 0.0), pending, batteries=[]))
     assert inputs[PLUG_18].plugged_in == {"auto": True}
     assert inputs[0].plugged_in == {"auto": False}
     inputs.append(sl.LedgerInput(DAY1 + timedelta(days=1), _closed(0.0), 20.0, 8.0))

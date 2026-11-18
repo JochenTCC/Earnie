@@ -34,6 +34,7 @@ if str(ROOT) not in sys.path:
 
 import config  # noqa: E402
 from optimizer.schedule import quarter_hour_slot_start  # noqa: E402
+from optimizer.sim_horizon_chart_soc import house_balance_batteries  # noqa: E402
 from runtime_store import savings_ledger as sl  # noqa: E402
 from runtime_store import savings_ledger_store as store  # noqa: E402
 from runtime_store.history_chart_rows import _parse_completed_at  # noqa: E402
@@ -112,7 +113,7 @@ def read_entries(
 def build(
     entries: list[dict[str, Any]],
     since: datetime,
-    battery: dict[str, Any] | None,
+    batteries: list[dict[str, Any]],
     day_bounds: sl.DayBounds,
     timezone_name: str,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], sl.LedgerState | None, int]:
@@ -120,11 +121,13 @@ def build(
 
     Returns the closed-day rows, their slot records, the state with the open day
     (``None`` without any slot that has a SoC) and the number of closed slots read.
-    ``battery`` ``None``: a house without battery (v2: shadow plant without battery).
+    ``batteries`` are the house-balance batteries; none: a house without battery (v2: shadow
+    plant without battery).
     """
+    battery = sl.shadow_battery_params(batteries) if batteries else None
     inputs = [
         inp
-        for inp in store.ledger_inputs_from_entries(entries, timezone_name)
+        for inp in store.ledger_inputs_from_entries(entries, timezone_name, batteries=batteries)
         if inp.slot_start >= since
     ]
     state: sl.LedgerState | None = None
@@ -249,7 +252,7 @@ def main(argv: list[str] | None = None) -> int:
             print("The Earnie daemon is running; stop it before writing the ledger.", file=sys.stderr)
             return 2
 
-    batteries = config.get_battery_params_list()
+    batteries = house_balance_batteries(config.get_battery_params_list())
     battery = sl.shadow_battery_params(batteries) if batteries else None
     timezone_name = config.get_planning_timezone()
     since = datetime.combine(args.since, datetime.min.time(), tzinfo=ZoneInfo(timezone_name))
@@ -265,7 +268,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     # The prices of the first slot come from the entry written in it.
     entries, bad = read_entries(paths, since - timedelta(minutes=15))
-    rows, slot_records, state, slots_read = build(entries, since, battery, day_bounds, timezone_name)
+    rows, slot_records, state, slots_read = build(entries, since, batteries, day_bounds, timezone_name)
 
     for line in bad:
         print(f"skipped malformed log line {line}", file=sys.stderr)

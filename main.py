@@ -1129,6 +1129,7 @@ def _main_cycle(
                 power_interval_sampler.note_decision_sample(
                     consumption_snapshot,
                     soc_percent=float(current_soc),
+                    soc_percent_by_ess=current_soc_by_id or None,
                 )
             run_state.save_run_state(run_payload)
             if run_payload.get("success"):

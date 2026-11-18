@@ -309,7 +309,7 @@ def test_log_entries_pair_prices_of_the_slot_with_its_closed_interval(monkeypatc
         },
     ]
 
-    (inp,) = store.ledger_inputs_from_entries(entries, "Europe/Vienna")
+    (inp,) = store.ledger_inputs_from_entries(entries, "Europe/Vienna", batteries=[BATTERY])
 
     assert inp.slot_start == datetime(2026, 11, 1, 12, 0, tzinfo=TZ)
     assert inp.closed is closed
@@ -323,7 +323,7 @@ def test_slot_without_own_entry_has_no_price(monkeypatch):
     closed = {**_closed(), "interval_start": "2026-11-01T12:00:00"}
     entries = [{"written_at": "2026-11-01T12:15:04", "market_price_cent": 30.0, "k_push_act": 8.0, "closed_interval": closed}]
 
-    (inp,) = store.ledger_inputs_from_entries(entries, "Europe/Vienna")
+    (inp,) = store.ledger_inputs_from_entries(entries, "Europe/Vienna", batteries=[BATTERY])
 
     assert inp.k_act_cent is None and inp.k_push_cent is None
 

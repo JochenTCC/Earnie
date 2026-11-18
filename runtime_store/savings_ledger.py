@@ -20,8 +20,9 @@ from typing import Any, Callable
 from data.live_consumption import is_dead_telemetry_snapshot
 from optimizer import battery as bat
 from optimizer.milp_horizon import (
-    primary_battery_with_plant_power,
     coerce_battery_params_list,
+    plant_battery_params,
+    plant_soc_percent,
 )
 from optimizer.slot_duration import DEFAULT_DT_H, validate_dt_h
 from runtime_store.power_interval_sampler import MIN_SAMPLE_COUNT_FOR_MEAN
@@ -134,14 +135,49 @@ def slot_skip_reason(closed: dict[str, Any] | None) -> str | None:
 
 
 def shadow_battery_params(battery_params: dict | list[dict] | None) -> dict:
-    """Battery the shadow plant runs: one ESS as is; several as the baseline does, the first
-    battery with the power of all (changing that is a new ``savings_v``)."""
+    """Battery the shadow plant runs: one ESS as is; several as the plant battery of the
+    optimized run and the baselines (``plant_battery_params``; spec § 3).
+
+    ``battery_params`` are the house-balance batteries
+    (``optimizer.sim_horizon_chart_soc.house_balance_batteries``); the caller filters them,
+    because this module reads no config.
+    """
     batteries = coerce_battery_params_list(battery_params)
     if not batteries:
         raise ValueError("savings ledger: no house battery parameters for the shadow plant")
     if len(batteries) == 1:
         return batteries[0]
-    return primary_battery_with_plant_power(batteries)
+    return plant_battery_params(batteries)
+
+
+_SOC_EDGES = ("start", "end")
+
+
+def with_plant_soc(closed: dict[str, Any] | None, batteries: list[dict]) -> dict[str, Any] | None:
+    """``closed`` with ``soc_start_percent`` / ``soc_end_percent`` of the plant battery.
+
+    The sampler logs the SoC of the first house battery there. With one house battery that is
+    the plant's and ``closed`` is returned as is. With several (``batteries``: the
+    house-balance batteries) the plant SoC is the energy-weighted SoC of the battery maps
+    ``soc_<edge>_percent_by_ess``. When a map is missing or lacks a battery, the plant SoC of
+    that edge is unknown and the key is removed: the ledger treats the slot as one without
+    SoC (a chain start waits for the next slot, the day close carries the correction).
+    """
+    if not isinstance(closed, dict) or len(batteries) < 2:
+        return closed
+    out = dict(closed)
+    for edge in _SOC_EDGES:
+        key = f"soc_{edge}_percent"
+        by_ess = closed.get(f"{key}_by_ess")
+        out.pop(key, None)
+        if not isinstance(by_ess, dict):
+            continue
+        try:
+            soc = plant_soc_percent(batteries, {str(k): float(v) for k, v in by_ess.items()})
+        except ValueError:
+            continue
+        out[key] = round(soc, 2)
+    return out
 
 
 def _cost_eur(grid_kwh: float, k_act_cent: float, k_push_cent: float) -> float:
