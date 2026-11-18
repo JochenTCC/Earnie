@@ -35,25 +35,49 @@ SHADOW_CLIENT_STAGE = "shadow-client"
 
 
 def _run_deploy_tariff_gate() -> None:
-    """Deploy-Gate: gebündelter Tarifkatalog muss plausibel und vollständig sein."""
+    """Deploy-Gate: gebündelter Tarifkatalog muss plausibel und vollständig sein.
+
+    Two checks: the catalog ``tariffs.json`` (schema + DACH source coverage),
+    and the example set (``backtesting_scenarios.example.json`` must reference
+    tariffs of ``tariffs.example.json``, the file it is shipped and imported
+    with — the example config pack loads as a set).
+    """
     from scripts.validate_tariffs import run_validation
 
     share_config = REPO_ROOT / "share" / "config"
+    schema_path = str(share_config / "tariffs.schema.json")
     tariffs_path = str(share_config / "tariffs.json")
-    errors = run_validation(
-        tariffs_path=tariffs_path,
-        scenarios_path=str(share_config / "backtesting_scenarios.example.json"),
-        schema_path=str(share_config / "tariffs.schema.json"),
-        check_catalog=True,
-        import_json=str(REPO_ROOT / "tools" / "tariff_catalog" / "stromtarife_dach_kombiniert.json"),
-        export_json=str(REPO_ROOT / "tools" / "tariff_catalog" / "einspeisetarife_dach_erweitert.json"),
+    example_tariffs_path = str(share_config / "tariffs.example.json")
+    checks = (
+        (
+            tariffs_path,
+            run_validation(
+                tariffs_path=tariffs_path,
+                scenarios_path=None,
+                schema_path=schema_path,
+                check_catalog=True,
+                import_json=str(REPO_ROOT / "tools" / "tariff_catalog" / "stromtarife_dach_kombiniert.json"),
+                export_json=str(REPO_ROOT / "tools" / "tariff_catalog" / "einspeisetarife_dach_erweitert.json"),
+            ),
+        ),
+        (
+            example_tariffs_path,
+            run_validation(
+                tariffs_path=example_tariffs_path,
+                scenarios_path=str(share_config / "backtesting_scenarios.example.json"),
+                schema_path=schema_path,
+                check_catalog=False,
+                import_json="",
+                export_json="",
+            ),
+        ),
     )
-    if errors:
-        detail = "\n".join(f"  - {item}" for item in errors)
-        raise ValueError(
-            "Deploy-Gate: Tarif-Plausibilität fehlgeschlagen "
-            f"({tariffs_path}):\n{detail}"
+    failed = [(path, errors) for path, errors in checks if errors]
+    if failed:
+        detail = "\n".join(
+            f"  - {path}: {item}" for path, errors in failed for item in errors
         )
+        raise ValueError(f"Deploy-Gate: Tarif-Plausibilität fehlgeschlagen:\n{detail}")
     print("Deploy-Gate: Tarifkatalog OK.")
 
 

@@ -2,6 +2,10 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix deploy tariff gate vs example scenarios (2026-11-18)
+
+- [x] **Bugfix — Release build fails in the deploy tariff gate** `[dev]` *(found 2026-11-18, first `v2.7.2` run)*: `scripts/build_container.py::_run_deploy_tariff_gate` validated `backtesting_scenarios.example.json` against the catalog `tariffs.json`, but the example-config fix `d7903efe` points the example scenarios at `fixed_37ct` / `monthly_sunny` from `tariffs.example.json` (so the example pack loads as a set). The gate now checks the catalog (schema + DACH coverage) and the example set (example scenarios against `tariffs.example.json`) separately. Tests in `tests/test_build_container.py` run the gate on the shipped files, so a red gate shows up in the suite instead of CI. No image or release was published by the failed run; tag `v2.7.2` was moved to the fixed commit (maintainer decision). Picked to `main` on 2026-11-18 (`-x` from `7d685ada`).
+
 ### SUSI P1 follow-up — heat-source fuel prices and CO2 factors refreshed (2026-11-18)
 
 - [x] **SUSI P1 follow-up — refresh heat-source fuel prices before the 2.8 release** `[dev]` *(moved from the SUSI block of Version 2.+1 on 2026-11-11; done 2026-11-18 on `main`, not committed yet)*: `share/config/heat_source_defaults.json` carried the Heizrechner 2022 prices.

@@ -301,3 +301,32 @@ def test_parse_args_target_loxberry():
     args = bc.parse_args(["--target", "loxberry"])
     assert args.target == "loxberry"
     assert bc.resolve_platform(args.target, args.platform) == "linux/arm64"
+
+
+def test_deploy_tariff_gate_passes_on_shipped_files(capsys):
+    """The release build runs this gate; a red gate must show up in the suite, not in CI."""
+    bc._run_deploy_tariff_gate()
+    assert "Deploy-Gate: Tarifkatalog OK." in capsys.readouterr().out
+
+
+def test_deploy_tariff_gate_checks_example_scenarios_against_example_tariffs(
+    tmp_path, monkeypatch
+):
+    share = tmp_path / "share" / "config"
+    share.mkdir(parents=True)
+    src = Path(bc.REPO_ROOT) / "share" / "config"
+    for name in ("tariffs.json", "tariffs.example.json", "tariffs.schema.json"):
+        (share / name).write_bytes((src / name).read_bytes())
+    scenarios = (src / "backtesting_scenarios.example.json").read_text(encoding="utf-8-sig")
+    (share / "backtesting_scenarios.example.json").write_text(
+        scenarios.replace('"fixed_37ct"', '"at_verbund_v_strom_sonneneinspeisung_fix"', 1),
+        encoding="utf-8",
+    )
+    tools_src = Path(bc.REPO_ROOT) / "tools" / "tariff_catalog"
+    tools_dst = tmp_path / "tools" / "tariff_catalog"
+    tools_dst.mkdir(parents=True)
+    for name in ("stromtarife_dach_kombiniert.json", "einspeisetarife_dach_erweitert.json"):
+        (tools_dst / name).write_bytes((tools_src / name).read_bytes())
+    monkeypatch.setattr(bc, "REPO_ROOT", tmp_path)
+    with pytest.raises(ValueError, match="tariffs.example.json.*at_verbund_v_strom_sonneneinspeisung_fix"):
+        bc._run_deploy_tariff_gate()
