@@ -487,8 +487,9 @@ def _max_on_slots_with_limits(
     by_pulses = max_hours * max_pulses
     if day_slots <= max_hours:
         return min(day_slots, by_pulses)
-    # Need ≥1 OFF between pulses; max ON in N slots with run-length ≤ H.
-    gaps_needed = max(0, (day_slots - 1) // (max_hours + 1))
+    # Need ≥1 OFF between pulses; max ON in N slots with run-length ≤ H is
+    # N - N // (H + 1) (every window of H + 1 slots needs one OFF).
+    gaps_needed = day_slots // (max_hours + 1)
     by_consecutive = day_slots - gaps_needed
     return min(day_slots, by_pulses, by_consecutive)
 

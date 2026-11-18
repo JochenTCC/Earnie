@@ -285,6 +285,58 @@ def test_prorate_thermal_day_target_scales_partial_days():
     assert _max_on_slots_with_limits(7, max_hours=4, max_pulses=4) < 7
 
 
+@pytest.mark.parametrize(
+    ("day_slots", "max_hours", "max_pulses", "expected"),
+    [
+        (16, 16, 4, 16),  # fits in one run
+        (17, 16, 4, 16),  # one OFF needed (old bound said 17)
+        (33, 16, 4, 32),
+        (34, 16, 4, 32),  # two OFF needed (old bound said 33)
+        (35, 16, 4, 33),
+        (7, 4, 4, 6),
+        (10, 4, 4, 8),  # ON×4 OFF ON×4 OFF → 8
+        (96, 16, 2, 32),  # pulse cap binds: 2 × 16
+        (0, 16, 4, 0),
+    ],
+)
+def test_max_on_slots_with_limits_matches_run_length_bound(
+    day_slots, max_hours, max_pulses, expected
+):
+    from optimizer.thermal_flex_context import _max_on_slots_with_limits
+
+    assert (
+        _max_on_slots_with_limits(
+            day_slots, max_hours=max_hours, max_pulses=max_pulses
+        )
+        == expected
+    )
+
+
+def test_max_on_slots_with_limits_is_tight_against_milp_constraint():
+    """The bound equals the MILP's max ON count under the max-on rows."""
+    import pulp
+
+    from optimizer.thermal_flex_context import (
+        _max_on_slots_with_limits,
+        add_max_on_duration_constraints,
+    )
+
+    for day_slots, max_hours in [(17, 16), (34, 16), (10, 4), (9, 4)]:
+        prob = pulp.LpProblem("max_on", pulp.LpMaximize)
+        on_vars = [
+            pulp.LpVariable(f"on_{i}", cat="Binary") for i in range(day_slots)
+        ]
+        prob += pulp.lpSum(on_vars)
+        add_max_on_duration_constraints(
+            prob, on_vars, max_hours=max_hours, prefix="t"
+        )
+        prob.solve(pulp.PULP_CBC_CMD(msg=False))
+        best = int(round(pulp.value(prob.objective)))
+        assert best == _max_on_slots_with_limits(
+            day_slots, max_hours=max_hours, max_pulses=day_slots
+        ), (day_slots, max_hours)
+
+
 def test_thermal_milp_cross_midnight_window_is_feasible(monkeypatch):
     """Partial calendar days in a 07:00 window must not make MILP Infeasible."""
     from datetime import timedelta
