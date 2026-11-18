@@ -2,7 +2,7 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
-### SUSI P1 follow-up — heat-source fuel prices refreshed (2026-11-18)
+### SUSI P1 follow-up — heat-source fuel prices and CO2 factors refreshed (2026-11-18)
 
 - [x] **SUSI P1 follow-up — refresh heat-source fuel prices before the 2.8 release** `[dev]` *(moved from the SUSI block of Version 2.+1 on 2026-11-11; done 2026-11-18 on `main`, not committed yet)*: `share/config/heat_source_defaults.json` carried the Heizrechner 2022 prices.
   - **Done:** prices as of `11/2026` (Vorarlberg household prices incl. VAT, delivered): oil 104.8 → 175.0 ct/l, gas 10.43 → 12.11 ct/kWh, pellets 322 → 447.7 EUR/t, district heat 10.5 → 11.6 ct/kWh, firewood 50 → 133 EUR/rm. Source note per value in the file's `sources.fuel_price`.
@@ -10,7 +10,8 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
   - **Firewood:** the Energieinstitut uses 155 EUR/rm at 2,100 kWh/rm (7.38 ct/kWh); the file keeps SUSI's 1,800 kWh/rm, so the price is converted to the same cost per kWh (133 EUR/rm).
   - **Docs:** table and source paragraph in `docs/konfiguration/flexible-verbraucher.md`; release-notes draft `v2.8.0-susi-p1.draft.md` (the "Stand 2022" warning and its REVIEW comment replaced by the new prices).
   - **Tests:** expectations in `tests/test_heat_source.py` and a comment in `tests/test_savings_ledger_heating_rod.py` follow the new gas, oil and pellet prices; all 58 test files that mention `fuel` or `heat_source` pass (1048 tests). No regression case uses a fuel heat source.
-  - **Open:** the CO2 factors stay from Hexit; the Energieinstitut 2026 table lists other values (e.g. oil and gas 271, pellets and wood 9 g/kWh) — not changed here.
+  - **CO2 factors (2026-11-18, maintainer):** from the same Energieinstitut table (2026-11-16, g CO2 per kWh of final energy): oil 344 → 271, gas 249 → 271, pellets 26 → 9, firewood 25 → 9, electricity 226 → 156 (Strom Hoch-/Niedertarif; the table's 52 g/kWh for the heat pump is 156 / JAZ 3). District heat is not in the table and keeps Hexit's 42. Source note in `sources.co2_g_per_kwh`, table and source sentence in `flexible-verbraucher.md`.
+  - **Firewood decision (2026-11-18, maintainer):** the conversion to 1,800 kWh/rm stays.
 
 ### Bugfix — SE single-window re-simulation showed one constant price (2026-11-18)
 

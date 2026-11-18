@@ -4,10 +4,10 @@
     "efficiency": "Heat pumps luft / erde: Earnie defaults before SUSI P1 (unchanged); grundwasser and boilers: SUSI hinterlegteWerte.json, new device (Energieinstitut Vorarlberg); electric_direct: Heizrechner v5.0 Stromheizung.",
     "energy_content": "SUSI hinterlegteWerte.json (oil 10 kWh/l, pellets 4,900 kWh/t, wood 1,800 kWh/rm).",
     "fuel_price": "Energieinstitut Vorarlberg, Brennstoffe im Vergleich 2026 (energieinstitut.at, table of 2026-11-16; Vorarlberg household prices incl. VAT, delivered): oil 1.750 EUR/l (annual average Vorarlberg), gas 12.11 ct/kWh (VKW, current), pellets 447.73 EUR/t (proPellets Austria, 6 t, 2026-11-01, without blow-in fee). Wood: same table, 7.38 ct/kWh (155 EUR/rm at 2,100 kWh/rm, LK Vorarlberg Ofenholz exchange), converted to 1,800 kWh/rm of this file = 133 EUR/rm. District heat: not in that table; median of the 2026 vkw local heat tariff sheets, gross energy price (Arbeitspreis) of the middle tier per network: Hard 10.16, Latschau 10.96, Sulz 12.34, Schetteregg 13.75 ct/kWh (all tiers 10.0-14.5); base and metering price not included.",
-    "co2_g_per_kwh": "Hexit / Replace data.js (Energieinstitut Vorarlberg); wood: Heizrechner v5.0 Stückholz."
+    "co2_g_per_kwh": "Energieinstitut Vorarlberg, Brennstoffe im Vergleich 2026 (energieinstitut.at, table of 2026-11-16, g CO2 per kWh of final energy): oil 271, gas 271, pellets 9, wood 9 (Stückholz), electricity 156 (Strom Hoch-/Niedertarif). District heat: not in that table, Hexit / Replace data.js (Energieinstitut Vorarlberg) 42."
   },
   "fuel_price_as_of": "11/2026",
-  "electricity_co2_g_per_kwh": 226,
+  "electricity_co2_g_per_kwh": 156,
   "heat_pump_types": {
     "luft": {"efficiency": 3.5},
     "erde": {"efficiency": 4.3},
@@ -22,7 +22,7 @@
       "fuel_unit": "ct_per_liter",
       "kwh_per_unit": 10.0,
       "fuel_price": 175.0,
-      "co2_g_per_kwh": 344
+      "co2_g_per_kwh": 271
     },
     "gas": {
       "electric": false,
@@ -30,7 +30,7 @@
       "fuel_unit": "ct_per_kwh",
       "kwh_per_unit": 1.0,
       "fuel_price": 12.11,
-      "co2_g_per_kwh": 249
+      "co2_g_per_kwh": 271
     },
     "pellets": {
       "electric": false,
@@ -38,7 +38,7 @@
       "fuel_unit": "eur_per_ton",
       "kwh_per_unit": 4900.0,
       "fuel_price": 447.7,
-      "co2_g_per_kwh": 26
+      "co2_g_per_kwh": 9
     },
     "district_heat": {
       "electric": false,
@@ -54,7 +54,7 @@
       "fuel_unit": "eur_per_rm",
       "kwh_per_unit": 1800.0,
       "fuel_price": 133.0,
-      "co2_g_per_kwh": 25
+      "co2_g_per_kwh": 9
     }
   }
 }

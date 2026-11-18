@@ -264,15 +264,15 @@ Jedes Heizsystem hat eine Hauptwärmequelle `heat_source` (Pflicht). Im Hauskonf
 
 | Wärmequelle | JAZ / Nutzungsgrad | Energieinhalt | Standardpreis | CO2 (g/kWh) |
 | ----------- | ------------------ | ------------- | ------------- | ----------- |
-| Wärmepumpe Luft / Erde / Grundwasser | 3,5 / 4,3 / 4,2 | – | Stromtarif | 226 (Strom) |
-| Stromheizung | 0,99 | – | Stromtarif | 226 (Strom) |
-| Öl | 0,90 | 10 kWh/l | 175 ct/l | 344 |
-| Gas | 0,95 | 1 kWh/kWh | 12,11 ct/kWh | 249 |
-| Pellets | 0,85 | 4.900 kWh/t | 447,7 €/t | 26 |
+| Wärmepumpe Luft / Erde / Grundwasser | 3,5 / 4,3 / 4,2 | – | Stromtarif | 156 (Strom) |
+| Stromheizung | 0,99 | – | Stromtarif | 156 (Strom) |
+| Öl | 0,90 | 10 kWh/l | 175 ct/l | 271 |
+| Gas | 0,95 | 1 kWh/kWh | 12,11 ct/kWh | 271 |
+| Pellets | 0,85 | 4.900 kWh/t | 447,7 €/t | 9 |
 | Fernwärme | 0,95 | 1 kWh/kWh | 11,6 ct/kWh | 42 |
-| Stückholz | 0,80 | 1.800 kWh/rm | 133 €/rm | 25 |
+| Stückholz | 0,80 | 1.800 kWh/rm | 133 €/rm | 9 |
 
-Quellen: Nutzungsgrade und Energieinhalte aus SUSI, CO2-Faktoren aus Hexit (beide Energieinstitut Vorarlberg). Die Brennstoffpreise sind Stand November 2026, Haushaltspreise in Vorarlberg inkl. MwSt. und Zustellung:
+Quellen: Nutzungsgrade und Energieinhalte aus SUSI (Energieinstitut Vorarlberg). Die CO2-Faktoren stammen aus der Tabelle „Brennstoffe im Vergleich 2026“ des Energieinstituts Vorarlberg (Stand 16.11.2026, g CO2 je kWh Endenergie); Fernwärme steht dort nicht und kommt weiter aus Hexit (ebenfalls Energieinstitut Vorarlberg). Die Brennstoffpreise sind Stand November 2026, Haushaltspreise in Vorarlberg inkl. MwSt. und Zustellung:
 
 - **Öl, Gas, Pellets, Stückholz:** Tabelle „Brennstoffe im Vergleich 2026“ des Energieinstituts Vorarlberg (Stand 16.11.2026). Öl ist der Jahresdurchschnitt Vorarlberg, Gas der aktuelle Preis der VKW, Pellets der Preis von proPellets Austria für 6 t ohne Einblaspauschale.
 - **Stückholz:** Das Energieinstitut rechnet mit 155 €/rm bei 2.100 kWh/rm, also 7,38 ct/kWh. Earnie rechnet wie SUSI mit 1.800 kWh/rm; der Standardpreis ist deshalb auf denselben Preis je kWh umgerechnet (133 €/rm).

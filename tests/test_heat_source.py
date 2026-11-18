@@ -511,7 +511,7 @@ def test_heat_fuel_for_result_subtracts_rod_heat(monkeypatch):
     assert block["fuel_kwh"] == pytest.approx(expected_fuel, abs=0.05)
     assert block["fuel_eur"] == pytest.approx(expected_fuel * 0.1211, abs=0.01)
     assert block["import_kwh"] == pytest.approx(48.0)
-    assert block["co2_kg"] == pytest.approx((48.0 * 226 + expected_fuel * 249) / 1000, abs=0.1)
+    assert block["co2_kg"] == pytest.approx((48.0 * 156 + expected_fuel * 271) / 1000, abs=0.1)
     assert block["carriers"] == ["gas"]
     assert block["heating_systems"] == {"wp_heating": "gas_rod"}
     assert block["rod_kwh"] == pytest.approx(4.0)
@@ -525,7 +525,7 @@ def test_heat_fuel_without_profile_has_only_electricity():
     )
     block = heat_fuel_for_result(df, None)
     assert block["fuel_kwh"] == 0.0
-    assert block["co2_kg"] == pytest.approx(4 * 226 / 1000, abs=0.1)
+    assert block["co2_kg"] == pytest.approx(4 * 156 / 1000, abs=0.1)
 
 
 def test_annual_cost_rows_add_fuel_to_jahres_kosten():
