@@ -550,6 +550,11 @@ def add_thermal_flex_constraints(
 ) -> None:
     """Tages-Lieferung, max. Pulsdauer und max. Pulse/Tag für thermal_annual."""
     continue_on = consumer_continue_on or {}
+
+    def running_day(consumer_id: str) -> date | None:
+        # Already running = ON before the plan's first slot: exempts only that day's first block.
+        return matrix[0]["date"] if continue_on.get(consumer_id, False) and matrix else None
+
     rods = [c for c in model.planned_consumers if is_heating_rod_consumer(c)]
     covered: dict[str, set[int]] = {str(rod["id"]): set() for rod in rods}
     for consumer in model.planned_consumers:
@@ -564,7 +569,7 @@ def add_thermal_flex_constraints(
                 schedule_indices,
                 consumer,
                 ctx,
-                continuing=bool(continue_on.get(consumer["id"], False)),
+                running_day=running_day(consumer["id"]),
                 rods=parent_rods,
                 rod_covered=covered,
             )
@@ -575,7 +580,7 @@ def add_thermal_flex_constraints(
             schedule_indices,
             consumer,
             ctx,
-            continuing=bool(continue_on.get(consumer["id"], False)),
+            running_day=running_day(consumer["id"]),
             rods=parent_rods,
             rod_covered=covered,
         )
@@ -606,7 +611,7 @@ def add_thermal_flex_constraints(
                 matrix,
                 rod,
                 covered[str(rod["id"])],
-                continuing=bool(continue_on.get(rod["id"], False)),
+                running_day=running_day(rod["id"]),
             )
 
 
@@ -783,7 +788,7 @@ def _add_live_store_consumer(
     consumer: dict,
     ctx: dict,
     *,
-    continuing: bool,
+    running_day: date | None,
     rods: list[dict],
     rod_covered: dict[str, set[int]],
 ) -> None:
@@ -815,7 +820,7 @@ def _add_live_store_consumer(
             day_indices,
             max_pulses=max_pulses,
             prefix=f"{cid}_{day.isoformat()}",
-            continuing=continuing,
+            continuing=running_day is not None and day == running_day,
         )
     book = list(range(min(schedule_indices), max(schedule_indices) + 1))
     store = live_store_level_model(matrix, plan, float(model.dt_h))
@@ -865,7 +870,7 @@ def _add_live_rod_pulse_limit(
     rod: dict,
     covered: set[int],
     *,
-    continuing: bool,
+    running_day: date | None,
 ) -> None:
     """A real rod hangs on a relay: no 15-minute flicker (SE keeps its goldens unchanged)."""
     for day in sorted({matrix[index].get("date") for index in covered}):
@@ -875,7 +880,7 @@ def _add_live_rod_pulse_limit(
             [index for index in _indices_for_date(matrix, day) if index in covered],
             max_pulses=_max_pulses_per_day(rod),
             prefix=f"{rod['id']}_{day.isoformat()}",
-            continuing=continuing,
+            continuing=running_day is not None and day == running_day,
         )
 
 
@@ -922,7 +927,7 @@ def _add_one_thermal_flex_consumer(
     consumer: dict,
     ctx: dict,
     *,
-    continuing: bool,
+    running_day: date | None,
     rods: list[dict] | None = None,
     rod_covered: dict[str, set[int]] | None = None,
 ) -> dict[date, float]:
@@ -983,7 +988,7 @@ def _add_one_thermal_flex_consumer(
                 day_indices,
                 max_pulses=max_pulses,
                 prefix=f"{cid}_{day.isoformat()}",
-                continuing=continuing,
+                continuing=running_day is not None and day == running_day,
             )
         delivered = _delivery_energy_expr(model, consumer, day_indices)
         for rod in rods:
