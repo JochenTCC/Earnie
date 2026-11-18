@@ -150,12 +150,18 @@ def build_chart_section(
     live_power: dict[str, Any] | None,
     session_meta: dict[str, Any] | None,
     chart1_plotly_json: str | None,
+    live_power_capture: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Chart payload nested under manifest['chart'] (schema v3)."""
+    """Chart payload nested under manifest['chart'] (schema v3).
+
+    ``live_power_capture``: read source/backend/error and push state per power
+    signal (``integrations.live_power_capture``); ``None`` when not captured.
+    """
     return _json_safe(
         {
             "live_soc_percent": current_soc,
             "live_power": live_power,
+            "live_power_capture": live_power_capture,
             "session_meta": session_meta or {},
             "chart_header_label": bundle.chart_header_label,
             "history_slot_count": bundle.history_slot_count,

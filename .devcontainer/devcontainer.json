@@ -8,7 +8,6 @@
     "EARNIE_ENV_PATH": "earnie_env",
     "EARNIE_UI_STREAMLIT_PORT": "8531",
     "EARNIE_AUTO_START_MAIN": "0",
-    "EARNIE_UI_CHART_DEBUG_CAPTURE_ENABLED": "1",
     "EARNIE_VERIFY_LOXONE_ON_START": "0",
     "PYTHONUTF8": "1",
     "TZ": "Europe/Vienna"

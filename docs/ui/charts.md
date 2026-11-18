@@ -7,7 +7,7 @@ Diese Seite beschreibt Charts und Panels der Seite **Monitor** (Sunset-2-Sunset;
 | Bereich | Inhalt |
 |---------|--------|
 | Kopf | Seitentitel mit **?** (Geltungsbereich des Modus: Sunset-2-Sunset bzw. Szenario-Explorer) |
-| Sidebar | Hinweise zu Env und Setup, Fortschritt der Ersteinrichtung, **Konfiguration speichern / laden** (ZIP); unten **Info / About** (Banner, Version, Kontakt). PV- und Batterie-Parameter liegen im **Szenarienkonfigurator** bzw. Hauskonfigurator, nicht in der Sidebar. |
+| Sidebar | Hinweise zu Env und Setup, Fortschritt der Ersteinrichtung, **Sichern & Übertragen** (Konfigurations-ZIP, Support-Paket); unten **Info / About** (Banner, Version, Kontakt). PV- und Batterie-Parameter liegen im **Szenarienkonfigurator** bzw. Hauskonfigurator, nicht in der Sidebar. |
 | Menü | `st.navigation` mit den Abschnitten Live-Cockpit, Konfiguration, Daemon Control |
 | Charts | Reihenfolge: Chart 1 → Navigation ←/→ → Sankey → Chart 2 → Simulations-Tabelle → Energievergleich (Expander) |
 | Sankey | Live-Energiefluss unter Chart 1 (nach der Navigation). Anlagenwerte (Plant) kommen über das EHAL-Backend; Flex und EV-SoC siehe [Energiefluss](#energiefluss-live-sankey). |

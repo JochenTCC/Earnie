@@ -121,8 +121,11 @@ def fetch_live_consumption_snapshot(
 ) -> dict[str, Any] | None:
     """
     Aktueller Verbrauchs-Snapshot: Haus gesamt, Grundlast, Flex je id, PV/Netz/Batterie.
+
+    PV/Netz/Batterie aus ``ehal_live.read_live_power_kw`` (EHAL-Adapter, wie das
+    Live-Sankey); ``None``, wenn der EHAL-Read fehlschlägt (geloggt).
     """
-    live_power = ehal_live.fetch_live_power()
+    live_power = ehal_live.read_live_power_kw()
     if live_power is None:
         return None
     flex_kw = fetch_live_flex_kw_for_ui(main_state)

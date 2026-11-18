@@ -2,6 +2,14 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Support package picked to 2.7.2 (2026-11-18)
+
+- [x] **Pick the always-on support package to `release/2.7`** `[feat]` *(decided 2026-11-18)* — a tester on the HA add-on could not switch on the Debug-Dump button: the bootstrapped `runtime/local_settings.json` carries `chart_debug_capture_enabled: false` and overrides `config.json`, and the add-on reads `.env` from `/data/earnie_env/config/` instead of `/config/` (both unreachable via Samba). Instead of fixing the switch, the main-line support package replaces it.
+  - Picked from `main`: `05ca91b7` (Sankey live power in debug dumps, `integrations/live_power_capture.py`) and `c63c9f8f` (sidebar "Sichern & Übertragen", `ui/support_package.py`, contact ZIP moved there).
+  - 2.7 adaptation (data model 4): no `dm6.debug_dump_flag_removal` step; `ui.chart_debug_capture_enabled` stays in the schema as obsolete and a leftover key in `config.json` only warns once (`settings/system_settings.py::reject_removed_debug_dump_flag`), like `local_settings.json` and the env var. Migration goldens and registry unchanged; main-only runtime files (`capacity_peaks*`, `import_cap_report.json`) left out of `_OPTIONAL_RUNTIME`.
+  - Docs: `docs/einrichtung/betrieb.md` § Support-Paket; release-notes draft `.github/release-notes/drafts/v2.7.2-support-package.draft.md`.
+  - Open on main (tracker): `.env` path in the HA add-on, kWp plausibility check.
+
 ### 2.7.0 official release (2026-11-02)
 
 - [x] **2.7.0 official release** `[dev]`: `version.py` **2.7.0** and release notes [`.github/release-notes/v2.7.0.md`](../.github/release-notes/v2.7.0.md) (baseline public 2.6.2, maintainer-approved; `UNRELEASED.md` reset; doc review checklist moved to `docs/dev/done/doc-review-checklist-2.7.0.md`) in `fcab2d7d` on `release/2.7`; full suite and regression 12/12 green before the tag. Candidate tag `v2.7.0` (`targets: both`).

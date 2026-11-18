@@ -84,7 +84,7 @@ def test_fetch_live_consumption_snapshot_uses_ui_flex_resolution():
         "grid": -3.1,
         "battery": -0.03,
     }
-    with patch.object(lc.ehal_live, "fetch_live_power", return_value=live_power):
+    with patch.object(lc.ehal_live, "read_live_power_kw", return_value=live_power):
         with patch.object(
             lc,
             "fetch_live_flex_kw_for_ui",
@@ -97,6 +97,16 @@ def test_fetch_live_consumption_snapshot_uses_ui_flex_resolution():
     assert snapshot["flex_kw"]["pool_filter"] == 0.18
     assert snapshot["flex_kw"]["swimspa"] == 0.0
     assert snapshot["baseload_kw"] == 0.32
+
+
+def test_fetch_live_consumption_snapshot_reads_sankey_path_not_legacy_loxone():
+    with patch.object(
+        lc.ehal_live,
+        "fetch_live_power",
+        side_effect=AssertionError("legacy Loxone path must not be used"),
+    ):
+        with patch.object(lc.ehal_live, "read_live_power_kw", return_value=None):
+            assert lc.fetch_live_consumption_snapshot({}) is None
 
 
 def test_apply_live_snapshot_maps_runtime_flex_to_canonical_ids():

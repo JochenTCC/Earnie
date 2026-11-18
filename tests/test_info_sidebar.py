@@ -1,16 +1,12 @@
 """Tests for sidebar Info contact helpers."""
 from __future__ import annotations
 
-import io
-import zipfile
-from types import SimpleNamespace
 from urllib.parse import parse_qs, unquote, urlparse
 
 from ui.github_issue_url import build_github_issue_url
 from ui.info_sidebar import (
     MANUAL_URL,
     SUPPORT_EMAIL,
-    build_contact_bundle_bytes,
     build_mailto_url,
 )
 from ui.truth_banner import OFFICIAL_REPO_URL, SITE_URL
@@ -46,19 +42,3 @@ def test_build_github_issue_url_used_for_kontakt():
     assert "/issues/new" in url
     qs = parse_qs(urlparse(url).query)
     assert "question" in unquote(qs["labels"][0])
-
-
-def test_build_contact_bundle_includes_pack_and_attachments():
-    attachment = SimpleNamespace(
-        name="notiz.txt",
-        getvalue=lambda: b"hello",
-    )
-    payload = build_contact_bundle_bytes(
-        [attachment],
-        config_pack=b"PK\x03\x04fake",
-    )
-    with zipfile.ZipFile(io.BytesIO(payload), "r") as archive:
-        names = set(archive.namelist())
-        assert "earnie_config_pack.zip" in names
-        assert "anhänge/notiz.txt" in names
-        assert archive.read("anhänge/notiz.txt") == b"hello"

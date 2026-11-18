@@ -320,21 +320,32 @@ def get_adapter() -> _EhalNetworkAdapter:
 
 
 
+LIVE_POWER_READ_ERRORS: tuple[type[BaseException], ...] = (
+    OpenemsHttpError,
+    HaHttpError,
+    LoxoneAdapterError,
+    ValueError,
+    OSError,
+)
+
+
 def read_live_power_kw() -> dict[str, float] | None:
-    """Return Live power dict (kW): grid ``+`` = import, battery ``+`` = discharge."""
+    """Return Live power dict (kW): grid ``+`` = import, battery ``+`` = discharge.
+
+    ``None`` when the EHAL read fails (logged); ``read_live_power_kw_strict`` raises.
+    """
     try:
-        telemetry = prepare_live_telemetry(get_adapter().read_telemetry())
-    except (
-        OpenemsHttpError,
-        HaHttpError,
-        LoxoneAdapterError,
-        ValueError,
-        OSError,
-    ) as exc:
+        return read_live_power_kw_strict()
+    except LIVE_POWER_READ_ERRORS as exc:
         logger.error("EHAL live power read failed: %s", exc)
         return None
 
-    pv = max(0.0, plant_pv_ac_w_live(telemetry) / 1000.0)
+
+def read_live_power_kw_strict() -> dict[str, float]:
+    """Live power dict (kW) from the EHAL adapter; raises ``LIVE_POWER_READ_ERRORS``."""
+    telemetry = prepare_live_telemetry(get_adapter().read_telemetry())
+
+    pv =max(0.0, plant_pv_ac_w_live(telemetry) / 1000.0)
     grid = float(telemetry["sens_grid_power_active"]) / 1000.0
     ess_w = telemetry.get("sens_ess_power")
     if ess_w is None:
