@@ -522,18 +522,40 @@ _OMIT_EXPORT_CAP = object()
 
 
 def _battery_max_powers_kw(battery_params: dict) -> tuple[float, float]:
-    """(max charge kW, max discharge kW) from battery params; ``max_power_kw`` as shared cap."""
-    max_charge = float(
-        battery_params.get("max_charge_power_kw")
-        or battery_params.get("max_power_kw")
-        or 0.0
-    )
-    max_discharge = float(
-        battery_params.get("max_discharge_power_kw")
-        or battery_params.get("max_power_kw")
-        or 0.0
-    )
-    return max_charge, max_discharge
+    """(max charge kW, max discharge kW) from battery params.
+
+    An explicit value wins, also 0 (charge/discharge disabled or derated to 0 by the
+    live limits). ``max_power_kw`` is only the shared cap when a direction is not set.
+    A battery without any max power raises: publishing 0/0 would block the battery.
+    """
+    shared = battery_params.get("max_power_kw")
+
+    def _pick(key: str) -> float:
+        value = battery_params.get(key)
+        if value is None:
+            value = shared
+        if value is None:
+            raise ValueError(
+                f"ESS C1: battery {battery_params.get('id') or '?'!s} has no {key} "
+                "and no max_power_kw — refusing to publish a power limit"
+            )
+        return float(value)
+
+    return _pick("max_charge_power_kw"), _pick("max_discharge_power_kw")
+
+
+def _ess_battery_params(battery_params: dict | None, source) -> dict:
+    """Battery params for the ESS C1 setpoints.
+
+    ``battery_params`` are the effective params the plan used (live ``get_ess_max_*``
+    applied, ``settings.ess_limits_resolve``). ``None`` means no telemetry is at hand
+    (startup safe push, watchdog rebuild without ``loxone_sent``): the house config
+    limits are used, and the log says so.
+    """
+    if battery_params is not None:
+        return battery_params
+    logger.info("ESS C1: Grenzen aus der Hauskonfiguration (keine Live-Limits übergeben)")
+    return source.get_battery_params()
 
 
 def ess_c1_kind_values(
@@ -629,9 +651,14 @@ def build_sent_loxone_snapshot(
     *,
     export_cap_kw: float | None | object = _OMIT_EXPORT_CAP,
     automatik_discharge_cap_kw: float | None = None,
+    battery_params: dict | None = None,
 ) -> dict[str, float]:
-    """Alle an Loxone gesendeten Steuerwerte: Merkername → Zahl."""
-    battery_params = config.get_battery_params()
+    """Alle an Loxone gesendeten Steuerwerte: Merkername → Zahl.
+
+    ``battery_params``: same effective params as ``send_huawei_modbus_states`` got in
+    this cycle, so the ledger matches what was sent (see ``_ess_battery_params``).
+    """
+    battery_params = _ess_battery_params(battery_params, config)
     contexts = charging_contexts or {}
     snapshot: dict[str, float] = {}
 
@@ -707,11 +734,16 @@ def send_huawei_modbus_states(
     *,
     export_cap_kw: float | None | object = _OMIT_EXPORT_CAP,
     automatik_discharge_cap_kw: float | None = None,
+    battery_params: dict | None = None,
 ) -> list[LoxoneWriteRecord]:
-    """Übersetzt Optimierungsmodi und schreibt ESS-Steuerwerte (Design C1) an Loxone."""
+    """Übersetzt Optimierungsmodi und schreibt ESS-Steuerwerte (Design C1) an Loxone.
+
+    ``battery_params``: the effective params the plan used (live limits applied);
+    ``None`` uses the house config limits (see ``_ess_battery_params``).
+    """
     from integrations import loxone_client as lc
 
-    battery_params = lc.config.get_battery_params()
+    battery_params = _ess_battery_params(battery_params, lc.config)
     kind_values = ess_c1_kind_values(
         mode,
         target_power_kw,

@@ -179,6 +179,7 @@ def write_huawei_modbus_states(
     *,
     export_cap_kw: float | None | object = OMIT_EXPORT_CAP,
     automatik_discharge_cap_kw: float | None = None,
+    battery_params: dict | None = None,
 ) -> list[LoxoneWriteRecord]:
     from integrations.loxone_writes import send_huawei_modbus_states
 
@@ -188,6 +189,7 @@ def write_huawei_modbus_states(
         target_soc,
         export_cap_kw=export_cap_kw,
         automatik_discharge_cap_kw=automatik_discharge_cap_kw,
+        battery_params=battery_params,
     )
 
 
@@ -201,6 +203,7 @@ def build_sent_loxone_snapshot(
     *,
     export_cap_kw: float | None | object = OMIT_EXPORT_CAP,
     automatik_discharge_cap_kw: float | None = None,
+    battery_params: dict | None = None,
 ) -> dict[str, float]:
     from integrations.loxone_writes import build_sent_loxone_snapshot as _impl
 
@@ -213,6 +216,7 @@ def build_sent_loxone_snapshot(
         consumer_pv_follow,
         export_cap_kw=export_cap_kw,
         automatik_discharge_cap_kw=automatik_discharge_cap_kw,
+        battery_params=battery_params,
     )
 
 

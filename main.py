@@ -907,6 +907,10 @@ def _main_cycle(
                 target_soc,
                 export_cap_kw=export_cap,
                 automatik_discharge_cap_kw=automatik_discharge_cap,
+                # Same live limits the plan used (primary battery, before reserves).
+                battery_params=apply_effective_ess_limits(
+                    config.get_battery_params(), telemetry=telemetry_for_export
+                ),
             )
             logger.info("📤 Sende flexible Verbraucher-Sollwerte an Loxone...")
             flex_writes = ehal_live.write_flexible_consumer_states(
@@ -963,6 +967,9 @@ def _main_cycle(
             consumer_pv_follow,
             export_cap_kw=export_cap,
             automatik_discharge_cap_kw=automatik_discharge_cap,
+            battery_params=apply_effective_ess_limits(
+                config.get_battery_params(), telemetry=telemetry_for_export
+            ),
         )
         loxone_sent.update(
             planned_powerstation_loxone_sent(phys_charge, standby_sources)
