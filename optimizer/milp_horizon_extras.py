@@ -124,19 +124,51 @@ def _add_virtual_reserve_charge_in_slots(
     efficiency: float,
     slots: list[int] | None,
 ) -> None:
-    """Primary ESS charge of the refill inside ``slots``; ``None`` = as soon as possible."""
+    """Primary ESS charge of the refill inside ``slots``; ``None`` = as soon as possible.
+
+    When ``slots`` cannot deliver the refill at ``max_charge_kw``, the window charges what it
+    can and the rest is required in the slots right after it (as soon as possible, decided
+    2026-11-18), with a warning. Only an amount beyond the horizon end stays unplanned (warning;
+    the next re-plan carries it). The requirement is never lowered silently.
+    """
     if refill_kwh <= 1e-9 or max_charge_kw <= 1e-9 or model.horizon < 1:
         return
     eta = float(efficiency) if efficiency > 1e-9 else 1.0
     ac_kwh_needed = refill_kwh / eta
     eligible = slots if slots is not None else _asap_slots(model, ac_kwh_needed, max_charge_kw)
-    deliverable = max_charge_kw * model.dt_h * len(eligible)
-    required = min(ac_kwh_needed, deliverable)
-    if required <= 1e-9:
+    per_slot = max_charge_kw * model.dt_h
+    deliverable = per_slot * len(eligible)
+    if ac_kwh_needed <= deliverable + 1e-9:
+        model.prob += (
+            pulp.lpSum(model.p_charge[t] * model.dt_h for t in eligible) >= ac_kwh_needed
+        ), "virtual_reserve_deadline_charge"
         return
-    model.prob += (
-        pulp.lpSum(model.p_charge[t] * model.dt_h for t in eligible) >= required
-    ), "virtual_reserve_deadline_charge"
+    if deliverable > 1e-9:
+        model.prob += (
+            pulp.lpSum(model.p_charge[t] * model.dt_h for t in eligible) >= deliverable
+        ), "virtual_reserve_deadline_charge"
+    shortfall = ac_kwh_needed - deliverable
+    first_after = max(eligible) + 1 if eligible else 0
+    after_count = math.ceil(shortfall / per_slot - 1e-9)
+    after = list(range(first_after, min(model.horizon, first_after + after_count)))
+    plannable = min(ac_kwh_needed, deliverable + per_slot * len(after))
+    beyond_horizon = ac_kwh_needed - plannable
+    if after:
+        model.prob += (
+            pulp.lpSum(model.p_charge[t] * model.dt_h for t in [*eligible, *after]) >= plannable
+        ), "virtual_reserve_after_deadline_charge"
+    logger.warning(
+        "Virtuelle Reserve: Nachlade-Fenster (%d Slots, %.3f kW) schafft nur %.3f von "
+        "%.3f kWh AC – Rest %.3f kWh in %d Slots direkt danach, %.3f kWh jenseits des "
+        "Planungshorizonts.",
+        len(eligible),
+        float(max_charge_kw),
+        deliverable,
+        ac_kwh_needed,
+        shortfall - beyond_horizon,
+        len(after),
+        beyond_horizon,
+    )
 
 
 def _add_virtual_reserve_deadline_charge(
