@@ -536,6 +536,66 @@ def _battery_max_powers_kw(battery_params: dict) -> tuple[float, float]:
     return max_charge, max_discharge
 
 
+def ess_c1_kind_values(
+    mode: int,
+    target_power_kw: float,
+    target_soc: float,
+    battery_params: dict,
+    *,
+    automatik_discharge_cap_kw: float | None = None,
+) -> tuple[tuple[str, float | None], ...]:
+    """ESS C1 setpoints (kind, value) Earnie sends for this battery control level.
+
+    Single source for the live send path (``send_huawei_modbus_states``) and the
+    ``loxone_sent`` ledger (``build_sent_loxone_snapshot``), so both stay identical:
+
+    - ``read_only``: no ESS setpoint at all (empty tuple).
+    - ``limits_only``: forced charge/discharge (modes 1/3) fall back to Automatik
+      (mode 0, power 0) and no active power setpoint is forced (``None``); the target
+      SoC is computed for the reduced mode.
+    - ``full``: the optimizer mode as mapped by ``map_ess_setpoints``.
+
+    ``None`` as value means "no forced setpoint" (callers send 0 on a wired active
+    power binding and skip the other kinds).
+    """
+    from house_config.battery_control import (
+        BATTERY_CONTROL_LIMITS_ONLY,
+        BATTERY_CONTROL_READ_ONLY,
+        control_from_battery_params,
+    )
+
+    control = control_from_battery_params(battery_params)
+    if control == BATTERY_CONTROL_READ_ONLY:
+        return ()
+
+    max_charge, max_discharge = _battery_max_powers_kw(battery_params)
+    if control == BATTERY_CONTROL_LIMITS_ONLY and mode in (1, 3):
+        mode = 0
+        target_power_kw = 0.0
+    active_kw, charge_kw, discharge_kw, control_cmd = map_ess_setpoints(
+        mode,
+        target_power_kw,
+        max_charge,
+        max_discharge,
+        automatik_discharge_cap_kw=automatik_discharge_cap_kw,
+    )
+    if control == BATTERY_CONTROL_LIMITS_ONLY:
+        active_kw = None
+    target_soc_pct = ess_target_soc_percent(
+        target_soc,
+        mode=mode,
+        target_power_kw=target_power_kw,
+        battery_params=battery_params,
+    )
+    return (
+        ("set_ess_active_power", active_kw),
+        ("set_ess_charge_power_limit", charge_kw),
+        ("set_ess_discharge_power_limit", discharge_kw),
+        ("set_ess_mode", float(control_cmd)),
+        ("set_ess_target_soc", target_soc_pct),
+    )
+
+
 def _export_cap_marker_and_value(
     export_cap_kw: float | None | object,
 ) -> tuple[str, float] | None:
@@ -572,14 +632,6 @@ def build_sent_loxone_snapshot(
 ) -> dict[str, float]:
     """Alle an Loxone gesendeten Steuerwerte: Merkername → Zahl."""
     battery_params = config.get_battery_params()
-    max_charge, max_discharge = _battery_max_powers_kw(battery_params)
-    active_kw, charge_kw, discharge_kw, control_cmd = map_ess_setpoints(
-        mode,
-        target_power_kw,
-        max_charge,
-        max_discharge,
-        automatik_discharge_cap_kw=automatik_discharge_cap_kw,
-    )
     contexts = charging_contexts or {}
     snapshot: dict[str, float] = {}
 
@@ -587,21 +639,14 @@ def build_sent_loxone_snapshot(
     from integrations.ehal_debug_mapping import has_mappable_live_batteries
 
     has_batteries = bool(has_mappable_live_batteries())
-    for kind, value in (
-        ("set_ess_active_power", active_kw),
-        ("set_ess_charge_power_limit", charge_kw),
-        ("set_ess_discharge_power_limit", discharge_kw),
-        ("set_ess_mode", float(control_cmd)),
-        (
-            "set_ess_target_soc",
-            ess_target_soc_percent(
-                target_soc,
-                mode=mode,
-                target_power_kw=target_power_kw,
-                battery_params=battery_params,
-            ),
-        ),
-    ):
+    kind_values = ess_c1_kind_values(
+        mode,
+        target_power_kw,
+        target_soc,
+        battery_params,
+        automatik_discharge_cap_kw=automatik_discharge_cap_kw,
+    )
+    for kind, value in kind_values:
         wired = resolve_primary_ess_binding(kind)
         if not wired:
             continue
@@ -616,7 +661,9 @@ def build_sent_loxone_snapshot(
         ) or wired
         snapshot[key] = send_value
 
-    if export_cap_kw is not _OMIT_EXPORT_CAP:
+    # Same gate as send_huawei_modbus_states: read_only (no ESS values) sends no
+    # export cap either, so the ledger must not expect one.
+    if kind_values and export_cap_kw is not _OMIT_EXPORT_CAP:
         export = _export_cap_marker_and_value(export_cap_kw)
         if export is not None:
             snapshot[export[0]] = export[1]
@@ -662,57 +709,31 @@ def send_huawei_modbus_states(
     automatik_discharge_cap_kw: float | None = None,
 ) -> list[LoxoneWriteRecord]:
     """Übersetzt Optimierungsmodi und schreibt ESS-Steuerwerte (Design C1) an Loxone."""
-    from house_config.battery_control import (
-        BATTERY_CONTROL_LIMITS_ONLY,
-        BATTERY_CONTROL_READ_ONLY,
-        control_from_battery_params,
-    )
     from integrations import loxone_client as lc
 
     battery_params = lc.config.get_battery_params()
-    control = control_from_battery_params(battery_params)
-    if control == BATTERY_CONTROL_READ_ONLY:
-        return []
-
-    max_charge, max_discharge = _battery_max_powers_kw(battery_params)
-    if control == BATTERY_CONTROL_LIMITS_ONLY and mode in (1, 3):
-        mode = 0
-        target_power_kw = 0.0
-    active_kw, charge_kw, discharge_kw, control_cmd = map_ess_setpoints(
+    kind_values = ess_c1_kind_values(
         mode,
         target_power_kw,
-        max_charge,
-        max_discharge,
+        target_soc,
+        battery_params,
         automatik_discharge_cap_kw=automatik_discharge_cap_kw,
     )
-    if control == BATTERY_CONTROL_LIMITS_ONLY:
-        active_kw = None
-    target_soc_pct = ess_target_soc_percent(
-        target_soc,
-        mode=mode,
-        target_power_kw=target_power_kw,
-        battery_params=battery_params,
-    )
+    if not kind_values:
+        return []
 
+    sent = dict(kind_values)
     logger.info(
         "Sending ESS C1 Mapping -> Soll: %s kW, Ladegrenze: %s kW, "
         "Entladegrenze: %s kW, set_ess_mode/Cmd: %s, Ziel-SoC: %s %%",
-        active_kw,
-        charge_kw,
-        discharge_kw,
-        control_cmd,
-        target_soc_pct,
+        sent["set_ess_active_power"],
+        sent["set_ess_charge_power_limit"],
+        sent["set_ess_discharge_power_limit"],
+        sent["set_ess_mode"],
+        sent["set_ess_target_soc"],
     )
 
-    records = _publish_ess_c1_setpoints(
-        (
-            ("set_ess_active_power", active_kw),
-            ("set_ess_charge_power_limit", charge_kw),
-            ("set_ess_discharge_power_limit", discharge_kw),
-            ("set_ess_mode", float(control_cmd)),
-            ("set_ess_target_soc", target_soc_pct),
-        )
-    )
+    records = _publish_ess_c1_setpoints(kind_values)
     if export_cap_kw is not _OMIT_EXPORT_CAP:
         from ehal.qualified_ids import qualified_plant_id
 
