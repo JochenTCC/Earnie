@@ -58,6 +58,7 @@ alwaysApply: true
 * **Edibert integration (`Edibert`, 2.8):** P0 (packaging + license decision), P1 (data files + read-only coexistence), P2 (Netznutzung split + migration), P3a (engine parity harness), P3b (engine switch), P4a (market prices live), P4b (market prices SE / backtesting), P5 (forecast handover), P6 (shared weather access), P7 (editor embed), P8 (catalog decision)
 * **Savings ledger (`Ledger`, 2.8):** P0 (method decisions), P1 (Chart 2 quarter-hour alignment), P2 (BL Ziel without fallback energy), P3 (shadow slot engine), P4 (day close + ledger files), P5 (daemon hook), P6 (backfill CLI), P7 (Chart 2 from the ledger), P8 (cockpit KPI + method note), P9–P10 (`savings_v: 2` flex re-timing, optional), P11 (Chart 1 baseline from the shadow chain)
 * **SE rule-based reference (`RuleRef`, 2.8):** P0 (method decisions), P1 (L1 vendor-mode battery chain), P2 (L2 rule builder), P3 (ladder in the SE, L2 headline), P4 (UI ladder + docs), P5 (study export + sensitivity)
+* **Support upload (`SupportUpload`, 2.+1):** P1 (smaller debug dump), P2 (upload with codes + contract), P3 (UI send + client encryption), P4 (fetch into intake + retention check), P5 (one-click registration + upload without code)
 * **Predictive heat control (`HeatControl`, 2.+1):** P1 (feedback signals), P2 (operating state), P3 (store target), P4 (two leaky stores), P5 (COP by temperature), P6 (building as a store), P7 (scheduled demand study), P8 (ready-by temperature)
 
 ## 5. Commit & Chat Syntax
