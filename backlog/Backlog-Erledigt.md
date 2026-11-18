@@ -2,6 +2,16 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### SUSI P1 follow-up — heat-source fuel prices refreshed (2026-11-18)
+
+- [x] **SUSI P1 follow-up — refresh heat-source fuel prices before the 2.8 release** `[dev]` *(moved from the SUSI block of Version 2.+1 on 2026-11-11; done 2026-11-18 on `main`, not committed yet)*: `share/config/heat_source_defaults.json` carried the Heizrechner 2022 prices.
+  - **Done:** prices as of `11/2026` (Vorarlberg household prices incl. VAT, delivered): oil 104.8 → 175.0 ct/l, gas 10.43 → 12.11 ct/kWh, pellets 322 → 447.7 EUR/t, district heat 10.5 → 11.6 ct/kWh, firewood 50 → 133 EUR/rm. Source note per value in the file's `sources.fuel_price`.
+  - **Sources:** Energieinstitut Vorarlberg, table "Brennstoffe im Vergleich 2026" (2026-11-16) for oil (annual average Vorarlberg), gas (VKW), pellets (proPellets Austria, 6 t, 2026-11-01) and firewood; district heat from the 2026 vkw local heat tariff sheets (median of the middle tier of Hard, Latschau, Sulz, Schetteregg; energy price only). Cross-check: proPellets Austria comparison November 2026 (oil 18.51, gas 16.16 AT average incl. grid fees, pellets 9.33 ct/kWh).
+  - **Firewood:** the Energieinstitut uses 155 EUR/rm at 2,100 kWh/rm (7.38 ct/kWh); the file keeps SUSI's 1,800 kWh/rm, so the price is converted to the same cost per kWh (133 EUR/rm).
+  - **Docs:** table and source paragraph in `docs/konfiguration/flexible-verbraucher.md`; release-notes draft `v2.8.0-susi-p1.draft.md` (the "Stand 2022" warning and its REVIEW comment replaced by the new prices).
+  - **Tests:** expectations in `tests/test_heat_source.py` and a comment in `tests/test_savings_ledger_heating_rod.py` follow the new gas, oil and pellet prices; all 58 test files that mention `fuel` or `heat_source` pass (1048 tests). No regression case uses a fuel heat source.
+  - **Open:** the CO2 factors stay from Hexit; the Energieinstitut 2026 table lists other values (e.g. oil and gas 271, pellets and wood 9 g/kWh) — not changed here.
+
 ### Bugfix — SE single-window re-simulation showed one constant price (2026-11-18)
 
 - [x] **Bugfix — SE single-window re-simulation showed one constant price** *(found 2026-11-18 in the SE calendar, scenario Live, window 2026-03-19 07:00; fixed 2026-11-18 on `main`, `af4db43c`)*: a window without a stored snapshot is re-simulated on demand (`simulation/backtesting_single_window.py::simulate_window_snapshot`). It loaded prices for `backtesting_year` and the anchor's month, but `backtesting_year` is the year of the period start, so a period 2025-11 … 2026-10 gave a March-2026 window the prices of March 2025. `epex_prices_for_slots` filled every missing slot with the last sample, so Chart 1 showed one constant import and feed-in price; the year run's results were right.

@@ -46,11 +46,11 @@ def test_fuel_defaults_and_units():
     assert gas == {"type": "gas"}  # defaults are resolved by getters, never stored
     assert not heat_source_is_electric(gas)
     assert heat_source_efficiency(gas) == 0.95
-    assert fuel_price_eur_per_kwh(gas) == pytest.approx(0.1043)
-    assert fuel_price_eur_per_kwh({"type": "oil"}) == pytest.approx(1.048 / 10.0)
-    assert fuel_price_eur_per_kwh({"type": "pellets"}) == pytest.approx(322.0 / 4900.0)
+    assert fuel_price_eur_per_kwh(gas) == pytest.approx(0.1211)
+    assert fuel_price_eur_per_kwh({"type": "oil"}) == pytest.approx(1.75 / 10.0)
+    assert fuel_price_eur_per_kwh({"type": "pellets"}) == pytest.approx(447.7 / 4900.0)
     assert fuel_price_eur_per_kwh({"type": "oil", "fuel_price": 120.0}) == pytest.approx(0.12)
-    assert heating_rod_fuel_credit_cent_per_kwh(gas) == pytest.approx(10.43 / 0.95)
+    assert heating_rod_fuel_credit_cent_per_kwh(gas) == pytest.approx(12.11 / 0.95)
     assert heat_source_is_electric({"type": "electric_direct"})
     assert heat_source_efficiency({"type": "electric_direct"}) == 0.99
 
@@ -291,7 +291,7 @@ def test_collect_flex_gas_house_has_only_the_rod():
     rod = flex[0]
     assert rod["parent_id"] == "wp_heating"
     assert rod["parent_heat_electric"] is False
-    assert rod["fuel_credit_cent_per_kwh"] == pytest.approx(10.43 / 0.95)
+    assert rod["fuel_credit_cent_per_kwh"] == pytest.approx(12.11 / 0.95)
 
 
 def test_collect_flex_heat_pump_with_rod():
@@ -509,7 +509,7 @@ def test_heat_fuel_for_result_subtracts_rod_heat(monkeypatch):
     block = heat_fuel_for_result(df, {"_house_profile": _profile(consumer)})
     expected_fuel = 40.0 - 4.0 / 0.95
     assert block["fuel_kwh"] == pytest.approx(expected_fuel, abs=0.05)
-    assert block["fuel_eur"] == pytest.approx(expected_fuel * 0.1043, abs=0.01)
+    assert block["fuel_eur"] == pytest.approx(expected_fuel * 0.1211, abs=0.01)
     assert block["import_kwh"] == pytest.approx(48.0)
     assert block["co2_kg"] == pytest.approx((48.0 * 226 + expected_fuel * 249) / 1000, abs=0.1)
     assert block["carriers"] == ["gas"]

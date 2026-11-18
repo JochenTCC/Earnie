@@ -97,7 +97,7 @@ def test_rod_beside_gas_is_fuel_in_the_shadow_plant():
     closed = _close(rod, None)
     row = closed.row
     rod_kwh = ROD_KW * len(ROD_SLOTS) * DT  # 6 kWh
-    credit = heating_rod_fuel_credit_cent_per_kwh(gas)  # 0.1043 €/kWh / 0.95 → ct per rod kWh
+    credit = heating_rod_fuel_credit_cent_per_kwh(gas)  # 0.1211 €/kWh / 0.95 → ct per rod kWh
 
     assert row["flex_timing"] == {rod["id"]: slf.TIMING_FUEL}
     assert row["fuel_saved_kwh"] == pytest.approx(round(rod_kwh / 0.95, 3))

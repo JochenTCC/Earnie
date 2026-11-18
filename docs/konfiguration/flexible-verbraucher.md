@@ -266,13 +266,19 @@ Jedes Heizsystem hat eine Hauptwärmequelle `heat_source` (Pflicht). Im Hauskonf
 | ----------- | ------------------ | ------------- | ------------- | ----------- |
 | Wärmepumpe Luft / Erde / Grundwasser | 3,5 / 4,3 / 4,2 | – | Stromtarif | 226 (Strom) |
 | Stromheizung | 0,99 | – | Stromtarif | 226 (Strom) |
-| Öl | 0,90 | 10 kWh/l | 104,8 ct/l | 344 |
-| Gas | 0,95 | 1 kWh/kWh | 10,43 ct/kWh | 249 |
-| Pellets | 0,85 | 4.900 kWh/t | 322 €/t | 26 |
-| Fernwärme | 0,95 | 1 kWh/kWh | 10,5 ct/kWh | 42 |
-| Stückholz | 0,80 | 1.800 kWh/rm | 50 €/rm | 25 |
+| Öl | 0,90 | 10 kWh/l | 175 ct/l | 344 |
+| Gas | 0,95 | 1 kWh/kWh | 12,11 ct/kWh | 249 |
+| Pellets | 0,85 | 4.900 kWh/t | 447,7 €/t | 26 |
+| Fernwärme | 0,95 | 1 kWh/kWh | 11,6 ct/kWh | 42 |
+| Stückholz | 0,80 | 1.800 kWh/rm | 133 €/rm | 25 |
 
-Quellen: Nutzungsgrade und Energieinhalte aus SUSI, Brennstoffpreise aus dem Heizrechner, CO2-Faktoren aus Hexit (alle Energieinstitut Vorarlberg). Die Brennstoffpreise sind Stand 2022. Für eine belastbare Rechnung den aktuellen Preis in `fuel_price` eintragen.
+Quellen: Nutzungsgrade und Energieinhalte aus SUSI, CO2-Faktoren aus Hexit (beide Energieinstitut Vorarlberg). Die Brennstoffpreise sind Stand November 2026, Haushaltspreise in Vorarlberg inkl. MwSt. und Zustellung:
+
+- **Öl, Gas, Pellets, Stückholz:** Tabelle „Brennstoffe im Vergleich 2026“ des Energieinstituts Vorarlberg (Stand 16.11.2026). Öl ist der Jahresdurchschnitt Vorarlberg, Gas der aktuelle Preis der VKW, Pellets der Preis von proPellets Austria für 6 t ohne Einblaspauschale.
+- **Stückholz:** Das Energieinstitut rechnet mit 155 €/rm bei 2.100 kWh/rm, also 7,38 ct/kWh. Earnie rechnet wie SUSI mit 1.800 kWh/rm; der Standardpreis ist deshalb auf denselben Preis je kWh umgerechnet (133 €/rm).
+- **Fernwärme:** Arbeitspreis (brutto) der Nahwärmenetze der VKW 2026, Median der mittleren Tarifstufe von vier Netzen (Hard, Latschau, Sulz, Schetteregg; alle Stufen 10,0 bis 14,5 ct/kWh). Grund- und Messpreis sind nicht enthalten, weil Earnie nur die Kosten je bezogener kWh braucht.
+
+Die Preise schwanken stark (Heizöl kostete im Herbst 2026 rund zwei Drittel mehr als ein Jahr davor). Für eine belastbare Rechnung den eigenen Preis in `fuel_price` eintragen.
 
 **Wie rechnet Earnie mit der Wärmequelle?** Die Jahressimulation des Hauses bleibt gleich: Wärmebedarf, Warmwasser und Wärmespeicher laufen unverändert. Die Wärmequelle bestimmt nur, welche Energie dafür nötig ist:
 

@@ -185,6 +185,7 @@ def _create_grid_battery_vars(
     horizon: int,
     battery_params: dict | list[dict],
     planned_consumers: list,
+    fixed_flex_by_t: dict[int, float],
     *,
     inverter_params: dict | list[dict] | None = None,
     pv_systems: list[dict] | None = None,
@@ -282,8 +283,13 @@ def _create_grid_battery_vars(
     e_batt = e_batt_by_ess[primary_id]
     delta_charge = delta_charge_by_ess[primary_id]
     max_flex_power = sum(power_limits_kw(c)[1] for c in planned_consumers)
+    # Preset flex (e.g. fixed EV charging) is load outside the MILP vars: the Big-M must
+    # cover it, or p_grid_buy is cut below the slot's real demand (wrong plan / Infeasible).
     max_load = max(
-        (effective_p_act(row, load_params) for row in matrix[:horizon]),
+        (
+            effective_p_act(row, load_params) + float(fixed_flex_by_t.get(t, 0.0))
+            for t, row in enumerate(matrix[:horizon])
+        ),
         default=0.0,
     )
     max_pv = max((_slot_house_pv(row) for row in matrix[:horizon]), default=0.0)
@@ -626,11 +632,13 @@ def _build_milp_model(
 ) -> MilpHorizonModel:
     dt_h = validate_dt_h(dt_h)
     prob = pulp.LpProblem("Energy_Cost_Minimization", pulp.LpMinimize)
+    fixed_flex_by_t = _normalize_fixed_flex_by_t(fixed_flex_kw_t0_or_by_t)
     grid_vars = _create_grid_battery_vars(
         matrix,
         horizon,
         battery_params,
         planned_consumers,
+        fixed_flex_by_t,
         inverter_params=inverter_params,
         pv_systems=pv_systems,
     )
@@ -651,7 +659,7 @@ def _build_milp_model(
         grid_vars,
         consumer_vars,
         planned_consumers,
-        _normalize_fixed_flex_by_t(fixed_flex_kw_t0_or_by_t),
+        fixed_flex_by_t,
         horizon=horizon,
         dt_h=dt_h,
         export_caps_kw=export_caps_kw,
