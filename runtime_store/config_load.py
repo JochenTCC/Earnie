@@ -29,8 +29,8 @@ def _abort_config_error(exc: BaseException) -> None:
     raise SystemExit(1) from None
 
 
-def prepare_config_path() -> str:
-    """Lädt .env und prüft, dass config.json existiert."""
+def _prepare_config_path_or_message() -> tuple[str, str | None]:
+    """Lädt .env; liefert (Pfad, Fehlermeldung) — Meldung gesetzt, wenn config.json fehlt."""
     from runtime_store.dotenv_loader import load_app_dotenv
     from runtime_store.ha_secrets_migrate import apply_ha_secrets_migration_to_disk
     from runtime_store.persist_paths import resolve_config_json_path
@@ -38,12 +38,48 @@ def prepare_config_path() -> str:
     load_app_dotenv(override=True)
     config_path = resolve_config_json_path()
     if not os.path.isfile(config_path):
-        print(_missing_config_message(config_path), file=sys.stderr)
-        raise SystemExit(1)
+        return config_path, _missing_config_message(config_path)
     # 2.6.i: move ehal.ha base_url/token into .env before Config reads env.
     if apply_ha_secrets_migration_to_disk():
         load_app_dotenv(override=True)
+    return config_path, None
+
+
+def prepare_config_path() -> str:
+    """Lädt .env und prüft, dass config.json existiert."""
+    config_path, message = _prepare_config_path_or_message()
+    if message is not None:
+        print(message, file=sys.stderr)
+        raise SystemExit(1)
     return config_path
+
+
+def load_config_for_ui() -> tuple[ModuleType | None, str | None]:
+    """Streamlit-Variante von ``load_config_or_exit`` + ``reinit_config_or_exit``.
+
+    Returns ``(config_module, None)`` on success, ``(module_or_None, message)`` when
+    the config cannot be loaded. Never raises ``SystemExit``: Streamlit's script
+    runner catches only ``Exception``, so ``SystemExit`` would kill the script
+    thread and leave the browser spinning without any message.
+
+    The migration gate is not checked here: ``app.py`` evaluates it before and
+    shows the migration wizard instead of calling this.
+    """
+    _config_path, message = _prepare_config_path_or_message()
+    if message is not None:
+        print(message, file=sys.stderr)
+        return None, message
+    try:
+        import config as config_module
+    except _CONFIG_ERRORS as exc:
+        print(f"Konfigurationsfehler: {exc}", file=sys.stderr)
+        return None, str(exc)
+    try:
+        config_module.reinit_config()
+    except _CONFIG_ERRORS as exc:
+        print(f"Konfigurationsfehler: {exc}", file=sys.stderr)
+        return config_module, str(exc)
+    return config_module, None
 
 
 def load_config_or_exit() -> ModuleType:

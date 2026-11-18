@@ -93,11 +93,11 @@ def render_config_pack_controls(payload: bytes | None) -> None:
     _render_config_pack_import()
 
 
-def render_backup_transfer_sidebar() -> None:
+def render_backup_transfer_sidebar(*, expanded: bool = False) -> None:
     """Sidebar "Sichern & Übertragen": everything that moves data in or out of Earnie."""
     from ui.support_package import render_support_package_controls
 
-    with st.sidebar.expander("Sichern & Übertragen", expanded=False):
+    with st.sidebar.expander("Sichern & Übertragen", expanded=expanded):
         payload = build_config_pack_for_sidebar()
         render_config_pack_controls(payload)
         st.divider()

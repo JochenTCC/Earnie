@@ -356,6 +356,11 @@ def test_config_pack_carries_user_tariffs_unstamped(monkeypatch, tmp_path: Path)
     (dest / "config.json").write_text("{}", encoding="utf-8")
     shutil.copy(CATALOG, dest / "tariffs.json")
     monkeypatch.setenv("EARNIE_CONFIG_PATH", str(dest))
+    # Pack mechanics only; the minimal docs are not a loadable config.
+    # Load validation: tests/test_config_pack_load_validation.py.
+    from runtime_store import config_pack
+
+    monkeypatch.setattr(config_pack, "_reload_live_config", lambda: None)
     written = import_config_pack_bytes(payload)
     assert "user_tariffs.json" in written
     assert json.loads((dest / "user_tariffs.json").read_text(encoding="utf-8")) == user_doc

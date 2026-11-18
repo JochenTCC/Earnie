@@ -116,7 +116,9 @@ def import_config_pack_bytes(payload: bytes) -> list[str]:
 
     Returns the list of written relative names. Raises DataModelError / ValueError
     on invalid packs (no partial write — uses a temp dir then replaces).
-    v3 packs are migrated to v4 before validation.
+    v3 packs are migrated to v4 before validation. After writing, the config is
+    reloaded from the live files; if it does not load, the previous files are
+    restored and a ValueError is raised (the active config stays usable).
     """
     with zipfile.ZipFile(io.BytesIO(payload), "r") as archive:
         names = set(archive.namelist())
@@ -167,12 +169,94 @@ def _migrate_pack_documents(
     return json_payloads
 
 
+def _pack_target_paths(staged_root: Path) -> list[Path]:
+    """Live files the staged pack will overwrite or create (JSON sidecars + uploads)."""
+    targets: list[Path] = []
+    for arcname, resolver in PACK_JSON_FILES:
+        if (staged_root / arcname).is_file():
+            targets.append(Path(resolver()))
+    uploads_src = staged_root / "uploads"
+    if uploads_src.is_dir():
+        uploads_dest = Path(resolve_uploads_dir())
+        for file_path in uploads_src.rglob("*"):
+            if file_path.is_file():
+                targets.append(uploads_dest / file_path.relative_to(uploads_src))
+    return targets
+
+
+def _snapshot_files(paths: list[Path]) -> dict[Path, bytes | None]:
+    """Current bytes of each path; ``None`` marks a file that does not exist yet."""
+    return {path: (path.read_bytes() if path.is_file() else None) for path in paths}
+
+
+def _restore_snapshot(snapshot: dict[Path, bytes | None]) -> None:
+    """Put every snapshotted path back: rewrite old bytes, delete files the import created."""
+    for path, content in snapshot.items():
+        if content is None:
+            if path.is_file():
+                path.unlink()
+        else:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(content)
+
+
+def _reload_live_config() -> None:
+    """Load the config from the live files, exactly like ``app.py`` does on the next rerun.
+
+    Raises the config loader's errors (``FileNotFoundError``, ``ValueError``,
+    ``KeyError``) when the files do not form a loadable config.
+    """
+    import sys
+
+    module = sys.modules.get("config")
+    if module is None:
+        # First import builds CONFIG from the live files (a failed import leaves
+        # no module behind, so the next call retries the import).
+        import config  # noqa: F401
+        return
+    module.reinit_config()
+
+
+def _activate_or_roll_back(snapshot: dict[Path, bytes | None]) -> None:
+    """Load the just-written config; on failure restore the previous files and raise."""
+    from runtime_store.config_load import _CONFIG_ERRORS
+
+    try:
+        _reload_live_config()
+    except _CONFIG_ERRORS as exc:
+        _restore_snapshot(snapshot)
+        message = (
+            "Config-Paket nicht übernommen: die Konfiguration darin lässt sich nicht "
+            f"laden ({_error_text(exc)}). Die bisherige Konfiguration bleibt aktiv."
+        )
+        try:
+            _reload_live_config()
+        except _CONFIG_ERRORS as restore_exc:
+            raise ValueError(
+                f"{message} Hinweis: auch die bisherige Konfiguration lässt sich "
+                f"nicht laden ({_error_text(restore_exc)})."
+            ) from exc
+        raise ValueError(message) from exc
+
+
+def _error_text(exc: BaseException) -> str:
+    """Loader message without the quotes ``str(KeyError)`` adds."""
+    if isinstance(exc, KeyError) and len(exc.args) == 1:
+        return str(exc.args[0])
+    return str(exc)
+
+
 def _write_pack_to_config_dir(
     archive: zipfile.ZipFile,
     json_payloads: dict[str, dict[str, Any]],
     upload_members: list[str],
 ) -> list[str]:
-    """Stage the pack in a temp dir, then copy JSON files and uploads into place."""
+    """Stage the pack in a temp dir, copy it into place, and keep it only if it loads.
+
+    The previous live files are snapshotted first; when the imported set does not
+    load (cross-file refs, house profile rules, ...), they are restored and a
+    ``ValueError`` with the loader's message is raised.
+    """
     with tempfile.TemporaryDirectory(prefix="earnie_pack_") as tmp:
         tmp_root = Path(tmp)
         for arcname, doc in json_payloads.items():
@@ -187,24 +271,38 @@ def _write_pack_to_config_dir(
             with archive.open(member) as src, target.open("wb") as dst:
                 shutil.copyfileobj(src, dst)
 
-        written: list[str] = []
-        for arcname, resolver in PACK_JSON_FILES:
-            src = tmp_root / arcname
-            if not src.is_file():
-                continue
-            dest = Path(resolver())
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            if arcname in TARIFF_TRACK_FILES:
-                # Tariff-track file: never stamp earnie_data_model (ConfigMigration).
-                dest.write_text(
-                    json.dumps(json_payloads[arcname], indent=4, ensure_ascii=False)
-                    + "\n",
-                    encoding="utf-8",
-                )
-            else:
-                write_json_dict(str(dest), json_payloads[arcname])
-            written.append(arcname)
-        _copy_pack_uploads(tmp_root / "uploads", written)
+        snapshot = _snapshot_files(_pack_target_paths(tmp_root))
+        try:
+            written = _copy_staged_pack(tmp_root, json_payloads)
+        except BaseException:
+            _restore_snapshot(snapshot)
+            raise
+        _activate_or_roll_back(snapshot)
+    return written
+
+
+def _copy_staged_pack(
+    tmp_root: Path, json_payloads: dict[str, dict[str, Any]]
+) -> list[str]:
+    """Copy staged JSON files and uploads into the live config dir."""
+    written: list[str] = []
+    for arcname, resolver in PACK_JSON_FILES:
+        src = tmp_root / arcname
+        if not src.is_file():
+            continue
+        dest = Path(resolver())
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        if arcname in TARIFF_TRACK_FILES:
+            # Tariff-track file: never stamp earnie_data_model (ConfigMigration).
+            dest.write_text(
+                json.dumps(json_payloads[arcname], indent=4, ensure_ascii=False)
+                + "\n",
+                encoding="utf-8",
+            )
+        else:
+            write_json_dict(str(dest), json_payloads[arcname])
+        written.append(arcname)
+    _copy_pack_uploads(tmp_root / "uploads", written)
     return written
 
 
