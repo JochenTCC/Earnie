@@ -248,6 +248,36 @@ def _looks_like_ehal_id(name: str) -> bool:
     return kind.startswith(("sens_", "get_", "set_"))
 
 
+# Unbound EHAL IDs already reported at WARNING; cleared when a value arrives.
+_unbound_missing_warned: set[str] = set()
+
+
+def _log_unbound_push_read(
+    name: str, value: Optional[float], state: str
+) -> None:
+    """Warn once per unbound EHAL ID without a push value, then log at DEBUG.
+
+    The 30 s power sampler reads optional getters (export limit, ESS limits) via
+    ``read_telemetry``; a site that never exports them would otherwise log five
+    WARNING lines every 30 s and push the cycle lines out of the Dienst-Log view.
+    """
+    if value is not None:
+        _unbound_missing_warned.discard(name)
+        return
+    if name in _unbound_missing_warned:
+        logger.debug(
+            "EHAL push: no value for unbound '%s' (state=%s)", name, state
+        )
+        return
+    _unbound_missing_warned.add(name)
+    logger.warning(
+        "EHAL push: no value for unbound '%s' (state=%s); repeats logged at "
+        "DEBUG until a value arrives",
+        name,
+        state,
+    )
+
+
 def fetch_loxone_generic_value(io_name: str) -> Optional[float]:
     """Numeric live read from the VO push inbox only (no hub poll).
 
@@ -280,12 +310,8 @@ def fetch_loxone_generic_value(io_name: str) -> Optional[float]:
         if _looks_like_ehal_id(name):
             if is_pushable_kind(field_kind(name)):
                 value, state = read_push_value(name)
-                if value is None and not is_explicit_offline():
-                    logger.warning(
-                        "EHAL push: no value for unbound '%s' (state=%s)",
-                        name,
-                        state,
-                    )
+                if value is not None or not is_explicit_offline():
+                    _log_unbound_push_read(name, value, state)
                 return value
             return None
         logger.warning(

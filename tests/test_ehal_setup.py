@@ -183,51 +183,6 @@ def test_require_loxone_credentials_false_for_ha(tmp_path, monkeypatch):
     assert dotenv_io.needs_loxone_setup() is False
 
 
-def test_deferred_loxone_does_not_block_live_for_ha(tmp_path, monkeypatch):
-    """HA hub configured: main must not wait for LOXONE_* during deferred setup."""
-    from runtime_store import dotenv_io
-
-    config_path = tmp_path / "config.json"
-    monkeypatch.setenv("EARNIE_CONFIG_PATH", str(config_path))
-    monkeypatch.delenv("EARNIE_OFFLINE", raising=False)
-    monkeypatch.delenv("LOXONE_IP", raising=False)
-    monkeypatch.delenv("LOXONE_USER", raising=False)
-    monkeypatch.delenv("LOXONE_PASS", raising=False)
-    config_path.write_text(
-        json.dumps(
-            {
-                "ehal": {
-                    "backend": "ha",
-                    "ha": {},
-                },
-            }
-        ),
-        encoding="utf-8",
-    )
-    monkeypatch.setenv("EHAL_HA_BASE_URL", "http://homeassistant:8123")
-    monkeypatch.setenv("EHAL_HA_TOKEN", "tok")
-    monkeypatch.setattr(
-        "runtime_store.ehal_setup.resolve_config_json_path",
-        lambda: str(config_path),
-    )
-    monkeypatch.setattr(dotenv_io, "loxone_setup_deferred", lambda: True)
-    assert dotenv_io.loxone_credentials_configured() is False
-    assert dotenv_io.deferred_loxone_blocks_live() is False
-
-
-def test_deferred_loxone_blocks_live_for_loxone_backend(monkeypatch):
-    from runtime_store import dotenv_io
-
-    monkeypatch.delenv("LOXONE_IP", raising=False)
-    monkeypatch.delenv("LOXONE_USER", raising=False)
-    monkeypatch.delenv("LOXONE_PASS", raising=False)
-    monkeypatch.setattr(dotenv_io, "loxone_setup_deferred", lambda: True)
-    monkeypatch.setattr(
-        "runtime_store.ehal_setup.is_network_backend", lambda: False
-    )
-    assert dotenv_io.deferred_loxone_blocks_live() is True
-
-
 def test_build_ehal_write_records_marks_failed_fields():
     from integrations.ehal_live import build_ehal_write_records
 

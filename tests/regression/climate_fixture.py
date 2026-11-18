@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Iterator
 from zoneinfo import ZoneInfo
 
-import time_machine
+from freezegun import freeze_time
 
 from tests.fixtures.backtesting_fixtures import FIXTURES_ROOT
 
@@ -91,7 +91,9 @@ def frozen_climate_fixture(fixture_dir: Path = CLIMATE_FIXTURE_DIR) -> Iterator[
         archive._fetch_hourly_archive_chunk = _refusing_fetch(fixture_dir)
     archive.clear_open_meteo_bundle_mem_cache()
     try:
-        with time_machine.travel(CLIMATE_FIXTURE_NOW, tick=True):
+        # freezegun's naive now() is UTC; the cache keys only use the date, which
+        # is the same in UTC and Vienna at the 12:00 fixture time.
+        with freeze_time(CLIMATE_FIXTURE_NOW, tick=True):
             yield used
     finally:
         archive.OPEN_METEO_CACHE_DIR = previous_dir

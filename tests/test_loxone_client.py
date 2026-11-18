@@ -114,6 +114,40 @@ class TestFetchLoxoneGenericValue:
     def test_empty_name_returns_none(self):
         assert lc.fetch_loxone_generic_value("") is None
 
+    def test_unbound_missing_value_warns_once_until_value_arrives(
+        self, monkeypatch, caplog
+    ):
+        """Regression: the 30 s sampler logged 5 WARNING lines per read for
+        unexported optional getters (2.7.0 tester support)."""
+        qid = "ess.bat1.get_ess_soc_min"
+        monkeypatch.setattr(lc, "_unbound_missing_warned", set())
+        # Explicit offline mode stays silent (main); the live path warns.
+        monkeypatch.setattr(
+            "runtime_store.env_vars.is_explicit_offline", lambda: False
+        )
+        reads: list[tuple[float | None, str]] = [
+            (None, "Lesefehler"),
+            (None, "Lesefehler"),
+            (10.0, "OK"),
+            (None, "Lesefehler"),
+        ]
+        with (
+            patch(
+                "ehal.loxone_push_source.resolve_push_binding",
+                return_value=None,
+            ),
+            patch(
+                "runtime_store.ehal_push_inbox.read_push_value",
+                side_effect=reads,
+            ),
+            caplog.at_level("DEBUG", logger="integrations.loxone_client"),
+        ):
+            results = [lc.fetch_loxone_generic_value(qid) for _ in reads]
+
+        assert results == [None, None, 10.0, None]
+        unbound = [r for r in caplog.records if "unbound" in r.getMessage()]
+        assert [r.levelname for r in unbound] == ["WARNING", "DEBUG", "WARNING"]
+
 
 class TestFetchLoxoneLivePower:
     def _patch_topology(self, *, values: dict[str, float | None]):

@@ -91,12 +91,12 @@ class _LoxoneRequestHandler(BaseHTTPRequestHandler):
     def log_message(self, format: str, *args) -> None:  # noqa: A003
         logger.debug("ehal_request_http: " + format, *args)
 
-    def _record_peer(self) -> None:
+    def _record_peer(self, *, status_json: bool = False) -> None:
         try:
             from runtime_store.loxone_callback_status import record_loxone_callback
 
             peer = self.client_address[0] if self.client_address else ""
-            record_loxone_callback(peer)
+            record_loxone_callback(peer, status_json=status_json)
         except Exception:  # noqa: BLE001 — never fail the Miniserver callback path
             logger.exception("ehal_request_http: failed to record last callback")
 
@@ -120,7 +120,7 @@ class _LoxoneRequestHandler(BaseHTTPRequestHandler):
         self.send_error(404)
 
     def _send_status_json(self) -> None:
-        self._record_peer()
+        self._record_peer(status_json=True)
         from integrations.loxone_status_json import build_loxone_status_payload
 
         body = json.dumps(build_loxone_status_payload()).encode("utf-8")

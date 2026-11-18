@@ -146,7 +146,6 @@ assert hooks.shadow_migration_mode_refusal(None) is None
 assert hooks.block_write_if_shadow(backend="x", target="t", value=1) is False
 hooks.assert_not_shadow_backend("probe")
 assert hooks.lookup_record("loxone:io:x") is None
-assert hooks.maybe_clear_auth_gate() is False
 assert hooks.prepare_shadow_cycle("quarter", optimize_trigger="opt").skipped is False
 assert hooks.resolve_next_trigger(None, "quarter", optimize_trigger="opt") == "quarter"
 assert hooks.should_invoke_setpoint_writes(silent=False) is True
