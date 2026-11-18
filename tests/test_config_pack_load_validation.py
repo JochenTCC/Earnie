@@ -72,16 +72,29 @@ def _live_files(session: Path) -> dict[str, bytes]:
     }
 
 
-def _example_pack_bytes() -> bytes:
-    """Pack of the six ``share/config/*.example.json`` files, data model 4."""
+def _break_live_export_tariff(docs: dict[str, dict]) -> None:
+    """Point the live scenario at an export tariff that does not exist."""
+    live = docs["backtesting_scenarios.json"]["scenarios"][0]
+    assert live["id"] == "live"
+    live["settings"]["export_tariff_id"] = "does_not_exist"
+
+
+def _example_pack_bytes(mutate=None) -> bytes:
+    """Pack of the six ``share/config/*.example.json`` files, data model 4.
+
+    ``mutate`` may change the documents (keyed by pack name) before zipping.
+    """
+    docs: dict[str, dict] = {}
+    for arcname, _resolver in PACK_JSON_FILES:
+        src = _SHARE_CONFIG / arcname.replace(".json", ".example.json")
+        if src.is_file():
+            docs[arcname] = json.loads(src.read_text(encoding="utf-8-sig"))
+    if mutate is not None:
+        mutate(docs)
     buffer = io.BytesIO()
     files: list[str] = []
     with zipfile.ZipFile(buffer, "w") as archive:
-        for arcname, _resolver in PACK_JSON_FILES:
-            src = _SHARE_CONFIG / arcname.replace(".json", ".example.json")
-            if not src.is_file():
-                continue
-            doc = json.loads(src.read_text(encoding="utf-8-sig"))
+        for arcname, doc in docs.items():
             stamp_data_model(doc)
             archive.writestr(arcname, json.dumps(doc, ensure_ascii=False))
             files.append(arcname)
@@ -93,14 +106,26 @@ def _example_pack_bytes() -> bytes:
     return buffer.getvalue()
 
 
+def test_example_configs_pack_imports_and_loads(cloud_session):
+    """The shipped example set is a loadable config on its own (all scenarios resolve)."""
+    import config
+
+    written = import_config_pack_bytes(_example_pack_bytes())
+
+    assert len(written) == 6
+    assert config.CONFIG.config_path.startswith(str(cloud_session))
+    scenarios = config.CONFIG.get_backtesting_scenarios()
+    assert {"live", "entity_refs_planning"} <= set(scenarios)
+
+
 def test_unloadable_pack_is_rejected_and_previous_config_kept(cloud_session):
     import config
 
     before = _live_files(cloud_session)
     live_before = config.CONFIG.get_live_scenario_id()
 
-    with pytest.raises(ValueError, match="Config-Paket nicht übernommen"):
-        import_config_pack_bytes(_example_pack_bytes())
+    with pytest.raises(ValueError, match="Config-Paket nicht übernommen.*does_not_exist"):
+        import_config_pack_bytes(_example_pack_bytes(_break_live_export_tariff))
 
     assert _live_files(cloud_session) == before
     # The active config object is rebuilt from the restored files and still works.
@@ -111,7 +136,8 @@ def test_unloadable_pack_is_rejected_and_previous_config_kept(cloud_session):
 
 def test_unloadable_pack_removes_uploads_it_created(cloud_session):
     payload = io.BytesIO()
-    with zipfile.ZipFile(io.BytesIO(_example_pack_bytes())) as src, zipfile.ZipFile(
+    broken = _example_pack_bytes(_break_live_export_tariff)
+    with zipfile.ZipFile(io.BytesIO(broken)) as src, zipfile.ZipFile(
         payload, "w"
     ) as dst:
         for name in src.namelist():
