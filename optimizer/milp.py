@@ -44,6 +44,7 @@ from .milp_horizon import (
     _build_milp_model,
     _terminal_soc_energy_kwh,
 )
+from .milp_horizon_extras import plant_capacity_kwh
 from .import_power_limit import ImportCaps
 from .milp_ev_pool import add_ev_pool_constraints
 from .milp_import_cap import add_import_cap_constraints
@@ -271,12 +272,14 @@ def _add_soc_anchor_constraints(
     sunrise_soc_min_index: int | None,
     terminal_soc_percent: float | None,
 ) -> None:
-    """SOC-Anker in Vorrangfolge: Hold-Slot, PV-only bis Sonnenaufgang, End-SoC."""
+    """SOC-Anker in Vorrangfolge: Hold-Slot, PV-only bis Sonnenaufgang, End-SoC.
+
+    ``soc_hold_percent`` and ``terminal_soc_percent`` are plant SoC values: they bind the energy
+    of all house batteries (``plant_capacity_kwh``), not the first battery alone.
+    """
     battery_params = _primary_battery_params(battery_params)
     if soc_hold_index is not None and soc_hold_percent is not None:
-        e_hold = (float(soc_hold_percent) / 100.0) * battery_params[
-            "battery_capacity_kwh"
-        ]
+        e_hold = (float(soc_hold_percent) / 100.0) * plant_capacity_kwh(model)
         _add_soc_equality_constraint(model, soc_hold_index, e_hold)
         if verbose:
             logger.info(
@@ -321,7 +324,7 @@ def _add_soc_anchor_constraints(
                     "MILP SOC-Anker Sonnenaufgang: Slot %d PV-only charge (no hard SOC_min eq)",
                     sunrise_soc_min_index,
                 )
-    elif e_terminal := _terminal_soc_energy_kwh(battery_params, terminal_soc_percent):
+    elif e_terminal := _terminal_soc_energy_kwh(model, terminal_soc_percent):
         _add_terminal_soc_constraint(model, e_terminal)
         if verbose:
             logger.info(

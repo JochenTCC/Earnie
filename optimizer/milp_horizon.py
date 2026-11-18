@@ -67,10 +67,11 @@ def primary_battery_with_plant_power(batteries: list[dict]) -> dict:
     """The first battery with the charge, discharge and standby power of all batteries.
 
     Capacity, SoC limits, efficiency, ``control`` and the virtual reserve keys are those of the
-    first battery. The MILP needs exactly this view: ``model.e_batt``, the SoC anchors (hold,
-    terminal, sunrise) and ``current_soc`` all refer to the first battery, while the grid
-    balance needs the power of all. It is not a model of the whole plant; the simulation and the
-    charts use ``plant_battery_params``.
+    first battery. The MILP needs this view where it refers to the first battery
+    (``model.e_batt``, ``current_soc``, the sunrise anchor, virtual reserve, wear), while the
+    grid balance needs the power of all. The terminal and hold anchors bind the energy of all
+    batteries (``milp_horizon_extras.plant_capacity_kwh``). It is not a model of the whole
+    plant; the simulation and the charts use ``plant_battery_params``.
     """
     if not batteries:
         return {

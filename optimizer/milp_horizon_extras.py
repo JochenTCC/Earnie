@@ -34,11 +34,38 @@ def lookahead_hours() -> float:
     return hours
 
 
+def _plant_energy_series(model: MilpHorizonModel) -> list[list]:
+    """Energy variables of every house battery in the model (one list per battery)."""
+    if not model.ess_ids or not model.e_batt_by_ess:
+        raise ValueError("MILP-Modell ohne Speicher-Variablen je ESS (e_batt_by_ess fehlt).")
+    return [model.e_batt_by_ess[eid] for eid in model.ess_ids]
+
+
+def plant_capacity_kwh(model: MilpHorizonModel) -> float:
+    """Summed capacity [kWh] of the house batteries in the model: the base of the SoC anchors."""
+    if not model.ess_ids or not model.battery_params_by_id:
+        raise ValueError("MILP-Modell ohne Speicher-Parameter je ESS (battery_params_by_id fehlt).")
+    return sum(
+        float(model.battery_params_by_id[eid].get("battery_capacity_kwh") or 0.0)
+        for eid in model.ess_ids
+    )
+
+
+def _plant_energy_at(model: MilpHorizonModel, slot_index: int):
+    """Energy [kWh] stored in all house batteries at the end of ``slot_index``.
+
+    The SoC anchors (terminal, hold) bind this sum: the callers' targets are plant SoC values
+    (``plant_start_soc``, the SE carry-in chain), so a single battery must not be pinned to them.
+    With one battery the sum is ``model.e_batt[slot_index]``.
+    """
+    return pulp.lpSum(series[slot_index] for series in _plant_energy_series(model))
+
+
 def _add_terminal_soc_constraint(model: MilpHorizonModel, e_terminal: float) -> None:
-    """End-SOC am Horizontende = Ziel-SOC (Anker zu Simulations-/Planungsbeginn)."""
+    """Energy of all house batteries at the horizon end = target (anchor at simulation start)."""
     if model.horizon < 1:
         return
-    model.prob += model.e_batt[model.horizon - 1] == e_terminal
+    model.prob += _plant_energy_at(model, model.horizon - 1) == e_terminal
 
 
 def _add_soc_equality_constraint(
@@ -46,7 +73,7 @@ def _add_soc_equality_constraint(
     slot_index: int,
     e_kwh: float,
 ) -> None:
-    """SOC at slot_index equals e_kwh (sunrise floor or SE SA₁ carry-in)."""
+    """Energy of all house batteries at the end of slot_index equals e_kwh (SE SA₁ carry-in)."""
     if model.horizon < 1:
         return
     if slot_index < 0 or slot_index >= model.horizon:
@@ -54,7 +81,7 @@ def _add_soc_equality_constraint(
             f"soc equality index {slot_index} liegt außerhalb des Horizonts "
             f"(0..{model.horizon - 1})."
         )
-    model.prob += model.e_batt[slot_index] == e_kwh
+    model.prob += _plant_energy_at(model, slot_index) == e_kwh
 
 
 def _add_virtual_reserve_asap_charge(
@@ -194,12 +221,13 @@ def _add_pv_only_charge_through_sunrise(
 
 
 def _terminal_soc_energy_kwh(
-    battery_params: dict,
+    model: MilpHorizonModel,
     terminal_soc_percent: float | None,
 ) -> float | None:
+    """Target energy [kWh] of all house batteries for a plant SoC in percent."""
     if terminal_soc_percent is None:
         return None
-    return (terminal_soc_percent / 100.0) * battery_params["battery_capacity_kwh"]
+    return (terminal_soc_percent / 100.0) * plant_capacity_kwh(model)
 
 
 def _add_milp_objective(

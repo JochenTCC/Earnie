@@ -72,10 +72,11 @@ def milp_start_soc(
     sim_soc: float,
     current_soc_by_id: dict[str, float] | None,
 ) -> float:
-    """``current_soc`` for the MILP: its SoC anchors refer to the first house battery.
+    """``current_soc`` for the MILP: the start SoC of the first house battery.
 
     With one house battery that is the simulated SoC. With several the simulated SoC is the
     plant's, so the first battery's own start SoC is passed (``ValueError`` when missing).
+    The MILP's terminal and hold anchors are plant SoC values and do not use it.
     """
     house = house_balance_batteries(batteries)
     if len(house) < 2:

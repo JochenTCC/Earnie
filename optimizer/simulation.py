@@ -271,8 +271,11 @@ def _prepare_horizon_state(
     if disable_horizon_soc_anchor:
         horizon_terminal_soc = None
     else:
+        # The MILP terminal anchor binds all house batteries: it needs the plant SoC.
         horizon_terminal_soc = (
-            None if options.sunrise_soc_min_index is not None else initial_soc
+            None
+            if options.sunrise_soc_min_index is not None
+            else plant_start_soc(batteries, initial_soc, current_soc_by_id)
         )
     standby_plans, standby_packs_by_id = _resolve_standby_chart_plans(
         optimization_matrix, current_soc_by_id
@@ -660,6 +663,11 @@ def simulate_horizon(
         raise ValueError("booking_matrix erfordert den Open-Loop-Pfad (commit_hours > 1).")
     if disable_horizon_soc_anchor:
         sunrise_soc_min_index = None
+    if commit_hours <= 1:
+        # Before the setup: it already needs the plant SoC, which a slot re-solve does not carry.
+        _reject_slot_resolve_with_several_house_batteries(
+            _resolve_horizon_batteries(battery_params)[0]
+        )
     raw_plan = [dict(row) for row in optimization_matrix] if booking_matrix is not None else None
     options = _HorizonOptions(
         k_push=k_push,
@@ -685,8 +693,6 @@ def simulate_horizon(
         flexible_consumers=flexible_consumers,
         current_soc_by_id=current_soc_by_id,
     )
-    if commit_hours <= 1:
-        _reject_slot_resolve_with_several_house_batteries(setup.batteries)
     if booking_matrix is not None:
         setup = replace(
             setup,
