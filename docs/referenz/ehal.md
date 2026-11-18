@@ -336,9 +336,9 @@ On failed setpoint writes (OEM locks, read-only REST, missing HA write entities)
 
 1. Catch the error; **do not crash** the optimizer.
 2. Log with enough context for support (adapter_id, field, hub status/message).
-3. Flip the matching capability flag (`supports_ess_write=false` and/or `supports_evcs_current=false`).
-4. Emit **Write-Error-Telemetry** (see below) so UI can show a user hint.
-5. Continue with read-only / degraded control for that subsystem.
+3. **Keep the capability flags** as the configuration defines them: a failed write never flips `supports_ess_write` / `supports_evcs_current` and never disables a charger. Adapters are cached for the daemon's lifetime, so a flip would turn one transient failure (e.g. a POST timeout) into a silent skip until restart.
+4. Emit **Write-Error-Telemetry** (see below) on **every** failed cycle so UI can show a user hint.
+5. Continue the cycle (a failed field does not block the other fields, e.g. the HA `set_ess_active_power = 0` release) and **retry** every field on the next cycle. A persistent failure (OEM lock, missing binding) therefore shows up as a write error and log warning each cycle, not as a quiet skip.
 
 
 
@@ -366,7 +366,7 @@ Machine schema: `[share/ehal/write_error.schema.json](../../share/ehal/write_err
 | ------------------------------ | ------------------------------------------------------------------------ |
 | Optional telemetry absent      | Omit / null; Core continues                                              |
 | Primary `ess.{id}.sens_ess_soc` absent | Live abort                                                         |
-| Setpoint write fails           | Log + capability degrade + Write-Error-Telemetry; optimizer continues    |
+| Setpoint write fails           | Log + Write-Error-Telemetry each cycle; retried next cycle; optimizer continues |
 | Capability false from start    | Skip writes for that family; no repeated error spam beyond periodic hint |
 | Schema validation fail         | Reject document; adapter must not pass invalid JSON to Core              |
 
@@ -389,6 +389,8 @@ Fields map to known OpenEMS Edge channels (semantic reference). Channel architec
 | `set_ess_charge_power_limit`    | e.g. `SetActivePowerGreaterOrEquals` (adapter maps magnitude)                                                                               |
 | `set_ess_discharge_power_limit` | e.g. `SetActivePowerLessOrEquals`                                                                                                           |
 | `set_ess_mode`                  | *(ignored by OpenEMS)*                                                                                                                      |
+| `set_ess_target_soc`            | *(no channel; reported as unconfigured — no trace row, one warning per adapter)* |
+| `set_grid_export_power_limit`   | *(no channel wired; reported as **skipped** — trace row "Übersprungen: kein OpenEMS-Kanal …" via `last_skipped_messages()`, one warning per adapter. The feed-in cap is **not enforced** on OpenEMS plants.)* |
 | `get_ess_soc_min` / `get_ess_soc_max` / `get_ess_max_charge_power` / `get_ess_max_discharge_power` | *(optional 2.7.j; omit when no Edge channel — Core uses HK fallback)* |
 | `set_evcs_max_current`          | EVCS Max Current                                                                                                                            |
 | `sens_absent_mode`              | Optional side-channel: `plant.ehal_bindings.sens_absent_mode` = `componentId/ChannelId` (no fixed Edge default; not in core telemetry wire) |
@@ -449,6 +451,7 @@ Fields map to known OpenEMS Edge channels (semantic reference). Channel architec
 - Optional absent / holiday: set `plant.ehal_bindings.sens_absent_mode` to `componentId/ChannelId` (read via `read_channel`; no HITL plant mapper yet).
 - Optional inverter: bindings on `inverters[].ehal_bindings` as `inv.{id}.*` (capability `supports_inv_power_limit` reported false until mapped; curtailment write when mapped + `control=full`).
 - Southbound silent gate: reuse `silent_mode` (`local_settings.json`) for OpenEMS writes as well.
+- ESS fields without an OpenEMS channel are never reported as written: `set_grid_export_power_limit` → `last_skipped_fields()` (Live trace "Übersprungen" with the OpenEMS reason from `last_skipped_messages()`; other adapters keep the generic "Mapping unvollständig" text), `set_ess_target_soc` → `last_unconfigured_fields()` (no row); each logs one warning per adapter instance. `set_ess_mode` stays silently ignored (Design C1).
 - Write failures → `runtime/ehal_write_error.json` + UI banner on EHAL-Com / Daemon page.
 
 

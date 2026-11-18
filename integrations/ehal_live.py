@@ -533,12 +533,15 @@ def write_ess_setpoints_from_control(
     error = adapter.write_setpoints(setpoint)
     if error is not None:
         persist_write_error(error)
+    from integrations.ehal_live_records import _last_skipped_messages
+
     records = build_ehal_write_records(
         record_fields,
         written_at=ts,
         error=error,
         skipped=_last_skipped(adapter),
         unconfigured=_last_unconfigured(adapter),
+        skipped_messages=_last_skipped_messages(adapter),
     )
     return error, records
 

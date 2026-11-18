@@ -43,8 +43,6 @@ class HaWriteMixin:
             message=f"Invalid EHAL setpoint: {exc}",
             hub_status=None,
             retryable=False,
-            flip_ess=False,
-            flip_evcs=False,
         )
 
     @staticmethod
@@ -53,14 +51,10 @@ class HaWriteMixin:
         field_name: str,
         status: str | None,
         msg: str,
-        *,
-        flip_ess: bool = False,
     ) -> None:
         outcome.failed.append(field_name)
         outcome.messages.append(msg)
         outcome.hub_status = status or outcome.hub_status
-        if flip_ess:
-            outcome.flip_ess = True
 
     def _write_optional_setpoint(
         self,
@@ -103,9 +97,7 @@ class HaWriteMixin:
                 continue
             ok, status, msg = self._try_setpoint_write(field_name, float(doc[field_name]))
             if not ok:
-                self._record_write_failure(
-                    outcome, field_name, status, msg, flip_ess=True
-                )
+                self._record_write_failure(outcome, field_name, status, msg)
 
         # Push bindings are activation flags with empty values: test the key, not the value.
         mode_activated = any(
@@ -151,7 +143,7 @@ class HaWriteMixin:
     ) -> EhalWriteError | None:
         """Current and mode of one charger (``evcs.<charger_id>.*``) via status.json.
 
-        A failed publish disables this charger only; the other chargers keep writing.
+        A failed publish is reported for this charger only and retried on the next cycle.
         Skipped / failed fields are reported bare (``set_evcs_max_current``).
         """
         from ehal.qualified_ids import qualified_charger_id
@@ -167,11 +159,7 @@ class HaWriteMixin:
             if field_name not in doc:
                 continue
             key = qualified_charger_id(charger_id, field_name)
-            if (
-                not self._supports_evcs_current
-                or charger_id in self._evcs_disabled
-                or key not in self.cfg.entities
-            ):
+            if not self._supports_evcs_current or key not in self.cfg.entities:
                 self._skip(field_name, outcome)
                 continue
             value = doc[field_name]
@@ -184,27 +172,22 @@ class HaWriteMixin:
             ok, status, msg = self._try_setpoint_write(key, numeric)
             if not ok:
                 self._record_write_failure(outcome, field_name, status, msg)
-                outcome.flip_evcs = True
         self._last_skipped = list(outcome.skipped)
         self._last_unconfigured = list(outcome.unconfigured)
         if not outcome.failed:
             return None
-        if outcome.flip_evcs:
-            self._evcs_disabled.add(charger_id)
         return self._record_write_error(
             failed_fields=outcome.failed,
             message="; ".join(outcome.messages),
             hub_status=outcome.hub_status,
             retryable=True,
-            flip_ess=False,
-            flip_evcs=False,
         )
 
     def write_setpoints(
         self,
         setpoint: EhalSetpoint | dict[str, Any],
     ) -> EhalWriteError | None:
-        """Write plant / ESS setpoints; on failure degrade capabilities and return write_error.
+        """Write plant / ESS setpoints; on failure return write_error (retried next cycle).
 
         Charger setpoints go through :meth:`write_evcs_setpoints` (one call per charger).
         """
@@ -230,8 +213,6 @@ class HaWriteMixin:
             message="; ".join(outcome.messages),
             hub_status=outcome.hub_status,
             retryable=True,
-            flip_ess=outcome.flip_ess,
-            flip_evcs=outcome.flip_evcs,
         )
 
     @staticmethod
@@ -304,8 +285,6 @@ class HaWriteMixin:
                 outcome.failed.append(key)
                 outcome.messages.append(msg)
                 outcome.hub_status = status or outcome.hub_status
-                if "ess" in key or key.startswith("set_ess"):
-                    outcome.flip_ess = True
         self._last_skipped = list(outcome.skipped)
         self._last_unconfigured = list(outcome.unconfigured)
         if not outcome.failed:
@@ -316,8 +295,6 @@ class HaWriteMixin:
             message="; ".join(outcome.messages),
             hub_status=outcome.hub_status,
             retryable=True,
-            flip_ess=outcome.flip_ess,
-            flip_evcs=outcome.flip_evcs,
         )
 
     def _publish_setpoint_push(
@@ -360,14 +337,15 @@ class HaWriteMixin:
         message: str,
         hub_status: str | None,
         retryable: bool,
-        flip_ess: bool,
-        flip_evcs: bool,
     ) -> EhalWriteError:
-        if flip_ess:
-            self._supports_ess_write = False
-            self._supports_ess_active = False
-        if flip_evcs:
-            self._supports_evcs_current = False
+        # Capabilities stay as configured: a failed write is reported on every cycle
+        # and retried on the next one instead of disabling control for the process.
+        logger.warning(
+            "HA setpoint publish failed adapter_id=%s fields=%s: %s",
+            self.cfg.adapter_id,
+            ",".join(failed_fields),
+            message,
+        )
         payload: dict[str, Any] = {
             "schema_version": EHAL_SCHEMA_VERSION,
             "ts": _utc_ts(),

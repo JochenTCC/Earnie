@@ -147,11 +147,12 @@ def test_a_failing_charger_does_not_stop_the_other(post_mock):
     error = adapter.write_evcs_setpoints("auto_a", _evcs_setpoint(10), voltage_v=230, phases=1)
     assert error is not None and error["failed_fields"] == ["set_evcs_max_current"]
     assert adapter.write_evcs_setpoints("auto_b", _evcs_setpoint(10), voltage_v=230, phases=1) is None
-    # auto_a stays disabled, auto_b keeps writing.
+    # Next cycle: auto_a is retried (and fails again), auto_b keeps writing.
     post_mock.reset_mock()
-    adapter.write_evcs_setpoints("auto_a", _evcs_setpoint(10), voltage_v=230, phases=1)
+    again = adapter.write_evcs_setpoints("auto_a", _evcs_setpoint(10), voltage_v=230, phases=1)
+    assert again is not None and again["failed_fields"] == ["set_evcs_max_current"]
     adapter.write_evcs_setpoints("auto_b", _evcs_setpoint(10), voltage_v=230, phases=1)
-    assert [("evcs1" in call.args[0]) for call in post_mock.call_args_list] == [True]
+    assert [("evcs1" in call.args[0]) for call in post_mock.call_args_list] == [False, True]
     assert adapter.capabilities()["supports_evcs_current"] is True
 
 
@@ -162,7 +163,7 @@ def test_charger_without_openems_address_is_skipped():
 
 
 @patch("integrations.openems_adapter.requests.post")
-def test_write_lock_degrades_ess(post_mock):
+def test_write_lock_reports_error_and_keeps_ess_capability(post_mock):
     response = MagicMock()
     response.status_code = 403
     post_mock.return_value = response
@@ -178,5 +179,6 @@ def test_write_lock_degrades_ess(post_mock):
     assert error is not None
     assert "set_ess_charge_power_limit" in error["failed_fields"]
     assert error["hub_status"] == "403"
+    # Reported every cycle, never a silent capability flip (retried next cycle).
     caps = adapter.capabilities()
-    assert caps["supports_ess_write"] is False
+    assert caps["supports_ess_write"] is True

@@ -137,7 +137,7 @@ def test_switch_write_domain_rejected_by_adapter(bench):
     assert "Unsupported write domain" in err["message"]
 
 
-def test_write_error_degrades_ess_capability(bench):
+def test_write_error_keeps_ess_capability(bench):
     _package, store, _physics, adapter, _base = bench
     assert adapter.capabilities()["supports_ess_write"] is True
     store.force_service_status(403)
@@ -150,7 +150,7 @@ def test_write_error_degrades_ess_capability(bench):
         }
     )
     assert err is not None
-    assert adapter.capabilities()["supports_ess_write"] is False
+    assert adapter.capabilities()["supports_ess_write"] is True
     assert adapter.last_write_error() is not None
     store.force_service_status(None)
 

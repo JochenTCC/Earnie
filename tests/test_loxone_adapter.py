@@ -312,10 +312,17 @@ def test_a_failing_charger_does_not_stop_the_other():
         assert adapter.write_evcs_setpoints(
             "auto_b", _evcs(set_evcs_max_current=10), voltage_v=230, phases=1
         ) is None
+        # Next cycle: auto_a is retried (and fails again), auto_b keeps writing.
         pub_mock.reset_mock()
-        adapter.write_evcs_setpoints("auto_a", _evcs(set_evcs_max_current=10), voltage_v=230, phases=1)
+        again = adapter.write_evcs_setpoints(
+            "auto_a", _evcs(set_evcs_max_current=10), voltage_v=230, phases=1
+        )
+        assert again is not None and again["failed_fields"] == ["set_evcs_max_current"]
         adapter.write_evcs_setpoints("auto_b", _evcs(set_evcs_max_current=10), voltage_v=230, phases=1)
-    assert [c.args[0] for c in pub_mock.call_args_list] == ["evcs.auto_b.set_evcs_max_current"]
+    assert [c.args[0] for c in pub_mock.call_args_list] == [
+        "evcs.auto_a.set_evcs_max_current",
+        "evcs.auto_b.set_evcs_max_current",
+    ]
 
 
 @patch("integrations.loxone_writes._publish_setpoint_traced", side_effect=_pub_ok)
@@ -335,7 +342,7 @@ def test_write_setpoints_ess_mode_skipped_without_cmd_marker(pub_mock):
 
 
 @patch("integrations.loxone_writes._publish_setpoint_traced", side_effect=_pub_fail)
-def test_write_setpoints_degrades_on_failure(pub_mock):
+def test_write_setpoints_reports_failure_and_keeps_capability(pub_mock):
     adapter = LoxoneAdapter(_cfg())
     error = adapter.write_setpoints(
         {
@@ -347,4 +354,4 @@ def test_write_setpoints_degrades_on_failure(pub_mock):
     )
     assert error is not None
     assert "set_ess_charge_power_limit" in error["failed_fields"]
-    assert adapter.capabilities()["supports_ess_write"] is False
+    assert adapter.capabilities()["supports_ess_write"] is True

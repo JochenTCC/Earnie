@@ -30,13 +30,11 @@ _NONNEG_TELEMETRY = frozenset(
 
 @dataclass
 class _HaWriteOutcome:
-    """Fehlfelder, Meldungen und Capability-Flips eines Setpoint-Schreibvorgangs."""
+    """Fehlfelder, Meldungen und übersprungene Felder eines Setpoint-Schreibvorgangs."""
 
     failed: list[str] = field(default_factory=list)
     messages: list[str] = field(default_factory=list)
     hub_status: str | None = None
-    flip_ess: bool = False
-    flip_evcs: bool = False
     skipped: list[str] = field(default_factory=list)
     # Never activated (not an incomplete mapping): nothing was written, no record.
     unconfigured: list[str] = field(default_factory=list)

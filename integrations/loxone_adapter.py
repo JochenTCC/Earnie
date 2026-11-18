@@ -231,8 +231,6 @@ class LoxoneAdapter:
             logger.warning("Loxone mapping adapter_id=%s: %s", cfg.adapter_id, message)
         self._incomplete_fields = incomplete_function_fields(write_map)
         self._evcs_markers = {cid: (current, mode) for cid, current, mode in cfg.evcs_markers}
-        # Chargers whose last publish failed; the others keep writing.
-        self._evcs_disabled: set[str] = set()
         self._last_write_error: EhalWriteError | None = None
         self._last_skipped: list[str] = []
         self._warned_skips: set[str] = set()
@@ -391,8 +389,6 @@ class LoxoneAdapter:
                 message=f"Invalid EHAL setpoint: {exc}",
                 hub_status=None,
                 retryable=False,
-                flip_ess=False,
-                flip_evcs=False,
             )
 
         evcs = [k for k in ("set_evcs_max_current", "set_evcs_mode") if k in doc]
@@ -403,11 +399,9 @@ class LoxoneAdapter:
             )
         failed: list[str] = []
         messages: list[str] = []
-        flip_ess = False
-        flip_evcs = False
         self._last_skipped = []
 
-        flip_ess = self._write_ess_setpoints(doc, failed, messages) or flip_ess
+        self._write_ess_setpoints(doc, failed, messages)
         if "set_ess_mode" in doc and not self.cfg.control_cmd_name:
             self._skip("set_ess_mode")
         elif "set_ess_mode" in doc:
@@ -444,14 +438,11 @@ class LoxoneAdapter:
             message="; ".join(messages),
             hub_status=None,
             retryable=True,
-            flip_ess=flip_ess,
-            flip_evcs=flip_evcs,
         )
 
     def _write_ess_setpoints(
         self, doc: dict[str, Any], failed: list[str], messages: list[str]
-    ) -> bool:
-        flip = False
+    ) -> None:
         for field_name, supported in (
             ("set_ess_active_power", self._supports_ess_active),
             ("set_ess_charge_power_limit", self._supports_ess_write),
@@ -478,7 +469,6 @@ class LoxoneAdapter:
             if not ok:
                 failed.append(field_name)
                 messages.append(msg)
-                flip = True
         if "set_grid_export_power_limit" in doc:
             if not self.cfg.grid_export_limit_out_name:
                 self._skip("set_grid_export_power_limit")
@@ -496,7 +486,6 @@ class LoxoneAdapter:
                 if not ok:
                     failed.append("set_grid_export_power_limit")
                     messages.append(msg)
-        return flip
 
     def write_evcs_setpoints(
         self,
@@ -508,7 +497,7 @@ class LoxoneAdapter:
     ) -> EhalWriteError | None:
         """Current and mode of one charger (``evcs.<charger_id>.*``) via status.json.
 
-        A failed publish disables this charger only; the other chargers keep writing.
+        A failed publish is reported for this charger only and retried on the next cycle.
         """
         from ehal.qualified_ids import qualified_charger_id
 
@@ -523,16 +512,13 @@ class LoxoneAdapter:
                 message=f"Invalid EHAL setpoint: {exc}",
                 hub_status=None,
                 retryable=False,
-                flip_ess=False,
-                flip_evcs=False,
             )
         self._last_skipped = []
         current_marker, mode_marker = self._evcs_markers.get(charger_id, ("", ""))
-        usable = charger_id not in self._evcs_disabled
         failed: list[str] = []
         messages: list[str] = []
         if "set_evcs_max_current" in doc:
-            if not (usable and current_marker):
+            if not current_marker:
                 self._skip("set_evcs_max_current")
             else:
                 ok, msg = self._try_marker_write(
@@ -545,7 +531,7 @@ class LoxoneAdapter:
                     messages.append(msg)
         if "set_evcs_mode" in doc:
             mode_l = str(doc["set_evcs_mode"] or "").strip().lower()
-            if not (usable and mode_marker):
+            if not mode_marker:
                 self._skip("set_evcs_mode")
             elif mode_l not in EVCS_MODE_VALUES:
                 failed.append("set_evcs_mode")
@@ -562,14 +548,11 @@ class LoxoneAdapter:
                     messages.append(msg)
         if not failed:
             return None
-        self._evcs_disabled.add(charger_id)
         return self._record_write_error(
             failed_fields=failed,
             message="; ".join(messages),
             hub_status=None,
             retryable=True,
-            flip_ess=False,
-            flip_evcs=False,
         )
 
     def _read_or_derive_consumers(
@@ -649,14 +632,9 @@ class LoxoneAdapter:
         message: str,
         hub_status: str | None,
         retryable: bool,
-        flip_ess: bool,
-        flip_evcs: bool,
     ) -> EhalWriteError:
-        if flip_ess:
-            self._supports_ess_write = False
-            self._supports_ess_active = False
-        if flip_evcs:
-            self._supports_evcs_current = False
+        # Capabilities stay as configured: a failed write is reported on every cycle
+        # and retried on the next one instead of disabling control for the process.
         payload: dict[str, Any] = {
             "schema_version": EHAL_SCHEMA_VERSION,
             "ts": _utc_ts(),

@@ -67,6 +67,12 @@ def _last_unconfigured(adapter: Any) -> list[str]:
     return list(getter()) if callable(getter) else []
 
 
+def _last_skipped_messages(adapter: Any) -> dict[str, str]:
+    """Adapter-specific skip reasons per field (fields absent use ``SKIPPED_MESSAGE``)."""
+    getter = getattr(adapter, "last_skipped_messages", None)
+    return dict(getter()) if callable(getter) else {}
+
+
 def build_ehal_write_records(
     fields: dict[str, float],
     *,
@@ -74,11 +80,14 @@ def build_ehal_write_records(
     error: EhalWriteError | None,
     skipped: list[str] | None = None,
     unconfigured: list[str] | None = None,
+    skipped_messages: dict[str, str] | None = None,
 ) -> list[dict[str, Any]]:
     """Compact write trace rows for optimizer_run_state.ehal_writes.
 
     ``unconfigured`` fields were never activated: nothing was written, so no row
     (a "success" row for a field that never left Earnie would be wrong).
+    ``skipped_messages`` overrides ``SKIPPED_MESSAGE`` per skipped field when the
+    adapter knows a more specific reason (e.g. no OpenEMS channel exists).
     """
     failed = set(error.get("failed_fields") or []) if error else set()
     message = str(error.get("message") or "") if error else ""
@@ -96,7 +105,7 @@ def build_ehal_write_records(
                     "success": False,
                     "skipped": True,
                     "written_at": written_at,
-                    "message": SKIPPED_MESSAGE,
+                    "message": (skipped_messages or {}).get(field, SKIPPED_MESSAGE),
                 }
             )
             continue

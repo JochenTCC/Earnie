@@ -30,6 +30,8 @@ Details zur OpenEMS-Plant (Kanal-Tabelle, Ersttest auf dem Pi): [docs/dev/openem
 
 **Abwesenheitsmodus (optional):** In `house_profiles.json` unter `plant.ehal_bindings.sens_absent_mode` einen Kanal im Format `componentId/ChannelId` eintragen (z. B. `ctrlHoliday0/HolidayMode`). Für OpenEMS gibt es noch keine Zuordnung in der Oberfläche (HITL-Mapper). Der Kanal wird deshalb direkt im Hausprofil (JSON) gepflegt. Details: [Flexible Verbraucher](../konfiguration/flexible-verbraucher.md#abwesenheitsmodus-live).
 
+**Einspeisegrenze:** Für OpenEMS ist noch kein Kanal für die Einspeisebegrenzung angebunden. Hat die Anlage eine Einspeisegrenze (z. B. Nulleinspeisung oder §14a-Drosselung), plant Earnie zwar damit, setzt sie in OpenEMS aber nicht durch. Im Live-Schreiben-Protokoll steht das Feld `set_grid_export_power_limit` deshalb als „Übersprungen: kein OpenEMS-Kanal für die Einspeisegrenze angebunden“, und das Log enthält eine Warnung. Die Grenze muss in OpenEMS selbst eingerichtet sein. Den Ziel-SoC (`set_ess_target_soc`) schreibt Earnie bei OpenEMS ebenfalls nicht; er erscheint nicht im Protokoll.
+
 ## Stop
 
 Stack beenden:

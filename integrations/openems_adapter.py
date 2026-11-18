@@ -47,13 +47,11 @@ class OpenemsHttpError(RuntimeError):
 
 @dataclass
 class _OpenemsWriteOutcome:
-    """Fehlfelder, Meldungen und Capability-Flips eines Setpoint-Schreibvorgangs."""
+    """Fehlfelder und Meldungen eines Setpoint-Schreibvorgangs."""
 
     failed: list[str] = field(default_factory=list)
     messages: list[str] = field(default_factory=list)
     hub_status: str | None = None
-    flip_ess: bool = False
-    flip_evcs: bool = False
 
 
 def _utc_ts() -> str:
@@ -130,6 +128,18 @@ def _openems_inv_limit_channels() -> dict[str, tuple[str, str]]:
     return out
 
 
+# ESS setpoint fields without an OpenEMS channel (see ``_report_unwired_ess_fields``).
+_OPENEMS_SKIPPED_ESS_FIELDS = ("set_grid_export_power_limit",)
+_OPENEMS_UNCONFIGURED_ESS_FIELDS = ("set_ess_target_soc",)
+# Live-trace reason for skipped ESS fields (German: shown in the UI).
+_OPENEMS_SKIPPED_ESS_MESSAGES = {
+    "set_grid_export_power_limit": (
+        "Übersprungen: kein OpenEMS-Kanal für die Einspeisegrenze angebunden "
+        "(Grenze wird von Earnie nicht durchgesetzt)"
+    ),
+}
+
+
 class OpenemsAdapter:
     """REST-only OpenEMS ↔ EHAL adapter (no OpenEMS libraries)."""
 
@@ -140,7 +150,6 @@ class OpenemsAdapter:
             cid: (component, channel) for cid, component, channel in cfg.evcs_channels
         }
         self._supports_evcs_current = bool(self._evcs_channels)
-        self._evcs_disabled: set[str] = set()
         self._inv_limit_channels = _openems_inv_limit_channels()
         self._supports_inv_power_limit = bool(self._inv_limit_channels)
         self._last_write_error: EhalWriteError | None = None
@@ -343,16 +352,64 @@ class OpenemsAdapter:
             message=f"Invalid EHAL setpoint: {exc}",
             hub_status=None,
             retryable=False,
-            flip_ess=False,
-            flip_evcs=False,
         )
+
+    # ESS-path fields OpenEMS has no channel for. Class-level immutable defaults; the
+    # ESS write rebinds them per instance (``__init__`` stays untouched).
+    _last_unconfigured: tuple[str, ...] = ()
+    _warned_unwired: frozenset[str] = frozenset()
+
+    def last_skipped_messages(self) -> dict[str, str]:
+        """Skip reason per field of the last write where it differs from the generic one."""
+        return {
+            f: _OPENEMS_SKIPPED_ESS_MESSAGES[f]
+            for f in self._last_skipped
+            if f in _OPENEMS_SKIPPED_ESS_MESSAGES
+        }
+
+    def last_unconfigured_fields(self) -> list[str]:
+        """ESS fields of the last write OpenEMS ignores by design (no trace row)."""
+        return list(self._last_unconfigured)
+
+    def _report_unwired_ess_fields(self, doc: dict[str, Any]) -> None:
+        """Report ESS fields without an OpenEMS channel instead of dropping them silently.
+
+        ``set_grid_export_power_limit``: skipped (trace row "Übersprungen") — the plan
+        assumes a feed-in cap that nothing on OpenEMS enforces. ``set_ess_target_soc``:
+        unconfigured (no row) — ignoring it is documented Design C1 behaviour.
+        ``set_ess_mode`` stays out of both: Design C1 encodes it in active power + limits.
+        """
+        skipped = [f for f in _OPENEMS_SKIPPED_ESS_FIELDS if f in doc]
+        unconfigured = [f for f in _OPENEMS_UNCONFIGURED_ESS_FIELDS if f in doc]
+        self._last_skipped = skipped
+        self._last_unconfigured = tuple(unconfigured)
+        for field_name in skipped + unconfigured:
+            if field_name in self._warned_unwired:
+                continue
+            self._warned_unwired = self._warned_unwired | {field_name}
+            logger.warning(
+                "OpenEMS setpoint %s not written adapter_id=%s: no OpenEMS channel "
+                "wired for this field%s",
+                field_name,
+                self.cfg.adapter_id,
+                (
+                    " — feed-in cap is NOT enforced on this plant"
+                    if field_name == "set_grid_export_power_limit"
+                    else ""
+                ),
+            )
 
     def _write_ess_setpoints(
         self,
         doc: dict[str, Any],
         outcome: _OpenemsWriteOutcome,
     ) -> None:
-        """Design C1: active_power → Equals; limits → Greater/Less; set_ess_mode ignored."""
+        """Design C1: active_power → Equals; limits → Greater/Less; set_ess_mode ignored.
+
+        Fields without an OpenEMS channel are reported via
+        :meth:`_report_unwired_ess_fields` (skipped / unconfigured), never as written.
+        """
+        self._report_unwired_ess_fields(doc)
         if "set_ess_active_power" in doc and self._supports_ess_write:
             ok, status, msg = self._try_ess_write(
                 "SetActivePowerEquals",
@@ -362,7 +419,6 @@ class OpenemsAdapter:
                 outcome.failed.append("set_ess_active_power")
                 outcome.messages.append(msg)
                 outcome.hub_status = status
-                outcome.flip_ess = True
 
         if "set_ess_charge_power_limit" in doc and self._supports_ess_write:
             ok, status, msg = self._try_ess_write(
@@ -373,7 +429,6 @@ class OpenemsAdapter:
                 outcome.failed.append("set_ess_charge_power_limit")
                 outcome.messages.append(msg)
                 outcome.hub_status = status or outcome.hub_status
-                outcome.flip_ess = True
 
         if "set_ess_discharge_power_limit" in doc and self._supports_ess_write:
             ok, status, msg = self._try_ess_write(
@@ -384,11 +439,6 @@ class OpenemsAdapter:
                 outcome.failed.append("set_ess_discharge_power_limit")
                 outcome.messages.append(msg)
                 outcome.hub_status = status or outcome.hub_status
-                outcome.flip_ess = True
-
-        if "set_grid_export_power_limit" in doc:
-            # OpenEMS feed-in curtailment channel not wired yet — ignore quietly.
-            pass
 
     def write_evcs_setpoints(
         self,
@@ -400,7 +450,8 @@ class OpenemsAdapter:
     ) -> EhalWriteError | None:
         """EVCS current limit as active power on this charger's component.
 
-        A failed write disables this charger only. ``set_evcs_mode`` has no channel.
+        A failed write is reported for this charger only and retried on the next
+        cycle. ``set_evcs_mode`` has no channel.
         """
         raw = dict(setpoint)
         try:
@@ -411,7 +462,7 @@ class OpenemsAdapter:
         if "set_evcs_max_current" not in doc:
             return None
         target = self._evcs_channels.get(charger_id)
-        if target is None or charger_id in self._evcs_disabled:
+        if target is None:
             self._last_skipped = ["set_evcs_max_current"]
             return None
         watts = evcs_amps_to_watts(
@@ -420,21 +471,18 @@ class OpenemsAdapter:
         ok, status, msg = self._try_evcs_write(*target, watts)
         if ok:
             return None
-        self._evcs_disabled.add(charger_id)
         return self._record_write_error(
             failed_fields=["set_evcs_max_current"],
             message=msg,
             hub_status=status,
             retryable=True,
-            flip_ess=False,
-            flip_evcs=False,
         )
 
     def write_setpoints(
         self,
         setpoint: EhalSetpoint | dict[str, Any],
     ) -> EhalWriteError | None:
-        """Write ESS setpoints; on failure degrade capabilities and return write_error.
+        """Write ESS setpoints; on failure return write_error (retried next cycle).
 
         Charger setpoints go through :meth:`write_evcs_setpoints`.
         """
@@ -462,8 +510,6 @@ class OpenemsAdapter:
             message="; ".join(outcome.messages),
             hub_status=outcome.hub_status,
             retryable=True,
-            flip_ess=outcome.flip_ess,
-            flip_evcs=outcome.flip_evcs,
         )
 
     def write_mapped_fields(
@@ -511,8 +557,6 @@ class OpenemsAdapter:
             message="; ".join(outcome.messages),
             hub_status=outcome.hub_status,
             retryable=True,
-            flip_ess=False,
-            flip_evcs=False,
         )
 
     def _channel_url(self, component: str, channel: str) -> str:
@@ -568,13 +612,9 @@ class OpenemsAdapter:
         message: str,
         hub_status: str | None,
         retryable: bool,
-        flip_ess: bool,
-        flip_evcs: bool,
     ) -> EhalWriteError:
-        if flip_ess:
-            self._supports_ess_write = False
-        if flip_evcs:
-            self._supports_evcs_current = False
+        # Capabilities stay as configured: a failed write is reported on every cycle
+        # and retried on the next one instead of disabling control for the process.
         payload: dict[str, Any] = {
             "schema_version": EHAL_SCHEMA_VERSION,
             "ts": _utc_ts(),
