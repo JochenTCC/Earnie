@@ -688,6 +688,8 @@ def write_evcs_max_current_from_consumers(
 ) -> tuple[EhalWriteError | None, list[dict[str, Any]]]:
     """Write ``set_evcs_max_current`` (kW→A) for every EV ↔ wallbox pair (multi-EV M2).
 
+    The kW follow the same rule as the Loxone path (``loxone_control_outputs``): 0 or
+    [min_power_kw, nominal], P_max with PV follow.
     One adapter call per charger (``evcs.<Kennung>.*``) with the pair's voltage and phases:
     a failing charger does not stop the others. HA backend: also ``set_evcs_mode``
     (skipped by the adapter when not activated). With "Sofort laden" only the mode ``now``
@@ -761,25 +763,28 @@ def _write_one_charger(
     charging_contexts: dict[str, dict] | None,
     consumer_pv_follow: dict[str, int] | None,
 ) -> tuple[EhalWriteError | None, dict[str, Any], str]:
+    from integrations.loxone_writes import _effective_consumer_power_kw
+    from optimizer.consumer_power import loxone_control_outputs
+
     cid = consumer["id"]
-    planned_kw = max(0.0, float(consumer_powers.get(cid, 0.0) or 0.0))
-    ctx = (charging_contexts or {}).get(cid)
-    if ctx is not None and not ctx.get("active", True):
-        planned_kw = 0.0
-    if ctx is not None and ctx.get("anticipated") and not ctx.get("plugged_in"):
-        planned_kw = 0.0
+    contexts = charging_contexts or {}
+    ctx = contexts.get(cid)
+    # Same rule as the Loxone path (``flex_consumer_power_setpoint_kw``): inactive, or
+    # anticipated but not plugged in → 0 kW; otherwise 0 or [min_power_kw, nominal], and
+    # with PV follow P_max so the hub follows the surplus instead of the plan average.
+    planned_kw = _effective_consumer_power_kw(consumer, consumer_powers, contexts, cid)
+    plan_pv = int((consumer_pv_follow or {}).get(cid, 0) or 0)
+    setpoint_kw, pv_out = loxone_control_outputs(consumer, planned_kw, plan_pv)
     # The pair view carries the wallbox voltage and the pair's phases.
     voltage_v, phases = ev_nominal_power_conversion(consumer)
-    amps_out = max(0.0, kw_to_ampere(planned_kw, voltage_v=voltage_v, phases=phases))
+    amps_out = round(kw_to_ampere(setpoint_kw, voltage_v=voltage_v, phases=phases), 3)
     ts = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     written: dict[str, Any] = {}
     immediate = is_ha_backend() and bool((ctx or {}).get("skip_loxone_output"))
     if not immediate:
         written["set_evcs_max_current"] = amps_out
     if is_ha_backend():
-        written["set_evcs_mode"] = _evcs_mode_for_cycle(
-            consumer, planned_kw, amps_out, immediate, consumer_pv_follow
-        )
+        written["set_evcs_mode"] = _evcs_mode_for_cycle(pv_out, amps_out, immediate)
     setpoint = {
         "schema_version": EHAL_SCHEMA_VERSION,
         "ts": ts,
@@ -792,19 +797,16 @@ def _write_one_charger(
     return error, written, ts
 
 
-def _evcs_mode_for_cycle(
-    consumer: dict,
-    planned_kw: float,
-    amps: float,
-    immediate: bool,
-    consumer_pv_follow: dict[str, int] | None,
-) -> str:
-    from optimizer.consumer_power import loxone_control_outputs, set_evcs_mode_for_plan
+def _evcs_mode_for_cycle(pv_follow_out: int, amps: float, immediate: bool) -> str:
+    """Mode matching the current written this cycle.
 
-    plan_pv = int((consumer_pv_follow or {}).get(consumer["id"], 0) or 0)
-    _, pv_out = loxone_control_outputs(consumer, planned_kw, plan_pv)
+    ``pv_follow_out`` and ``amps`` come from the same ``loxone_control_outputs`` call, so
+    mode ``pv`` always goes with the P_max current and ``now`` with the clamped plan current.
+    """
+    from optimizer.consumer_power import set_evcs_mode_for_plan
+
     return set_evcs_mode_for_plan(
-        pv_follow=int(pv_out), immediate=immediate, charging=amps > 1e-6
+        pv_follow=int(pv_follow_out), immediate=immediate, charging=amps > 1e-6
     )
 
 
