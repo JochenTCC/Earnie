@@ -37,8 +37,8 @@ def _clear_session_after_config_import() -> None:
             del st.session_state[key]
 
 
-def render_config_pack_sidebar() -> None:
-    with st.sidebar.expander("Konfiguration speichern / laden", expanded=False):
+def render_config_pack_sidebar(*, expanded: bool = False) -> None:
+    with st.sidebar.expander("Konfiguration speichern / laden", expanded=expanded):
         st.caption(
             "Exportiert bzw. importiert die JSON-Konfiguration und CSV-Uploads "
             "als ZIP (ohne .env / Zugangsdaten)."

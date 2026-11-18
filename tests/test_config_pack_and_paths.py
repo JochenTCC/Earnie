@@ -255,6 +255,11 @@ def test_config_pack_round_trip(monkeypatch, tmp_path: Path) -> None:
     for name, doc in docs.items():
         # empty targets so import has somewhere to write
         (other / name).write_text("{}", encoding="utf-8")
+    # This test covers pack mechanics only; the minimal docs are not a loadable
+    # config. Load validation: tests/test_config_pack_load_validation.py.
+    from runtime_store import config_pack
+
+    monkeypatch.setattr(config_pack, "_reload_live_config", lambda: None)
     written = import_config_pack_bytes(payload)
     assert "config.json" in written
     assert "grid_fees.json" in written
