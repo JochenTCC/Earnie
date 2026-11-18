@@ -1,12 +1,16 @@
 """Terminal / reserve / sunrise constraints and objective of the horizon MILP (split from milp_horizon)."""
 from __future__ import annotations
 
+import logging
+import math
 import os
 from typing import Any
 import pulp
 from data.feed_in_prices import k_push_act_for_matrix_row
 from .milp_horizon_types import MilpHorizonModel
 from .slot_duration import validate_dt_h
+
+logger = logging.getLogger(__name__)
 
 LOOKAHEAD_ENV = "EARNIE_SE_LOOKAHEAD_H"
 DEFAULT_LOOKAHEAD_H = 8.0
@@ -60,15 +64,47 @@ def _add_virtual_reserve_asap_charge(
     max_charge_kw: float,
     efficiency: float,
 ) -> None:
-    """Deprecated alias — prefer ``_add_virtual_reserve_deadline_charge`` (2.7.p)."""
-    _add_virtual_reserve_deadline_charge(
+    """Deprecated alias — prefer ``_add_virtual_reserve_deadline_charge`` (2.7.p).
+
+    Charges the refill as soon as possible (first slots that can deliver it).
+    """
+    _add_virtual_reserve_charge_in_slots(
         model,
-        matrix=None,
         refill_kwh=asap_charge_kwh,
         max_charge_kw=max_charge_kw,
         efficiency=efficiency,
-        deadline=None,
+        slots=None,
     )
+
+
+def _asap_slots(model: MilpHorizonModel, ac_kwh_needed: float, max_charge_kw: float) -> list[int]:
+    """Fewest leading slots whose full charge power covers ``ac_kwh_needed`` (whole horizon max)."""
+    per_slot = max_charge_kw * model.dt_h
+    count = math.ceil(ac_kwh_needed / per_slot - 1e-9)
+    return list(range(max(1, min(model.horizon, count))))
+
+
+def _add_virtual_reserve_charge_in_slots(
+    model: MilpHorizonModel,
+    *,
+    refill_kwh: float,
+    max_charge_kw: float,
+    efficiency: float,
+    slots: list[int] | None,
+) -> None:
+    """Primary ESS charge of the refill inside ``slots``; ``None`` = as soon as possible."""
+    if refill_kwh <= 1e-9 or max_charge_kw <= 1e-9 or model.horizon < 1:
+        return
+    eta = float(efficiency) if efficiency > 1e-9 else 1.0
+    ac_kwh_needed = refill_kwh / eta
+    eligible = slots if slots is not None else _asap_slots(model, ac_kwh_needed, max_charge_kw)
+    deliverable = max_charge_kw * model.dt_h * len(eligible)
+    required = min(ac_kwh_needed, deliverable)
+    if required <= 1e-9:
+        return
+    model.prob += (
+        pulp.lpSum(model.p_charge[t] * model.dt_h for t in eligible) >= required
+    ), "virtual_reserve_deadline_charge"
 
 
 def _add_virtual_reserve_deadline_charge(
@@ -82,33 +118,42 @@ def _add_virtual_reserve_deadline_charge(
 ) -> None:
     """Require primary ESS charge of refill kWh by deadline (price-optimal within window).
 
-    Sum of ``p_charge`` over slots before the deadline (or full horizon when the
-    deadline is missing / beyond the horizon) must cover AC kWh needed. The MILP
-    cost objective picks cheap slots inside that window — not ASAP front-loading.
+    Sum of ``p_charge`` over the slots before the deadline (all of them when the deadline
+    lies beyond the horizon) must cover the AC kWh needed; the cost objective picks cheap
+    slots inside that window. A deadline at or before the first slot is overdue: the refill
+    goes into the first slots that can deliver it (as soon as possible, decided 2026-11-18),
+    with a warning. A missing deadline or matrix is an error, not "whole horizon".
     """
     if refill_kwh <= 1e-9 or max_charge_kw <= 1e-9 or model.horizon < 1:
         return
-    eta = float(efficiency) if efficiency > 1e-9 else 1.0
-    ac_kwh_needed = refill_kwh / eta
+    if deadline is None:
+        raise ValueError(
+            "Virtuelle Reserve: Nachlademenge ohne Nachlade-Deadline "
+            "(_virtual_reserve_refill_deadline_utc fehlt)."
+        )
+    if not matrix:
+        raise ValueError("Virtuelle Reserve: Nachlade-Deadline braucht die Planungsmatrix.")
     from optimizer.charging_schedule import matrix_slot_datetime
 
-    eligible: list[int] = []
-    if matrix and deadline is not None:
-        for t in range(min(model.horizon, len(matrix))):
-            if matrix_slot_datetime(matrix, t) < deadline:
-                eligible.append(t)
+    eligible = [
+        t
+        for t in range(min(model.horizon, len(matrix)))
+        if matrix_slot_datetime(matrix, t) < deadline
+    ]
     if not eligible:
-        # No usable pre-deadline slots (missing deadline / past): full horizon so
-        # the cost objective can still pick cheap slots inside the plan.
-        eligible = list(range(model.horizon))
-
-    deliverable = max_charge_kw * model.dt_h * len(eligible)
-    required = min(ac_kwh_needed, deliverable)
-    if required <= 1e-9:
-        return
-    model.prob += (
-        pulp.lpSum(model.p_charge[t] * model.dt_h for t in eligible) >= required
-    ), "virtual_reserve_deadline_charge"
+        logger.warning(
+            "Virtuelle Reserve: Nachlade-Deadline %s ist abgelaufen – Nachladung "
+            "(%.3f kWh) so früh wie möglich.",
+            deadline.isoformat(),
+            float(refill_kwh),
+        )
+    _add_virtual_reserve_charge_in_slots(
+        model,
+        refill_kwh=refill_kwh,
+        max_charge_kw=max_charge_kw,
+        efficiency=efficiency,
+        slots=eligible or None,
+    )
 
 
 def _add_sunrise_soc_min_constraint(

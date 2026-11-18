@@ -1,7 +1,7 @@
 """Tests für SOC_min-Randbedingung am Sonnenaufgang-Slot."""
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 import pulp
@@ -259,11 +259,15 @@ def test_milp_feasible_with_virtual_asap_and_sunrise_pv_only():
         "efficiency": 0.94,
         "control": "full",
     }
+    # The refill deadline (2.7.p) lies before sunrise, as the ASAP charge of the prod case.
+    refill_deadline = (start + timedelta(hours=1)).astimezone(timezone.utc).isoformat()
     reserves = [
         {
             "backing": "virtual",
             "protected_kwh": 0.0,
             "asap_charge_kwh": 1.0,
+            "refill_kwh": 1.0,
+            "refill_deadline_utc": refill_deadline,
             "state": "empty",
             "stored_kwh": 0.0,
             "target_kwh": 1.0,
@@ -272,6 +276,8 @@ def test_milp_feasible_with_virtual_asap_and_sunrise_pv_only():
             "backing": "virtual",
             "protected_kwh": 0.0,
             "asap_charge_kwh": 0.1,
+            "refill_kwh": 0.1,
+            "refill_deadline_utc": refill_deadline,
             "state": "empty",
             "stored_kwh": 0.0,
             "target_kwh": 0.1,

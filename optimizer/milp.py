@@ -102,10 +102,13 @@ def _add_virtual_reserve_refill(
     if deadline_raw:
         try:
             deadline = datetime.fromisoformat(str(deadline_raw).replace("Z", "+00:00"))
-            if deadline.tzinfo is None:
-                deadline = deadline.replace(tzinfo=timezone.utc)
-        except ValueError:
-            deadline = None
+        except ValueError as exc:
+            raise ValueError(
+                "Virtuelle Reserve: Nachlade-Deadline ist kein ISO-Zeitstempel "
+                f"({deadline_raw!r})."
+            ) from exc
+        if deadline.tzinfo is None:
+            deadline = deadline.replace(tzinfo=timezone.utc)
     _add_virtual_reserve_deadline_charge(
         model,
         matrix=matrix,

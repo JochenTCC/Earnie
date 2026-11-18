@@ -252,6 +252,11 @@ default (rule `no-implicit-fallbacks`).
   activated before the backend sends it): the configured band, a warning per cycle and
   `band_source = "config_no_value"` (decided 2026-11-15 after the first activation on the
   reference plant stopped the store plan). A negative tolerance is an error.
+- **`T_eq` without a value:** the store plan starts at the setpoint, with a warning per cycle
+  and `eq_source = "setpoint_no_value"` in `thermal_observability[]` (`"measured"`
+  otherwise); same reasoning as the band (decided 2026-11-18). Without an outdoor forecast
+  and without `sens_temperature_outside` the Live plan fails loud; there is no assumed
+  outdoor temperature.
 - **One key per kind:** the mapping UI stores the heat and pool read kinds bare
   (`house_config.ehal_bindings.consumer_bare_stored_kinds`); the signal list now writes
   the same key and treats the qualified spelling as activated too. Migration

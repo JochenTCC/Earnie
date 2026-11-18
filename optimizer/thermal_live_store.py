@@ -56,6 +56,10 @@ from optimizer.thermal_live_house import (  # noqa: F401  (re-exported)
 
 logger = logging.getLogger(__name__)
 
+EQ_SOURCE_MEASURED = "measured"
+EQ_SOURCE_SETPOINT_NO_VALUE = "setpoint_no_value"
+"""Observability ``eq_source``: T_eq had no value, the store plan started at the setpoint."""
+
 
 @dataclass(frozen=True)
 class HeatStorageReadings:
@@ -179,7 +183,13 @@ def resolve_heat_storage_readings(
     house_doc: dict | None = None,
     heat_storage: dict | None = None,
 ) -> HeatStorageReadings:
-    """Read T_eq / T_low; missing T_eq falls back to store setpoint."""
+    """Read T_eq / T_low.
+
+    A missing T_eq starts the plan at the store setpoint: a documented, visible default
+    (warning per cycle, ``used_measured_eq`` False → observability ``eq_source``
+    ``"setpoint_no_value"``; decided 2026-11-18 like the band's ``config_no_value``), so one
+    missing reading does not stop the whole Live cycle.
+    """
     from integrations.ehal_live import fetch_heat_storage_temps
 
     storage = normalize_heat_storage(
@@ -195,6 +205,13 @@ def resolve_heat_storage_readings(
     eq = measured.get("temp_eq_c")
     low = measured.get("temp_low_c")
     used_eq = eq is not None
+    if not used_eq:
+        logger.warning(
+            "Wärmespeicher '%s': T_eq (sens_temperature_heat_storage) liefert keinen Wert – "
+            "Speicherplan startet bei der Solltemperatur %.1f °C.",
+            consumer.get("id") or "?",
+            float(band.setpoint_c),
+        )
     return HeatStorageReadings(
         temp_eq_c=float(eq) if used_eq else float(band.setpoint_c),
         temp_low_c=float(low) if low is not None else None,
@@ -372,11 +389,8 @@ def plan_live_store_for_thermal_consumer(
     # Read in the planning path so the cycle recorder stores them like the store temperatures.
     feedback = fetch_heat_feedback(consumer)
     capacity = capacity_kwh_per_k_from_volume(storage["volume_liters"])
-    wp_kw = float(
-        thermal.get("nominal_power_kw")
-        or consumer.get("nominal_power_kw")
-        or 3.0
-    )
+    # Derived input power of the heating system; missing fails loud (no 3 kW default).
+    wp_kw = float(_thermal_with_nominal(thermal, consumer)["nominal_power_kw"])
     living = float(thermal.get("living_area_m2", 0.0) or 0.0)
     house_h = None
     gains: list[float] | None = None
@@ -465,23 +479,24 @@ def live_store_plan_for_matrix(
     )
 
 
-def _live_ambient_forecast(horizon_h: int) -> list[float]:
-    """Outdoor forecast for the Live horizon; constant live reading if Open-Meteo fails."""
-    from data.outdoor_forecast import get_outdoor_forecast_with_fallback
+def _read_live_outdoor_temp_c(house_doc: dict | None) -> float | None:
+    """Live outdoor temperature (plant ``sens_temperature_outside``); None when unmapped/empty."""
+    from integrations.ehal_live import read_optional_temp_c
+    from settings.ehal_marker_resolve import marker_sens_temperature_outside
 
-    fallback_ambient = 10.0
-    try:
-        from integrations.ehal_live import read_optional_temp_c as _read_optional_temp_c
-        from settings.ehal_marker_resolve import marker_sens_temperature_outside
+    return read_optional_temp_c(marker_sens_temperature_outside(house_doc=house_doc))
 
-        live_amb = _read_optional_temp_c(marker_sens_temperature_outside(house_doc=None))
-        if live_amb is not None:
-            fallback_ambient = float(live_amb)
-    except Exception:
-        pass
-    ambient_forecast, _src = get_outdoor_forecast_with_fallback(
+
+def _live_ambient_forecast(horizon_h: int, *, house_doc: dict | None = None) -> list[float]:
+    """Outdoor forecast for the Live horizon; constant live reading if Open-Meteo fails.
+
+    Without both there is no outdoor temperature and the plan fails loud (no invented value).
+    """
+    from data.outdoor_forecast import get_outdoor_forecast_or_live_reading
+
+    ambient_forecast, _src = get_outdoor_forecast_or_live_reading(
         horizon=horizon_h,
-        fallback_ambient_c=fallback_ambient,
+        read_live_ambient_c=lambda: _read_live_outdoor_temp_c(house_doc),
     )
     return ambient_forecast
 
@@ -798,6 +813,8 @@ def build_heat_storage_observability(
             "heat_loss_kw_per_k": float(storage["heat_loss_kw_per_k"]),
         },
         "used_measured_eq": plan.used_measured_eq,
+        # Start of the store plan: the measured T_eq, or the setpoint when T_eq has no value.
+        "eq_source": EQ_SOURCE_MEASURED if plan.used_measured_eq else EQ_SOURCE_SETPOINT_NO_VALUE,
         "used_measured_low": plan.used_measured_low,
         "collector_solar_source": plan.solar_source,
         "horizon_q_sim_kwh": [round(v, 3) for v in plan.q_sim_kwh],
@@ -812,23 +829,8 @@ def collect_heat_storage_observability(
     house_doc: dict | None = None,
 ) -> list[dict[str, Any]]:
     """Observability for thermal_annual consumers with active heat_storage."""
-    from data.outdoor_forecast import get_outdoor_forecast_with_fallback
-
     results: list[dict[str, Any]] = []
-    fallback_ambient = 10.0
-    try:
-        from integrations.ehal_live import read_optional_temp_c as _read_optional_temp_c
-        from settings.ehal_marker_resolve import marker_sens_temperature_outside
-
-        live_amb = _read_optional_temp_c(marker_sens_temperature_outside(house_doc=house_doc))
-        if live_amb is not None:
-            fallback_ambient = float(live_amb)
-    except Exception:
-        pass
-    ambient_forecast, _src = get_outdoor_forecast_with_fallback(
-        horizon=max(1, int(horizon)),
-        fallback_ambient_c=fallback_ambient,
-    )
+    ambient_forecast: list[float] | None = None
     for consumer in consumers:
         if not isinstance(consumer, dict):
             continue
@@ -839,6 +841,11 @@ def collect_heat_storage_observability(
             continue
         cid = consumer.get("id") or "?"
         try:
+            # Only with a store; a missing outdoor temperature is this item's error.
+            if ambient_forecast is None:
+                ambient_forecast = _live_ambient_forecast(
+                    max(1, int(horizon)), house_doc=house_doc
+                )
             item = build_heat_storage_observability(
                 consumer,
                 house_profile=house_profile,

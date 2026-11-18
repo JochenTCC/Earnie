@@ -5,7 +5,7 @@ import logging
 from contextlib import contextmanager
 from contextvars import ContextVar
 from datetime import datetime, timedelta, timezone as _timezone
-from typing import Iterator, Optional
+from typing import Callable, Iterator, Optional
 from zoneinfo import ZoneInfo
 
 import config
@@ -417,4 +417,40 @@ def get_outdoor_forecast_with_fallback(
             start=start,
         )
         _note_captured_forecast(series, source)
+    return series, source
+
+
+def get_outdoor_forecast_or_live_reading(
+    *,
+    horizon: int,
+    read_live_ambient_c: Callable[[], float | None],
+    start: datetime | None = None,
+) -> tuple[list[float], str]:
+    """Open-Meteo forecast; only if that fails, the live outdoor reading held constant.
+
+    ``read_live_ambient_c`` is called only when the forecast fetch fails. Without a forecast
+    and without a live reading there is no outdoor temperature: fail loud, never invent one.
+    """
+    recorded = _serve.get()
+    if recorded is not None:
+        return _series_from_recording(recorded, horizon)
+    try:
+        series = get_hourly_outdoor_forecast_c(horizon=horizon, start=start)
+        source = "open_meteo"
+    except Exception as exc:
+        live = read_live_ambient_c()
+        if live is None:
+            raise ValueError(
+                f"Außentemperatur fehlt: Open-Meteo-Prognose fehlgeschlagen ({exc}) und "
+                "sens_temperature_outside liefert keinen Wert – Außentemperatur-Sensor "
+                "mappen oder Internetverbindung prüfen."
+            ) from exc
+        logger.warning(
+            "Außentemperatur-Prognose fehlgeschlagen (%s) – konstante Live-Außentemperatur "
+            "%.2f °C",
+            exc,
+            float(live),
+        )
+        series, source = [round(float(live), 3)] * horizon, "fallback_constant"
+    _note_captured_forecast(series, source)
     return series, source
