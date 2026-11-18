@@ -4,8 +4,9 @@ from __future__ import annotations
 import logging
 import config
 from .milp_horizon import (
-    aggregate_battery_params_for_load,
     coerce_battery_params_list,
+    plant_battery_params,
+    plant_soc_percent,
 )
 from .sim_chart_rows import (
     COL_BATTERIE_AKTION,
@@ -17,23 +18,92 @@ from optimizer.sim_horizon_types import (
 )
 
 
+def house_balance_batteries(batteries: list[dict]) -> list[dict]:
+    """The batteries the MILP plans in the house balance (island-bus batteries dropped).
+
+    A single battery is returned as is, as the simulation has always booked it.
+    """
+    if len(batteries) < 2:
+        return list(batteries)
+    from .milp_defaults import _default_inverter_params
+    from .milp_inverter import coerce_inverter_params_list, filter_house_balance_batteries
+
+    return filter_house_balance_batteries(
+        batteries, coerce_inverter_params_list(_default_inverter_params())
+    )
+
+
+def _battery_id(battery: dict, index: int) -> str:
+    """Id of a battery as the MILP names it (``_create_grid_battery_vars``)."""
+    return str(battery.get("id") or f"ess_{index}").strip() or f"ess_{index}"
+
+
+def plant_start_soc(
+    batteries: list[dict],
+    initial_soc: float,
+    current_soc_by_id: dict[str, float] | None,
+) -> float:
+    """Start SoC of the plant battery: ``initial_soc`` with one house battery, else energy-weighted.
+
+    With several house batteries ``initial_soc`` is the SoC of the first only, so the SoC of
+    each is required (``ValueError`` otherwise).
+    """
+    house = house_balance_batteries(batteries)
+    if len(house) < 2:
+        return float(initial_soc)
+    return plant_soc_percent(house, dict(current_soc_by_id or {}))
+
+
+def plant_planned_soc(batteries: list[dict], slot: dict) -> float | None:
+    """Planned end-of-slot SoC of the plant battery, ``None`` when the slot carries no plan for it.
+
+    ``planned_soc_percent`` of a schedule slot is the first battery's; with several house
+    batteries the plant value is the energy-weighted ``planned_soc_by_ess``.
+    """
+    house = house_balance_batteries(batteries)
+    planned_by = slot.get("planned_soc_by_ess")
+    if len(house) < 2 or not planned_by:
+        return None
+    return plant_soc_percent(house, {str(k): float(v) for k, v in planned_by.items()})
+
+
+def milp_start_soc(
+    batteries: list[dict],
+    sim_soc: float,
+    current_soc_by_id: dict[str, float] | None,
+) -> float:
+    """``current_soc`` for the MILP: its SoC anchors refer to the first house battery.
+
+    With one house battery that is the simulated SoC. With several the simulated SoC is the
+    plant's, so the first battery's own start SoC is passed (``ValueError`` when missing).
+    """
+    house = house_balance_batteries(batteries)
+    if len(house) < 2:
+        return float(sim_soc)
+    first_id = _battery_id(house[0], 0)
+    by_id = current_soc_by_id or {}
+    if first_id not in by_id:
+        raise ValueError(f"MILP start SoC: no SoC for house battery '{first_id}'.")
+    return float(by_id[first_id])
+
+
 def _resolve_horizon_batteries(
     battery_params: dict | list[dict] | None,
 ) -> tuple[list[dict], dict]:
-    """Return (batteries list, aggregate params) for MILP + chart SoC."""
+    """Return (batteries list, plant battery) for MILP + chart SoC."""
     if battery_params is None:
         get_list = getattr(config, "get_battery_params_list", None)
         if callable(get_list):
             listed = get_list()
             if listed:
                 batteries = coerce_battery_params_list(listed)
-                return batteries, aggregate_battery_params_for_load(batteries)
+                return batteries, plant_battery_params(house_balance_batteries(batteries))
         battery_params = config.get_battery_params()
     batteries = coerce_battery_params_list(battery_params)
     if not batteries:
         agg = battery_params if isinstance(battery_params, dict) else {}
         return [], agg
-    return batteries, aggregate_battery_params_for_load(batteries)
+    return batteries, plant_battery_params(house_balance_batteries(batteries))
 
 
 def _resolve_chart_soc_entities(batteries: list[dict]) -> tuple[dict, ...]:

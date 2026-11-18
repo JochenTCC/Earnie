@@ -94,7 +94,7 @@ The lifetime sum therefore telescopes to Σ `saving_eur` + the correction of the
 
 The shadow battery is the existing baseline battery step fed with actuals instead of forecasts: `optimizer/battery.py::vendor_mode_step`, which `optimizer/sim_baseline.py::_simulate_single_hour_baseline` also calls. No new battery model. The shadow load is the logged `house_kw` plus the battery's `standby_power_kw`, as in the baseline.
 
-Multi-ESS: v1 aggregates house batteries with `aggregate_battery_params_for_load` (as the baseline does today).
+Multi-ESS: the shadow battery is `primary_battery_with_plant_power`, the first house battery with the charge, discharge and standby power of all. The optimized open-loop run books the plant battery instead (`plant_battery_params`: summed capacity, energy-weighted SoC), so with several house batteries the two sides of the saving are different plants. Moving the shadow plant and the baselines to the plant battery changes this definition and therefore is a new `savings_v`; it also needs the SoC of each battery in the power interval sampler (backlog: "Horizon simulation: SoC chain per house battery").
 
 **Powerstations and virtual reserves are not part of the shadow plant** *(decided 2026-11-02, Ledger P0)*. The logged `house_kw` is the balance `pv + grid + battery` (`integrations/ehal_live.py::read_live_power_kw`); on 43 days of the maintainer's plant the residual `house − (pv + grid + battery)` is 0.00 kWh. Load a powerstation supplies from its own storage therefore appears on neither side, and its charging sits in the house load with its logged timing on both sides. The comparison stays neutral; the method note says that powerstation supply is not valued and their charging counts at its actual time.
 

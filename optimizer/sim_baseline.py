@@ -14,7 +14,7 @@ from settings.flexible_consumers import flex_kw_lookup
 from optimizer import battery as bat
 from optimizer.consumer_power import power_limits_kw
 from optimizer.milp_horizon import (
-    aggregate_battery_params_for_load,
+    primary_battery_with_plant_power,
     coerce_battery_params_list,
 )
 from optimizer.rod_store import RodStoreBalance, next_level_kwh
@@ -34,7 +34,12 @@ logger = logging.getLogger(__name__)
 def _baseline_battery_params(
     battery_params: dict | list[dict] | None,
 ) -> dict:
-    """House-load aggregate for baseline (multi-ESS list → singular dict)."""
+    """Baseline battery: with several, the first battery with the power of all.
+
+    Not the plant battery of the optimized run (``plant_battery_params``): the baseline shares
+    its battery with the savings ledger's shadow plant, whose definition is versioned
+    (``savings_v``, ``docs/dev/savings-ledger.md``).
+    """
     if battery_params is None:
         return config.get_battery_params()
     batteries = coerce_battery_params_list(battery_params)
@@ -42,7 +47,7 @@ def _baseline_battery_params(
         return config.get_battery_params()
     if len(batteries) == 1:
         return batteries[0]
-    return aggregate_battery_params_for_load(batteries)
+    return primary_battery_with_plant_power(batteries)
 
 
 def _matched_baseline_profile_kw(row: dict, consumer: dict) -> float:

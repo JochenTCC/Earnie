@@ -781,9 +781,9 @@ def _main_cycle(
         # Export cap travels only on set_grid_export_power_limit; set_ess_mode stays battery-only.
         export_cap = export_ctx["effective_export_cap_kw"]
         if isinstance(battery_params, list):
-            from optimizer.milp_horizon import aggregate_battery_params_for_load
+            from optimizer.milp_horizon import primary_battery_with_plant_power
 
-            primary_battery = aggregate_battery_params_for_load(battery_params)
+            primary_battery = primary_battery_with_plant_power(battery_params)
         else:
             primary_battery = battery_params
         battery_plan_kw = optimizer.battery_plan_kw_from_control(

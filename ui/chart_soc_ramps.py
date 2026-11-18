@@ -24,21 +24,22 @@ from ui.chart_slot_axis import (
 
 
 def _resolve_battery_params(battery_params: dict | list[dict] | None) -> dict:
-    """Singular or multi-ESS list → house-load aggregate dict for chart helpers."""
+    """Singular or multi-ESS list → plant battery of the simulated SoC line."""
     if battery_params is None:
         return config.get_battery_params()
     if isinstance(battery_params, list):
         from optimizer.milp_horizon import (
-            aggregate_battery_params_for_load,
             coerce_battery_params_list,
+            plant_battery_params,
         )
+        from optimizer.sim_horizon_chart_soc import house_balance_batteries
 
         batteries = coerce_battery_params_list(battery_params)
         if not batteries:
             return config.get_battery_params()
         if len(batteries) == 1:
             return batteries[0]
-        return aggregate_battery_params_for_load(batteries)
+        return plant_battery_params(house_balance_batteries(batteries))
     return battery_params
 
 def _soc_tail_y_from_row(

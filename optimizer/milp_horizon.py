@@ -63,8 +63,15 @@ def coerce_battery_params_list(
     return []
 
 
-def aggregate_battery_params_for_load(batteries: list[dict]) -> dict:
-    """House-load view: first ESS fields + summed standby."""
+def primary_battery_with_plant_power(batteries: list[dict]) -> dict:
+    """The first battery with the charge, discharge and standby power of all batteries.
+
+    Capacity, SoC limits, efficiency, ``control`` and the virtual reserve keys are those of the
+    first battery. The MILP needs exactly this view: ``model.e_batt``, the SoC anchors (hold,
+    terminal, sunrise) and ``current_soc`` all refer to the first battery, while the grid
+    balance needs the power of all. It is not a model of the whole plant; the simulation and the
+    charts use ``plant_battery_params``.
+    """
     if not batteries:
         return {
             "battery_capacity_kwh": 0.0,
@@ -91,6 +98,64 @@ def aggregate_battery_params_for_load(batteries: list[dict]) -> dict:
     )
     agg["max_power_kw"] = max(agg["max_charge_power_kw"], agg["max_discharge_power_kw"])
     return agg
+
+
+def plant_battery_params(batteries: list[dict]) -> dict:
+    """One battery that stands for all of ``batteries`` (simulation and charts).
+
+    Power and standby are summed and the capacity is the sum. The SoC limits are the summed
+    energy limits as a share of that capacity, so the usable energy equals that of the single
+    batteries. The efficiency is capacity-weighted. With one battery the result is that of
+    ``primary_battery_with_plant_power``. Keys that describe one battery (``id``, ``label``,
+    virtual reserve) stay those of the first.
+
+    Raises ``ValueError`` when the batteries have different ``control`` modes: one battery
+    cannot stand for a plant that is only partly controllable.
+    """
+    agg = primary_battery_with_plant_power(batteries)
+    if len(batteries) < 2:
+        return agg
+    from house_config.battery_control import control_from_battery_params
+
+    controls = {str(b.get("id") or "?"): control_from_battery_params(b) for b in batteries}
+    if len(set(controls.values())) > 1:
+        raise ValueError(
+            "House batteries with different control modes cannot be simulated as one plant "
+            f"battery: {controls}."
+        )
+    capacities = [float(b.get("battery_capacity_kwh") or 0.0) for b in batteries]
+    total = sum(capacities)
+    agg["battery_capacity_kwh"] = total
+    if total <= 0.0:
+        # No energy to weight by: the limits of the first battery stay, they bound nothing.
+        return agg
+    for key in ("min_soc", "max_soc", "efficiency"):
+        agg[key] = sum(cap * float(b[key]) for cap, b in zip(capacities, batteries)) / total
+    return agg
+
+
+def plant_soc_percent(batteries: list[dict], soc_by_id: dict[str, float]) -> float:
+    """SoC of the plant battery (``plant_battery_params``): stored energy over total capacity.
+
+    Raises ``ValueError`` when a battery with capacity has no SoC in ``soc_by_id`` or the
+    batteries have no capacity at all.
+    """
+    energy = 0.0
+    total = 0.0
+    for index, battery in enumerate(batteries):
+        capacity = float(battery.get("battery_capacity_kwh") or 0.0)
+        if capacity <= 0.0:
+            continue
+        ess_id = str(battery.get("id") or f"ess_{index}").strip() or f"ess_{index}"
+        if ess_id not in soc_by_id:
+            raise ValueError(
+                f"Plant SoC: no SoC for house battery '{ess_id}' (have: {sorted(soc_by_id)})."
+            )
+        energy += capacity * float(soc_by_id[ess_id])
+        total += capacity
+    if total <= 0.0:
+        raise ValueError("Plant SoC: the house batteries have no capacity.")
+    return energy / total
 
 
 
@@ -145,7 +210,7 @@ def _create_grid_battery_vars(
                 "control": "full",
             }
         ]
-    load_params = aggregate_battery_params_for_load(batteries)
+    load_params = primary_battery_with_plant_power(batteries)
     ess_ids: list[str] = []
     params_by_id: dict[str, dict] = {}
     p_charge_by_ess: dict[str, list] = {}
@@ -425,7 +490,7 @@ def _add_power_balance_and_soc_dynamics(
     batteries = filter_house_balance_batteries(
         coerce_battery_params_list(battery_params), inverters
     )
-    load_params = aggregate_battery_params_for_load(batteries)
+    load_params = primary_battery_with_plant_power(batteries)
     e_init_by_ess: dict[str, float] = {}
     multi_ess = len(grid_vars.ess_ids) > 1
     for eid in grid_vars.ess_ids:

@@ -29,9 +29,9 @@ def _default_pv_systems() -> list[dict]:
 
 
 def _primary_battery_params(battery_params: dict | list[dict]) -> dict:
-    from .milp_horizon import aggregate_battery_params_for_load, coerce_battery_params_list
+    from .milp_horizon import primary_battery_with_plant_power, coerce_battery_params_list
 
     batteries = coerce_battery_params_list(battery_params)
     if not batteries:
         return {}
-    return aggregate_battery_params_for_load(batteries)
+    return primary_battery_with_plant_power(batteries)

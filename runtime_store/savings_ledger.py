@@ -20,7 +20,7 @@ from typing import Any, Callable
 from data.live_consumption import is_dead_telemetry_snapshot
 from optimizer import battery as bat
 from optimizer.milp_horizon import (
-    aggregate_battery_params_for_load,
+    primary_battery_with_plant_power,
     coerce_battery_params_list,
 )
 from optimizer.slot_duration import DEFAULT_DT_H, validate_dt_h
@@ -134,13 +134,14 @@ def slot_skip_reason(closed: dict[str, Any] | None) -> str | None:
 
 
 def shadow_battery_params(battery_params: dict | list[dict] | None) -> dict:
-    """Battery the shadow plant runs: one ESS as is, several aggregated like the baseline."""
+    """Battery the shadow plant runs: one ESS as is; several as the baseline does, the first
+    battery with the power of all (changing that is a new ``savings_v``)."""
     batteries = coerce_battery_params_list(battery_params)
     if not batteries:
         raise ValueError("savings ledger: no house battery parameters for the shadow plant")
     if len(batteries) == 1:
         return batteries[0]
-    return aggregate_battery_params_for_load(batteries)
+    return primary_battery_with_plant_power(batteries)
 
 
 def _cost_eur(grid_kwh: float, k_act_cent: float, k_push_cent: float) -> float:

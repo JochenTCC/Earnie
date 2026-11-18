@@ -82,6 +82,10 @@ from optimizer.sim_horizon_chart_soc import (  # noqa: F401  (re-exported)
     _initial_soc_by_ess,
     _resolve_chart_soc_entities,
     _resolve_horizon_batteries,
+    house_balance_batteries,
+    milp_start_soc,
+    plant_planned_soc,
+    plant_start_soc,
     _resolve_standby_chart_plans,
     _seed_virtual_soc_for_chart,
 )
@@ -390,7 +394,7 @@ def _refill_commit_buffer(
     milp_batteries = setup.batteries or setup.battery_params
     schedule = milp_horizon_schedule(
         remaining_slice,
-        sim_soc,
+        milp_start_soc(setup.batteries, sim_soc, setup.current_soc_by_id),
         battery_params=milp_batteries,
         k_push=options.k_push,
         verbose=options.verbose,
@@ -522,16 +526,11 @@ def _booking_rows(
 def _reject_slot_resolve_with_several_house_batteries(batteries: list[dict]) -> None:
     """``commit_hours=1`` plans one battery: it cannot run a house with several.
 
-    The slot re-solve carries one plant SoC from slot to slot and gives the MILP the aggregate
-    of the batteries (capacity of the first, power of all). With several house batteries that
-    is a different plant, so the run stops instead of booking it. Open loop plans each battery.
+    The slot re-solve carries one plant SoC from slot to slot and gives the MILP one battery
+    instead of the list. With several house batteries that is a different plant, so the run
+    stops instead of booking it. Open loop plans each battery.
     """
-    from .milp_defaults import _default_inverter_params
-    from .milp_inverter import coerce_inverter_params_list, filter_house_balance_batteries
-
-    house = filter_house_balance_batteries(
-        batteries, coerce_inverter_params_list(_default_inverter_params())
-    )
+    house = house_balance_batteries(batteries)
     if len(house) > 1:
         ids = ", ".join(str(b.get("id") or "?") for b in house)
         raise ValueError(
@@ -548,7 +547,7 @@ def _run_horizon_slots(
 ) -> tuple[list[dict], float]:
     """Läuft die Matrix Slot für Slot ab (MPC bzw. Open-Loop-Commit-Puffer)."""
     chart_rows: list[dict] = []
-    sim_soc = initial_soc
+    sim_soc = plant_start_soc(setup.batteries, initial_soc, setup.current_soc_by_id)
     soc_by_ess = _initial_soc_by_ess(setup, initial_soc)
     virtual_entries = _seed_virtual_soc_for_chart(setup, soc_by_ess)
     chart_entities = list(setup.chart_soc_entities) or list(setup.batteries)
@@ -573,6 +572,10 @@ def _run_horizon_slots(
                     buffer_pos = 0
                 slot = commit_buffer[buffer_pos]
                 buffer_pos += 1
+                plant_planned = plant_planned_soc(setup.batteries, slot)
+                if plant_planned is not None:
+                    # The slot's own value is the first battery's; the row books the plant.
+                    slot = {**slot, "planned_soc_percent": plant_planned}
                 sim_soc, chart_row, mode, target_power = _chart_row_from_schedule_slot(
                     setup.booking_matrix[i] if setup.booking_matrix is not None else row,
                     sim_soc,
@@ -692,18 +695,19 @@ def simulate_horizon(
     chart_rows, sim_soc = _run_horizon_slots(
         setup, initial_soc, on_progress, simulation_hour_offset
     )
+    plant_initial_soc = plant_start_soc(setup.batteries, initial_soc, setup.current_soc_by_id)
     if sunrise_soc_min_index is None and not disable_horizon_soc_anchor:
         sim_soc = _apply_forced_grid_recharge_at_horizon_end(
             chart_rows,
             sim_soc,
             battery_params=setup.battery_params,
-            horizon_anchor_soc=initial_soc,
+            horizon_anchor_soc=plant_initial_soc,
         )
     _finalize_chart_rows_for_display(chart_rows, setup.charging_contexts)
     if chart_rows:
         chart_rows[-1]["_horizon_end_soc"] = horizon_end_soc_percent(
             chart_rows,
-            initial_soc,
+            plant_initial_soc,
             setup.battery_params,
         )
     return chart_rows
