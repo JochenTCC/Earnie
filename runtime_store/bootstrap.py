@@ -592,6 +592,10 @@ def _bootstrap_runtime_data_artifacts(*, shadow: bool = False) -> list[str]:
             created.append(path)
     if _bootstrap_local_settings_json():
         created.append(resolve_local_settings_json_path())
+    if not shadow:
+        from runtime_store.addon_dotenv_migrate import migrate_addon_dotenv
+
+        migrate_addon_dotenv()
     if not shadow and _bootstrap_dotenv():
         created.append(resolve_dotenv_path())
     if _bootstrap_cons_data_csv():

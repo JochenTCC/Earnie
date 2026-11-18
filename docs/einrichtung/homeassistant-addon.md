@@ -102,6 +102,8 @@ Die Konfiguration liegt im Supervisor-Ordner `addon_config` (sichtbar per Samba 
 
 **Migration älterer Installationen:** Beim ersten Start einer Version mit `addon_config` kopiert `run.sh` einmalig `/data/earnie_env/config/` nach `/config/`. Den Altordner benennt es in `config.migrated-<datum>` um und bewahrt ihn eine Version lang auf.
 
+**`.env` bis Version 2.7:** Bis 2.7 hat das Add-on die `.env` trotz dieser Migration weiter unter `/data/earnie_env/config/.env` gelesen; die kopierte `/config/.env` blieb unbenutzt. Ab 2.8 liest es `/config/.env`. Beim ersten Start übernimmt Earnie einmalig die Werte aus der alten Datei nach `/config/.env`. Bei abweichenden Werten gilt der aus der alten Datei, denn mit ihm lief Earnie bisher. Leere Werte und Werte aus der Vorlage (`.env.example`) übernimmt es nicht. Die alte Datei heißt danach `.env.migrated-<datum>`. Welche Schlüssel übernommen wurden, steht im Log (`addon_dotenv`, ohne die Werte).
+
 Erreichbar sind die Ordner z. B. über das Add-on **Samba** oder **SSH & Web Terminal**.
 
 ## Ports

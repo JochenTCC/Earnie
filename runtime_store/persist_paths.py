@@ -711,6 +711,26 @@ def bundled_dotenv_example_file() -> str:
     return os.path.join(bundled_config_dir(), ".env.example")
 
 
+def addon_config_dotenv_path() -> str:
+    """``.env`` next to ``config.json`` in the Home Assistant add-on, else ``""``.
+
+    The add-on keeps its config on Supervisor ``addon_config`` (``EARNIE_CONFIG_PATH=/config``)
+    and only the runtime under ``EARNIE_ENV_PATH``; the ``.env`` belongs to the config, like
+    ``config.json`` (``_effective_config_path_env`` makes the same exception).
+    """
+    if read_env("INSTALL_CONTEXT").strip().lower() != "homeassistant_addon":
+        return ""
+    raw = read_env("CONFIG_PATH")
+    if not raw:
+        return ""
+    return os.path.join(_config_dir_from_config_path_env(raw), ".env")
+
+
+def legacy_addon_data_dotenv_path() -> str:
+    """The add-on ``.env`` under ``EARNIE_ENV_PATH/config`` that Earnie read before 2.8."""
+    return _preferred_dotenv()
+
+
 def resolve_dotenv_path() -> str:
     """Pfad zur .env: cloud session > ENV > Config-Dir > ENV_PATH/config/.env > legacy."""
     from runtime_store.cloud_demo import get_session_env_root
@@ -720,6 +740,9 @@ def resolve_dotenv_path() -> str:
     env = read_env("DOTENV_PATH")
     if env:
         return env
+    addon_dotenv = addon_config_dotenv_path()
+    if addon_dotenv:
+        return addon_dotenv
     preferred_dotenv = _preferred_dotenv()
     # Explicit ENV_PATH (launch.json / greenfield): stay inside that tree.
     # Do not fall back to legacy config/.env (often still points at NAS).
