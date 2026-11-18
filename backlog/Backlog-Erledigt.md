@@ -2,6 +2,10 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix deploy tariff gate vs example scenarios (2026-11-18)
+
+- [x] **Bugfix — Release build fails in the deploy tariff gate** `[dev]` *(found 2026-11-18, first `v2.7.2` run)*: `scripts/build_container.py::_run_deploy_tariff_gate` validated `backtesting_scenarios.example.json` against the catalog `tariffs.json`, but the example-config fix `d7903efe` points the example scenarios at `fixed_37ct` / `monthly_sunny` from `tariffs.example.json` (so the example pack loads as a set). The gate now checks the catalog (schema + DACH coverage) and the example set (example scenarios against `tariffs.example.json`) separately. Tests in `tests/test_build_container.py` run the gate on the shipped files, so a red gate shows up in the suite instead of CI. No image or release was published by the failed run; tag `v2.7.2` was moved to the fixed commit (maintainer decision). Same gate on `main` (tracker).
+
 ### Support package picked to 2.7.2 (2026-11-18)
 
 - [x] **Pick the always-on support package to `release/2.7`** `[feat]` *(decided 2026-11-18)* — a tester on the HA add-on could not switch on the Debug-Dump button: the bootstrapped `runtime/local_settings.json` carries `chart_debug_capture_enabled: false` and overrides `config.json`, and the add-on reads `.env` from `/data/earnie_env/config/` instead of `/config/` (both unreachable via Samba). Instead of fixing the switch, the main-line support package replaces it.
