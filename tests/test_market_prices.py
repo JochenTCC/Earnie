@@ -270,3 +270,95 @@ def test_resolve_market_slots_applies_live_bias_to_predicted_only():
     assert by_src[PRICE_SOURCE_DAY_AHEAD]["price_buy"] == pytest.approx(10.0)
     assert by_src[PRICE_SOURCE_PREDICTED]["price_buy"] == pytest.approx(6.25)
     assert by_src[PRICE_SOURCE_PREDICTED]["live_bias_cent_kwh"] == pytest.approx(1.25)
+
+
+# --- epex_prices_for_slots: bounded gap rule ---------------------------------------------------
+
+
+def _qh_frame(start: str, end: str, *, drop: tuple[str, ...] = ()) -> pd.DataFrame:
+    """Quarter-hour series, price = minutes since ``start`` / 15, without the ``drop`` stamps."""
+    idx = pd.date_range(start, end, freq="15min")
+    frame = pd.DataFrame({"price_cent_kwh": [float(i) for i in range(len(idx))]}, index=idx)
+    return frame.drop(index=pd.DatetimeIndex(list(drop))) if drop else frame
+
+
+def _naive(stamp: str) -> datetime:
+    return pd.Timestamp(stamp).to_pydatetime()
+
+
+def test_epex_prices_for_slots_takes_exact_and_hourly_parent_prices():
+    from data.market_prices import epex_prices_for_slots
+
+    hourly = pd.DataFrame(
+        {"price_cent_kwh": [5.0, 7.0]},
+        index=pd.DatetimeIndex(["2026-06-01 10:00", "2026-06-01 11:00"]),
+    )
+    slots = [_naive("2026-06-01 10:00"), _naive("2026-06-01 10:45"), _naive("2026-06-01 11:30")]
+    assert epex_prices_for_slots(hourly, slots) == [5.0, 5.0, 7.0]
+
+
+def test_epex_prices_for_slots_fills_a_hole_up_to_an_hour_and_warns(caplog):
+    from data.market_prices import epex_prices_for_slots
+
+    hole = ("2026-06-01 11:00", "2026-06-01 11:15", "2026-06-01 11:30", "2026-06-01 11:45")
+    prices = _qh_frame("2026-06-01 10:00", "2026-06-01 13:00", drop=hole)
+    with caplog.at_level("WARNING", logger="data.market_prices"):
+        out = epex_prices_for_slots(prices, [_naive(stamp) for stamp in hole])
+    assert out == [3.0] * 4  # 10:45, the last price before the hole
+    assert "4 Slot(s) ohne Preis" in caplog.text
+
+
+def test_epex_prices_for_slots_fills_the_spring_dst_hour_of_an_hourly_series():
+    from data.market_prices import epex_prices_for_slots
+
+    hourly = pd.DataFrame(
+        {"price_cent_kwh": [4.0, 9.0]},
+        index=pd.DatetimeIndex(["2026-03-29 01:00", "2026-03-29 03:00"]),
+    )
+    assert epex_prices_for_slots(hourly, [_naive("2026-03-29 02:15")]) == [4.0]
+
+
+def test_epex_prices_for_slots_raises_on_a_hole_longer_than_an_hour():
+    from data.market_prices import epex_prices_for_slots
+
+    hole = tuple(
+        f"2026-06-01 {hour:02d}:{minute:02d}" for hour in (11, 12) for minute in (0, 15, 30, 45)
+    )[:5]
+    prices = _qh_frame("2026-06-01 10:00", "2026-06-01 13:00", drop=hole)
+    with pytest.raises(ValueError, match="Lücke von 75 min"):
+        epex_prices_for_slots(prices, [_naive("2026-06-01 11:30")])
+
+
+def test_epex_prices_for_slots_raises_before_the_first_price():
+    from data.market_prices import epex_prices_for_slots
+
+    prices = _qh_frame("2026-06-01 10:00", "2026-06-01 12:00")
+    with pytest.raises(ValueError, match="2026-06-01 09:45: liegt vor den Preisdaten"):
+        epex_prices_for_slots(prices, [_naive("2026-06-01 09:45")])
+
+
+def test_epex_prices_for_slots_raises_after_the_last_price():
+    from data.market_prices import epex_prices_for_slots
+
+    prices = _qh_frame("2026-06-01 10:00", "2026-06-01 12:00")
+    with pytest.raises(ValueError, match="2026-06-01 12:15: liegt nach den Preisdaten"):
+        epex_prices_for_slots(prices, [_naive("2026-06-01 12:15")])
+
+
+def test_epex_prices_for_slots_raises_on_empty_prices():
+    from data.market_prices import epex_prices_for_slots
+
+    empty = pd.DataFrame({"price_cent_kwh": []}, index=pd.DatetimeIndex([]))
+    with pytest.raises(ValueError, match="Keine Börsenpreise geladen"):
+        epex_prices_for_slots(empty, [_naive("2026-06-01 10:00")])
+    assert epex_prices_for_slots(empty, []) == []
+
+
+def test_epex_prices_for_slots_does_not_stretch_a_quarter_hour_over_its_hour():
+    from data.market_prices import epex_prices_for_slots
+
+    prices = _qh_frame("2026-06-01 10:00", "2026-06-01 12:00", drop=("2026-06-01 11:15",))
+    # 11:15 is a 15-min hole (filled with 11:00); 12:15 lies after the series.
+    assert epex_prices_for_slots(prices, [_naive("2026-06-01 11:15")]) == [4.0]
+    with pytest.raises(ValueError, match="liegt nach den Preisdaten"):
+        epex_prices_for_slots(prices, [_naive("2026-06-01 12:15")])

@@ -327,9 +327,10 @@ def _end_customer_price_series(
 ) -> dict[datetime, float]:
     """End-customer price per slot, from the book's start to the last day published in it.
 
-    ``epex_prices_for_slots`` fills gaps with the previous price; here a slot without a
-    market price raises, since the lock must not rank prices that did not exist. Only the
-    end of the market data cuts the series, and never inside the book (spec § 4.2).
+    ``epex_prices_for_slots`` fills holes of up to ``MAX_PRICE_GAP`` with the previous price;
+    here any slot without a market price raises, since the lock must not rank prices that did
+    not exist. Only the end of the market data cuts the series, and never inside the book
+    (spec § 4.2).
     """
     from data.backtesting_prices import (
         last_day_ahead_calendar_date,

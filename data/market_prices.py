@@ -1,6 +1,7 @@
 """Day-Ahead-Preise für das rollierende 24h-Fenster inkl. Spiegel-Extrapolation."""
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -12,10 +13,16 @@ from edibert import api
 import config
 from data.ols_forecaster import METHOD_OLS, OlsForecaster
 
+logger = logging.getLogger(__name__)
+
 PRICE_SOURCE_DAY_AHEAD = "day_ahead"
 PRICE_SOURCE_MIRRORED = "mirrored"
 PRICE_SOURCE_PREDICTED = "predicted"
 MAX_MIRROR_LOOKBACK_DAYS = 7  # as far back as Edibert's MirrorForecaster looks
+# Longest hole inside the price data that epex_prices_for_slots fills with the previous price
+# (spring DST hour, a single missing archive value); a longer one raises.
+MAX_PRICE_GAP = timedelta(minutes=60)
+_HOUR = pd.Timedelta(hours=1)
 MAX_FORECAST_HOURS = 72  # as Edibert's publisher; edibert.api does not export it
 _SLOT = timedelta(minutes=15)
 MISSING_PRICE_STRATEGY_MIRROR = "mirror"
@@ -317,7 +324,13 @@ def epex_prices_for_slots(
     prices_df: pd.DataFrame,
     slot_datetimes: list[datetime],
 ) -> list[float]:
-    """EPEX Cent/kWh je Planungs-Slot; native QH kept, hourly series expanded."""
+    """EPEX Cent/kWh je Planungs-Slot; native QH kept, hourly series expanded.
+
+    A slot takes its own price, or the price of its hour when the series is hourly. A hole
+    inside the data of at most ``MAX_PRICE_GAP`` (spring DST hour, a single missing archive
+    value) takes the previous price and logs a warning. Every other missing slot raises:
+    before the first price, after the last one, or inside a longer hole.
+    """
     from optimizer.slot_duration import floor_to_hour_slot
 
     series = prices_df["price_cent_kwh"]
@@ -328,25 +341,57 @@ def epex_prices_for_slots(
     if getattr(idx, "tz", None) is not None:
         series = series.copy()
         series.index = idx.tz_localize(None)
+    if series.empty and slot_datetimes:
+        raise ValueError("Keine Börsenpreise geladen; die Slots lassen sich nicht bepreisen.")
 
     out: list[float] = []
+    filled: list[datetime] = []
     for slot in slot_datetimes:
         key = pd.Timestamp(slot).to_pydatetime().replace(tzinfo=None)
         if key in series.index:
             out.append(float(series.loc[key]))
             continue
-        parent = floor_to_hour_slot(key)
-        if parent in series.index:
+        parent = pd.Timestamp(floor_to_hour_slot(key))
+        if parent in series.index and _sample_step(series, parent) == _HOUR:
             out.append(float(series.loc[parent]))
             continue
-        # Nearest prior sample (covers sparse archives), then ffill-like fallback.
-        prior = series.loc[:key]
-        if len(prior) > 0:
-            out.append(float(prior.iloc[-1]))
-            continue
-        later = series.loc[key:]
-        if len(later) > 0:
-            out.append(float(later.iloc[0]))
-            continue
-        out.append(0.0)
+        out.append(_bounded_gap_price(series, key))
+        filled.append(key)
+    if filled:
+        logger.warning(
+            "Börsenpreise: %d Slot(s) ohne Preis mit dem vorherigen Preis gefüllt "
+            "(Lücke ≤ %d min, erster %s).",
+            len(filled),
+            int(MAX_PRICE_GAP.total_seconds() // 60),
+            f"{filled[0]:%Y-%m-%d %H:%M}",
+        )
     return out
+
+
+def _bounded_gap_price(series: pd.Series, key: datetime) -> float:
+    """Previous price for a slot inside a hole of at most ``MAX_PRICE_GAP``; else raise."""
+    loaded = f"geladen: {series.index.min():%Y-%m-%d %H:%M} – {series.index.max():%Y-%m-%d %H:%M}"
+    prior = series.loc[:key]
+    later = series.loc[key:]
+    if prior.empty:
+        raise ValueError(f"Kein Börsenpreis für {key:%Y-%m-%d %H:%M}: liegt vor den Preisdaten ({loaded}).")
+    if later.empty:
+        raise ValueError(f"Kein Börsenpreis für {key:%Y-%m-%d %H:%M}: liegt nach den Preisdaten ({loaded}).")
+    hole = later.index[0] - prior.index[-1] - _sample_step(series, prior.index[-1])
+    if hole > MAX_PRICE_GAP:
+        raise ValueError(
+            f"Kein Börsenpreis für {key:%Y-%m-%d %H:%M}: Lücke von {int(hole.total_seconds() // 60)} min "
+            f"in den Preisdaten (erlaubt ≤ {int(MAX_PRICE_GAP.total_seconds() // 60)} min; {loaded})."
+        )
+    return float(prior.iloc[-1])
+
+
+def _sample_step(series: pd.Series, stamp: pd.Timestamp) -> pd.Timedelta:
+    """Duration the sample at ``stamp`` covers: the shorter distance to a neighbouring sample
+    (a hole next to it is longer than the series' cadence); one hour for a single sample."""
+    pos = series.index.get_loc(stamp)
+    index = series.index
+    steps = [index[pos + 1] - stamp] if pos + 1 < len(index) else []
+    if pos > 0:
+        steps.append(stamp - index[pos - 1])
+    return min(steps) if steps else _HOUR

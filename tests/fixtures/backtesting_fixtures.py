@@ -107,11 +107,19 @@ def build_synthetic_prices_df(
     peak_hour: int = 18,
     peak_cent: float = 28.0,
 ) -> pd.DataFrame:
-    """Stündliche EPEX-Preise (Cent/kWh) für Tests ohne API-Zugriff."""
+    """Stündliche EPEX-Preise (Cent/kWh) für Tests ohne API-Zugriff.
+
+    Wie der Lauf (``_price_load_window``) reichen die Preise einige Tage vor ``start`` (das
+    erste Sunrise-Fenster plant ab SA₀) und über den ganzen Tag nach ``end`` (das letzte
+    Sunrise-Buch reicht bis in den nächsten Morgen).
+    """
+    from scripts.run_backtesting import PERFECT_PRICE_LOOKBACK_DAYS
+
     idx = pd.date_range(
-        start.normalize(),
-        end.normalize() + pd.Timedelta(days=1),
+        start.normalize() - pd.Timedelta(days=PERFECT_PRICE_LOOKBACK_DAYS),
+        end.normalize() + pd.Timedelta(days=2),
         freq="h",
+        inclusive="left",
     )
     prices = []
     for ts in idx:

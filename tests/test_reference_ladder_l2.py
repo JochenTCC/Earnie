@@ -528,7 +528,8 @@ def test_market_data_ending_after_the_book_shortens_the_lock_horizon_and_reports
         "l2",
         LOW_EAUTO_DAY,
         LOW_EAUTO_DAY,
-        prices=_prices_until(ladder_env, last_booked + pd.Timedelta(hours=1)),
+        # The plan's look-ahead needs prices until about noon; the lock needs the whole day.
+        prices=_prices_until(ladder_env, last_booked + pd.Timedelta(hours=12)),
     )
     assert short.truncated_lock_slots > 0
     assert short.report()["truncated_lock_slots"] == short.truncated_lock_slots
@@ -537,7 +538,8 @@ def test_market_data_ending_after_the_book_shortens_the_lock_horizon_and_reports
 
 def test_market_data_ending_inside_the_book_fails_loud(ladder_env):
     last_booked = _run_step(ladder_env, "l2", LOW_EAUTO_DAY, LOW_EAUTO_DAY).frame.index[-1]
-    with pytest.raises(ValueError, match="enden vor dem letzten gebuchten Slot"):
+    # The planning matrix needs these prices first and names the missing slot.
+    with pytest.raises(ValueError, match="liegt nach den Preisdaten"):
         _run_step(
             ladder_env,
             "l2",

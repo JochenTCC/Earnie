@@ -197,7 +197,10 @@ def test_price_load_reaches_the_day_after_the_end():
     from scripts.run_backtesting import _price_load_window
 
     start, end = pd.Timestamp("2026-06-01"), pd.Timestamp("2026-06-30")
-    assert _price_load_window(start, end, "perfect") == (start, pd.Timestamp("2026-07-01"))
+    assert _price_load_window(start, end, "perfect") == (
+        pd.Timestamp("2026-05-29"),
+        pd.Timestamp("2026-07-01"),
+    )
     load_start, load_end = _price_load_window(start, end, "mirror")
     assert load_start < start
     assert load_end == pd.Timestamp("2026-07-01")
