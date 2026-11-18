@@ -83,7 +83,7 @@
                     },
                     "appliance_recommendation": {
                         "mode": "advice",
-                        "power_source": "loxone",
+                        "power_source": "manual",
                         "default_power_kw": 2.0
                     },
                     "ehal_bindings": {
@@ -105,7 +105,7 @@
                     },
                     "appliance_recommendation": {
                         "mode": "advice",
-                        "power_source": "loxone",
+                        "power_source": "manual",
                         "default_power_kw": 2.5
                     },
                     "ehal_bindings": {
