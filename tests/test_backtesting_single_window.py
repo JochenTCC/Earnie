@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+from datetime import datetime
 
 import pandas as pd
 import pytest
@@ -95,3 +96,39 @@ def test_simulate_window_snapshot_on_fixture(
 def test_cache_key_normalizes_anchor():
     key = cache_key_for_window("2025-01-02T07:00:00", "live", "fixed_24h")
     assert key == ("2025-01-02T07:00:00", "live", "fixed_24h")
+
+
+def _hourly_prices(start: str, end: str) -> pd.DataFrame:
+    index = pd.date_range(start, end, freq="h", inclusive="left")
+    return pd.DataFrame({"price_cent_kwh": range(len(index))}, index=index, dtype=float)
+
+
+def test_prices_load_anchor_dates_not_period_start_year(monkeypatch):
+    """A period 2025-11 … 2026-10 has backtesting_year 2025; a March-2026 window needs 2026 prices."""
+    from simulation import backtesting_single_window as module
+
+    calls: list[tuple[pd.Timestamp, pd.Timestamp]] = []
+
+    def fake_load(start, end, sim_cfg, timeout=30, *, market_zone=None):
+        del sim_cfg, timeout, market_zone
+        calls.append((start, end))
+        return _hourly_prices(str(start.date()), str((end + pd.Timedelta(days=1)).date()))
+
+    monkeypatch.setattr(module, "load_market_prices", fake_load)
+    monkeypatch.setattr(module.config, "get_scenario_explorer_conf", lambda: {})
+    module._load_prices_for_anchor(datetime(2026, 3, 19, 7), market_zone="AT")
+    assert calls == [(pd.Timestamp(2026, 3, 16), pd.Timestamp(2026, 3, 21))]
+
+
+def test_prices_not_covering_window_fail_loud(monkeypatch):
+    """No constant-price fallback: prices that miss the window raise instead of being filled."""
+    from simulation import backtesting_single_window as module
+
+    monkeypatch.setattr(
+        module,
+        "load_market_prices",
+        lambda *args, **kwargs: _hourly_prices("2026-03-18", "2026-03-22"),
+    )
+    monkeypatch.setattr(module.config, "get_scenario_explorer_conf", lambda: {})
+    with pytest.raises(ValueError, match="decken das Fenster"):
+        module._load_prices_for_anchor(datetime(2026, 3, 19, 7), market_zone="AT")

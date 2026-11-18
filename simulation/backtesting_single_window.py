@@ -8,7 +8,6 @@ import pandas as pd
 
 import config
 from data.edibert_market_range import load_market_prices
-from scripts.run_backtesting import resolve_backtesting_window
 from simulation.backtesting_snapshots import build_window_snapshot, normalize_window_anchor_key
 from simulation.engine import (
     HistoricalDataCache,
@@ -60,36 +59,61 @@ def initial_soc_for_anchor(
     return float(match.iloc[0]["sim_soc"])
 
 
-def _price_month_bounds(anchor: datetime, period: dict) -> tuple[int, int]:
-    start_month = int(period.get("start_month") or anchor.month)
-    end_month = int(period.get("end_month") or anchor.month)
-    month = anchor.month
-    if start_month == end_month:
-        return start_month, end_month
-    return month, min(12, month + 1)
+# Days of prices loaded around the anchor: the sunrise window plans from SA₀ (about two days
+# before the anchor) and its full horizon reaches past the anchor; fixed_24h needs [anchor−24h, anchor).
+_PRICE_DAYS_BEFORE_ANCHOR = 3
+_PRICE_DAYS_AFTER_ANCHOR = 2
+# Required price coverage before the anchor (start of the planning window, SA₀ or anchor−24h).
+_REQUIRED_PRICE_DAYS_BEFORE_ANCHOR = 2
 
 
 def _load_prices_for_anchor(
     anchor: datetime,
-    period: dict,
     *,
     market_zone: str | None = None,
 ) -> pd.DataFrame:
+    """Day-ahead prices for the days around the window anchor (the anchor's own dates).
+
+    The year run's ``backtesting_year`` is the year of the period start; a period across a
+    year end (e.g. 2025-11 … 2026-10) must not load the anchor's month in that year.
+    """
     sim_cfg = config.get_scenario_explorer_conf()
-    year = int(period.get("backtesting_year") or anchor.year)
-    price_start, price_end = _price_month_bounds(anchor, period)
-    start, end = resolve_backtesting_window(
-        pd.Timestamp(year, price_start, 1),
-        pd.Timestamp(year, price_end, 1),
-        sim_cfg.get("price_range", "last_12_months"),
-    )
-    return load_market_prices(
+    anchor_naive = _naive_timestamp(anchor)
+    anchor_day = anchor_naive.normalize()
+    start = anchor_day - pd.Timedelta(days=_PRICE_DAYS_BEFORE_ANCHOR)
+    end = anchor_day + pd.Timedelta(days=_PRICE_DAYS_AFTER_ANCHOR)
+    prices_df = load_market_prices(
         start,
         end,
         sim_cfg,
         timeout=config.get_global_timeout(default=30),
         market_zone=market_zone,
     )
+    _require_price_coverage(prices_df, anchor_naive)
+    return prices_df
+
+
+def _naive_timestamp(value: datetime) -> pd.Timestamp:
+    ts = pd.Timestamp(value)
+    return ts.tz_localize(None) if ts.tzinfo is not None else ts
+
+
+def _require_price_coverage(prices_df: pd.DataFrame, anchor_naive: pd.Timestamp) -> None:
+    """Fail loud when the loaded prices do not cover the window.
+
+    ``epex_prices_for_slots`` would otherwise fill every missing slot with the nearest
+    sample, i.e. one constant price for the whole window.
+    """
+    index = prices_df.index
+    if getattr(index, "tz", None) is not None:
+        index = index.tz_localize(None)
+    required_start = anchor_naive.normalize() - pd.Timedelta(days=_REQUIRED_PRICE_DAYS_BEFORE_ANCHOR)
+    required_last = anchor_naive.floor("h") - pd.Timedelta(hours=1)
+    if index.min() > required_start or index.max() < required_last:
+        raise ValueError(
+            f"Börsenpreise decken das Fenster {required_start} – {anchor_naive} nicht ab "
+            f"(geladen: {index.min()} – {index.max()})."
+        )
 
 
 def simulate_window_snapshot(
@@ -102,8 +126,8 @@ def simulate_window_snapshot(
     cache: HistoricalDataCache | None = None,
 ) -> dict:
     """Simuliert ein Fenster und liefert ein In-Memory-Snapshot-Dict."""
+    del meta  # prices follow the anchor's own dates, not the run period (see _load_prices_for_anchor)
     horizon_mode = parse_horizon_mode(horizon_mode)
-    period = meta.get("period") or {}
     scenarios = config.get_backtesting_scenarios()
     if scenario_id not in scenarios:
         raise ValueError(f"Szenario {scenario_id!r} nicht in backtesting_scenarios.json.")
@@ -112,7 +136,6 @@ def simulate_window_snapshot(
     cache.load()
     prices_df = _load_prices_for_anchor(
         anchor,
-        period,
         market_zone=scenario_params.get("market_zone"),
     )
     battery_params = _scenario_to_battery_params(scenario_params)
