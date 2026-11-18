@@ -41,7 +41,7 @@ class SeBaseline:
     """What every scenario's Δ in the cost table is measured against."""
 
     kind: str
-    series: str = SERIES_OWN
+    series: str = SERIES_LIVE
 
     @property
     def column(self) -> str:
@@ -71,10 +71,14 @@ def baseline_options(meta: dict, totals: dict, live_id: str | None) -> list[str]
 
 
 def default_baseline(options: list[str]) -> SeBaseline:
-    """Live's Referenz ohne Speicher when it ran (the comparison before 2.8), else the first."""
+    """Live's Referenz ohne Speicher when it ran (the comparison before 2.8), else the first.
+
+    The series defaults to Live's for every baseline, so switching to L0 or L1 later starts
+    on "Reihe von Live" as well.
+    """
     if REF_L0 in options:
         return SeBaseline(REF_L0, SERIES_LIVE)
-    return SeBaseline(options[0])
+    return SeBaseline(options[0], SERIES_LIVE)
 
 
 def render_baseline_selector(meta: dict, totals: dict, live_id: str | None) -> SeBaseline | None:

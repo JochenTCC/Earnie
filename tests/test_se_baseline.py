@@ -85,7 +85,12 @@ def test_log_before_the_selection_offers_no_baseline_and_no_delta():
 
 def test_default_is_lives_referenz_ohne_speicher_else_live():
     assert default_baseline(["live", "historical", "l0"]) == SeBaseline("l0", "live")
-    assert default_baseline(["live", "l1"]) == SeBaseline("live")
+    assert default_baseline(["live", "l1"]) == SeBaseline("live", "live")
+
+
+def test_series_defaults_to_lives_for_every_baseline():
+    assert default_baseline(["live", "l1"]).series == "live"
+    assert default_baseline(["historical", "l1"]).series == "live"
 
 
 def test_missing_series_of_a_scenario_shows_a_dash():
