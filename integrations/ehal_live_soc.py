@@ -170,23 +170,42 @@ def filter_planning_batteries_with_soc(
     battery_params: list | dict,
     current_soc_by_id: dict[str, float] | None,
 ) -> list | dict:
-    """Drop multi-ESS house batteries without an own SoC from this cycle's plan."""
+    """Drop multi-ESS house batteries without an own SoC from this cycle's plan.
+
+    One battery is returned unchanged: the MILP plans it with the primary SoC
+    (``read_ess_soc``) when its id has no own SoC. With several batteries each
+    needs an ``id`` to look up its own SoC, and at least one must have it.
+
+    Raises ``ValueError`` with several batteries when one has no ``id`` or none
+    has an own SoC (naming the battery ids and the SoC ids that are present).
+    """
     if not isinstance(battery_params, list):
         return battery_params
+    batteries = [bat for bat in battery_params if isinstance(bat, dict)]
+    if len(batteries) < 2:
+        return battery_params
     soc_map = current_soc_by_id or {}
+    ids = [str(bat.get("id") or "").strip() for bat in batteries]
+    if not all(ids):
+        raise ValueError(
+            "Mehrere Hausbatterien: eine Batterie hat keine id, ihr SoC lässt sich nicht "
+            f"zuordnen (Batterie-ids: {ids}); id in der Komponentenkonfiguration setzen."
+        )
     kept: list[dict] = []
-    for bat in battery_params:
-        if not isinstance(bat, dict):
-            continue
-        ess_id = str(bat.get("id") or "").strip()
-        if ess_id and ess_id not in soc_map:
+    for ess_id, bat in zip(ids, batteries):
+        if ess_id not in soc_map:
             logger.warning(
                 "Dropping ESS %s from this cycle — no own SoC",
                 ess_id,
             )
             continue
         kept.append(bat)
-    return kept if kept else battery_params
+    if not kept:
+        raise ValueError(
+            f"Mehrere Hausbatterien: keine hat einen eigenen SoC (Batterien: {ids}, "
+            f"SoC vorhanden für: {sorted(soc_map)}); SoC je Batterie in EHAL zuordnen."
+        )
+    return kept
 
 
 def read_ess_soc_by_id() -> dict[str, float]:

@@ -471,6 +471,42 @@ def _add_slot_power_balance_and_soc(
         prob += p_grid_sell[t] <= max(0.0, float(export_cap_kw))
 
 
+def _initial_energy_by_ess(
+    grid_vars: _GridBatteryVars,
+    current_soc: float,
+    current_soc_by_id: dict[str, float] | None,
+) -> dict[str, float]:
+    """Stored energy [kWh] of each house battery at the plan start.
+
+    One battery takes its SoC from ``current_soc_by_id`` when present, else ``current_soc``.
+    Several batteries need each one's own SoC in ``current_soc_by_id``: one battery's SoC does
+    not stand for another. A battery without capacity stores nothing and needs no SoC (as in
+    ``plant_soc_percent``).
+
+    Raises ``ValueError`` naming the batteries without SoC and the ids that are present.
+    """
+    by_id = current_soc_by_id or {}
+    ess_ids = list(grid_vars.ess_ids)
+    capacity_by_ess = {
+        eid: float(grid_vars.battery_params_by_id[eid].get("battery_capacity_kwh") or 0.0)
+        for eid in ess_ids
+    }
+    if len(ess_ids) == 1:
+        eid = ess_ids[0]
+        soc = float(by_id[eid]) if eid in by_id else float(current_soc)
+        return {eid: (soc / 100.0) * capacity_by_ess[eid]}
+    missing = [eid for eid in ess_ids if eid not in by_id and capacity_by_ess[eid] > 0.0]
+    if missing:
+        raise ValueError(
+            f"MILP: Start-SoC fehlt für Hausbatterie(n) {missing} (vorhanden: {sorted(by_id)}); "
+            "mit mehreren Hausbatterien braucht jede ihren eigenen SoC."
+        )
+    return {
+        eid: (float(by_id[eid]) / 100.0) * capacity_by_ess[eid] if eid in by_id else 0.0
+        for eid in ess_ids
+    }
+
+
 def _add_power_balance_and_soc_dynamics(
     prob: pulp.LpProblem,
     matrix: list[dict[str, Any]],
@@ -498,22 +534,7 @@ def _add_power_balance_and_soc_dynamics(
         coerce_battery_params_list(battery_params), inverters
     )
     load_params = primary_battery_with_plant_power(batteries)
-    e_init_by_ess: dict[str, float] = {}
-    multi_ess = len(grid_vars.ess_ids) > 1
-    for eid in grid_vars.ess_ids:
-        bat = grid_vars.battery_params_by_id[eid]
-        if current_soc_by_id and eid in current_soc_by_id:
-            soc = float(current_soc_by_id[eid])
-        elif not multi_ess:
-            soc = float(current_soc)
-        else:
-            logger.error(
-                "MILP multi-ESS: SoC missing for %s — refusing primary substitute; SoC=0",
-                eid,
-            )
-            soc = 0.0
-        capacity = float(bat.get("battery_capacity_kwh") or 0.0)
-        e_init_by_ess[eid] = (soc / 100.0) * capacity
+    e_init_by_ess = _initial_energy_by_ess(grid_vars, current_soc, current_soc_by_id)
     relaxed_soc_bounds = add_soc_recovery_constraints(prob, grid_vars, e_init_by_ess)
     for t in range(horizon):
         cap = None

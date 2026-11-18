@@ -337,6 +337,7 @@ def test_milp_two_battery_balance_builds():
         0.0,
         {},
         {},
+        current_soc_by_id={"a": 50.0, "b": 50.0},
     )
     assert model.ess_ids == ["a", "b"]
     assert "a" in model.p_charge_by_ess
