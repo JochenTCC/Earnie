@@ -260,6 +260,7 @@ def _edit_and_sync_consumers(
             session_scope=session_scope,
             default_pv_tilt=location["default_pv_tilt"],
             default_pv_azimuth=location["default_pv_azimuth"],
+            horizon_fields=location,
         )
         for index, consumer in enumerate(consumers)
     ]
@@ -272,6 +273,7 @@ def _edit_and_sync_consumers(
         location["latitude"],
         location["longitude"],
         timezone_name=str(location.get("timezone_name") or ""),
+        horizon_fields=location,
     )
     st.session_state[_SESSION_CONSUMERS_KEY] = resolved_for_preview
     return resolved, _preview_consumers(resolved_for_preview, heating)
@@ -421,6 +423,16 @@ def _render_profile_identity(ctx: dict) -> tuple[str, str, float, dict, dict, bo
     )
     _render_absent_mode_status(profile_absent=bool(absent_mode))
     location = _render_location_fields(session_scope=session_scope)
+    from ui.house_config_profile_horizon import render_horizon_section
+
+    location.update(
+        render_horizon_section(
+            ctx["existing"],
+            session_scope=session_scope,
+            latitude=location["latitude"],
+            longitude=location["longitude"],
+        )
+    )
     return label, preview_id, float(annual_kwh), household, location, bool(absent_mode)
 
 

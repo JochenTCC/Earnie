@@ -42,7 +42,9 @@ class ClimateFixtureMissingError(RuntimeError):
 
 
 def _refusing_fetch(fixture_dir: Path):
-    def _refuse_archive_fetch(*, lat, lon, timezone, start, end, hourly_vars, extra_params=None):
+    def _refuse_archive_fetch(
+        *, lat, lon, timezone, start, end, hourly_vars, extra_params=None, payload_transform=None
+    ):
         raise ClimateFixtureMissingError(
             f"Regression climate fixture missing in {fixture_dir}: "
             f"lat={lat} lon={lon} tz={timezone} {start}..{end} vars={hourly_vars} "
@@ -70,18 +72,27 @@ def frozen_climate_fixture(fixture_dir: Path = CLIMATE_FIXTURE_DIR) -> Iterator[
     previous_load = archive._load_bundle_from_cache
     previous_save = archive._save_bundle_to_cache
 
-    def _tracking_load(lat, lon, timezone, start, end, surfaces, *, cache_dir=None):
-        bundle = previous_load(lat, lon, timezone, start, end, surfaces, cache_dir=cache_dir)
+    # ``horizon`` (SUSI P3a): a house with a horizon reads and records its own shaded file.
+    def _tracking_load(
+        lat, lon, timezone, start, end, surfaces, *, cache_dir=None, horizon=None
+    ):
+        bundle = previous_load(
+            lat, lon, timezone, start, end, surfaces, cache_dir=cache_dir, horizon=horizon
+        )
         if bundle is not None:
             used.add(archive.open_meteo_cache_path(
-                lat, lon, timezone, start, end, surfaces, cache_dir=cache_dir
+                lat, lon, timezone, start, end, surfaces, cache_dir=cache_dir, horizon=horizon
             ))
         return bundle
 
-    def _tracking_save(bundle, lat, lon, timezone, start, end, surfaces, *, cache_dir=None):
-        previous_save(bundle, lat, lon, timezone, start, end, surfaces, cache_dir=cache_dir)
+    def _tracking_save(
+        bundle, lat, lon, timezone, start, end, surfaces, *, cache_dir=None, horizon=None
+    ):
+        previous_save(
+            bundle, lat, lon, timezone, start, end, surfaces, cache_dir=cache_dir, horizon=horizon
+        )
         used.add(archive.open_meteo_cache_path(
-            lat, lon, timezone, start, end, surfaces, cache_dir=cache_dir
+            lat, lon, timezone, start, end, surfaces, cache_dir=cache_dir, horizon=horizon
         ))
 
     archive.OPEN_METEO_CACHE_DIR = fixture_dir

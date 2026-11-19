@@ -10,6 +10,11 @@ from house_config.baseload import normalize_baseload_distribution
 from house_config.consumption_csv import load_hourly_profile_csv
 from house_config.geo_timezone import timezone_for_land
 from house_config.profile_schema_defaults import profile_default
+from data.solar_horizon import (
+    copy_horizon_fields,
+    normalize_horizon_fields,
+    stored_horizon_fields,
+)
 from house_config.house_cooling import (
     COOLING_ENABLED_KEY,
     COOLING_KEY,
@@ -99,6 +104,7 @@ def _normalize_profile_consumers(
     house_thermal: dict | None,
     persons: int,
     wallboxes: dict | None,
+    horizon_fields: dict | None = None,
 ) -> list[dict]:
     consumers: list[dict] = []
     seen: set[str] = set()
@@ -119,6 +125,8 @@ def _normalize_profile_consumers(
             consumer["thermal"]["latitude"] = latitude
             consumer["thermal"]["longitude"] = longitude
             consumer["thermal"]["timezone_name"] = timezone_name
+            # The horizon shades collector and windows of the year model (SUSI P3a).
+            copy_horizon_fields(horizon_fields, consumer["thermal"])
         if consumer["type"] == "thermal_rc" and consumer.get("thermal_rc"):
             consumer["thermal_rc"]["latitude"] = latitude
             consumer["thermal_rc"]["longitude"] = longitude
@@ -265,6 +273,7 @@ def _normalize_profile(
         )
     fields = _profile_geo_and_csv_fields(raw)
     region = fields.pop("region")
+    horizon_fields = normalize_horizon_fields(raw, label=where)
     normalized_consumers = _normalize_profile_consumers(
         consumers_raw,
         profile_id=profile_id,
@@ -275,6 +284,7 @@ def _normalize_profile(
         house_thermal=house_thermal,
         persons=persons,
         wallboxes=wallboxes,
+        horizon_fields=horizon_fields,
     )
     # Switch off: the heating consumer is kept for the file but not planned.
     consumers = [
@@ -330,6 +340,8 @@ def _normalize_profile(
     # Only when set, so profiles without a region keep their exact normalized shape.
     if region:
         spec["region"] = region
+    # Only with a stored horizon (SUSI P3a): no field means no horizon, as before.
+    spec.update(stored_horizon_fields(horizon_fields))
     return spec
 
 
@@ -646,6 +658,7 @@ def _serialize_profile(profile: dict) -> dict:
     if profile.get("default_pv_azimuth") is not None:
         out["default_pv_azimuth"] = profile["default_pv_azimuth"]
     out["netznutzung"] = normalize_netznutzung_config(profile.get("netznutzung"))
+    out.update(stored_horizon_fields(profile))
     return out
 
 

@@ -89,6 +89,7 @@ def _window_wm2_forecast(
     profile: dict, direction: str, start: datetime, horizon: int
 ) -> tuple[list[float], str]:
     from data.outdoor_forecast import get_hourly_tilted_irradiance_forecast_wm2
+    from data.solar_horizon import horizon_from_profile
     from optimizer.house_gains import window_surface
 
     surface = window_surface(direction)
@@ -100,6 +101,7 @@ def _window_wm2_forecast(
             latitude=float(profile["latitude"]),
             longitude=float(profile["longitude"]),
             start=start,
+            shading=horizon_from_profile(profile),
         )
         return [max(0.0, float(v or 0.0)) for v in values], SOLAR_SOURCE_FORECAST
     except Exception as exc:  # noqa: BLE001 — same documented fallback as the collector
@@ -123,6 +125,7 @@ def _archive_window_wm2(profile: dict, surface, start: datetime, horizon: int) -
     if series is None:
         from data.open_meteo_solar_archive import build_open_meteo_climate_bundle_for_year
         from data.modeled_climate import _planning_timezone_for_thermal
+        from data.solar_horizon import horizon_from_profile
 
         bundle = build_open_meteo_climate_bundle_for_year(
             year,
@@ -130,6 +133,7 @@ def _archive_window_wm2(profile: dict, surface, start: datetime, horizon: int) -
             lon=float(profile["longitude"]),
             timezone=_planning_timezone_for_thermal({}, profile),
             surfaces=[surface],
+            horizon=horizon_from_profile(profile),
         )
     out: list[float] = []
     for offset in range(horizon):

@@ -233,12 +233,17 @@ def _render_wp_annual_metric(item: dict, *, location: dict) -> None:
     latitude = location["latitude"]
     longitude = location["longitude"]
 
-    thermal_preview = {**item, "latitude": latitude, "longitude": longitude}
+    from data.solar_horizon import stored_horizon_fields
+
+    # The horizon of the form shades collector and windows of the estimate (SUSI P3a).
+    horizon_fields = stored_horizon_fields(location)
+    thermal_preview = {**item, "latitude": latitude, "longitude": longitude, **horizon_fields}
     house_profile = {
         "latitude": latitude,
         "longitude": longitude,
         "default_pv_tilt": location["default_pv_tilt"],
         "default_pv_azimuth": location["default_pv_azimuth"],
+        **horizon_fields,
     }
     heat_annual, ref_year = thermal_annual_heat_kwh_from_archive(
         thermal_preview, house_profile=house_profile

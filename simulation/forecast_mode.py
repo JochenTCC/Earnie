@@ -65,6 +65,7 @@ class PvForecastSource:
                 tilt=system.surface.tilt_deg,
                 azimuth=system.surface.azimuth_deg,
                 timezone=self._climate.timezone,
+                horizon=self._climate.horizon,
             )
             kw = wm2 / REFERENCE_WM2 * float(system.kwp)
             total = kw if total is None else total + kw

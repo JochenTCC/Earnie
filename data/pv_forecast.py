@@ -470,11 +470,15 @@ def _open_meteo_pv_vector(
     """
     from data.open_meteo_solar_archive import irradiance_wm2_to_pv_kw
     from data.outdoor_forecast import get_hourly_tilted_irradiance_forecast_wm2
+    from data.solar_horizon import horizon_from_profile
     from optimizer.slot_duration import floor_to_hour_slot
 
     start = floor_to_hour_slot(min(target_hours))
     end = floor_to_hour_slot(max(target_hours))
     wall_hours = int((end - start).total_seconds() // 3600) + 1
+    # The Live profile's manual horizon (SUSI P3a). forecast.solar itself already uses the
+    # PVGIS terrain horizon; a manual one is passed to it with SUSI P3a-2.
+    live_profile = config.get_resolved_runtime_settings().get("_house_profile")
     wm2 = get_hourly_tilted_irradiance_forecast_wm2(
         horizon=wall_hours + 1,
         tilt_deg=tilt,
@@ -482,6 +486,7 @@ def _open_meteo_pv_vector(
         latitude=lat,
         longitude=lon,
         start=start,
+        shading=horizon_from_profile(live_profile),
     )
     kw_by_hour = {
         start + timedelta(hours=i): irradiance_wm2_to_pv_kw(wm2[i + 1], kwp)

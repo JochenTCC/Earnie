@@ -115,7 +115,7 @@ Stündliche interne Gewinne = Σ Verbraucherleistung × Faktor plus Grundlast ×
 | `g_value` | Gesamtenergiedurchlassgrad der Verglasung | 0,6 |
 | `frame_shading_factor` | Abminderung für Rahmen, Laibung, Vorsprünge, Verschmutzung | 0,5 |
 
-Gewinn je Stunde = Σ Fensterfläche × g-Wert × Abminderung × Einstrahlung auf die senkrechte Fläche (Open-Meteo, vier Flächen Süd/Ost/West/Nord). Der Vorschlag im Hauskonfigurator folgt dem SUSI-Quader: BGF über 2 Geschosse, Seitenverhältnis 1,5, Geschosshöhe 2,6 m, Fensteranteil der Fassade Süd 20 %, Ost/West 10 %, Nord 6 %. Die Verschattung durch Gelände und Nachbargebäude ist hier noch nicht enthalten.
+Gewinn je Stunde = Σ Fensterfläche × g-Wert × Abminderung × Einstrahlung auf die senkrechte Fläche (Open-Meteo, vier Flächen Süd/Ost/West/Nord). Der Vorschlag im Hauskonfigurator folgt dem SUSI-Quader: BGF über 2 Geschosse, Seitenverhältnis 1,5, Geschosshöhe 2,6 m, Fensteranteil der Fassade Süd 20 %, Ost/West 10 %, Nord 6 %. Die Verschattung durch Gelände und Nachbargebäude kommt über den [Horizont](batterie-pv.md#horizont) des Hausprofils dazu: Steht die Sonne dahinter, entfällt die direkte Einstrahlung auf die Fenster.
 
 ```json
 "thermal": {"living_area_m2": 140, "hwb_kwh_m2": 55, "gross_floor_area_m2": 180,

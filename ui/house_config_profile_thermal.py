@@ -59,7 +59,10 @@ def _inject_profile_geo(
     longitude: float,
     *,
     timezone_name: str | None = None,
+    horizon_fields: dict | None = None,
 ) -> list[dict]:
+    from data.solar_horizon import copy_horizon_fields
+
     enriched: list[dict] = []
     for consumer in consumers:
         item = dict(consumer)
@@ -67,6 +70,8 @@ def _inject_profile_geo(
             item = dict(item)
             item["latitude"] = latitude
             item["longitude"] = longitude
+            # Preview of „Haus Wärme“ with the horizon of the form (SUSI P3a).
+            copy_horizon_fields(horizon_fields or {}, item)
         elif item.get("type") == "thermal_rc":
             rc = dict(item.get("thermal_rc") or {})
             rc["latitude"] = latitude

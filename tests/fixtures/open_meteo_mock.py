@@ -25,8 +25,10 @@ def _fake_fetch_hourly_archive_chunk(
     end: date,
     hourly_vars: str,
     extra_params: dict | None = None,
+    payload_transform=None,
 ) -> dict[str, pd.Series]:
-    del lat, lon, timezone, extra_params
+    # The horizon mask works on the HTTP payload, which this mock replaces: series stay unshaded.
+    del lat, lon, timezone, extra_params, payload_transform
     chunk_end = end - timedelta(days=1)
     if chunk_end < start:
         chunk_end = start

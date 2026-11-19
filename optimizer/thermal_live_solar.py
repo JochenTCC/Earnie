@@ -42,6 +42,7 @@ def resolve_live_collector_solar_kw(
     from data.modeled_climate import collector_surface_from_thermal
     from data.open_meteo_solar_archive import irradiance_wm2_to_thermal_kwh
     from data.outdoor_forecast import get_hourly_tilted_irradiance_forecast_wm2
+    from data.solar_horizon import horizon_from_profile
 
     profile = _profile_with_geo(house_profile)
     surface = collector_surface_from_thermal(thermal, profile)
@@ -54,6 +55,7 @@ def resolve_live_collector_solar_kw(
             latitude=float(profile["latitude"]),
             longitude=float(profile["longitude"]),
             start=start_dt,
+            shading=horizon_from_profile(profile),
         )
     except Exception as exc:
         logger.warning(

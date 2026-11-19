@@ -483,6 +483,8 @@ def test_open_meteo_vector_uses_orientation_and_preceding_hour_mean():
             "latitude": 51.0,
             "longitude": 10.0,
             "start": base,
+            # No horizon on the Live profile: the request stays the one without DNI.
+            "shading": None,
         }
     ]
     # Slot 10:00 ← stamp 11:00 (500 W/m²), QH 10:15 inherits 10:00.

@@ -23,6 +23,7 @@ from data.open_meteo_solar_archive import (
     build_open_meteo_climate_bundle_for_year,
     last_full_archive_year,
 )
+from data.solar_horizon import HorizonProfile, horizon_from_profile
 
 
 def collector_surface_from_thermal(thermal: dict, profile: dict) -> TiltedSurface:
@@ -236,6 +237,11 @@ class ModeledClimateContext:
     def _pv_surfaces(self) -> list[TiltedSurface]:
         return [system.surface for system in self.pv_systems]
 
+    @property
+    def horizon(self) -> HorizonProfile | None:
+        """Horizon of the house profile (SUSI P3a); None without one."""
+        return horizon_from_profile(self.house_profile)
+
     @classmethod
     def for_house_profile(cls, profile: dict, *, kwp: float) -> ModeledClimateContext:
         lat = float(profile["latitude"])
@@ -300,6 +306,7 @@ class ModeledClimateContext:
                 lon=self.lon,
                 timezone=self.timezone,
                 surfaces=_surfaces_for_profile(self.house_profile, self._pv_surfaces()),
+                horizon=self.horizon,
             )
         return self._year_bundles[year]
 
@@ -313,6 +320,7 @@ class ModeledClimateContext:
                 lon=self.lon,
                 timezone=self.timezone,
                 surfaces=_surfaces_for_profile(self.house_profile, self._pv_surfaces()),
+                horizon=self.horizon,
             )
         return self._range_bundles[key]
 
@@ -526,6 +534,8 @@ def reference_climate_for_thermal(
         lon=lon,
         timezone=timezone,
         surfaces=thermal_bundle_surfaces(thermal, collector),
+        # The thermal block carries the profile's horizon like latitude / longitude.
+        horizon=horizon_from_profile(thermal) or horizon_from_profile(house_profile),
     )
     return bundle, collector
 

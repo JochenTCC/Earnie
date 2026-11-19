@@ -52,9 +52,13 @@ def house_thermal_parameters(
     )
     from data.heating_need import heating_params_from_thermal
     from data.open_meteo_solar_archive import last_full_archive_year
+    from data.solar_horizon import copy_horizon_fields, horizon_from_profile, horizon_token
     from optimizer.thermal_year_cache import THERMAL_PARAMETERS_CACHE, fingerprint_json
 
     geo = thermal_with_geo(thermal, house_profile)
+    if horizon_from_profile(geo) is None:
+        # Callers that pass a bare thermal block (Live, previews): the profile's horizon.
+        copy_horizon_fields(house_profile, geo)
     year = reference_year if reference_year is not None else last_full_archive_year()
     profile = house_profile or {}
     # The house profile only enters via timezone and collector surface; keying on
@@ -71,6 +75,8 @@ def house_thermal_parameters(
         fingerprint_json(heating_params_from_thermal(geo)),
         _planning_timezone_for_thermal(geo, profile),
         (surface.tilt_deg, surface.azimuth_deg),
+        # Shaded collector and window gains change the calibrated H (SUSI P3a).
+        horizon_token(horizon_from_profile(geo)),
         year,
     )
     return THERMAL_PARAMETERS_CACHE.get_or_compute(

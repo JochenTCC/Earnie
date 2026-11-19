@@ -107,7 +107,7 @@ def test_modeled_thermal_annual_archive_requests_collector(monkeypatch):
             recorded["surface"] = surface
             return "wm2-series"
 
-    def fake_bundle(year, *, lat, lon, timezone, surfaces):
+    def fake_bundle(year, *, lat, lon, timezone, surfaces, horizon=None):
         recorded["surfaces"] = surfaces
         recorded["lat"] = lat
         return _FakeBundle()
@@ -639,7 +639,7 @@ def test_modeled_temperature_series_passes_collector_irradiance(monkeypatch):
             recorded["collector_surface"] = surface
             return wm2
 
-    def fake_bundle(year, *, lat, lon, timezone, surfaces):
+    def fake_bundle(year, *, lat, lon, timezone, surfaces, horizon=None):
         recorded["surfaces"] = surfaces
         return _FakeBundle()
 

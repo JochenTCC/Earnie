@@ -22,6 +22,8 @@ from ui.house_config_profile_points import _render_points_fields
 
 import streamlit as st
 
+from data.solar_horizon import stored_horizon_fields
+
 from house_config.entity_id_lock import (
     FORCE_ID_FROM_LABEL_KEY,
     ID_PROVISIONAL_LABEL_KEY,
@@ -126,6 +128,7 @@ def _render_consumer_form(
     session_scope: str,
     default_pv_tilt: float = 18.0,
     default_pv_azimuth: float = 0.0,
+    horizon_fields: dict | None = None,
 ) -> dict:
     expander_title, annual, c_type = _consumer_expander_title(
         consumer, index, session_scope=session_scope
@@ -172,6 +175,7 @@ def _render_consumer_form(
                 session_scope=session_scope,
                 default_pv_tilt=default_pv_tilt,
                 default_pv_azimuth=default_pv_azimuth,
+                horizon_fields=horizon_fields,
             )
     # Unreachable when expander runs; keep type-checkers happy if body returns.
     return dict(consumer)
@@ -322,6 +326,7 @@ def _render_consumer_form_body(
     session_scope: str,
     default_pv_tilt: float = 18.0,
     default_pv_azimuth: float = 0.0,
+    horizon_fields: dict | None = None,
 ) -> dict:
     consumer = _seed_ev_defaults_on_type_switch(
         consumer, index, session_scope=session_scope
@@ -372,6 +377,7 @@ def _render_consumer_form_body(
                 "longitude": longitude,
                 "default_pv_tilt": default_pv_tilt,
                 "default_pv_azimuth": default_pv_azimuth,
+                **stored_horizon_fields(horizon_fields),
             },
         )
     )

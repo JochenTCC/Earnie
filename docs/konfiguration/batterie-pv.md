@@ -25,6 +25,7 @@ Im **Szenario-Explorer** (Verbrauchsdaten / cons_data) gilt für die PV-Linien:
 | `pv_tilt` | ° | `components.json` → `pv_systems[]` | Dachneigung **je Anlage** (bei mehreren Anlagen gibt es keine gemeinsame Neigung) |
 | `pv_azimuth` | ° | `components.json` → `pv_systems[]` | Ausrichtung je Anlage: `0` = Süd, `-90` = Ost, `90` = West |
 | `latitude`, `longitude` | ° | `house_profiles.json` (über das Szenario) | Standort für die PV-Prognose (Forecast.Solar / Open-Meteo) |
+| `horizon_source`, `horizon` | – / ° | `house_profiles.json` | Horizont am Standort (Gelände, Gebäude, Bäume), siehe [Horizont](#horizont). Ohne die Felder rechnet Earnie mit freiem Horizont. |
 | `k_push_cent` | Cent/kWh | `tariffs.json` (Export-Tarif) | **Einspeisevergütung** |
 | `battery_capacity_kwh` | kWh | `components.json` → `batteries[]` | Nutzbare Speicherkapazität |
 | `battery_max_charge_power_kw` | kW | `components.json` → `batteries[]` | Max. Ladeleistung (ersetzt das gemeinsame `battery_max_power_kw`) |
@@ -101,6 +102,38 @@ Earnie holt die PV-Prognose je PV-Feld in dieser Reihenfolge:
 3. **Abbruch des Zyklus**, wenn auch Open-Meteo nicht antwortet. Earnie plant dann nicht mit erfundenen PV-Werten, sondern meldet einen Fehler und versucht es im nächsten Zyklus erneut, wie bei fehlenden Day-Ahead-Preisen.
 
 Die Quelle je PV-Feld steht im Laufzustand (`optimizer_run_state.json`, Feld `pv_forecast_sources`: `forecast_solar`, `open_meteo` oder `none` bei 0 kWp).
+
+<a id="horizont"></a>
+
+### Horizont (Verschattung durch Gelände und Gebäude)
+
+Steht die Sonne hinter einem Berg, einem Nachbarhaus oder einem Baum, erreicht sie das Haus nicht direkt. Earnie kann das einrechnen: Im Hauskonfigurator unter **Standort** den Schalter **Horizont berücksichtigen** einschalten und für 16 Himmelsrichtungen (alle 22,5°) den Höhenwinkel des Horizonts eintragen.
+
+**Messen:** vom Dach oder von der PV-Anlage aus mit der Kompass-App die Richtung und mit der Neigungsmesser-App des Handys den Winkel bis zur Oberkante von Berg, Haus oder Baum anpeilen. 0° heißt freier Horizont. Die Vorschau unter der Tabelle zeigt den Horizont und die Sonnenbahnen am 21. Juni, zur Tagundnachtgleiche und am 21. Dezember. Wo eine Sonnenbahn unter dem Horizont liegt, fehlt an diesem Tag die direkte Sonne.
+
+| Feld | Bedeutung |
+| ---- | --------- |
+| `horizon_source` | `manual`: die Liste in `horizon` wird angewendet. `none`: kein Horizont; eine vorhandene Liste bleibt gespeichert, wirkt aber nicht (Schalter aus). |
+| `horizon` | Liste aus `azimuth_deg` (0 = Süd, -90 = Ost, 90 = West, ±180 = Nord, wie bei den PV-Feldern) und `elevation_deg` (0–90°). Zwischen den Punkten interpoliert Earnie linear, auch über Nord hinweg. |
+
+```json
+"horizon_source": "manual",
+"horizon": [{"azimuth_deg": -90, "elevation_deg": 4},
+            {"azimuth_deg": -45, "elevation_deg": 12},
+            {"azimuth_deg": 0, "elevation_deg": 18},
+            {"azimuth_deg": 45, "elevation_deg": 9},
+            {"azimuth_deg": 90, "elevation_deg": 0}]
+```
+
+**So rechnet Earnie:** Für jede Stunde bestimmt Earnie den Sonnenstand an vier Zeitpunkten. Liegt die Sonne unter dem Horizont ihrer Richtung, entfällt für diesen Teil der Stunde die direkte Einstrahlung auf die Fläche. Das diffuse Licht des Himmels und das vom Boden reflektierte Licht bleiben. Dafür fragt Earnie bei Open-Meteo zusätzlich die Direktstrahlung (`direct_normal_irradiance`) ab, und zwar nur, wenn ein Horizont eingeschaltet ist.
+
+**Wo der Horizont wirkt:**
+
+- **PV-Ertrag** im Szenarien-Explorer und im Jahresmodell (Open-Meteo-Archiv), auch im Prognose-Modus des Szenarien-Explorers.
+- **Solarthermie-Kollektor** und **solare Gewinne durch die Fenster**, im Jahresmodell und in der Live-Planung. Der Verlustkoeffizient H des Hauses wird mit den beschatteten Gewinnen kalibriert; die Jahres-Heizwärme bleibt also beim HWB.
+- **PV-Prognose im Live-Betrieb** nur im Ersatzweg über Open-Meteo. forecast.solar rechnet bereits mit dem Gelände am Standort (PVGIS-Horizont), kennt aber keine Nachbarhäuser und Bäume. Der eingetragene Horizont wird noch nicht an forecast.solar übergeben.
+
+> **Hinweis:** Ein eingeschalteter Horizont ändert die Ergebnisse: PV-Ertrag und Kollektorwärme sinken vor allem im Winter und in den Randstunden. Ohne die beiden Felder oder mit ausgeschaltetem Schalter bleibt alles wie bisher.
 
 ## Wechselrichter (`inverters[]`)
 

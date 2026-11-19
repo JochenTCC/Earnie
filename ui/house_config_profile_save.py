@@ -17,6 +17,8 @@ import os
 
 import streamlit as st
 
+from data.solar_horizon import stored_horizon_fields
+
 from house_config.earnie_role import (
     DEFAULT_MANUAL_HORIZON_H,
     EARNIE_ROLE_FLEX,
@@ -255,6 +257,7 @@ def _perform_house_profile_save(
                 "longitude": location["longitude"],
                 "default_pv_tilt": location["default_pv_tilt"],
                 "default_pv_azimuth": location["default_pv_azimuth"],
+                **stored_horizon_fields(location),
                 "netznutzung": netznutzung,
                 "consumers": resolved,
                 "total_profile_csv": hist["total_profile_csv"],
@@ -335,6 +338,7 @@ def _render_house_profile_save(
         "longitude": location["longitude"],
         "default_pv_tilt": location["default_pv_tilt"],
         "default_pv_azimuth": location["default_pv_azimuth"],
+        **stored_horizon_fields(location),
         "netznutzung": location["netznutzung"],
         "consumers": resolved,
         "total_profile_csv": hist["total_profile_csv"],

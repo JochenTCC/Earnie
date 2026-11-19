@@ -11,6 +11,7 @@ import pandas as pd
 
 from data import opendata_session
 from data.eu_market_features import month_ranges
+from data.solar_horizon import DNI_VAR, HorizonProfile, shade_hourly_payload
 from opendata import FetchBudgetExceeded, fetch_budget, open_meteo
 from runtime_store.env_vars import read_env
 
@@ -20,6 +21,7 @@ OPEN_METEO_ARCHIVE = open_meteo.ARCHIVE_URL
 OPEN_METEO_CACHE_DIR = Path("data/cache/open_meteo_utc")
 HOURLY_VAR = "global_tilted_irradiance"
 HOURLY_VAR_DAY1_FORECAST = f"{HOURLY_VAR}_previous_day1"
+DNI_VAR_DAY1_FORECAST = f"{DNI_VAR}_previous_day1"
 HOURLY_TEMP_VAR = "temperature_2m"
 REFERENCE_WM2 = 1000.0
 DEFAULT_THERMAL_EFFICIENCY = 0.40
@@ -199,6 +201,7 @@ def _fetch_hourly_archive_chunk(
     hourly_vars: str,
     extra_params: dict[str, Any] | None = None,
     fetch=open_meteo.archive,
+    payload_transform=None,
 ) -> dict[str, pd.Series]:
     # One UTC day earlier: the first local hours of ``start`` belong to the previous UTC day.
     payload = fetch(
@@ -210,6 +213,9 @@ def _fetch_hourly_archive_chunk(
         hourly=hourly_vars,
         extra_params=extra_params,
     )
+    if payload_transform is not None:
+        # On the UTC stamps, before the local wall clock: the sun position needs real time.
+        payload = payload_transform(payload)
     series_by_var = _hourly_series_from_payload(
         payload,
         hourly_vars=hourly_vars,
@@ -249,6 +255,40 @@ def fetch_hourly_temperature_c_series(
     return _concat_hourly_chunks(chunks)
 
 
+def _tilted_request(
+    tilted_var: str,
+    dni_var: str,
+    *,
+    lat: float,
+    lon: float,
+    tilt: float,
+    azimuth: float,
+    horizon: HorizonProfile | None,
+):
+    """(hourly variables, extra chunk-fetch keywords) of a tilted-irradiance request.
+
+    Without a horizon the request and the chunk fetch are the ones from before SUSI P3a
+    (same parameters, same cache and shadow keys, no extra keyword). The mask uses the same
+    whole degrees Open-Meteo is asked for.
+    """
+    if horizon is None:
+        return tilted_var, {}
+
+    def _shade(payload: dict) -> dict:
+        return shade_hourly_payload(
+            payload,
+            tilted_var=tilted_var,
+            dni_var=dni_var,
+            lat=lat,
+            lon=lon,
+            tilt_deg=float(int(round(tilt))),
+            azimuth_deg=float(int(round(azimuth))),
+            horizon=horizon,
+        )
+
+    return f"{tilted_var},{dni_var}", {"payload_transform": _shade}
+
+
 def fetch_hourly_tilted_irradiance_wm2_series(
     start: date,
     end: date,
@@ -258,10 +298,18 @@ def fetch_hourly_tilted_irradiance_wm2_series(
     tilt: float,
     azimuth: float,
     timezone: str,
+    horizon: HorizonProfile | None = None,
 ) -> pd.Series:
-    """Stündliche geneigte Einstrahlung (W/m²) für eine Oberfläche."""
+    """Stündliche geneigte Einstrahlung (W/m²) für eine Oberfläche.
+
+    With ``horizon`` the direct beam is removed while the sun is behind it (SUSI P3a); only
+    then the request also asks for ``direct_normal_irradiance``.
+    """
     if end < start:
         raise ValueError("Open-Meteo Irradianz: end muss nicht vor start liegen.")
+    hourly_vars, transform = _tilted_request(
+        HOURLY_VAR, DNI_VAR, lat=lat, lon=lon, tilt=tilt, azimuth=azimuth, horizon=horizon
+    )
     chunks: list[pd.Series] = []
     for chunk_start, chunk_end in month_ranges(start, end + timedelta(days=1)):
         payload = _fetch_hourly_archive_chunk(
@@ -270,11 +318,12 @@ def fetch_hourly_tilted_irradiance_wm2_series(
             timezone=timezone,
             start=chunk_start,
             end=chunk_end,
-            hourly_vars=HOURLY_VAR,
+            hourly_vars=hourly_vars,
             extra_params={
                 "tilt": int(round(tilt)),
                 "azimuth": int(round(azimuth)),
             },
+            **transform,
         )
         chunks.append(payload[HOURLY_VAR])
     return _concat_hourly_chunks(chunks)
@@ -289,10 +338,23 @@ def fetch_hourly_tilted_irradiance_day1_forecast_wm2_series(
     tilt: float,
     azimuth: float,
     timezone: str,
+    horizon: HorizonProfile | None = None,
 ) -> pd.Series:
-    """Tilted irradiance as forecast 24 h earlier, local wall clock; NaN where no run is archived."""
+    """Tilted irradiance as forecast 24 h earlier, local wall clock; NaN where no run is archived.
+
+    With ``horizon`` shaded like the archive series, with the DNI of the same forecast run.
+    """
     if end < start:
         raise ValueError("Open-Meteo Prognosearchiv: end muss nicht vor start liegen.")
+    hourly_vars, transform = _tilted_request(
+        HOURLY_VAR_DAY1_FORECAST,
+        DNI_VAR_DAY1_FORECAST,
+        lat=lat,
+        lon=lon,
+        tilt=tilt,
+        azimuth=azimuth,
+        horizon=horizon,
+    )
     chunks: list[pd.Series] = []
     for chunk_start, chunk_end in month_ranges(start, end + timedelta(days=1)):
         payload = _fetch_hourly_archive_chunk(
@@ -301,12 +363,13 @@ def fetch_hourly_tilted_irradiance_day1_forecast_wm2_series(
             timezone=timezone,
             start=chunk_start,
             end=chunk_end,
-            hourly_vars=HOURLY_VAR_DAY1_FORECAST,
+            hourly_vars=hourly_vars,
             extra_params={
                 "tilt": int(round(tilt)),
                 "azimuth": int(round(azimuth)),
             },
             fetch=open_meteo.previous_runs,
+            **transform,
         )
         chunks.append(payload[HOURLY_VAR_DAY1_FORECAST])
     return _concat_hourly_chunks(chunks)
@@ -465,8 +528,12 @@ def open_meteo_cache_path(
     surfaces: list[TiltedSurface],
     *,
     cache_dir: Path | None = None,
+    horizon: HorizonProfile | None = None,
 ) -> Path:
     token = _surface_cache_token(_unique_surfaces(surfaces))
+    if horizon is not None:
+        # Shaded series are another file; without a horizon the name is unchanged.
+        token = f"{token}_hz{horizon.token()}"
     tz_token = timezone.replace("/", "-")
     name = (
         f"{lat:.4f}_{lon:.4f}_{start.isoformat()}_{end.isoformat()}_"
@@ -523,6 +590,7 @@ def _load_bundle_from_cache(
     surfaces: list[TiltedSurface],
     *,
     cache_dir: Path | None = None,
+    horizon: HorizonProfile | None = None,
 ) -> OpenMeteoClimateBundle | None:
     path = open_meteo_cache_path(
         lat,
@@ -532,6 +600,7 @@ def _load_bundle_from_cache(
         end,
         surfaces,
         cache_dir=cache_dir,
+        horizon=horizon,
     )
     if not path.exists():
         return None
@@ -565,6 +634,7 @@ def _save_bundle_to_cache(
     surfaces: list[TiltedSurface],
     *,
     cache_dir: Path | None = None,
+    horizon: HorizonProfile | None = None,
 ) -> None:
     path = open_meteo_cache_path(
         lat,
@@ -574,6 +644,7 @@ def _save_bundle_to_cache(
         end,
         surfaces,
         cache_dir=cache_dir,
+        horizon=horizon,
     )
     path.parent.mkdir(parents=True, exist_ok=True)
     _bundle_to_frame(bundle).to_json(path, orient="split", date_format="iso")
@@ -590,10 +661,13 @@ def build_open_meteo_climate_bundle(
     surfaces: list[TiltedSurface],
     use_cache: bool = True,
     cache_dir: Path | None = None,
+    horizon: HorizonProfile | None = None,
 ) -> OpenMeteoClimateBundle:
     """
     Lädt Temperatur und geneigte Einstrahlung für alle Oberflächen.
     API-Fehler werden durchgereicht (kein Fallback).
+
+    With ``horizon`` every surface series is shaded (SUSI P3a) and cached under its own name.
     """
     end = _cap_inclusive_end(end)
     if end < start:
@@ -611,6 +685,7 @@ def build_open_meteo_climate_bundle(
             end,
             unique_surfaces,
             cache_dir=cache_dir,
+            horizon=horizon,
         )
         if cached is not None:
             return cached
@@ -631,6 +706,7 @@ def build_open_meteo_climate_bundle(
             tilt=surface.tilt_deg,
             azimuth=surface.azimuth_deg,
             timezone=timezone,
+            horizon=horizon,
         )
     bundle = OpenMeteoClimateBundle(
         temperature_c=temperature_c,
@@ -646,6 +722,7 @@ def build_open_meteo_climate_bundle(
             end,
             unique_surfaces,
             cache_dir=cache_dir,
+            horizon=horizon,
         )
     return bundle
 
@@ -659,6 +736,7 @@ def build_open_meteo_climate_bundle_for_year(
     surfaces: list[TiltedSurface],
     use_cache: bool = True,
     cache_dir: Path | None = None,
+    horizon: HorizonProfile | None = None,
 ) -> OpenMeteoClimateBundle:
     """Volles Kalenderjahr (01-01 .. 12-31)."""
     return build_open_meteo_climate_bundle(
@@ -670,4 +748,5 @@ def build_open_meteo_climate_bundle_for_year(
         surfaces=surfaces,
         use_cache=use_cache,
         cache_dir=cache_dir,
+        horizon=horizon,
     )
