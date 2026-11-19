@@ -83,6 +83,7 @@ def test_earnie_points_view_shows_total_and_breakdown(monkeypatch):
     assert at.metric[0].value == "7"
     assert len(at.table) == 1
     assert not at.warning
+    assert any("bis **15 Earnie-Points** kostenfrei" in c.value for c in at.caption)
 
 
 def test_earnie_points_view_shows_error_instead_of_number(monkeypatch):

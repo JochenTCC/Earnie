@@ -9,6 +9,10 @@ from runtime_store.usage_points import compute_live_points
 
 logger = logging.getLogger(__name__)
 
+# Maintainer decision 2026-11-13: private, non-commercial self-hosting is free up to this total.
+# Communicated only; nothing is checked or limited (LICENSE.md unchanged).
+FREE_SELF_HOST_POINTS = 15
+
 PART_LABELS = (
     ("pv", "PV-Felder"),
     ("storage", "Speicher"),
@@ -30,7 +34,8 @@ def render_earnie_points() -> None:
         "Grobe Größenkennzahl des **Live-Szenarios** (PV, Speicher, Wallboxen, "
         "Wärmepumpen / Klimaanlagen, Heizstab, flexible Großverbraucher). Nur die Gesamtsumme "
         "kann Teil der Nutzungsstatistik sein. Regel: Betriebs-Doku, Abschnitt "
-        "Nutzungsstatistik."
+        "Nutzungsstatistik. Für private, nicht gewerbliche Selbst-Hoster ist Earnie bis "
+        f"**{FREE_SELF_HOST_POINTS} Earnie-Points** kostenfrei."
     )
     try:
         result = compute_live_points()

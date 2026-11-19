@@ -150,6 +150,7 @@ Vollständige Roadmap: **[backlog/Backlog.md](backlog/Backlog.md)**
 Earnie ist **Source-Available**, nicht Open Source im Sinne der OSI: Der Quellcode ist öffentlich, die Nutzung aber eingeschränkt.
 
 - **Erlaubt:** Nutzung durch Privatpersonen im eigenen Haushalt, eigene Änderungen am Code und öffentliche Forks, solange sie unter derselben Lizenz bleiben, den Lizenztext mitführen (auch in Container-Images) und das „Banner der Wahrheit“ zeigen.
+- **Kostenfrei:** für private, nicht gewerbliche Selbst-Hoster bis 15 Earnie-Points (Regel und Anzeige: [Betriebs-Doku, Earnie-Points](docs/einrichtung/betrieb.md#earnie-points)).
 - **Nicht erlaubt:** kommerzielle Nutzung, Verkauf, Vermietung oder Betrieb als Dienstleistung durch Dritte, ohne schriftliche Zustimmung.
 - **Beiträge:** Wer Code oder Doku per Pull Request einreicht, räumt dem Rechteinhaber ein umfassendes Nutzungsrecht daran ein. Änderungen, die nur in einem Fork bleiben, gehören weiter ihrem Urheber.
 

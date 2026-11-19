@@ -10,6 +10,7 @@ The Earnie-Points rate the size and complexity of one **plant** (one location). 
 - Only the point **total** goes on the wire (usage ping, schema v2). The breakdown is local (UI, tests).
 - No tariff name is sent or stored by the client. The mapping to S / M / L happens at analysis time from the histogram.
 - Points are not a licence check; values are fakeable like the rest of the ping statistic.
+- Private, non-commercial self-hosting is free up to **15 points** (maintainer decision 2026-11-13). Since 2.8 this is stated in the README, the operations guide and on the points view (`FREE_SELF_HOST_POINTS` in `ui/earnie_points_view.py`); nothing checks or limits it, and `LICENSE.md` is unchanged until the new licence.
 
 ## 2. Rule (`points_v: 3`)
 

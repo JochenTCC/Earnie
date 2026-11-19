@@ -355,7 +355,7 @@ Wer bereits zugestimmt hat, wird wegen `points` nicht erneut gefragt. Die exakte
 
 ### Earnie-Points
 
-Die Earnie-Points sind eine grobe Größenkennzahl **einer Anlage** (ein Standort). Earnie berechnet sie aus dem **Live-Szenario**, nicht aus Szenarien des Szenarienkonfigurators. Die Seite **Optimierer-Dienst** zeigt sie unter **Earnie-Points dieser Anlage** mit Aufschlüsselung an. Zweck der Earnie-Points ist zukünftig die Zuordnung zu möglichen Abo-Tarifen. Derzeit ist das rein informativ und bei selbst verwalteten Installationen fallen auch keine Kosten an. Fehlen Angaben im Live-Szenario, zeigt Earnie den Grund an und sendet keine Punkte.
+Die Earnie-Points sind eine grobe Größenkennzahl **einer Anlage** (ein Standort). Earnie berechnet sie aus dem **Live-Szenario**, nicht aus Szenarien des Szenarienkonfigurators. Die Seite **Optimierer-Dienst** zeigt sie unter **Earnie-Points dieser Anlage** mit Aufschlüsselung an. Für private, nicht gewerbliche Selbst-Hoster ist Earnie bis **15 Earnie-Points** kostenfrei; größere Anlagen bitte beim Projekt melden. Earnie prüft die Punkte nicht und schränkt bei mehr Punkten nichts ein. Zukünftig dienen sie auch der Zuordnung zu möglichen Abo-Tarifen. Fehlen Angaben im Live-Szenario, zeigt Earnie den Grund an und sendet keine Punkte.
 
 Regel (Version 3). Jeder Teil wird kaufmännisch auf ganze Punkte gerundet. Ein Ausbau der Anlage (mehr PV, mehr Speicher, eine weitere Wallbox) senkt die Punkte nie:
 
