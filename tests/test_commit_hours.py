@@ -185,20 +185,7 @@ def _two_house_batteries() -> list[dict]:
     return [{**_BATTERY, **no_wear, "id": "haus_1"}, {**_BATTERY, **no_wear, "id": "haus_2"}]
 
 
-def test_slot_resolve_rejects_several_house_batteries():
-    """commit_hours=1 would plan one battery with the first one's capacity and the power of both."""
-    with pytest.raises(ValueError, match="haus_1, haus_2"):
-        simulate_horizon(
-            _small_matrix(2),
-            50.0,
-            battery_params=_two_house_batteries(),
-            verbose=False,
-            flexible_consumers=[],
-            commit_hours=1,
-        )
-
-
-def test_open_loop_and_single_battery_slot_resolve_still_run():
+def test_open_loop_and_single_battery_slot_resolve_run():
     matrix = _small_matrix(2)
     open_loop = simulate_horizon(
         matrix,

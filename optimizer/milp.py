@@ -43,6 +43,7 @@ from .milp_horizon import (
     _add_terminal_soc_constraint,
     _build_milp_model,
     _terminal_soc_energy_kwh,
+    plant_soc_view,
 )
 from .milp_horizon_extras import BASE_LEVEL_ENV, base_level_enabled, plant_capacity_kwh
 from .import_power_limit import ImportCaps
@@ -63,6 +64,7 @@ from .import_cap_report import (
 from .milp_vendor_mode import add_vendor_mode_export_constraints, plan_vendor_mode_enabled
 from .milp_result import (
     _extract_milp_plan,
+    _planned_soc_by_ess_at,
     _log_milp_decision,
     extract_horizon_schedule,
 )
@@ -321,6 +323,8 @@ def _add_soc_anchor_constraints(
     of all house batteries (``plant_capacity_kwh``), not the first battery alone.
     """
     battery_params = _primary_battery_params(battery_params)
+    # The sunrise check compares the plan's SoC: the plant's with several house batteries.
+    current_soc, soc_params = plant_soc_view(model, current_soc, battery_params)
     if soc_hold_index is not None and soc_hold_percent is not None:
         e_hold = (float(soc_hold_percent) / 100.0) * plant_capacity_kwh(model)
         _add_soc_equality_constraint(model, soc_hold_index, e_hold)
@@ -332,7 +336,7 @@ def _add_soc_anchor_constraints(
             )
     elif sunrise_soc_min_index is not None:
         # Floor already via e_batt lowBound; do not force == SOC_min (residual dump).
-        min_soc = float(battery_params["min_soc"])
+        min_soc = float(soc_params["min_soc"])
         below_min = float(current_soc) < min_soc - 1e-9
         refill_kwh = float(
             battery_params.get("_virtual_reserve_refill_kwh")
@@ -496,8 +500,16 @@ def _extract_optimizer_controls_from_model(
     current_soc: float,
     battery_params: dict,
 ) -> _OptimizerControls:
-    """Modus/Leistung/SoC für t=0 inkl. E-Auto-Preset-Leistung außerhalb des MILP."""
+    """Modus/Leistung/SoC für t=0 inkl. E-Auto-Preset-Leistung außerhalb des MILP.
+
+    With several house batteries the controls refer to the plant (``plant_soc_view``) and
+    ``milp_plan["planned_soc_by_ess"]`` holds each battery's planned SoC at the end of slot 0.
+    """
     milp_plan = _extract_milp_plan(model)
+    current_soc, battery_params = plant_soc_view(model, current_soc, battery_params)
+    planned_by_ess = _planned_soc_by_ess_at(model, 0)
+    if planned_by_ess:
+        milp_plan["planned_soc_by_ess"] = planned_by_ess
     consumer_powers, total_flex_power = _consumer_powers_now(model)
     preset_t0 = preset_by_slot.get(0, {})
     consumer_powers.update(preset_t0)

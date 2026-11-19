@@ -33,11 +33,6 @@ def house_balance_batteries(batteries: list[dict]) -> list[dict]:
     )
 
 
-def _battery_id(battery: dict, index: int) -> str:
-    """Id of a battery as the MILP names it (``_create_grid_battery_vars``)."""
-    return str(battery.get("id") or f"ess_{index}").strip() or f"ess_{index}"
-
-
 def plant_start_soc(
     batteries: list[dict],
     initial_soc: float,
@@ -52,40 +47,6 @@ def plant_start_soc(
     if len(house) < 2:
         return float(initial_soc)
     return plant_soc_percent(house, dict(current_soc_by_id or {}))
-
-
-def plant_planned_soc(batteries: list[dict], slot: dict) -> float | None:
-    """Planned end-of-slot SoC of the plant battery, ``None`` when the slot carries no plan for it.
-
-    ``planned_soc_percent`` of a schedule slot is the first battery's; with several house
-    batteries the plant value is the energy-weighted ``planned_soc_by_ess``.
-    """
-    house = house_balance_batteries(batteries)
-    planned_by = slot.get("planned_soc_by_ess")
-    if len(house) < 2 or not planned_by:
-        return None
-    return plant_soc_percent(house, {str(k): float(v) for k, v in planned_by.items()})
-
-
-def milp_start_soc(
-    batteries: list[dict],
-    sim_soc: float,
-    current_soc_by_id: dict[str, float] | None,
-) -> float:
-    """``current_soc`` for the MILP: the start SoC of the first house battery.
-
-    With one house battery that is the simulated SoC. With several the simulated SoC is the
-    plant's, so the first battery's own start SoC is passed (``ValueError`` when missing).
-    The MILP's terminal and hold anchors are plant SoC values and do not use it.
-    """
-    house = house_balance_batteries(batteries)
-    if len(house) < 2:
-        return float(sim_soc)
-    first_id = _battery_id(house[0], 0)
-    by_id = current_soc_by_id or {}
-    if first_id not in by_id:
-        raise ValueError(f"MILP start SoC: no SoC for house battery '{first_id}'.")
-    return float(by_id[first_id])
 
 
 def _resolve_horizon_batteries(
@@ -244,13 +205,20 @@ def _advance_chart_soc_after_slot(
     slot_index: int,
     virtual_entries: list[dict],
     end_soc: float | None = None,
+    house_soc: dict[str, float] | None = None,
 ) -> None:
-    """Update house / physical-standby / virtual SoC maps for the next Chart1 attach."""
+    """Update house / physical-standby / virtual SoC maps for the next Chart1 attach.
+
+    ``house_soc``: simulated end-of-slot SoC of each house battery (several house batteries);
+    it replaces the plan's ``planned_soc_by_ess``.
+    """
     from optimizer.powerstation_soc_chart import simulate_virtual_reserve_soc_after_slot
     from optimizer.powerstation_standby import advance_physical_standby_soc_after_slot
 
     planned_by = (slot or {}).get("planned_soc_by_ess") or {}
-    if planned_by:
+    if house_soc is not None:
+        soc_by_ess.update(house_soc)
+    elif planned_by:
         for ess_id, soc_val in planned_by.items():
             soc_by_ess[str(ess_id)] = float(soc_val)
     else:

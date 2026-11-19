@@ -153,6 +153,35 @@ def _chart_row_from_controls(
         battery_params["max_soc"],
         dt_h=DEFAULT_DT_H,
     )
+    chart_row = chart_row_layout(
+        row,
+        pv=pv,
+        con=con,
+        total_flex_power=total_flex_power,
+        batt_action=batt_action,
+        start_soc=old_soc,
+        action_text=action_text,
+        consumers_cfg=consumers_cfg,
+        consumer_powers=consumer_powers,
+        consumer_pv_follow=consumer_pv_follow,
+    )
+    return sim_soc, chart_row, mode, target_power
+
+
+def chart_row_layout(
+    row: dict,
+    *,
+    pv: float,
+    con: float,
+    total_flex_power: float,
+    batt_action: float,
+    start_soc: float,
+    action_text: str,
+    consumers_cfg: list,
+    consumer_powers: dict[str, float],
+    consumer_pv_follow: dict[str, int],
+) -> dict:
+    """Chart row of one slot from its energy values (grid power from the balance)."""
     from optimizer.export_power_limit import clip_grid_kw_to_export_cap
 
     p_grid = clip_grid_kw_to_export_cap(
@@ -167,7 +196,7 @@ def _chart_row_from_controls(
         COL_VERBRAUCH_PROGNOSE: con,
         COL_BATTERIE_AKTION: round(batt_action, 2),
         COL_NETZBEZUG: round(p_grid, 2),
-        COL_SOC: round(old_soc, 1),
+        COL_SOC: round(start_soc, 1),
         "Steuerbefehl": action_text,
     }
     for consumer in consumers_cfg:
@@ -178,7 +207,24 @@ def _chart_row_from_controls(
             chart_row[consumer_pv_follow_column_name(consumer)] = int(
                 consumer_pv_follow.get(consumer["id"], 0) or 0
             )
-    return sim_soc, chart_row, mode, target_power
+    return chart_row
+
+
+def set_chart_row_battery_action(chart_row: dict, batt_action: float) -> None:
+    """Battery action of a chart row and the grid power that follows from it."""
+    from optimizer.export_power_limit import clip_grid_kw_to_export_cap
+
+    pv = float(chart_row[COL_PV_PROGNOSE])
+    con = float(chart_row[COL_VERBRAUCH_PROGNOSE])
+    total_flex = flexible_consumer_power_kw(chart_row)
+    chart_row[COL_BATTERIE_AKTION] = round(batt_action, 2)
+    chart_row[COL_NETZBEZUG] = round(
+        clip_grid_kw_to_export_cap(
+            con + total_flex - pv + chart_row[COL_BATTERIE_AKTION],
+            k_push_act=chart_row.get(COL_EINSPEISEVERGUETUNG),
+        ),
+        2,
+    )
 
 
 def _chart_row_from_schedule_slot(

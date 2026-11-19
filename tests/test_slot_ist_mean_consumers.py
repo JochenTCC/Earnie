@@ -5,6 +5,8 @@ from datetime import datetime
 
 import pytest
 
+import config
+
 from optimizer.deviation_facts import build_slot_deviation_facts
 from runtime_store.history_chart_rows import (
     CHART_IST_BATTERY_KW_COLUMN,
@@ -84,7 +86,10 @@ def test_reconcile_skipped_when_mean_usable(monkeypatch):
         },
     ]
     out = _reconcile_history_battery_with_soc(
-        rows, [SLOT_PRESENT, SLOT_PRESENT], mean_usable=[True, False]
+        rows,
+        [SLOT_PRESENT, SLOT_PRESENT],
+        mean_usable=[True, False],
+        battery_params=config.get_battery_params(),
     )
     assert out[0][CHART_IST_BATTERY_KW_COLUMN] == pytest.approx(-2.5)
 

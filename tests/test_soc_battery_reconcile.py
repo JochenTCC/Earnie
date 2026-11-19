@@ -52,7 +52,9 @@ def test_reconcile_replaces_discharge_bar_when_soc_rises(monkeypatch):
             CHART_IST_BATTERY_KW_COLUMN: 2.5,
         },
     ]
-    out = _reconcile_history_battery_with_soc(rows, [SLOT_PRESENT, SLOT_PRESENT])
+    out = _reconcile_history_battery_with_soc(
+        rows, [SLOT_PRESENT, SLOT_PRESENT], battery_params=dict(_PARAMS)
+    )
     assert out[0][CHART_IST_BATTERY_KW_COLUMN] > 0.0
     assert out[0][CHART_IST_BATTERY_KW_COLUMN] == pytest.approx(1.739, abs=0.05)
     assert out[1][CHART_IST_BATTERY_KW_COLUMN] == 2.5
@@ -75,5 +77,7 @@ def test_reconcile_keeps_ist_when_signs_agree(monkeypatch):
             CHART_IST_BATTERY_KW_COLUMN: -0.72,
         },
     ]
-    out = _reconcile_history_battery_with_soc(rows, [SLOT_PRESENT, SLOT_PRESENT])
+    out = _reconcile_history_battery_with_soc(
+        rows, [SLOT_PRESENT, SLOT_PRESENT], battery_params=dict(_PARAMS)
+    )
     assert out[0][CHART_IST_BATTERY_KW_COLUMN] == pytest.approx(-0.29)

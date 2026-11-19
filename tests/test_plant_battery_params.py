@@ -8,11 +8,7 @@ from optimizer.milp_horizon import (
     plant_soc_percent,
     primary_battery_with_plant_power,
 )
-from optimizer.sim_horizon_chart_soc import (
-    milp_start_soc,
-    plant_planned_soc,
-    plant_start_soc,
-)
+from optimizer.sim_horizon_chart_soc import plant_start_soc
 
 
 def _battery(ess_id: str, **overrides) -> dict:
@@ -123,25 +119,6 @@ def test_plant_start_soc_several_batteries(monkeypatch):
     assert plant_start_soc(batteries, 40.0, {"a": 40.0, "b": 80.0}) == pytest.approx(70.0)
     with pytest.raises(ValueError, match="no SoC for house battery"):
         plant_start_soc(batteries, 40.0, None)
-
-
-def test_milp_start_soc_is_the_first_batterys(monkeypatch):
-    monkeypatch.setattr("optimizer.milp_defaults._default_inverter_params", lambda: [])
-    batteries = [_battery("a"), _battery("b")]
-
-    assert milp_start_soc([_battery("a")], 61.0, None) == 61.0
-    assert milp_start_soc(batteries, 61.0, {"a": 40.0, "b": 80.0}) == 40.0
-    with pytest.raises(ValueError, match="'a'"):
-        milp_start_soc(batteries, 61.0, {"b": 80.0})
-
-
-def test_plant_planned_soc(monkeypatch):
-    monkeypatch.setattr("optimizer.milp_defaults._default_inverter_params", lambda: [])
-    batteries = [_battery("a", battery_capacity_kwh=5.0), _battery("b", battery_capacity_kwh=15.0)]
-    slot = {"planned_soc_percent": 20.0, "planned_soc_by_ess": {"a": 20.0, "b": 60.0}}
-
-    assert plant_planned_soc(batteries, slot) == pytest.approx(50.0)
-    assert plant_planned_soc([_battery("a")], {"planned_soc_percent": 20.0}) is None
 
 
 def test_open_loop_books_the_plant_soc(monkeypatch):

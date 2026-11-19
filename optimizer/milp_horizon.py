@@ -67,11 +67,10 @@ def primary_battery_with_plant_power(batteries: list[dict]) -> dict:
     """The first battery with the charge, discharge and standby power of all batteries.
 
     Capacity, SoC limits, efficiency, ``control`` and the virtual reserve keys are those of the
-    first battery. The MILP needs this view where it refers to the first battery
-    (``model.e_batt``, ``current_soc``, the sunrise anchor, virtual reserve, wear), while the
-    grid balance needs the power of all. The terminal and hold anchors bind the energy of all
-    batteries (``milp_horizon_extras.plant_capacity_kwh``). It is not a model of the whole
-    plant; the simulation and the charts use ``plant_battery_params``.
+    first battery. The MILP's grid balance needs the power of all; the virtual reserve and the
+    trivial-window check refer to the first battery. It is not a model of the whole plant: the
+    plan's SoC (``model.e_batt``) is the plant's (``plant_soc_view``), and the simulation and the
+    charts use ``plant_battery_params``.
     """
     if not batteries:
         return {
@@ -113,17 +112,23 @@ def plant_battery_params(batteries: list[dict]) -> dict:
     Raises ``ValueError`` when the batteries have different ``control`` modes: one battery
     cannot stand for a plant that is only partly controllable.
     """
+    if len(batteries) >= 2:
+        from house_config.battery_control import control_from_battery_params
+
+        controls = {str(b.get("id") or "?"): control_from_battery_params(b) for b in batteries}
+        if len(set(controls.values())) > 1:
+            raise ValueError(
+                "House batteries with different control modes cannot be simulated as one plant "
+                f"battery: {controls}."
+            )
+    return plant_energy_params(batteries)
+
+
+def plant_energy_params(batteries: list[dict]) -> dict:
+    """``plant_battery_params`` without the check of the control modes (``control`` of the first)."""
     agg = primary_battery_with_plant_power(batteries)
     if len(batteries) < 2:
         return agg
-    from house_config.battery_control import control_from_battery_params
-
-    controls = {str(b.get("id") or "?"): control_from_battery_params(b) for b in batteries}
-    if len(set(controls.values())) > 1:
-        raise ValueError(
-            "House batteries with different control modes cannot be simulated as one plant "
-            f"battery: {controls}."
-        )
     capacities = [float(b.get("battery_capacity_kwh") or 0.0) for b in batteries]
     total = sum(capacities)
     agg["battery_capacity_kwh"] = total
@@ -159,6 +164,45 @@ def plant_soc_percent(batteries: list[dict], soc_by_id: dict[str, float]) -> flo
     return energy / total
 
 
+
+
+def plant_soc_params(model: MilpHorizonModel, battery_params: dict) -> dict:
+    """Battery that the plan's SoC (``model.e_batt``) refers to.
+
+    ``battery_params`` with one house battery in the model. With several, ``model.e_batt`` is the
+    energy of all house batteries and the battery is the plant battery over the house batteries
+    of the model (``plant_battery_params`` without ``id`` and ``label``, so the plan values are
+    those of the plant; ``control``, ``ac_connection`` and the virtual reserve keys are those of
+    the first battery, the one the live cycle commands).
+    """
+    ess_ids = list(model.ess_ids or [])
+    if len(ess_ids) < 2:
+        return battery_params
+    params_by_id = model.battery_params_by_id or {}
+    params = plant_energy_params([params_by_id[eid] for eid in ess_ids])
+    params.pop("id", None)
+    params.pop("label", None)
+    return params
+
+
+def plant_soc_view(
+    model: MilpHorizonModel, current_soc: float, battery_params: dict
+) -> tuple[float, dict]:
+    """Start SoC and battery that the plan's SoC (``model.e_batt``) refers to.
+
+    With one house battery in the model these are ``current_soc`` and ``battery_params``. With
+    several, the plant SoC at the plan start (from each battery's own start SoC; ``current_soc``
+    is not used) and ``plant_soc_params``.
+    """
+    params = plant_soc_params(model, battery_params)
+    if params is battery_params:
+        return float(current_soc), battery_params
+    capacity = float(params.get("battery_capacity_kwh") or 0.0)
+    if capacity <= 0.0:
+        raise ValueError(f"MILP: the house batteries {model.ess_ids} have no capacity.")
+    if model.plant_start_energy_kwh is None:
+        raise ValueError("MILP model without plant start energy (plant_start_energy_kwh).")
+    return float(model.plant_start_energy_kwh) / capacity * 100.0, params
 
 
 def _normalize_fixed_flex_by_t(
@@ -281,7 +325,13 @@ def _create_grid_battery_vars(
         for t in range(horizon)
     ]
     primary_id = ess_ids[0]
-    e_batt = e_batt_by_ess[primary_id]
+    # model.e_batt is the plan's SoC: the battery itself, or with several the energy of all
+    # (tied to the sum in ``_add_slot_power_balance_and_soc``; bounds come from the batteries).
+    e_batt = (
+        e_batt_by_ess[primary_id]
+        if len(ess_ids) == 1
+        else [pulp.LpVariable(f"e_batt_plant_{t}") for t in range(horizon)]
+    )
     delta_charge = delta_charge_by_ess[primary_id]
     max_flex_power = sum(power_limits_kw(c)[1] for c in planned_consumers)
     # Preset flex (e.g. fixed EV charging) is load outside the MILP vars: the Big-M must
@@ -400,6 +450,10 @@ def _add_slot_power_balance_and_soc(
         for consumer in planned_consumers
     )
     # Tie aggregates to per-ESS vars
+    if len(grid_vars.ess_ids) > 1:
+        prob += grid_vars.e_batt[t] == pulp.lpSum(
+            grid_vars.e_batt_by_ess[eid][t] for eid in grid_vars.ess_ids
+        )
     prob += p_charge[t] == pulp.lpSum(
         grid_vars.p_charge_by_ess[eid][t] for eid in grid_vars.ess_ids
     )
@@ -711,6 +765,9 @@ def _build_milp_model(
         battery_params_by_id=dict(grid_vars.battery_params_by_id),
         p_pv_curtail=list(grid_vars.p_pv_curtail),
         relaxed_soc_bounds_percent=relaxed_soc_bounds or None,
+        plant_start_energy_kwh=sum(
+            _initial_energy_by_ess(grid_vars, current_soc, current_soc_by_id).values()
+        ),
     )
 
 

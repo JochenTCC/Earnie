@@ -319,14 +319,59 @@ def _attach_history_ess_soc_columns(row: dict[str, Any], entry: dict[str, Any]) 
     )
 
 
+def history_house_batteries() -> list[dict]:
+    """House-balance batteries of the configuration (the batteries of the plant SoC)."""
+    from optimizer.milp_horizon import coerce_battery_params_list
+    from optimizer.sim_horizon_chart_soc import house_balance_batteries
+
+    return house_balance_batteries(coerce_battery_params_list(config.get_battery_params_list()))
+
+
+def history_soc_battery_params(house: list[dict]) -> dict:
+    """Battery of the history SoC line: the battery itself, or the plant battery of several."""
+    if len(house) < 2:
+        return config.get_battery_params()
+    from optimizer.milp_horizon import plant_energy_params
+
+    return plant_energy_params(house)
+
+
+def history_soc_percent(entry: dict[str, Any], house: list[dict]) -> float:
+    """SoC of a log entry for the history line.
+
+    One house battery: the logged ``soc_percent``. Several: the plant SoC, energy-weighted from
+    ``soc_percent_by_ess``; an entry whose map misses a battery with capacity (logs from before
+    the map, a battery without reading) has none (NaN, a gap in the line).
+    """
+    if len(house) < 2:
+        return round(float(entry.get("soc_percent", 0.0) or 0.0), 1)
+    from optimizer.milp_horizon import plant_soc_percent
+    from optimizer.sim_house_batteries import battery_id
+
+    raw = entry.get("soc_percent_by_ess")
+    by_ess = {str(k): float(v) for k, v in raw.items()} if isinstance(raw, dict) else {}
+    for index, battery in enumerate(house):
+        if float(battery.get("battery_capacity_kwh") or 0.0) > 0.0 and (
+            battery_id(battery, index) not in by_ess
+        ):
+            return float("nan")
+    return round(plant_soc_percent(house, by_ess), 1)
+
+
 def entry_to_chart_row(
     entry: dict[str, Any],
     slot_start: datetime,
     *,
     include_date: bool = False,
     ist_snapshot: dict[str, Any] | None = None,
+    house_batteries: list[dict] | None = None,
 ) -> dict[str, Any]:
-    """Baut eine Chart-Zeile aus einem Produktiv-Durchlauf."""
+    """Baut eine Chart-Zeile aus einem Produktiv-Durchlauf.
+
+    ``house_batteries``: the batteries of the SoC column (``history_house_batteries`` when
+    omitted); with several the column is the plant SoC (``history_soc_percent``).
+    """
+    house = history_house_batteries() if house_batteries is None else house_batteries
     mode = int(entry.get("mode", bat.MODE_AUTOMATIK))
     target_power = float(entry.get("target_power_kw", 0.0) or 0.0)
     snapshot = ist_snapshot if ist_snapshot else _chart_snapshot(entry)
@@ -341,7 +386,7 @@ def entry_to_chart_row(
         "PV-Prognose (kW)": round(_pv_forecast_kw_from_entry(entry), 3),
         "Verbrauch-Prognose (kW)": round(baseload, 3),
         "Geplante Batterie-Aktion (kW)": round(battery_plan, 3),
-        "Simulierter SoC (%)": round(float(entry.get("soc_percent", 0.0) or 0.0), 1),
+        "Simulierter SoC (%)": history_soc_percent(entry, house),
         "Steuerbefehl": bat.steuerbefehl_for_mode(mode, target_power),
     }
     _attach_history_ess_soc_columns(row, entry)
@@ -472,11 +517,15 @@ def _battery_kw_for_soc_row(row: dict[str, Any]) -> float:
 def _sanitize_history_soc_rows(
     rows: list[dict[str, Any]],
     qualities: list[str],
+    battery_params: dict,
 ) -> list[dict[str, Any]]:
-    """Replace implausible Produktiv-Log SoC spikes using battery power integration."""
+    """Replace implausible Produktiv-Log SoC spikes using battery power integration.
+
+    ``battery_params``: the battery of the SoC column (``history_soc_battery_params``). A row
+    without SoC (NaN plant SoC) is left as it is and does not break the chain.
+    """
     if not rows:
         return rows
-    battery_params = config.get_battery_params()
     prev_soc: float | None = None
     last_raw_reported: float | None = None
     consecutive_same_reported = 0
@@ -484,7 +533,11 @@ def _sanitize_history_soc_rows(
     for index, row in enumerate(rows):
         row = dict(row)
         reported = row.get("Simulierter SoC (%)")
-        if reported is None or qualities[index] != SLOT_PRESENT:
+        if (
+            reported is None
+            or qualities[index] != SLOT_PRESENT
+            or math.isnan(float(reported))
+        ):
             sanitized.append(row)
             continue
         raw_reported = float(reported)
@@ -512,15 +565,16 @@ def _reconcile_history_battery_with_soc(
     qualities: list[str],
     *,
     mean_usable: list[bool] | tuple[bool, ...] | None = None,
+    battery_params: dict,
 ) -> list[dict[str, Any]]:
     """
     Replace instantaneous Ist battery when it opposes the SoC step to the next slot.
 
-    Skip slots that already use a usable QH slot-mean (``mean_usable``).
+    Skip slots that already use a usable QH slot-mean (``mean_usable``). ``battery_params``:
+    the battery of the SoC column (``history_soc_battery_params``).
     """
     if len(rows) < 2:
         return rows
-    battery_params = config.get_battery_params()
     reconciled: list[dict[str, Any]] = []
     for index, row in enumerate(rows):
         row = dict(row)
@@ -548,6 +602,8 @@ def _reconcile_history_battery_with_soc(
                     and soc_f is not None
                     and next_f is not None
                     and not math.isnan(ist_kw)
+                    and not math.isnan(soc_f)
+                    and not math.isnan(next_f)
                     and ist_contradicts_soc_delta(ist_kw, next_f - soc_f)
                 ):
                     implied = battery_kw_from_soc_delta(
@@ -616,6 +672,7 @@ def _build_rows_for_slot_starts(
     # Index ALL entries (not by_slot winners): a later same-slot rewrite may omit
     # closed_interval for the previous QH, which chart/deviation still need.
     closed_by = index_closed_intervals_by_start(entries)
+    house = history_house_batteries()
     rows: list[dict[str, Any]] = []
     qualities: list[str] = []
     mean_usable_flags: list[bool] = []
@@ -631,6 +688,7 @@ def _build_rows_for_slot_starts(
                 slot,
                 include_date=include_date,
                 ist_snapshot=ist_snap,
+                house_batteries=house,
             )
             present += 1
             last_row = row
@@ -653,8 +711,9 @@ def _build_rows_for_slot_starts(
             mean_usable_flags.append(False)
         rows.append(row)
     rows = _sanitize_dead_telemetry_rows(rows, qualities, by_slot)
-    rows = _sanitize_history_soc_rows(rows, qualities)
+    soc_battery = history_soc_battery_params(house)
+    rows = _sanitize_history_soc_rows(rows, qualities, soc_battery)
     rows = _reconcile_history_battery_with_soc(
-        rows, qualities, mean_usable=mean_usable_flags
+        rows, qualities, mean_usable=mean_usable_flags, battery_params=soc_battery
     )
     return rows, tuple(qualities), present, held, missing, by_slot, closed_by

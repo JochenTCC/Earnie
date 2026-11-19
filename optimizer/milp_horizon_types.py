@@ -33,6 +33,8 @@ class MilpHorizonModel:
     hp_store_slack: dict[str, list] | None = None  # SE heat pump band: (below, above) per book slot
     # Batteries that start outside their SoC limits: (lowest, highest) SoC in % of their plan.
     relaxed_soc_bounds_percent: dict[str, tuple[float, float]] | None = None
+    # Energy [kWh] stored in all house batteries at the plan start (``plant_soc_view``).
+    plant_start_energy_kwh: float | None = None
     # Live: store plan per heat pump with a store (HeatControl P3 charge target).
     live_store_plans: dict[str, Any] | None = None
     # Live: (StoreLevelModel, StoreLevelVars) per heat pump with a store (HeatControl P4).

@@ -97,6 +97,39 @@ def _soc_clamp_percent(
     return min(min_soc, low), max(max_soc, high)
 
 
+def _plan_soc_range(model: MilpHorizonModel, battery_params: dict) -> tuple[float, float, float]:
+    """SoC range in % and capacity of the plan's SoC (``model.e_batt``).
+
+    One house battery: its limits, widened for a start outside them. Several: the plant battery
+    (``plant_soc_params``) with the energy range of all batteries, each widened the same way.
+    """
+    from .milp_horizon import plant_soc_params
+
+    params = plant_soc_params(model, battery_params)
+    capacity = float(params["battery_capacity_kwh"])
+    if params is battery_params:
+        min_soc, max_soc = _soc_clamp_percent(
+            model, None, float(params["min_soc"]), float(params["max_soc"])
+        )
+        return min_soc, max_soc, capacity
+    if capacity <= 0.0:
+        return float(params["min_soc"]), float(params["max_soc"]), capacity
+    e_low = 0.0
+    e_high = 0.0
+    for ess_id in model.ess_ids or []:
+        bat_params = (model.battery_params_by_id or {})[ess_id]
+        cap = float(bat_params.get("battery_capacity_kwh") or 0.0)
+        low, high = _soc_clamp_percent(
+            model,
+            ess_id,
+            float(bat_params.get("min_soc") or 0.0),
+            float(bat_params.get("max_soc") or 100.0),
+        )
+        e_low += cap * low
+        e_high += cap * high
+    return e_low / capacity, e_high / capacity, capacity
+
+
 def _planned_soc_by_ess_at(model: MilpHorizonModel, hour_index: int) -> dict[str, float]:
     """End-of-slot SoC (%) per ESS from ``e_batt_by_ess`` (empty when single/legacy)."""
     ess_ids = getattr(model, "ess_ids", None) or []
@@ -135,10 +168,7 @@ def extract_horizon_schedule(
     EV-Preset-Leistungen (außerhalb der MILP-Variablen) werden je Slot gemerged —
     Live meist nur Slot 0; SE open-loop am günstigsten eligible Slot.
     """
-    min_soc = float(battery_params["min_soc"])
-    max_soc = float(battery_params["max_soc"])
-    min_soc, max_soc = _soc_clamp_percent(model, None, min_soc, max_soc)
-    capacity = float(battery_params["battery_capacity_kwh"])
+    min_soc, max_soc, capacity = _plan_soc_range(model, battery_params)
     presets_by_slot = _normalize_preset_by_slot(preset_powers_t0_or_by_slot)
     slots: list[dict[str, Any]] = []
     for t in range(model.horizon):
