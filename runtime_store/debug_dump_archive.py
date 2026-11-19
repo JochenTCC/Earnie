@@ -18,8 +18,11 @@ from runtime_store.live_optimization_debug import _json_safe
 from runtime_store.persist_paths import runtime_dir, runtime_path
 from runtime_store.recorder_config_pack import (
     PACK_ARCNAME,
+    SEGMENT_GZ_SUFFIX,
     build_config_pack,
-    expand_packed_configs,
+    compress_segment_xz,
+    expand_recorder_dump,
+    segment_xz_arcname,
 )
 
 logger = logging.getLogger(__name__)
@@ -148,7 +151,7 @@ def _readme_text() -> str:
         "inputs/* – aktive Konfigurationen fuer spaetere Reproduktion\n"
         "recorder/* – optional cycle-recorder ring buffer "
         "(Lastprofile, nur an Maintainer weitergeben); Config-Snapshots gepackt in "
-        "recorder/configs.pack.json, entpacken: "
+        "recorder/configs.pack.json, Zyklen als cycles_*.jsonl.xz; entpacken: "
         "python -m runtime_store.recorder_config_pack <dump>/recorder\n"
         "runtime/optimization_history.jsonl – Standard: nur das Recorder-Fenster "
         "(manifest.history)\n"
@@ -406,7 +409,8 @@ def _write_recorder_to_zip(
 ) -> list[str]:
     """Optional recorder ring buffer; a missing or unreadable recorder never fails the dump.
 
-    Config snapshots go into one ``recorder/configs.pack.json``
+    Config snapshots go into one ``recorder/configs.pack.json`` and the cycle
+    segments into ``recorder/cycles_<date>.jsonl.xz``
     (``runtime_store.recorder_config_pack``); a packing error fails the dump.
     """
     try:
@@ -420,15 +424,30 @@ def _write_recorder_to_zip(
         return []
     written: list[str] = []
     snapshot_paths: list[str] = []
+    segments = {"count": 0, "gz_bytes": 0, "xz_bytes": 0, "jsonl_bytes": 0}
     for source_path, arcname in payload.get("files") or []:
         if not os.path.isfile(source_path):
             continue
         if arcname.startswith(_RECORDER_CONFIGS_PREFIX):
             snapshot_paths.append(source_path)
             continue
+        if arcname.endswith(SEGMENT_GZ_SUFFIX):
+            # A segment that cannot be re-compressed fails the dump, like the pack.
+            xz_bytes, text_len = compress_segment_xz(source_path)
+            xz_arcname = segment_xz_arcname(arcname)
+            # xz output does not shrink further; store it without deflate.
+            archive.writestr(xz_arcname, xz_bytes, compress_type=zipfile.ZIP_STORED)
+            written.append(xz_arcname)
+            segments["count"] += 1
+            segments["gz_bytes"] += os.path.getsize(source_path)
+            segments["xz_bytes"] += len(xz_bytes)
+            segments["jsonl_bytes"] += text_len
+            continue
         archive.write(source_path, arcname=arcname)
         written.append(arcname)
     recorder_meta = payload.get("manifest")
+    if recorder_meta is not None and segments["count"]:
+        recorder_meta["segments_xz"] = segments
     if snapshot_paths:
         # Packing errors fail the dump: a dump without its snapshots cannot be replayed.
         pack_bytes, pack_summary = build_config_pack(snapshot_paths)
@@ -475,7 +494,8 @@ def load_manifest_from_dir(root: str | Path) -> dict[str, Any]:
 def extract_dump_to_dir(source: str | Path, target: str | Path | None = None) -> Path:
     """Extract a dump ZIP to ``target`` (or a temp dir). Returns the root path.
 
-    ``recorder/configs.pack.json`` is expanded into ``recorder/configs/<hash>.json``.
+    ``recorder/configs.pack.json`` is expanded into ``recorder/configs/<hash>.json``
+    and ``recorder/cycles_*.jsonl.xz`` into ``recorder/cycles_*.jsonl.gz``.
     A directory is returned unchanged (expand it with
     ``python -m runtime_store.recorder_config_pack <dir>/recorder``).
     """
@@ -488,7 +508,7 @@ def extract_dump_to_dir(source: str | Path, target: str | Path | None = None) ->
     out.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(source_path, "r") as archive:
         archive.extractall(out)
-    expand_packed_configs(out / "recorder")
+    expand_recorder_dump(out / "recorder")
     return out.resolve()
 
 

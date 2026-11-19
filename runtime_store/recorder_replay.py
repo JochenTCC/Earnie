@@ -978,6 +978,11 @@ def _segment_paths_for_root(root: Path) -> list[Path]:
         direct = sorted(root.glob("cycles_*.jsonl.gz"))
         if direct:
             return direct
+        if any(root.glob("cycles_*.jsonl.xz")):
+            raise FileNotFoundError(
+                f"recorder segments under {root} are still xz-packed: "
+                f"python -m runtime_store.recorder_config_pack {root}"
+            )
         os.environ["EARNIE_RUNTIME_PATH"] = str(root.parent)
         return cycle_recorder.list_segment_paths()
     finally:

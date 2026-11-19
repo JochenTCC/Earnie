@@ -1,7 +1,9 @@
-"""SupportUpload P1: packed recorder config snapshots and the history window of debug dumps."""
+"""SupportUpload P1: packed recorder (config snapshots, xz cycle segments) and the history window of debug dumps."""
 from __future__ import annotations
 
+import gzip
 import json
+import lzma
 import zipfile
 from datetime import date, datetime
 from pathlib import Path
@@ -15,7 +17,11 @@ from runtime_store.recorder_config_pack import (
     PACK_FILENAME,
     ConfigPackError,
     build_config_pack,
+    compress_segment_xz,
     expand_packed_configs,
+    expand_recorder_dump,
+    expand_xz_segments,
+    segment_xz_arcname,
 )
 from tests.regression.intake import intake_debug_dump
 from tests.test_debug_dump_archive import _dump_config
@@ -113,6 +119,80 @@ def test_config_pack_rejects_unknown_format(tmp_path):
 
 def test_expand_without_pack_is_noop(tmp_path):
     assert expand_packed_configs(tmp_path) == 0
+    assert expand_recorder_dump(tmp_path) == {"configs": 0, "segments": 0}
+    assert expand_xz_segments(tmp_path / "missing") == 0
+
+
+def _gz_segment(root: Path, day: str, text: bytes) -> Path:
+    root.mkdir(parents=True, exist_ok=True)
+    path = root / f"cycles_{day}.jsonl.gz"
+    with gzip.open(path, "wb") as handle:
+        handle.write(text)
+    return path
+
+
+_LINE_1 = b'{"n": 1}\n'
+
+
+def _repeating_cycles(count: int = 200) -> bytes:
+    block = json.dumps({"matrix": list(range(3000))})
+    return "".join(
+        json.dumps({"n": i, "block": block}) + "\n" for i in range(count)
+    ).encode("utf-8")
+
+
+def test_segment_xz_round_trip_keeps_jsonl_text_and_is_small(tmp_path):
+    text = _repeating_cycles()
+    gz_path = _gz_segment(tmp_path / "src", "2026-11-18", text)
+    xz_bytes, text_len = compress_segment_xz(gz_path)
+    assert text_len == len(text)
+    assert len(xz_bytes) * 3 < gz_path.stat().st_size
+
+    recorder = tmp_path / "dst"
+    recorder.mkdir()
+    (recorder / "cycles_2026-11-18.jsonl.xz").write_bytes(xz_bytes)
+    assert expand_xz_segments(recorder) == 1
+    assert not (recorder / "cycles_2026-11-18.jsonl.xz").exists()
+    with gzip.open(recorder / "cycles_2026-11-18.jsonl.gz", "rb") as handle:
+        assert handle.read() == text
+
+
+def test_segment_xz_arcname_requires_a_gz_segment():
+    assert segment_xz_arcname("recorder/cycles_2026-11-18.jsonl.gz") == (
+        "recorder/cycles_2026-11-18.jsonl.xz"
+    )
+    with pytest.raises(ConfigPackError, match="not a recorder segment"):
+        segment_xz_arcname("recorder/configs/abc.json")
+
+
+def test_damaged_xz_segment_fails_loud(tmp_path):
+    good = lzma.compress(_LINE_1)
+    (tmp_path / "cycles_2026-11-18.jsonl.xz").write_bytes(good[:-8] + bytes(8))
+    with pytest.raises(ConfigPackError, match="damaged xz segment"):
+        expand_xz_segments(tmp_path)
+    assert not (tmp_path / "cycles_2026-11-18.jsonl.gz").exists()
+
+
+def test_xz_segment_does_not_overwrite_different_gz(tmp_path):
+    _gz_segment(tmp_path, "2026-11-18", _LINE_1)
+    (tmp_path / "cycles_2026-11-18.jsonl.xz").write_bytes(lzma.compress(b'{"n": 2}\n'))
+    with pytest.raises(ConfigPackError, match="different content"):
+        expand_xz_segments(tmp_path)
+
+
+def test_xz_segment_beside_equal_gz_is_dropped(tmp_path):
+    _gz_segment(tmp_path, "2026-11-18", _LINE_1)
+    (tmp_path / "cycles_2026-11-18.jsonl.xz").write_bytes(lzma.compress(_LINE_1))
+    assert expand_xz_segments(tmp_path) == 1
+    assert not (tmp_path / "cycles_2026-11-18.jsonl.xz").exists()
+
+
+def test_replay_names_xz_segments_that_were_not_expanded(tmp_path):
+    from runtime_store.recorder_replay import _segment_paths_for_root
+
+    (tmp_path / "cycles_2026-11-18.jsonl.xz").write_bytes(lzma.compress(b"{}\n"))
+    with pytest.raises(FileNotFoundError, match="xz-packed"):
+        _segment_paths_for_root(tmp_path)
 
 
 def _history_line(stamp: str, n: int) -> str:
@@ -219,6 +299,10 @@ def _dump_with_packed_recorder(tmp_path: Path) -> tuple[Path, dict[str, bytes]]:
     )
     recorder = root / "recorder"
     _write_recorder_segment(recorder, _minimal_cycle())
+    segment = recorder / "cycles_2026-07-16.jsonl.gz"
+    xz_bytes, _ = compress_segment_xz(segment)
+    segment.unlink()
+    (recorder / "cycles_2026-07-16.jsonl.xz").write_bytes(xz_bytes)
     (recorder / "configs" / "abc123.json").unlink()
     snapshot = _write_snapshot(
         tmp_path / "snap", "abc123", {"inputs/cons_data.csv": _cons_csv(50)}
@@ -244,6 +328,8 @@ def test_extract_dump_zip_expands_packed_configs(tmp_path):
     out = extract_dump_to_dir(zip_path, tmp_path / "out")
     assert (out / "recorder" / "configs" / "abc123.json").read_bytes() == expected["abc123.json"]
     assert not (out / "recorder" / PACK_FILENAME).exists()
+    assert (out / "recorder" / "cycles_2026-07-16.jsonl.gz").is_file()
+    assert not (out / "recorder" / "cycles_2026-07-16.jsonl.xz").exists()
 
 
 def test_intake_from_dump_folder_expands_packed_configs(tmp_path):
@@ -261,5 +347,8 @@ def test_intake_from_dump_folder_expands_packed_configs(tmp_path):
     snapshot = case_dir / "recorder" / "configs" / "abc123.json"
     assert snapshot.read_bytes() == expected["abc123.json"]
     assert not (case_dir / "recorder" / PACK_FILENAME).exists()
+    assert (case_dir / "recorder" / "cycles_2026-07-16.jsonl.gz").is_file()
+    assert not (case_dir / "recorder" / "cycles_2026-07-16.jsonl.xz").exists()
     # The source folder is left as it was.
     assert (root / "recorder" / PACK_FILENAME).is_file()
+    assert (root / "recorder" / "cycles_2026-07-16.jsonl.xz").is_file()

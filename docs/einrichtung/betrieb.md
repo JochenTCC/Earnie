@@ -413,7 +413,7 @@ Das vollständige Paket enthält die Optimierungshistorie der Recorder-Tage (wie
 | `runtime/optimization_history.jsonl` | Pflicht. Standard: nur die Zeilen der Recorder-Tage (auch aus Monatsarchiven); mit Häkchen vollständig samt Monatsarchiven (`manifest.history`) |
 | `optimizer_run_state.json`, `live_optimization_debug.json`, `flexible_consumers_state.json`, `pv_counter_state.json`, `powerstation_reserves.json`, `capacity_peaks.json`, `capacity_peaks_observe.json`, `capacity_peaks_observe_measured.json`, `import_cap_report.json`, `cycle_stats.jsonl`, `daemon_heartbeat.json` | Optional, falls vorhanden |
 | `earnie.log`, `main_stdio.log` | Optional, falls vorhanden (aktueller Monat) |
-| `recorder/` (Cycle-Recorder-Ringpuffer inkl. Config-Snapshots) | Optional. Fenster = Retention (Default 7 Tage); enthält Lastprofile. Die Config-Snapshots liegen platzsparend in `recorder/configs.pack.json` (gleiche Zeilen nur einmal). |
+| `recorder/` (Cycle-Recorder-Ringpuffer inkl. Config-Snapshots) | Optional. Fenster = Retention (Default 7 Tage); enthält Lastprofile. Die Config-Snapshots liegen platzsparend in `recorder/configs.pack.json` (gleiche Zeilen nur einmal), die Zyklen als `recorder/cycles_<Datum>.jsonl.xz` (xz statt gzip). |
 | `anhaenge/*` | Optional: hochgeladene Anhänge (`manifest.attachments`) |
 | `manifest.chart` | Optional (nur wenn die Monitor-Seite in der Sitzung offen war) |
 | `manifest.recorder` | Optional (`from` / `to` / `cycle_count` / `config_hashes`) |
@@ -436,7 +436,7 @@ python -m scripts.replay_debug_dump path/to/debug_dump_….zip
 python -m scripts.replay_debug_dump path/to/debug_dump_….zip --html-out /tmp/chart1.html
 ```
 
-Beim Entpacken eines ZIPs baut das Skript die Config-Snapshots aus `recorder/configs.pack.json` wieder als einzelne Dateien `recorder/configs/<hash>.json` auf; der Inhalt wird per Prüfsumme kontrolliert. Wurde ein Paket von Hand entpackt, erledigt das `python -m runtime_store.recorder_config_pack <Ordner>/recorder`.
+Beim Entpacken eines ZIPs baut das Skript die Config-Snapshots aus `recorder/configs.pack.json` wieder als einzelne Dateien `recorder/configs/<hash>.json` auf; der Inhalt wird per Prüfsumme kontrolliert. Die Zyklen `recorder/cycles_*.jsonl.xz` schreibt es wieder als `cycles_*.jsonl.gz`. Wurde ein Paket von Hand entpackt, erledigt beides `python -m runtime_store.recorder_config_pack <Ordner>/recorder`.
 
 Das Skript prüft die Pflichtdateien und führt einen Smoke-Pfad aus. Es parst die Historie und baut bei vorhandenem `chart.display_rows` zusätzlich Chart 1 neu auf. Akzeptiert werden nur Dumps mit `schema_version: 3` und `dump_type: debug`.
 

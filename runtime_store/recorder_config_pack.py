@@ -1,24 +1,39 @@
-"""Compact form of the recorder config snapshots inside a debug dump.
+"""Compact form of the cycle recorder inside a debug dump.
 
-Each snapshot ``recorder/configs/<hash>.json`` carries every input file in full,
-including ``inputs/cons_data.csv`` (~2 MB) that changes on every snapshot only at
-its end. A dump of 150 snapshots therefore held ~300 MB of nearly identical text.
-
-The dump stores one ``recorder/configs.pack.json`` instead: a shared table of
-unique lines and, per snapshot, its JSON skeleton plus runs of line indices per
-file. ``expand_packed_configs`` rebuilds byte-identical snapshot files (checked by
+Config snapshots: each ``recorder/configs/<hash>.json`` carries every input file in
+full, including ``inputs/cons_data.csv`` (~2 MB) that changes on every snapshot only
+at its end. A dump of 150 snapshots therefore held ~300 MB of nearly identical text.
+The dump stores one ``recorder/configs.pack.json`` instead: a shared table of unique
+lines and, per snapshot, its JSON skeleton plus runs of line indices per file.
+``expand_packed_configs`` rebuilds byte-identical snapshot files (checked by
 SHA-256), so replays, case fingerprints and goldens see the same files as before.
+
+Cycle segments: ``cycles_<date>.jsonl.gz`` repeat large blocks from cycle to cycle,
+which gzip's 32 KB window does not see. The dump stores them as
+``cycles_<date>.jsonl.xz`` (same JSONL text, about a sixth of the gzip size);
+``expand_xz_segments`` writes the ``.jsonl.gz`` files back. Their JSONL text is
+identical; the gzip bytes are not (gzip header and level), and nothing hashes them.
+
+``expand_recorder_dump`` does both; it is what extraction and intake call.
 """
 from __future__ import annotations
 
+import gzip
 import hashlib
 import json
+import lzma
 from pathlib import Path
 from typing import Any, Iterable
 
 PACK_FILENAME = "configs.pack.json"
 PACK_ARCNAME = f"recorder/{PACK_FILENAME}"
 PACK_FORMAT = 1
+
+SEGMENT_GZ_SUFFIX = ".jsonl.gz"
+SEGMENT_XZ_SUFFIX = ".jsonl.xz"
+# Preset 3: 0.93 MB for 49 MB of cycles in 0.4 s; preset 6 gives 0.80 MB in 2.2 s
+# (measured 2026-11-19 on the maintainer dump). The dump is built on small NAS CPUs.
+SEGMENT_XZ_PRESET = 3
 
 
 class ConfigPackError(ValueError):
@@ -165,16 +180,73 @@ def expand_packed_configs(recorder_root: Path | str) -> int:
     return len(rebuilt)
 
 
+def segment_xz_arcname(arcname: str) -> str:
+    """``recorder/cycles_<date>.jsonl.gz`` → ``recorder/cycles_<date>.jsonl.xz``."""
+    if not arcname.endswith(SEGMENT_GZ_SUFFIX):
+        raise ConfigPackError(f"not a recorder segment: {arcname!r}")
+    return arcname[: -len(SEGMENT_GZ_SUFFIX)] + SEGMENT_XZ_SUFFIX
+
+
+def compress_segment_xz(gz_path: Path | str) -> tuple[bytes, int]:
+    """Re-compress one gzip segment with xz; returns (xz bytes, JSONL text length)."""
+    with gzip.open(Path(gz_path), "rb") as handle:
+        text = handle.read()
+    return lzma.compress(text, preset=SEGMENT_XZ_PRESET), len(text)
+
+
+def expand_xz_segments(recorder_root: Path | str) -> int:
+    """Rewrite ``cycles_*.jsonl.xz`` as ``cycles_*.jsonl.gz`` and remove the ``.xz`` files.
+
+    Returns the number of segments written; 0 when there are none. Raises
+    ``ConfigPackError`` on a damaged xz file (xz checks its own CRC) or an existing
+    ``.jsonl.gz`` with different JSONL text (nothing is overwritten).
+    """
+    root = Path(recorder_root)
+    if not root.is_dir():
+        return 0
+    sources = sorted(root.glob(f"cycles_*{SEGMENT_XZ_SUFFIX}"))
+    for source in sources:
+        try:
+            text = lzma.decompress(source.read_bytes())
+        except lzma.LZMAError as exc:
+            raise ConfigPackError(f"{source}: damaged xz segment ({exc})") from exc
+        target = source.with_name(source.name[: -len(SEGMENT_XZ_SUFFIX)] + SEGMENT_GZ_SUFFIX)
+        if target.is_file():
+            with gzip.open(target, "rb") as handle:
+                if handle.read() != text:
+                    raise ConfigPackError(f"{target} exists with different content")
+        else:
+            tmp = target.with_name(target.name + ".tmp")
+            tmp.write_bytes(gzip.compress(text, mtime=0))
+            tmp.replace(target)
+        source.unlink()
+    return len(sources)
+
+
+def expand_recorder_dump(recorder_root: Path | str) -> dict[str, int]:
+    """Expand the packed config snapshots and the xz cycle segments of a dump's ``recorder/``."""
+    return {
+        "configs": expand_packed_configs(recorder_root),
+        "segments": expand_xz_segments(recorder_root),
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     import argparse
 
     parser = argparse.ArgumentParser(
-        description="Expand recorder/configs.pack.json of an extracted debug dump into configs/<hash>.json."
+        description=(
+            "Expand an extracted debug dump's recorder/: configs.pack.json into "
+            "configs/<hash>.json and cycles_*.jsonl.xz into cycles_*.jsonl.gz."
+        )
     )
     parser.add_argument("recorder_dir", help="the dump's recorder/ folder")
     args = parser.parse_args(argv)
-    count = expand_packed_configs(args.recorder_dir)
-    print(f"expanded {count} config snapshot(s)" if count else "no configs.pack.json found")
+    counts = expand_recorder_dump(args.recorder_dir)
+    print(
+        f"expanded {counts['configs']} config snapshot(s), "
+        f"{counts['segments']} cycle segment(s)"
+    )
     return 0
 
 

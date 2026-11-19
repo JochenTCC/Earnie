@@ -20,7 +20,7 @@ Wenn seit dem letzten Tag neue Schritte in `runtime_store/migration/` hinzukamen
 
 - **Heizstab im Live-Betrieb.** Earnie plant und schaltet den Heizstab jetzt auch live, sobald Freigabe, Leistung oder Laufstatus und Speichertemperatur zugeordnet sind. Er nutzt die freie Kapazität des Speichers am laufenden Tag, höchstens vier Einschaltungen. Grenzen: Übertemperaturschutz und das Verhalten beim Ausfall von Earnie bleiben Sache des Smarthomes, und die Ersparnis-Kachel rechnet gesparten Brennstoff nicht gegen.
 
-- **Support-Paket deutlich kleiner.** Das vollständige Support-Paket legt jetzt nur die Optimierer-Historie der Recorder-Tage bei (Standard 7) und speichert die Config-Snapshots des Recorders platzsparend. Ein Paket von rund 29 MB schrumpft so auf etwa 5 MB und passt wieder in eine E-Mail. Die gesamte Historie lässt sich mit dem Häkchen **Vollständige Optimierer-Historie beilegen** weiter mitschicken.
+- **Support-Paket deutlich kleiner.** Das vollständige Support-Paket legt jetzt nur die Optimierer-Historie der Recorder-Tage bei (Standard 7) und speichert die Config-Snapshots und Zyklen des Recorders platzsparend. Ein Paket von rund 29 MB schrumpft so auf etwa 3 MB und passt wieder in eine E-Mail. Die gesamte Historie lässt sich mit dem Häkchen **Vollständige Optimierer-Historie beilegen** weiter mitschicken.
 
 ## Behoben
 
