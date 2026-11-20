@@ -28,7 +28,10 @@ from optimizer.slot_duration import DEFAULT_DT_H, validate_dt_h
 from runtime_store.power_interval_sampler import MIN_SAMPLE_COUNT_FOR_MEAN
 from runtime_store.savings_ledger_flex import FlexDayInputs, retime_flex_day
 
-SAVINGS_V = 2
+# 3 (decided 2026-11-19, maintainer): v2 with the plant battery over all house batteries in the
+# shadow plant (spec § 3, § 9 item 15). Houses with one battery book the same as v2, but every
+# chain restarts once.
+SAVINGS_V = 3
 # First version with the day replay (flex re-timing, spec § 7); ``SAVINGS_V`` reaches it in Ledger P9d.
 SAVINGS_V_REPLAY = 2
 
