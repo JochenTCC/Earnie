@@ -1,4 +1,4 @@
-"""Baselines and the ledger's shadow plant run the plant battery (savings_v 2, spec § 3).
+"""Baselines and the ledger's shadow plant run the plant battery (savings_v 3, spec § 3).
 
 With several house batteries both sides of the saving are the same plant: summed capacity
 and power, energy-weighted SoC. With one house battery every path is unchanged, so the
