@@ -1,4 +1,4 @@
-"""House-profile section „Horizont“ (SUSI P3a): manual horizon in 16 directions with preview.
+"""House-profile section „Horizont“ (SUSI P3a): manual horizon as 16 draggable bars over the compass.
 
 The values belong to the house profile (``horizon_source``, ``horizon``). Switch off: the
 list stays stored with ``horizon_source: none`` and is not applied. A profile that never had
@@ -21,8 +21,8 @@ from data.solar_horizon import (
     wrap_azimuth,
 )
 from ui.form_layout import labeled_checkbox
+from ui.horizon_bars_component import horizon_bars
 from ui.house_config_profile_session import _scoped_key
-from ui.number_format import localized_figure
 
 # Clockwise from north; azimuth 0° = south, east negative (as for the PV fields).
 DIRECTION_LABELS: tuple[str, ...] = (
@@ -33,7 +33,6 @@ DIRECTION_STEP_DEG = 360.0 / len(DIRECTION_LABELS)
 DIRECTION_AZIMUTHS: tuple[float, ...] = tuple(
     -180.0 + index * DIRECTION_STEP_DEG for index in range(len(DIRECTION_LABELS))
 )
-_COLUMNS = 4
 _SUN_DAYS: tuple[tuple[str, int, int, str], ...] = (
     ("21. Juni", 6, 21, "#E69F00"),
     ("Tagundnachtgleiche", 3, 20, "#009E73"),
@@ -45,8 +44,9 @@ def horizon_enabled_key(session_scope: str) -> str:
     return _scoped_key(session_scope, "house_horizon_enabled")
 
 
-def horizon_elevation_key(session_scope: str, index: int) -> str:
-    return _scoped_key(session_scope, f"house_horizon_elevation_{index}")
+def horizon_bars_key(session_scope: str) -> str:
+    """Key of the bar editor. Streamlit forbids ``__`` in a component key, so not ``_scoped_key``."""
+    return f"house-horizon-bars-{session_scope}".replace("__", "_-")
 
 
 def _stored_profile(existing: dict) -> HorizonProfile | None:
@@ -64,27 +64,6 @@ def _on_grid(stored: HorizonProfile) -> bool:
     return tuple(azimuth for azimuth, _elevation in stored.points) == DIRECTION_AZIMUTHS
 
 
-def _render_elevation_inputs(stored: HorizonProfile | None, *, session_scope: str) -> list[float]:
-    elevations = [0.0] * len(DIRECTION_LABELS)
-    columns = st.columns(_COLUMNS)
-    per_column = len(DIRECTION_LABELS) // _COLUMNS
-    for index, (label, azimuth) in enumerate(zip(DIRECTION_LABELS, DIRECTION_AZIMUTHS)):
-        seed = round(stored.elevation_at(azimuth), 1) if stored is not None else 0.0
-        with columns[index // per_column]:
-            elevations[index] = float(
-                st.number_input(
-                    f"{label} ({azimuth:+.1f}°)".replace(".", ","),
-                    min_value=0.0,
-                    max_value=MAX_ELEVATION_DEG,
-                    value=float(seed),
-                    step=1.0,
-                    format="%.1f",
-                    key=horizon_elevation_key(session_scope, index),
-                )
-            )
-    return elevations
-
-
 @st.cache_data(show_spinner=False, max_entries=16)
 def _sun_paths(latitude: float, longitude: float, year: int) -> dict[str, list[tuple[float, float]]]:
     return {
@@ -93,49 +72,77 @@ def _sun_paths(latitude: float, longitude: float, year: int) -> dict[str, list[t
     }
 
 
-def horizon_preview_figure(elevations: list[float], *, latitude: float, longitude: float):
-    """Horizon line (filled) and the sun's path on three days over the azimuth."""
-    import plotly.graph_objects as go
+def compass_deg(azimuth_deg: float) -> float:
+    """Compass bearing (0° = north, clockwise) of a stored azimuth (0° = south, east negative)."""
+    return (float(azimuth_deg) + 180.0) % 360.0
 
-    azimuths = [*DIRECTION_AZIMUTHS, 180.0]
-    line = [*elevations, elevations[0]]
-    fig = go.Figure()
-    fig.add_trace(
-        go.Scatter(
-            x=azimuths,
-            y=line,
-            name="Horizont",
-            mode="lines",
-            fill="tozeroy",
-            line={"color": "#555555"},
-            fillcolor="rgba(85, 85, 85, 0.35)",
+
+def compass_label(azimuth_deg: float) -> str:
+    return f"{compass_deg(azimuth_deg):g}°".replace(".", ",")
+
+
+def active_directions(paths: dict[str, list[tuple[float, float]]]) -> list[bool]:
+    """Directions the sun can reach: within one step of a sun azimuth on one of the days.
+
+    The neighbour outside the sun's range is needed for the interpolation up to sunrise and
+    sunset. The days hold both solstices, so the widest range of either hemisphere is covered.
+    """
+    sun_azimuths = [azimuth for path in paths.values() for azimuth, _elevation in path]
+
+    def _near(direction: float) -> bool:
+        return any(
+            abs((azimuth - direction + 180.0) % 360.0 - 180.0) < DIRECTION_STEP_DEG
+            for azimuth in sun_azimuths
         )
-    )
-    paths = _sun_paths(round(float(latitude), 3), round(float(longitude), 3), date.today().year)
-    for label, _month, _day, color in _SUN_DAYS:
-        path = paths[label]
-        fig.add_trace(
-            go.Scatter(
-                x=[azimuth for azimuth, _elevation in path],
-                y=[elevation for _azimuth, elevation in path],
-                name=f"Sonne {label}",
-                mode="lines",
-                line={"color": color},
-            )
+
+    return [_near(direction) for direction in DIRECTION_AZIMUTHS]
+
+
+def seed_elevations(stored: HorizonProfile | None, active: list[bool]) -> list[float]:
+    """Start values of the 16 bars: the stored horizon on the grid, 0° where the sun never is."""
+    if stored is None:
+        return [0.0] * len(DIRECTION_AZIMUTHS)
+    return [
+        round(stored.elevation_at(azimuth), 1) if on else 0.0
+        for azimuth, on in zip(DIRECTION_AZIMUTHS, active)
+    ]
+
+
+def dropped_directions(stored: HorizonProfile | None, active: list[bool]) -> list[str]:
+    """Labels of the directions with a stored elevation that the sun never reaches."""
+    if stored is None:
+        return []
+    return [
+        label
+        for label, azimuth, on in zip(DIRECTION_LABELS, DIRECTION_AZIMUTHS, active)
+        if not on and stored.elevation_at(azimuth) > 0.0
+    ]
+
+
+def checked_elevations(raw: list[float], active: list[bool]) -> list[float]:
+    """The editor's values as stored: one per direction, 0–90°, 0° outside the sun's range."""
+    if len(raw) != len(DIRECTION_AZIMUTHS):
+        raise ValueError(
+            f"Horizon editor returned {len(raw)} values, expected {len(DIRECTION_AZIMUTHS)}."
         )
-    fig.update_layout(
-        height=320,
-        margin={"l": 40, "r": 10, "t": 10, "b": 40},
-        legend={"orientation": "h", "y": -0.25},
-        xaxis={
-            "title": "Himmelsrichtung",
-            "range": [-180, 180],
-            "tickvals": [-180, -135, -90, -45, 0, 45, 90, 135, 180],
-            "ticktext": ["N", "NO", "O", "SO", "S", "SW", "W", "NW", "N"],
-        },
-        yaxis={"title": "Höhenwinkel (°)", "range": [0, 90]},
-    )
-    return fig
+    for value in raw:
+        if not 0.0 <= float(value) <= MAX_ELEVATION_DEG:
+            raise ValueError(f"Horizon editor returned an elevation out of range: {value!r}.")
+    return [float(value) if on else 0.0 for value, on in zip(raw, active)]
+
+
+def _chart_paths(paths: dict[str, list[tuple[float, float]]]) -> list[dict]:
+    return [
+        {
+            "label": f"Sonne {label}",
+            "color": color,
+            "points": sorted(
+                (round(compass_deg(azimuth), 2), round(elevation, 2))
+                for azimuth, elevation in paths[label]
+            ),
+        }
+        for label, _month, _day, color in _SUN_DAYS
+    ]
 
 
 def render_horizon_section(
@@ -162,26 +169,39 @@ def render_horizon_section(
             return {}
         # Kept for the next time the switch is turned on.
         return {HORIZON_SOURCE_KEY: SOURCE_NONE, HORIZON_KEY: stored.as_list()}
+    paths = _sun_paths(round(float(latitude), 3), round(float(longitude), 3), date.today().year)
+    active = active_directions(paths)
     with st.expander("Horizont in 16 Richtungen", expanded=True):
         st.caption(
             "Höhenwinkel des Horizonts in Grad über der Waagrechten, je Himmelsrichtung "
-            "(Azimut 0° = Süd, Ost negativ, West positiv). Messen: vom Dach oder von der "
-            "PV-Anlage aus mit der Kompass- und der Neigungsmesser-App des Handys die "
-            "Oberkante von Berg, Haus oder Baum anpeilen. Zwischen den Richtungen wird "
-            "linear interpoliert; 0° heißt freier Horizont."
+            "(Kompass: N 0°, O 90°, S 180°, W 270°). Balken mit der Maus ziehen oder mit "
+            "▲ / ▼ in 1°-Schritten ändern. Messen: vom Dach oder von der PV-Anlage aus mit "
+            "der Kompass- und der Neigungsmesser-App des Handys die Oberkante von Berg, Haus "
+            "oder Baum anpeilen. Zwischen den Richtungen wird linear interpoliert; 0° heißt "
+            "freier Horizont. Graue Richtungen erreicht die Sonne an diesem Standort nie."
         )
         if stored is not None and not _on_grid(stored):
             st.info(
-                "Der gespeicherte Horizont hat andere Richtungen als diese Tabelle. Die Werte "
+                "Der gespeicherte Horizont hat andere Richtungen als dieses Diagramm. Die Werte "
                 "sind auf die 16 Richtungen umgerechnet und werden beim Speichern so abgelegt."
             )
-        elevations = _render_elevation_inputs(stored, session_scope=session_scope)
-        st.plotly_chart(
-            localized_figure(
-                horizon_preview_figure(elevations, latitude=latitude, longitude=longitude)
+        dropped = dropped_directions(stored, active)
+        if dropped:
+            st.info(
+                f"Gespeicherte Werte für {', '.join(dropped)} entfallen: Diese Richtungen "
+                "erreicht die Sonne an diesem Standort nie. Sie werden mit 0° gespeichert."
+            )
+        elevations = checked_elevations(
+            horizon_bars(
+                key=horizon_bars_key(session_scope),
+                labels=list(DIRECTION_LABELS),
+                compass=[compass_label(azimuth) for azimuth in DIRECTION_AZIMUTHS],
+                active=active,
+                seed=seed_elevations(stored, active),
+                paths=_chart_paths(paths),
+                max_elevation=MAX_ELEVATION_DEG,
             ),
-            width="stretch",
-            key=_scoped_key(session_scope, "house_horizon_chart"),
+            active,
         )
         st.caption(
             "Wo eine Sonnenbahn unter der grauen Fläche liegt, erreicht die Sonne das Haus "

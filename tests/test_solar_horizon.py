@@ -1,6 +1,8 @@
 """SUSI P3a — horizon shading: profile, sun position, mask, weather requests, house profile."""
 from __future__ import annotations
 
+import json
+
 import math
 from datetime import date, datetime, timedelta
 
@@ -312,7 +314,8 @@ def test_archive_without_horizon_asks_for_the_same_variables_and_file_as_before(
     assert plain.name == "47.4000_9.7000_2025-06-21_2025-06-21_Europe-Vienna_30.0_0.0.json"
     assert plain.exists()
     shaded = archive.open_meteo_cache_path(*args, cache_dir=tmp_path, horizon=_EAST)
-    assert shaded.name.endswith(f"_30.0_0.0_hz{_EAST.token()}.json")
+    assert shaded.name.endswith("_30.0_0.0_hzraw.json")
+    assert not shaded.exists()
 
 
 def test_archive_with_horizon_asks_for_dni_and_shades_the_local_morning(monkeypatch, tmp_path):
@@ -323,11 +326,44 @@ def test_archive_with_horizon_asks_for_dni_and_shades_the_local_morning(monkeypa
     assert series[datetime(2025, 6, 21, 9)] < 500.0
     assert series[datetime(2025, 6, 21, 17)] == 500.0
     assert series[datetime(2025, 6, 21, 2)] == 500.0
-    # A second build reads the shaded file, no new request.
+    # A second build needs no new request.
     before = len(calls)
     again = _bundle(monkeypatch, tmp_path, date(2025, 6, 21), _EAST, calls)
     assert len(calls) == before
     assert list(again) == list(series)
+
+
+def test_another_horizon_reuses_the_weather_of_the_site(monkeypatch, tmp_path):
+    """The cache file holds the unshaded data, so a changed horizon is masked locally."""
+    calls: list = []
+    day = date(2025, 6, 21)
+    east = _bundle(monkeypatch, tmp_path, day, _EAST, calls)
+    before = len(calls)
+    wall = _bundle(monkeypatch, tmp_path, day, _WALL, calls)
+    flat = _bundle(monkeypatch, tmp_path, day, HorizonProfile(points=((0.0, 0.0),)), calls)
+    assert len(calls) == before
+    assert [p.name for p in tmp_path.iterdir()] == [
+        "47.4000_9.7000_2025-06-21_2025-06-21_Europe-Vienna_30.0_0.0_hzraw.json"
+    ]
+    assert set(flat) == {500.0}
+    assert list(wall) != list(east)
+    # A new process (no memory cache) reads the file and gets the same series.
+    archive.clear_open_meteo_bundle_mem_cache()
+    assert list(_bundle(monkeypatch, tmp_path, day, _EAST, calls)) == list(east)
+    assert len(calls) == before
+
+
+def test_incomplete_raw_cache_fails_loud(monkeypatch, tmp_path):
+    calls: list = []
+    day = date(2025, 6, 21)
+    _bundle(monkeypatch, tmp_path, day, _EAST, calls)
+    path = next(tmp_path.iterdir())
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    doc["payloads"].pop(next(k for k in doc["payloads"] if k.startswith("temperature_2m")))
+    path.write_text(json.dumps(doc), encoding="utf-8")
+    archive.clear_open_meteo_bundle_mem_cache()
+    with pytest.raises(ValueError, match="unvollständig"):
+        _bundle(monkeypatch, tmp_path, day, _EAST, calls)
 
 
 @pytest.mark.parametrize("day", [date(2025, 3, 30), date(2025, 10, 26)])

@@ -27,7 +27,6 @@ def _fake_fetch_hourly_archive_chunk(
     extra_params: dict | None = None,
     payload_transform=None,
 ) -> dict[str, pd.Series]:
-    # The horizon mask works on the HTTP payload, which this mock replaces: series stay unshaded.
     del lat, lon, timezone, extra_params, payload_transform
     chunk_end = end - timedelta(days=1)
     if chunk_end < start:
@@ -46,6 +45,29 @@ def _fake_fetch_hourly_archive_chunk(
     return result
 
 
+def _fake_fetch_archive_payload(
+    *,
+    lat: float,
+    lon: float,
+    start: date,
+    end: date,
+    hourly_vars: str,
+    extra_params: dict | None = None,
+) -> dict:
+    """UTC payload of a house with a horizon (SUSI P3a): same values, DNI 0, so nothing is shaded."""
+    del lat, lon, extra_params
+    index = _hourly_index(start - timedelta(days=1), max(start, end - timedelta(days=1)))
+    hourly: dict[str, list] = {"time": [stamp.strftime("%Y-%m-%dT%H:%M") for stamp in index]}
+    for var_name in [name.strip() for name in hourly_vars.split(",")]:
+        if var_name == HOURLY_TEMP_VAR:
+            hourly[var_name] = [-2.0] * len(index)
+        elif var_name == HOURLY_VAR:
+            hourly[var_name] = [500.0 if stamp.month in (6, 7, 8) else 200.0 for stamp in index]
+        else:
+            hourly[var_name] = [0.0] * len(index)
+    return {"hourly": hourly}
+
+
 def install_open_meteo_climate_mock(monkeypatch) -> None:
     from data import open_meteo_solar_archive as archive
 
@@ -54,3 +76,4 @@ def install_open_meteo_climate_mock(monkeypatch) -> None:
         "_fetch_hourly_archive_chunk",
         _fake_fetch_hourly_archive_chunk,
     )
+    monkeypatch.setattr(archive, "_fetch_archive_payload", _fake_fetch_archive_payload)

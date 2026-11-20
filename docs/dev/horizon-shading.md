@@ -20,6 +20,19 @@ obstacle input and `horizon` for forecast.solar follow as **SUSI P3a-2**. User d
 - The loader copies an applied horizon into the normalized heating consumer's `thermal`, as it
   does with latitude and longitude. The serializer never writes it there.
 
+## Editor (`ui/house_config_profile_horizon.py`, `ui/horizon_bars_component.py`)
+
+- One bar per 22.5° over the compass bearing (N 0°, clockwise); the stored azimuth stays
+  south-based. Drag with the mouse or step by 1° with the buttons under the axis.
+- The bars are a Streamlit component (`st.components.v2`, inline HTML/CSS/JS, no asset to
+  package). Its state `elevations` is sent when the mouse is released or 0.6 s after the last
+  button step. The component key must not contain `__`, so it is not a `_scoped_key`.
+- Active are the directions within one step of a sun azimuth on 21 June, the equinox or
+  21 December (`active_directions`). The others are stored as 0°; a stored value there is
+  dropped with a notice.
+- Every change saves the profile and rebuilds the annual heat preview on the same page. That
+  needs no request, see *Archive cache*.
+
 ## Mask (`data/solar_horizon.py`)
 
 Open-Meteo's hourly irradiance is the mean of the hour before its stamp. For the hour ending at
@@ -47,9 +60,21 @@ ones from before.
 
 | Path | Function | With a horizon |
 | --- | --- | --- |
-| Archive bundle | `build_open_meteo_climate_bundle` | every surface series shaded; cache file `…_<surfaces>_hz<token>.json` |
+| Archive bundle | `build_open_meteo_climate_bundle` | every surface series shaded; cache file `…_<surfaces>_hzraw.json` (see below) |
 | Forecast | `get_hourly_tilted_irradiance_forecast_wm2(shading=…)` | own cache entry per horizon token |
 | Previous Runs (SE forecast mode) | `fetch_hourly_tilted_irradiance_day1_forecast_wm2_series` | `direct_normal_irradiance_previous_day1` of the same run |
+
+## Archive cache
+
+With a horizon the cache file holds what Open-Meteo sent: the unshaded UTC payloads of the
+temperature and of every surface with its DNI (`{"version": 1, "payloads": {...}}`, one entry
+per request). It is the same file for every horizon of the site; the mask is applied when the
+bundle is read, and the shaded bundle is kept in memory only (eight per process, keyed on the
+file and the horizon token). A file with a missing entry fails loud. The file without a horizon
+is the one from before; turning the horizon on fetches the year once more with DNI.
+
+The regression climate fixture tracks and records this file like the others and refuses the
+raw fetch outside recording.
 
 ## Where it applies
 
@@ -65,12 +90,14 @@ ones from before.
 
 ## Cost
 
-One year, three surfaces: about 13 s for the first build (twelve requests per surface carry one
-more variable; about 35,000 sun positions, cached per site and hour in the process). Later
-builds read the cache file.
+One year, five surfaces: about 18 s for the first build with a horizon (72 requests, twelve
+per surface carry one more variable). Every other horizon of the site: 0.1 to 0.3 s for the
+mask (about 35,000 sun positions, cached per site and hour in the process), no request.
 
 ## Tests
 
 `tests/test_solar_horizon.py` (interpolation, validation, sun position, mask incl. sunrise hour,
 night and DST days, requests with and without horizon, profile round trip, wiring) and
-`tests/apptest/test_house_horizon_apptest.py` (editor).
+`tests/apptest/test_house_horizon_apptest.py` (editor; AppTest mounts the component and the
+tests set its state), `tests/test_house_horizon_editor.py` (compass, active directions, checks).
+Dragging and the buttons are checked in the browser only.

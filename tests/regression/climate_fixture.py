@@ -71,35 +71,49 @@ def frozen_climate_fixture(fixture_dir: Path = CLIMATE_FIXTURE_DIR) -> Iterator[
     previous_fetch = archive._fetch_hourly_archive_chunk
     previous_load = archive._load_bundle_from_cache
     previous_save = archive._save_bundle_to_cache
+    previous_raw_fetch = archive._fetch_archive_payload
+    previous_raw_load = archive._load_raw_from_cache
+    previous_raw_save = archive._save_raw_to_cache
 
-    # ``horizon`` (SUSI P3a): a house with a horizon reads and records its own shaded file.
-    def _tracking_load(
-        lat, lon, timezone, start, end, surfaces, *, cache_dir=None, horizon=None
-    ):
-        bundle = previous_load(
-            lat, lon, timezone, start, end, surfaces, cache_dir=cache_dir, horizon=horizon
-        )
+    def _tracking_load(lat, lon, timezone, start, end, surfaces, *, cache_dir=None):
+        bundle = previous_load(lat, lon, timezone, start, end, surfaces, cache_dir=cache_dir)
         if bundle is not None:
             used.add(archive.open_meteo_cache_path(
-                lat, lon, timezone, start, end, surfaces, cache_dir=cache_dir, horizon=horizon
+                lat, lon, timezone, start, end, surfaces, cache_dir=cache_dir
             ))
         return bundle
 
-    def _tracking_save(
-        bundle, lat, lon, timezone, start, end, surfaces, *, cache_dir=None, horizon=None
-    ):
-        previous_save(
-            bundle, lat, lon, timezone, start, end, surfaces, cache_dir=cache_dir, horizon=horizon
-        )
+    def _tracking_save(bundle, lat, lon, timezone, start, end, surfaces, *, cache_dir=None):
+        previous_save(bundle, lat, lon, timezone, start, end, surfaces, cache_dir=cache_dir)
         used.add(archive.open_meteo_cache_path(
-            lat, lon, timezone, start, end, surfaces, cache_dir=cache_dir, horizon=horizon
+            lat, lon, timezone, start, end, surfaces, cache_dir=cache_dir
         ))
+
+    # A house with a horizon (SUSI P3a) reads and records the unshaded payloads of its site.
+    def _tracking_raw_load(path):
+        payloads = previous_raw_load(path)
+        if payloads is not None:
+            used.add(path)
+        return payloads
+
+    def _tracking_raw_save(path, payloads):
+        previous_raw_save(path, payloads)
+        used.add(path)
+
+    def _refuse_raw_fetch(*, lat, lon, start, end, hourly_vars, extra_params=None):
+        _refusing_fetch(fixture_dir)(
+            lat=lat, lon=lon, timezone="UTC", start=start, end=end,
+            hourly_vars=hourly_vars, extra_params=extra_params,
+        )
 
     archive.OPEN_METEO_CACHE_DIR = fixture_dir
     archive._load_bundle_from_cache = _tracking_load
     archive._save_bundle_to_cache = _tracking_save
+    archive._load_raw_from_cache = _tracking_raw_load
+    archive._save_raw_to_cache = _tracking_raw_save
     if not recording:
         archive._fetch_hourly_archive_chunk = _refusing_fetch(fixture_dir)
+        archive._fetch_archive_payload = _refuse_raw_fetch
     archive.clear_open_meteo_bundle_mem_cache()
     try:
         # freezegun's naive now() is UTC; the cache keys only use the date, which
@@ -111,6 +125,9 @@ def frozen_climate_fixture(fixture_dir: Path = CLIMATE_FIXTURE_DIR) -> Iterator[
         archive._fetch_hourly_archive_chunk = previous_fetch
         archive._load_bundle_from_cache = previous_load
         archive._save_bundle_to_cache = previous_save
+        archive._fetch_archive_payload = previous_raw_fetch
+        archive._load_raw_from_cache = previous_raw_load
+        archive._save_raw_to_cache = previous_raw_save
         if previous_env is not None:
             os.environ[_CACHE_PATH_ENV] = previous_env
         archive.clear_open_meteo_bundle_mem_cache()
