@@ -28,9 +28,9 @@ Einige Seiten hängen nicht von `EARNIE_UI_MODES` ab:
 - **Hauskonfigurator** und **Szenarienkonfigurator:** Sie werden je nach Fortschritt der Einrichtung freigeschaltet (`ui/setup_readiness.py`).
 - **Analyse Verbrauch & Kosten:** Die Seite erscheint nur mit `live_environment` und nur im Abschnitt Live-Cockpit. Ohne Live-Verbindung zur Smarthome-Steuerung zeigt sie einen Hinweis statt der Analyse. Die Analyse nutzt rollierende **7-/28-Tage**-Charts (keine Kalenderwochen) und eine Kennzahl über die letzten **365 Tage** vorhandener Log-Daten.
 
-Die Sidebar enthält oben Setup-Hinweise und **„Sichern & Übertragen“**. Dort liegen der Export und Import der Config-Sidecars und `uploads/` als ZIP (siehe [Speichern / Laden](../konfiguration/speichern-laden.md)) und das Support-Paket (siehe [Betrieb → Support-Paket](../einrichtung/betrieb.md#support-paket-debug-dump)).
+Die Sidebar enthält oben den Knopf **Earnie unterstützen** (freiwillige Unterstützung über GitHub Sponsors, siehe [Benutzer-Handbuch](../user-manual/Benutzer-Handbuch-Earnie.md#earnie-unterstützen)), darunter **„Sichern & Übertragen“** und Setup-Hinweise. Dort liegen der Export und Import der Config-Sidecars und `uploads/` als ZIP (siehe [Speichern / Laden](../konfiguration/speichern-laden.md)) und das Support-Paket (siehe [Betrieb → Support-Paket](../einrichtung/betrieb.md#support-paket-debug-dump)).
 
-Unten in der Sidebar liegen der Knopf **Earnie unterstützen** (freiwillige Unterstützung über GitHub Sponsors, siehe [Benutzer-Handbuch](../user-manual/Benutzer-Handbuch-Earnie.md#earnie-unterstützen)) und der Abschnitt **Info / About** mit folgenden Inhalten:
+Unten in der Sidebar liegt der Abschnitt **Info / About** mit folgenden Inhalten:
 
 - Banner der Wahrheit und Version.
 - Häkchen **Unterstützen-Knopf ausblenden** (blendet den Knopf aus, jederzeit umkehrbar).

@@ -8,10 +8,14 @@ from runtime_store.sponsoring import SPONSORS_URL, is_opted_out, set_opt_out
 SPONSOR_BUTTON_LABEL = "Earnie unterstützen"
 OPT_OUT_LABEL = "Unterstützen-Knopf ausblenden"
 _OPT_OUT_KEY = "sponsor_opt_out_checkbox"
+# st.divider() brings 32px margins; with the 16px element gap the space below the
+# button would be twice the space above it. These margins mirror the navigation
+# separator above the button: 32px between button and line, about 24px below the line.
+SPONSOR_DIVIDER_HTML = '<hr style="margin: 1rem 0 1.5rem;">'
 
 
 def render_sponsor_sidebar_button() -> None:
-    """Link button to the Sponsors profile; hidden after opt-out."""
+    """Link button to the Sponsors profile with a divider below; both hidden after opt-out."""
     if is_opted_out():
         return
     st.sidebar.link_button(
@@ -23,6 +27,7 @@ def render_sponsor_sidebar_button() -> None:
         ),
         width="stretch",
     )
+    st.sidebar.markdown(SPONSOR_DIVIDER_HTML, unsafe_allow_html=True)
 
 
 def _on_opt_out_change() -> None:

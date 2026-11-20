@@ -72,16 +72,30 @@ def _button_labels(at: AppTest) -> list[str]:
     ]
 
 
+def _divider_count(at: AppTest) -> int:
+    from ui.sponsor_button import SPONSOR_DIVIDER_HTML
+
+    return sum(1 for el in at.sidebar.markdown if el.value == SPONSOR_DIVIDER_HTML)
+
+
 def test_button_shown_hidden_and_shown_again(tmp_path: Path) -> None:
     state_path = str(tmp_path / "sponsoring.json")
     at = AppTest.from_function(_sidebar_app, args=(state_path,)).run(timeout=_TIMEOUT_S)
     assert not at.exception
     assert _button_labels(at) == ["Earnie unterstützen"]
+    assert _divider_count(at) == 1
 
     at.sidebar.checkbox[0].check().run(timeout=_TIMEOUT_S)
     assert not at.exception
     assert _button_labels(at) == []
+    assert _divider_count(at) == 0
     assert json.loads(Path(state_path).read_text(encoding="utf-8"))["opt_out"] is True
 
     at.sidebar.checkbox[0].uncheck().run(timeout=_TIMEOUT_S)
     assert _button_labels(at) == ["Earnie unterstützen"]
+
+
+def test_sponsor_button_sits_above_backup_transfer_in_app() -> None:
+    app_src = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
+    button_idx = app_src.index("    render_sponsor_sidebar_button()\n    render_backup_transfer_sidebar()")
+    assert button_idx < app_src.index("navigation.run()")
