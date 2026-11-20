@@ -12,6 +12,8 @@ Earnie arbeitet unabhängig von Energie- und Systemlieferanten.
 
 GitHub-Repository: [JochenTCC/Earnie](https://github.com/JochenTCC/Earnie).
 
+Earnie unterstützen: freiwillig über [GitHub Sponsors](https://github.com/sponsors/Earnie-HEMS). Earnie bleibt für alle gleich; es gibt dafür keine Gegenleistung.
+
 ## Was ist Earnie?
 
 **Earnie** richtet sich an Hausbesitzer:innen, die ihre Stromkosten minimieren möchten, insbesondere bei [Spot-Tarifen](https://www.epexspot.com/). In einem variablen Zeitfenster von max. 48 h plant Earnie Verbräuche und Erträge so, dass die Kosten minimal sind.

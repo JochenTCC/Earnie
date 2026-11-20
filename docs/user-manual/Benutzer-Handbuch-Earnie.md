@@ -59,6 +59,12 @@ Earnie ist unabhängig von Energieversorger und Systemlieferant.
 - **Community:** z. B. Diskussionen im Loxone-Umfeld (LoxForum u. Ä.)
 - **Technische Doku:** [docs/README.md](../README.md)
 
+### Earnie unterstützen
+
+Wer die Weiterentwicklung von Earnie unterstützen möchte, kann das freiwillig über [GitHub Sponsors](https://github.com/sponsors/Earnie-HEMS) tun. Earnie bleibt für alle gleich; es gibt dafür keine Gegenleistung.
+
+In der Sidebar steht dafür der Knopf **Earnie unterstützen**; er öffnet die Sponsors-Seite in einem neuen Tab. Earnie sendet dabei nichts, auch nicht, ob der Knopf geklickt wurde. Wer den Knopf nicht sehen möchte, setzt unter **Info / About** das Häkchen **Unterstützen-Knopf ausblenden**. Das lässt sich jederzeit wieder rückgängig machen; die Einstellung liegt lokal in `runtime/sponsoring.json`.
+
 Einen vertraglichen Herstellersupport gibt es derzeit nicht. Umso mehr freuen wir uns über Ihre Rückmeldungen – gerade zu Hardware-Typen und Konfigurationen, die wir noch nicht kennen. Jeder Hinweis hilft, Earnie für alle besser zu machen.
 
 ---

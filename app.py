@@ -137,6 +137,7 @@ def main() -> None:
     from ui.info_sidebar import render_info_sidebar, render_missing_next_month_tariff_sidebar
     from ui.mode_selector import get_enabled_ui_mode_keys, render_ui_mode_env_notices
     from ui.navigation import build_navigation
+    from ui.sponsor_button import render_sponsor_sidebar_button
     from ui.setup_dotenv import render_ehal_setup_page
     from ui.setup_progress import render_setup_progress_notice
     from ui.styles import (
@@ -151,6 +152,7 @@ def main() -> None:
     render_flash_notices()
     if needs_loxone_setup():
         render_ehal_setup_page()
+        render_sponsor_sidebar_button()
         render_info_sidebar()
         st.stop()
 
@@ -163,6 +165,7 @@ def main() -> None:
     inject_single_file_uploader_css()
     inject_checkbox_highlight_css()
     render_ui_mode_env_notices()
+    render_sponsor_sidebar_button()
     render_backup_transfer_sidebar()
     render_setup_progress_notice()
     render_missing_next_month_tariff_sidebar()

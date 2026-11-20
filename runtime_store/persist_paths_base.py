@@ -222,6 +222,10 @@ def feature_reviews_state_file() -> str:
     return runtime_path("feature_reviews.json")
 
 
+def sponsoring_state_file() -> str:
+    return runtime_path("sponsoring.json")
+
+
 def pv_counter_state_file() -> str:
     return runtime_path("pv_counter_state.json")
 
