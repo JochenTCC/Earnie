@@ -1,7 +1,7 @@
 # Horizon shading (SUSI P3a)
 
-Status: implemented 2026-11-19, manual input only (decision 21 of the SUSI epic). PVGIS import,
-obstacle input and `horizon` for forecast.solar follow as **SUSI P3a-2**. User docs:
+Status: implemented 2026-11-19, manual input only (decision 21 of the SUSI epic). `horizon` for
+forecast.solar since 2026-11-20 (**SUSI P3a-2**, Version 2.8); PVGIS import and obstacle input as **SUSI P3a-3**. User docs:
 `docs/konfiguration/batterie-pv.md` § *Horizont*.
 
 ## Data model
@@ -85,8 +85,16 @@ raw fetch outside recording.
   `thermal` block. `house_thermal_parameters` keys its cache on the horizon token, so the P2
   calibration of H runs on the shaded gains and the annual heat still matches the HWB.
 - Live: window gains (`optimizer/thermal_live_gains.py`), collector
-  (`optimizer/thermal_live_solar.py`) and the Open-Meteo PV substitute (`data/pv_forecast.py`).
-  forecast.solar gets no `horizon` parameter yet (its default is the PVGIS terrain horizon).
+  (`optimizer/thermal_live_solar.py`) and the PV forecast (`data/pv_forecast.py`): the line is
+  passed to forecast.solar as `?horizon=` (SUSI P3a-2, 2026-11-20) and the Open-Meteo substitute
+  shades with the same line.
+- forecast.solar format (`solar_horizon.forecast_solar_horizon_param`): 36 elevations at 10°
+  steps, clockwise from north (compass bearing `b` = our azimuth `b - 180`), whole degrees.
+  The line **replaces** forecast.solar's default PVGIS terrain horizon. Without a horizon the
+  URL is unchanged, so the in-memory / disk cache and the Shadow feed key (`url_hash`) stay;
+  a new or changed line is a new URL (first fetch without cache, counts against the public
+  rate limit of 12 calls per hour and IP). Checked 2026-11-20 on the public plan without key:
+  accepted, a test site with 40° to the west lost about 14 % of its daily yield.
 - SE forecast mode (`simulation/forecast_mode.py`): the archived forecast is shaded like the
   booked PV before the monthly scaling.
 

@@ -21,6 +21,8 @@ def reset_pv_forecast_state(tmp_path, monkeypatch):
     monkeypatch.setattr(pf, "_disk_cache_path", lambda: str(tmp_path / pf.DISK_CACHE_FILENAME))
     # Legacy single system from PV_* keys (id "pv"); tests with several systems patch this.
     monkeypatch.setattr(pf.config, "get_planning_pv_systems", lambda: [])
+    # No manual horizon unless a test sets one (the real Live profile may carry one).
+    monkeypatch.setattr(pf, "_live_profile_horizon", lambda: None)
     # No real Open-Meteo calls: a dark sky unless a test patches its own irradiance.
     monkeypatch.setattr(
         "data.outdoor_forecast.get_hourly_tilted_irradiance_forecast_wm2",
@@ -472,7 +474,13 @@ def test_open_meteo_vector_uses_orientation_and_preceding_hour_mean():
     targets = [base, base + timedelta(minutes=15), base + timedelta(hours=1), base + timedelta(hours=2)]
     with patch("data.outdoor_forecast.get_hourly_tilted_irradiance_forecast_wm2", side_effect=fake_gti):
         vector = pf._open_meteo_pv_vector(
-            lat=51.0, lon=10.0, tilt=18.0, azimuth=-154.0, kwp=6.8, target_hours=targets
+            lat=51.0,
+            lon=10.0,
+            tilt=18.0,
+            azimuth=-154.0,
+            kwp=6.8,
+            target_hours=targets,
+            shading=None,
         )
 
     assert calls == [
@@ -483,7 +491,7 @@ def test_open_meteo_vector_uses_orientation_and_preceding_hour_mean():
             "latitude": 51.0,
             "longitude": 10.0,
             "start": base,
-            # No horizon on the Live profile: the request stays the one without DNI.
+            # No horizon: the request stays the one without DNI.
             "shading": None,
         }
     ]
@@ -581,3 +589,87 @@ def test_shadow_record_staleness_honours_per_feed_max_age():
     assert is_record_stale(
         four_h_old, ref_ts=ref.isoformat(), max_age_s=pf.SHADOW_FEED_MAX_AGE_SEC
     )
+
+
+# ---------------------------------------------------------------------------
+# Manual horizon to forecast.solar (SUSI P3a-2)
+# ---------------------------------------------------------------------------
+
+
+def _east_horizon():
+    from data.solar_horizon import HorizonProfile
+
+    # East half blocked up to 60°, west half free (azimuth 0° = south, -90° = east).
+    return HorizonProfile(points=((-179.0, 60.0), (-1.0, 60.0), (1.0, 0.0), (179.0, 0.0)))
+
+
+def test_url_without_horizon_is_unchanged():
+    url = pf._forecast_solar_url(lat=51.0, lon=10.0, tilt=35.0, azimuth=0.0, kwp=6.0, shading=None)
+    assert url == "https://api.forecast.solar/estimate/51.0/10.0/35.0/0.0/6.0"
+
+
+def test_url_with_horizon_carries_the_line_clockwise_from_north():
+    url = pf._forecast_solar_url(
+        lat=51.0, lon=10.0, tilt=35.0, azimuth=0.0, kwp=6.0, shading=_east_horizon()
+    )
+    base, query = url.split("?")
+    assert base == "https://api.forecast.solar/estimate/51.0/10.0/35.0/0.0/6.0"
+    values = [int(v) for v in query.removeprefix("horizon=").split(",")]
+    assert len(values) == 36
+    # North (index 0) sits between the free west and the blocked east: half way.
+    assert values[0] == 30
+    # Bearings 10°…170° (north-east, east, south-east) are blocked …
+    assert values[1:18] == [60] * 17
+    # … south is half way again, and the west half is free.
+    assert values[18] == 30
+    assert values[19:] == [0] * 17
+
+
+@patch("data.pv_forecast.config.get_global_timeout", return_value=10)
+@patch("data.pv_forecast.config.get", side_effect=_config_get_side_effect)
+@patch("data.pv_forecast.requests.get")
+def test_live_profile_horizon_goes_to_forecast_solar(get_mock, _config_mock, _timeout_mock, monkeypatch):
+    monkeypatch.setattr(pf, "_live_profile_horizon", _east_horizon)
+    get_mock.return_value = _ok_response()
+
+    pf.get_hourly_pv_forecast_for_hours(_target_hours())
+
+    (url,), _kwargs = get_mock.call_args
+    assert "?horizon=30,60,60," in url
+    assert pf.get_api_status()["source_by_system"] == {"pv": pf.SOURCE_FORECAST_SOLAR}
+
+
+@patch("data.pv_forecast.config.get_global_timeout", return_value=10)
+@patch("data.pv_forecast.config.get", side_effect=_config_get_side_effect)
+@patch("data.pv_forecast.requests.get")
+def test_open_meteo_substitute_shades_with_the_same_horizon(
+    get_mock, _config_mock, _timeout_mock, monkeypatch
+):
+    horizon = _east_horizon()
+    monkeypatch.setattr(pf, "_live_profile_horizon", lambda: horizon)
+    get_mock.return_value = _http_500_response()
+    shading_seen: list = []
+
+    def fake_gti(**kwargs):
+        shading_seen.append(kwargs["shading"])
+        return [0.0] * kwargs["horizon"]
+
+    with patch("data.outdoor_forecast.get_hourly_tilted_irradiance_forecast_wm2", side_effect=fake_gti):
+        pf.get_hourly_pv_forecast_for_hours(_target_hours())
+
+    assert shading_seen == [horizon]
+    assert pf.get_api_status()["source_by_system"] == {"pv": pf.SOURCE_OPEN_METEO}
+
+
+def test_live_profile_horizon_reads_the_manual_line_only(monkeypatch):
+    monkeypatch.undo()
+    profile = {
+        "horizon_source": "manual",
+        "horizon": [{"azimuth_deg": -90.0, "elevation_deg": 20.0}],
+    }
+    monkeypatch.setattr(
+        pf.config, "get_resolved_runtime_settings", lambda: {"_house_profile": profile}
+    )
+    assert pf._live_profile_horizon().points == ((-90.0, 20.0),)
+    profile["horizon_source"] = "none"
+    assert pf._live_profile_horizon() is None

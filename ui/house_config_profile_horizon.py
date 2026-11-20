@@ -162,8 +162,9 @@ def render_horizon_section(
             help=(
                 "Ein: Steht die Sonne hinter Bergen, Nachbarhäusern oder Bäumen, entfällt die "
                 "direkte Einstrahlung auf PV, Kollektor und Fenster; das diffuse Licht bleibt. "
-                "Das ändert Jahresmodell, Szenarien-Explorer und die Open-Meteo-Prognosen. "
-                "Die PV-Prognose von forecast.solar kennt das Gelände bereits selbst."
+                "Das ändert Jahresmodell, Szenarien-Explorer und die PV-Prognose. "
+                "forecast.solar ersetzt damit sein eigenes Gelände: auch entfernte Berge "
+                "eintragen."
             ),
         )
     )

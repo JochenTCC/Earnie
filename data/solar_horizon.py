@@ -179,6 +179,26 @@ def horizon_token(horizon: HorizonProfile | None) -> str:
     return horizon.token() if horizon is not None else ""
 
 
+FORECAST_SOLAR_HORIZON_STEPS = 36
+
+
+def forecast_solar_horizon_param(horizon: HorizonProfile) -> str:
+    """forecast.solar ``horizon`` query value for a manual horizon (SUSI P3a-2).
+
+    forecast.solar wants the elevations at equal steps, clockwise from north (north, east,
+    south, west). Our azimuth is 0° = south, -90° = east, so compass bearing ``b`` is our
+    azimuth ``b - 180``. 36 values (10° steps) sampled with :meth:`HorizonProfile.elevation_at`;
+    whole degrees, as in forecast.solar's docs. The line **replaces** forecast.solar's own
+    PVGIS terrain horizon.
+    """
+    step = 360.0 / FORECAST_SOLAR_HORIZON_STEPS
+    values = (
+        round(horizon.elevation_at(index * step - 180.0))
+        for index in range(FORECAST_SOLAR_HORIZON_STEPS)
+    )
+    return ",".join(str(int(value)) for value in values)
+
+
 def copy_horizon_fields(source: dict | None, target: dict) -> None:
     """Carry the profile's horizon into ``target`` (as latitude / longitude travel)."""
     if not isinstance(source, dict):

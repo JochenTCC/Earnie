@@ -20,6 +20,7 @@ def test_get_hourly_pv_forecast_sums_systems(monkeypatch):
             "PV_AZIMUTH": 0.0,
         }.get(name, default),
     )
+    monkeypatch.setattr(pv_forecast, "_live_profile_horizon", lambda: None)
     monkeypatch.setattr(
         "data.pv_forecast.config.get_planning_pv_systems",
         lambda: [
@@ -30,7 +31,7 @@ def test_get_hourly_pv_forecast_sums_systems(monkeypatch):
 
     calls: list[str] = []
 
-    def fake_forecast_one(*, lat, lon, tilt, azimuth, kwp, target_hours):
+    def fake_forecast_one(*, lat, lon, tilt, azimuth, kwp, target_hours, shading):
         calls.append((float(tilt), float(azimuth), float(kwp)))
         return [float(kwp), float(kwp) * 0.5], pv_forecast.SOURCE_FORECAST_SOLAR
 

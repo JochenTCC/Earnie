@@ -460,6 +460,7 @@ def _open_meteo_pv_vector(
     azimuth: float,
     kwp: float,
     target_hours: list,
+    shading,
 ) -> list[float]:
     """PV kW per target slot from Open-Meteo ``global_tilted_irradiance`` (forecast).
 
@@ -467,18 +468,15 @@ def _open_meteo_pv_vector(
     Hourly GTI is the mean of the preceding hour, so slot hour ``h`` takes the value
     stamped ``h + 1`` (as ``scripts/pv_forecast_compare.py``). kW = GTI / 1000 × kWp
     (``irradiance_wm2_to_pv_kw``, same conversion as the Open-Meteo archive path).
+    ``shading``: the Live profile's manual horizon (SUSI P3a) or None.
     """
     from data.open_meteo_solar_archive import irradiance_wm2_to_pv_kw
     from data.outdoor_forecast import get_hourly_tilted_irradiance_forecast_wm2
-    from data.solar_horizon import horizon_from_profile
     from optimizer.slot_duration import floor_to_hour_slot
 
     start = floor_to_hour_slot(min(target_hours))
     end = floor_to_hour_slot(max(target_hours))
     wall_hours = int((end - start).total_seconds() // 3600) + 1
-    # The Live profile's manual horizon (SUSI P3a). forecast.solar itself already uses the
-    # PVGIS terrain horizon; a manual one is passed to it with SUSI P3a-2.
-    live_profile = config.get_resolved_runtime_settings().get("_house_profile")
     wm2 = get_hourly_tilted_irradiance_forecast_wm2(
         horizon=wall_hours + 1,
         tilt_deg=tilt,
@@ -486,7 +484,7 @@ def _open_meteo_pv_vector(
         latitude=lat,
         longitude=lon,
         start=start,
-        shading=horizon_from_profile(live_profile),
+        shading=shading,
     )
     kw_by_hour = {
         start + timedelta(hours=i): irradiance_wm2_to_pv_kw(wm2[i + 1], kwp)
@@ -503,12 +501,21 @@ def _forecast_one_system(
     azimuth: float,
     kwp: float,
     target_hours: list,
+    shading,
 ) -> tuple[list[float], str]:
-    """Returns (vector, source); raises :class:`PvForecastUnavailableError`."""
+    """Returns (vector, source); raises :class:`PvForecastUnavailableError`.
+
+    ``shading``: the Live profile's manual horizon or None. Without it forecast.solar uses
+    its own PVGIS terrain horizon and the URL is the one from before SUSI P3a-2; with it the
+    URL carries ``?horizon=`` (which replaces that terrain horizon) and the Open-Meteo
+    substitute shades the beam with the same line.
+    """
     if kwp <= 0.0:
         return [0.0] * len(target_hours), SOURCE_NONE
 
-    url = f"https://api.forecast.solar/estimate/{lat}/{lon}/{tilt}/{azimuth}/{kwp}"
+    url = _forecast_solar_url(
+        lat=lat, lon=lon, tilt=tilt, azimuth=azimuth, kwp=kwp, shading=shading
+    )
     hourly_watts = _check_and_fetch_api_data(url, kwp)
     if hourly_watts:
         pv_vector, success = _map_hourly_data_to_vector(hourly_watts, target_hours)
@@ -533,6 +540,7 @@ def _forecast_one_system(
             azimuth=azimuth,
             kwp=kwp,
             target_hours=target_hours,
+            shading=shading,
         )
     except Exception as exc:
         raise PvForecastUnavailableError(
@@ -540,6 +548,24 @@ def _forecast_one_system(
             f"{kwp} kWp): forecast.solar {reason}; Open-Meteo: {exc}"
         ) from exc
     return vector, SOURCE_OPEN_METEO
+
+
+def _forecast_solar_url(
+    *, lat: float, lon: float, tilt: float, azimuth: float, kwp: float, shading
+) -> str:
+    url = f"https://api.forecast.solar/estimate/{lat}/{lon}/{tilt}/{azimuth}/{kwp}"
+    if shading is None:
+        return url
+    from data.solar_horizon import forecast_solar_horizon_param
+
+    return f"{url}?horizon={forecast_solar_horizon_param(shading)}"
+
+
+def _live_profile_horizon():
+    """Manual horizon of the Live house profile (SUSI P3a), or None."""
+    from data.solar_horizon import horizon_from_profile
+
+    return horizon_from_profile(config.get_resolved_runtime_settings().get("_house_profile"))
 
 
 def _sum_vectors(vectors: list[list[float]], length: int) -> list[float]:
@@ -592,6 +618,7 @@ def get_hourly_pv_forecast_by_system_for_hours(
 
     lat = float(config.get("LATITUDE", cast=float))
     lon = float(config.get("LONGITUDE", cast=float))
+    shading = _live_profile_horizon()
     by_system: dict[str, List[float]] = {}
     sources: dict[str, str] = {}
     for system in systems:
@@ -603,6 +630,7 @@ def get_hourly_pv_forecast_by_system_for_hours(
             azimuth=float(system.get("pv_azimuth", 0.0) or 0.0),
             kwp=float(system.get("pv_kwp", 0.0) or 0.0),
             target_hours=target_hours,
+            shading=shading,
         )
         by_system[sid] = vector
         sources[sid] = source
