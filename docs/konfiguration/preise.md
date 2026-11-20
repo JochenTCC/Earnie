@@ -35,7 +35,7 @@ Der Arbeitspreis für die Netznutzung steht am Hausprofil unter Standort im Obje
 - Earnie addiert ihn **vor** der USt zum Bezugspreis. Das gilt für Live-MILP und SE und für alle Import-Typen.
 - In Fake-Jahresrechnungen erscheint er als eigene Position. Earnie rechnet ihn dafür aus dem Energiebezug heraus; bei Zeitfenstern ist er je Fenster aufgeschlüsselt.
 - Der Arbeitspreis kann **zeitabhängig** sein (SNAP/WiNAP, siehe unten).
-- **Leistungspreis:** Trägt der Netzbereich `capacity_charges`, weist der Szenario-Explorer den Betrag je Kalendermonat aus, siehe [Tarife und Preise nachrechnen](../referenz/tarife-quellen.md). Die Planung kennt den Preis selbst nicht. Die SE-Optimierung und der Live-Betrieb planen aber unter einer eingetragenen Bezugsgrenze; im Beobachtungsmodus (`import_cap_mode`: `observe`) plant der Live-Betrieb ohne sie und rechnet nur nach, was sie gebracht hätte. Der Katalog enthält noch keine Werte, bis zur endgültigen Tarifverordnung gehen sie nur über einen eigenen Netzbereich in `user_grid_fees.json`.
+- **Leistungspreis:** Ab 2027 kommt je Monat ein Betrag für die höchste Viertelstunde des Netzbezugs dazu. Wie Earnie ihn rechnet und eine Bezugsgrenze einplant, steht unter [Leistungspreis und Bezugsgrenze](#leistungspreis-und-bezugsgrenze).
 - **Netzverlust und Abgaben je kWh:** Der Katalog führt je Netzbereich auch das Netzverlustentgelt und die bundesweiten Abgaben (Erneuerbaren-Förderbeitrag, Elektrizitätsabgabe für Haushalte). Earnie addiert sie wie den Arbeitspreis vor der USt zum Bezugspreis. In Live-MILP und SE zählen sie also mit. Zeitregeln wie SNAP ändern sie nicht.
 - **Feste Beträge je Jahr:** Grundpauschale, Förderbeitrag auf die Grundpauschale und Erneuerbaren-Förderpauschale stehen ebenfalls im Katalog, in Österreich zusammen 76,82 € netto je Jahr. Der Szenario-Explorer zählt je Kalendermonat ein Zwölftel davon, mit der USt des Bezugstarifs; bei 20 % USt sind das 7,68 € je Monat. Die Fake-Jahresrechnung zeigt jeden Betrag einzeln. Live-MILP und Slotpreise enthalten sie nicht.
 - **Anzeige im Hauskonfigurator:** Unter dem gewählten Netzbereich steht, was er neben dem Arbeitspreis je kWh und je Jahr kostet.
@@ -83,6 +83,48 @@ Beide Netzentgelt-Dateien gehören wie die Tarifdateien zum **Tarif-Track** (Fel
 **Migration (Datenmodell 5):** Hausprofile aus Datenmodell 4 mit `area_id: null` und eigenem Wert `base_cent_kwh` stellt der Migrations-Wizard um: der Wert wandert unverändert in den Benutzer-Netzbereich `user_<Hausprofil-ID>`. Hat ein Profil keinen Netzbereich und keinen Wert (oder `0`), fragt der Wizard nach: Katalog-Netzbereich wählen oder `user_<Hausprofil-ID>` mit 0 Cent/kWh anlegen. Ein Hausprofil mit `base_cent_kwh` oder ohne `area_id` lädt Earnie nicht mehr; die Fehlermeldung verweist auf den Wizard bzw. `python -m scripts.migrate_config`.
 
 Das noch ältere Feld `netznutzung_arbeitspreis_cent_kwh` stellt derselbe Wizard-Lauf zuerst auf das Objekt `netznutzung` um.
+
+### Leistungspreis und Bezugsgrenze
+
+Ab 2027 rechnen die österreichischen Netzbetreiber einen Teil des Netzentgelts als **Leistungspreis** ab (Systemnutzungsentgelte-Verordnung SNE-G-V, BGBl. II Nr. 299/2026). Maßgeblich ist je Kalendermonat die höchste Viertelstunde des Netzbezugs, gemittelt über die Viertelstunde. Für Haushalte (Netzebene 7) gibt es zwei Sätze in Cent je kW und Monat: einen bis 10 kW und einen höheren für den Anteil darüber. Abgerechnet werden mindestens 2 kW. Ein angebrochener Monat zählt voll.
+
+**Start je Netzbereich.** Die Verordnung gilt ab 1.1.2027, der Netzbetreiber kann den Start für seinen Netzbereich aber bis 30.6.2028 hinausschieben. Earnie rechnet den Leistungspreis deshalb nur für Monate, die ein Eintrag des Netzbereichs abdeckt. Vor dem ersten Eintrag fällt keiner an, und eine Bezugsgrenze bleibt inaktiv; Monitor und Szenario-Formular sagen dann „Die Grenze bleibt inaktiv bis …“. Fehlt nach dem Start ein Monat, meldet Earnie einen Fehler, statt mit 0 zu rechnen.
+
+**Preise und ihr Status.** Die Sätze je Netzbereich legt erst die Tarifverordnung (SNE-T-V) fest. Bis dahin enthält der Katalog **keine** Leistungspreise. Wer schon jetzt rechnen will, trägt sie in einen eigenen Netzbereich in `user_grid_fees.json` ein (siehe [Eigener Arbeitspreis](#eigener-arbeitspreis-benutzer-netzbereich)), zum Beispiel:
+
+```json
+"capacity_charges": [
+  {
+    "id": "lp_2027",
+    "basis": "monthly_peak_15min",
+    "min_kw": 2.0,
+    "bands": [
+      { "up_to_kw": 10, "cent_per_kw_month": 150 },
+      { "up_to_kw": null, "cent_per_kw_month": 300 }
+    ],
+    "valid_from": "2027-01-01",
+    "valid_to": "2027-12-31"
+  }
+]
+```
+
+Die Zahlen sind Platzhalter. Die Sätze sind netto; Earnie rechnet die USt des Bezugstarifs dazu. Ein eigener Eintrag ohne `status` gilt immer. Katalogeinträge tragen einen Status wie die Zeitregeln: `verordnet` gilt, `entwurf` und `illustrativ` nur, wenn `include_status` am Hausprofil sie einschließt. Ein ausgelassener Eintrag erscheint als Hinweis. Das Formular **Eigener Arbeitspreis** bearbeitet die Einträge nicht, behält sie aber beim Speichern.
+
+**Was Earnie damit tut.**
+
+- **Szenario-Explorer:** Er weist den Betrag je Kalendermonat aus, für jede Vergleichsstufe und für die Optimierung ([Tarife und Preise nachrechnen](../referenz/tarife-quellen.md)).
+- **Monitor:** Er zeigt im laufenden Monat die gemessene Spitze, die abgerechnete Leistung und den Betrag bisher ([Betriebsmodi](../ui/betriebsmodi.md#sunset-2-sunset-seite-monitor)).
+- **Bezugsgrenze:** Am Szenario lässt sich eine Grenze für den Netzbezug je Viertelstunde eintragen, dazu eine Marge ([Konfiguration](overview.md), [Handbuch](../user-manual/Benutzer-Handbuch-Earnie.md)). Der Plan hält den Bezug dann unter Grenze minus Marge. Den Preis selbst kennt die Planung nicht: Earnie wägt nicht ab, ob sich ein Überschreiten in diesem Monat lohnen würde. Die Grenze wählt der Nutzer.
+- **Vorgehen:** Zuerst im Szenario-Explorer Varianten mit verschiedenen Grenzen vergleichen, denn eine enge Grenze kann mehr Strom kosten, als sie beim Leistungspreis spart. Dann die Grenze im Live-Betrieb auf **Beobachten** stellen: Earnie steuert wie ohne Grenze und zeigt auf dem Monitor, wo er eingegriffen hätte und was das gespart hätte. Erst danach auf **Danach planen** umstellen.
+
+**Ein zuverlässiger Plan, keine Garantie.** Earnie plant jede Viertelstunde so, dass der Bezug unter der Grenze bleibt. Die gemessene Spitze kann trotzdem höher liegen:
+
+- **Keine Regelung innerhalb der Viertelstunde.** Earnie plant einmal je Viertelstunde. Schaltet jemand Herd, Wasserkocher oder Waschmaschine ein, steigt der Bezug, und Earnie reagiert erst mit dem nächsten Plan.
+- **Lastprognose.** Der Plan rechnet mit einer geschätzten Grundlast. Die Marge, vorbelegt mit 0,3 kW, fängt den üblichen Fehler ab, nicht jeden. Der Wert ist vorläufig, bis ein Vergleich mit den Viertelstundenwerten des Netzbetreibers vorliegt.
+- **Plan hält die Grenze nicht.** Reichen Batterie und Verschieben nicht, etwa bei hoher Grundlast, leerer Batterie oder einem Verbraucher, der sein Ziel erreichen muss, nennt der Monitor die Viertelstunden und die Ursache.
+- **Ohne Plan keine Grenze.** Im Automatikbetrieb und in Fenstern ohne Optimierung gilt die Grenze nicht; Protokoll und Monitor vermerken das.
+- **Einmal überschritten.** Liegt die Spitze des Monats schon über der Grenze, plant Earnie bis zu dieser Spitze, weil sie ohnehin bezahlt wird.
+- **Eigene Messung.** Earnie misst die Spitze selbst, nach der eigenen Systemuhr ([Betrieb](../einrichtung/betrieb.md)). Maßgeblich ist die Abrechnung des Netzbetreibers.
 
 ### Land am Hausprofil
 

@@ -1,6 +1,6 @@
 # Max-power dependent tariff: implementation plan (Version 2.8)
 
-**Status:** P0–P5b and P6a–P6c on `main` (PR #96 merged 2026-11-08; P6a–P6c 2026-11-11). P6d 2026-11-11. Open: P5c field test with the margin proposal, P7.
+**Status:** P0–P5b and P6a–P6c on `main` (PR #96 merged 2026-11-08; P6a–P6c 2026-11-11). P6d 2026-11-11. P7 docs 2026-11-20 (`docs/konfiguration/preise.md` § Leistungspreis und Bezugsgrenze). Open: P5c field test with the margin proposal; catalog values per D1 once the SNE-T-V is final.
 **Backlog item:** **Implement max-power dependent tariff**, Version 2.8. Scope as decided on 2026-11-07: dev doc steps L2, L3 and L4, stage A of [`Capacity-Peak-Budget-Draft.md`](../../backlog/Capacity-Peak-Budget-Draft.md) with a cap the user chooses.
 **Regulation:** [`SNE-G-V-2027-Research.md`](../../backlog/SNE-G-V-2027-Research.md).
 
