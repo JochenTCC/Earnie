@@ -22,7 +22,9 @@ obstacle input and `horizon` for forecast.solar follow as **SUSI P3a-2**. User d
 
 ## Editor (`ui/house_config_profile_horizon.py`, `ui/horizon_bars_component.py`)
 
-- One bar per 22.5° over the compass bearing (N 0°, clockwise); the stored azimuth stays
+- One bar per 22.5°, north to north clockwise, labelled with the azimuth of the PV fields
+  (S 0°, E −90°, W 90°, N ±180°; compass bearings were tried first and dropped on 2026-11-20,
+  the bar under the sun path already shows the direction); the stored azimuth stays
   south-based. Drag with the mouse or step by 1° with the buttons under the axis.
 - The bars are a Streamlit component (`st.components.v2`, inline HTML/CSS/JS, no asset to
   package). Its state `elevations` is sent when the mouse is released or 0.6 s after the last
@@ -99,5 +101,5 @@ mask (about 35,000 sun positions, cached per site and hour in the process), no r
 `tests/test_solar_horizon.py` (interpolation, validation, sun position, mask incl. sunrise hour,
 night and DST days, requests with and without horizon, profile round trip, wiring) and
 `tests/apptest/test_house_horizon_apptest.py` (editor; AppTest mounts the component and the
-tests set its state), `tests/test_house_horizon_editor.py` (compass, active directions, checks).
+tests set its state), `tests/test_house_horizon_editor.py` (axis and labels, active directions, checks).
 Dragging and the buttons are checked in the browser only.

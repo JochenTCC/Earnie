@@ -1,4 +1,4 @@
-"""Hauskonfigurator (SUSI P3a): manual horizon as 16 bars over the compass.
+"""Hauskonfigurator (SUSI P3a): manual horizon as 16 bars, north to north.
 
 The fixture house ``test_home`` has no horizon. The switch shows the bar editor (a Streamlit
 component, which AppTest mounts but cannot operate: the tests set its state). Every change

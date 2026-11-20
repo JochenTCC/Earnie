@@ -1,4 +1,4 @@
-"""Streamlit component: horizon as draggable bars over the compass (SUSI P3a editor).
+"""Streamlit component: horizon as draggable bars, north to north (SUSI P3a editor).
 
 One bar per direction. Active bars are dragged with the mouse or stepped by 1° with the
 buttons under the axis; the state ``elevations`` goes back to Python when the mouse is
@@ -133,7 +133,7 @@ export default function (component) {
   columns.forEach((c, i) => {
     const active = data.active[c.index];
     const label = el('text', { x: c.x, y: Y1 + 18, 'text-anchor': 'middle' }, svg, data.labels[c.index]);
-    const degrees = el('text', { class: 'small', x: c.x, y: Y1 + 32, 'text-anchor': 'middle' }, svg, data.compass[c.index]);
+    const degrees = el('text', { class: 'small', x: c.x, y: Y1 + 32, 'text-anchor': 'middle' }, svg, data.degrees[c.index]);
     if (!active) {
       label.classList.add('off');
       degrees.classList.add('off');
@@ -203,7 +203,7 @@ def horizon_bars(
     *,
     key: str,
     labels: list[str],
-    compass: list[str],
+    degrees: list[str],
     active: list[bool],
     seed: list[float],
     paths: list[dict],
@@ -221,7 +221,7 @@ def horizon_bars(
             "up_hint": "1° höher (gedrückt halten: schneller)",
             "down_hint": "1° niedriger (gedrückt halten: schneller)",
             "labels": labels,
-            "compass": compass,
+            "degrees": degrees,
             "active": active,
             "elevations": elevations,
             "paths": paths,

@@ -1,4 +1,4 @@
-"""House-profile section „Horizont“ (SUSI P3a): manual horizon as 16 draggable bars over the compass.
+"""House-profile section „Horizont“ (SUSI P3a): manual horizon as 16 draggable bars, north to north.
 
 The values belong to the house profile (``horizon_source``, ``horizon``). Switch off: the
 list stays stored with ``horizon_source: none`` and is not applied. A profile that never had
@@ -73,12 +73,15 @@ def _sun_paths(latitude: float, longitude: float, year: int) -> dict[str, list[t
 
 
 def compass_deg(azimuth_deg: float) -> float:
-    """Compass bearing (0° = north, clockwise) of a stored azimuth (0° = south, east negative)."""
+    """Position on the chart axis (0° = north, clockwise) of a stored azimuth (0° = south)."""
     return (float(azimuth_deg) + 180.0) % 360.0
 
 
-def compass_label(azimuth_deg: float) -> str:
-    return f"{compass_deg(azimuth_deg):g}°".replace(".", ",")
+def azimuth_label(azimuth_deg: float) -> str:
+    """Azimuth as for the PV fields (0° = south, east negative); north is both ends."""
+    if abs(azimuth_deg) == 180.0:
+        return "±180°"
+    return f"{azimuth_deg:g}°".replace(".", ",")
 
 
 def active_directions(paths: dict[str, list[tuple[float, float]]]) -> list[bool]:
@@ -174,7 +177,7 @@ def render_horizon_section(
     with st.expander("Horizont in 16 Richtungen", expanded=True):
         st.caption(
             "Höhenwinkel des Horizonts in Grad über der Waagrechten, je Himmelsrichtung "
-            "(Kompass: N 0°, O 90°, S 180°, W 270°). Balken mit der Maus ziehen oder mit "
+            "(Azimut wie bei den PV-Feldern: Süd 0°, Ost -90°, West 90°). Balken mit der Maus ziehen oder mit "
             "▲ / ▼ in 1°-Schritten ändern. Messen: vom Dach oder von der PV-Anlage aus mit "
             "der Kompass- und der Neigungsmesser-App des Handys die Oberkante von Berg, Haus "
             "oder Baum anpeilen. Zwischen den Richtungen wird linear interpoliert; 0° heißt "
@@ -195,7 +198,7 @@ def render_horizon_section(
             horizon_bars(
                 key=horizon_bars_key(session_scope),
                 labels=list(DIRECTION_LABELS),
-                compass=[compass_label(azimuth) for azimuth in DIRECTION_AZIMUTHS],
+                degrees=[azimuth_label(azimuth) for azimuth in DIRECTION_AZIMUTHS],
                 active=active,
                 seed=seed_elevations(stored, active),
                 paths=_chart_paths(paths),

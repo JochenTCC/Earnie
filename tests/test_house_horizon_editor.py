@@ -1,4 +1,4 @@
-"""SUSI P3a editor: compass bearings, directions the sun reaches, values of the bar component."""
+"""SUSI P3a editor: axis and azimuth labels, directions the sun reaches, values of the bar component."""
 from __future__ import annotations
 
 from datetime import date
@@ -20,12 +20,17 @@ def _labels(active: list[bool]) -> list[str]:
     return [label for label, on in zip(editor.DIRECTION_LABELS, active) if on]
 
 
-def test_compass_runs_clockwise_from_north():
+def test_axis_runs_clockwise_from_north_and_is_labelled_like_the_pv_fields():
     assert editor.compass_deg(-180.0) == 0.0
     assert editor.compass_deg(-90.0) == 90.0
     assert editor.compass_deg(0.0) == 180.0
     assert editor.compass_deg(90.0) == 270.0
-    assert [editor.compass_label(a) for a in editor.DIRECTION_AZIMUTHS[:3]] == ["0°", "22,5°", "45°"]
+    labels = dict(zip(editor.DIRECTION_LABELS, map(editor.azimuth_label, editor.DIRECTION_AZIMUTHS)))
+    assert labels["N"] == "±180°"
+    assert labels["NNO"] == "-157,5°"
+    assert labels["O"] == "-90°"
+    assert labels["S"] == "0°"
+    assert labels["W"] == "90°"
 
 
 def test_mid_latitude_is_active_from_north_east_to_north_west():
