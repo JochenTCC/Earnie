@@ -1,6 +1,7 @@
 """Synthetische Verbrauchsprofile aus Hausprofilen für Backtesting."""
 from __future__ import annotations
 
+import os
 from datetime import datetime, timedelta
 from functools import lru_cache
 from typing import TYPE_CHECKING
@@ -72,8 +73,24 @@ def _timestamp_hour_key(slot_dt: datetime) -> str:
 
 
 @lru_cache(maxsize=32)
-def _csv_kw_lookup(path: str) -> dict[str, float]:
+def _csv_kw_lookup_cached(path: str, _mtime_ns: int, _size: int) -> dict[str, float]:
     return {ts: float(kw) for ts, kw in load_hourly_profile_csv(path)}
+
+
+def _csv_kw_lookup(path: str) -> dict[str, float]:
+    """Hour → kW of a profile CSV; re-read when the file changes.
+
+    Imports overwrite fixed paths, so the path alone is no cache key: mtime and size
+    are part of it. The path is resolved like ``load_hourly_profile_csv`` does
+    (``config/…`` prefixes); a missing file raises there with its own message.
+    """
+    from runtime_store.persist_paths import resolve_config_prefixed_path
+
+    resolved = resolve_config_prefixed_path(path)
+    if not os.path.isfile(resolved):
+        return _csv_kw_lookup_cached(path, -1, -1)  # raises FileNotFoundError
+    stat = os.stat(resolved)
+    return _csv_kw_lookup_cached(path, stat.st_mtime_ns, stat.st_size)
 
 
 def csv_kw_at_datetime(path: str, slot_dt: datetime) -> float:

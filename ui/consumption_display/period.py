@@ -60,9 +60,10 @@ def _kind_for_days(days: int) -> PeriodKind:
 
 
 def resolve_rolling_window(anchor_end: datetime, *, days: int) -> TimeWindow:
-    """Inclusive window ``[anchor_end - days, anchor_end]`` on both ends.
+    """Half-open window ``(anchor_end - days, anchor_end]``.
 
-    Slots with ``start <= ts <= end`` belong to the window. ``days`` must be > 0.
+    Slots with ``start < ts <= end`` belong to the window, so consecutive windows
+    stepped by ``days`` never share their boundary slot. ``days`` must be > 0.
     """
     if days <= 0:
         raise ValueError(f"days must be > 0, got {days}.")
@@ -77,7 +78,7 @@ def resolve_rolling_kind_window(anchor_end: datetime, kind: PeriodKind) -> TimeW
 def timestamp_in_window(ts: datetime, window: TimeWindow) -> bool:
     if window.kind == PeriodKind.ISO_WEEK and window.iso_year is not None:
         return ts.isocalendar()[:2] == (window.iso_year, window.iso_week)
-    return window.start <= ts <= window.end
+    return window.start < ts <= window.end
 
 
 def indices_in_window(timestamps: list[str], window: TimeWindow) -> list[int]:
@@ -153,7 +154,7 @@ def list_rolling_windows(
         window = resolve_rolling_window(anchor, days=days)
         if any(timestamp_in_window(ts, window) for ts in points):
             collected.append(window)
-        if window.start <= data_min:
+        if window.start < data_min:  # the start itself is outside the window
             break
         next_anchor = anchor - timedelta(days=days)
         if next_anchor >= anchor:

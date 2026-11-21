@@ -139,9 +139,9 @@ def test_residual_aligns_consumer_csv_by_timestamp(tmp_path: Path) -> None:
         kw = 2.0 if ts >= start_total else 9.0
         cons_rows.append((ts.strftime("%Y-%m-%d %H:%M:%S"), kw))
     write_canonical_hourly_csv(str(cons), cons_rows)
-    from data.consumption_profiles import _csv_kw_lookup
+    from data.consumption_profiles import _csv_kw_lookup_cached
 
-    _csv_kw_lookup.cache_clear()
+    _csv_kw_lookup_cached.cache_clear()
     profile = {
         "baseload_kwh": 0.0,
         "total_profile_csv": str(total),

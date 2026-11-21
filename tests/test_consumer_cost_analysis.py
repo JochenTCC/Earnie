@@ -406,6 +406,60 @@ def test_manual_schedule_peels_from_baseload() -> None:
     assert loads["baseload"] == pytest.approx(1.0)
 
 
+def test_metered_consumer_not_on_the_page_stays_in_baseload() -> None:
+    """baseload_kw already lacks every flex_kw entry; unlisted meters go back into it."""
+    from ui.consumer_cost_analysis_data import _load_by_id_from_entry
+
+    entry = {
+        "consumption_snapshot": {
+            "house_kw": 3.0,
+            "grid_kw": 3.0,
+            "baseload_kw": 0.5,
+            "pv_kw": 0.0,
+            "flex_kw": {"wp": 1.0, "pool_known": 1.5},
+        },
+    }
+    loads = _load_by_id_from_entry(
+        entry,
+        [{"id": "wp", "name": "Wärmepumpe"}],
+        slot_start=datetime(2026, 7, 20, 10, 0),
+    )
+    assert loads["wp"] == pytest.approx(1.0)
+    assert loads["baseload"] == pytest.approx(2.0)
+    assert sum(loads.values()) == pytest.approx(3.0)
+
+
+def test_grid_fallback_counts_battery_discharge() -> None:
+    """Without a measured grid the balance includes the battery, else discharge counts twice."""
+    from ui.consumer_cost_analysis_data import _grid_import_export_kw
+
+    grid_import, grid_export = _grid_import_export_kw(
+        {},
+        3.0,
+        0.0,
+        battery_charge_kw=0.0,
+        battery_discharge_kw=2.0,
+        ist_snapshot={},
+    )
+    assert grid_import == pytest.approx(1.0)
+    assert grid_export == 0.0
+
+
+def test_consecutive_rolling_windows_do_not_share_the_boundary_slot() -> None:
+    from datetime import timedelta
+
+    from ui.consumption_display.period import list_rolling_windows, timestamp_in_window
+
+    start = datetime(2026, 9, 1, 0, 0)
+    stamps = [start + timedelta(minutes=15 * i) for i in range(4 * 24 * 14)]
+    windows = list_rolling_windows(
+        [ts.strftime("%Y-%m-%d %H:%M:%S") for ts in stamps], days=7
+    )
+    counts = [sum(timestamp_in_window(ts, w) for ts in stamps) for w in windows]
+    assert sum(counts) == len(stamps)
+    assert max(counts) == 4 * 24 * 7
+
+
 def test_cost_analysis_consumers_includes_manuals(monkeypatch) -> None:
     from ui.consumer_cost_analysis_data import cost_analysis_consumers
 

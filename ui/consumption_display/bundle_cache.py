@@ -1,8 +1,8 @@
 """Session memo for slow HK / shared consumption bundle builds."""
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Callable, MutableMapping
-from typing import Any
 
 import streamlit as st
 
@@ -87,10 +87,12 @@ def csv_validation_probe_cache_key(
 
 
 def fingerprint_ist_series(series: list[tuple[str, float]]) -> str:
-    """Fingerprint of loaded Ist CSV series (timestamps + values)."""
-    # Sample endpoints + length keep the key small for multi-year CSVs.
-    if not series:
-        return payload_fingerprint([])
-    n = len(series)
-    sample: list[Any] = [n, series[0], series[n // 2], series[-1]]
-    return payload_fingerprint(sample)
+    """Fingerprint of loaded Ist CSV series over every timestamp and value.
+
+    A sample of a few points is not enough: the balance invert switches or a corrected
+    CSV import with the same span change values in between and would hit a stale bundle.
+    """
+    digest = hashlib.sha256()
+    for timestamp, value in series:
+        digest.update(f"{timestamp}={float(value)!r};".encode())
+    return f"{len(series)}:{digest.hexdigest()}"
