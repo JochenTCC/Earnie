@@ -26,7 +26,7 @@ from house_config.inverter import (
     INVERTER_TYPE_PV_STRING,
 )
 from house_config.label_uniqueness import allocate_unique_label
-from runtime_store.persist_paths import resolve_config_json_path
+from runtime_store.persist_paths import resolve_components_json_path
 from ui.flash import flash
 from ui.auto_persist import (
     auto_persist,
@@ -117,7 +117,7 @@ def _inv_session_scope(selected_id: str, *, is_new: bool) -> str:
 
 
 def _config_file_stamp() -> str:
-    path = resolve_config_json_path()
+    path = resolve_components_json_path()
     try:
         return f"{os.path.abspath(path)}:{os.path.getmtime(path)}"
     except OSError:

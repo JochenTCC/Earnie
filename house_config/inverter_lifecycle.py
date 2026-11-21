@@ -94,6 +94,38 @@ def ensure_owned_island_inverter(
     return replaced, inv_id
 
 
+def rename_owned_island_inverter(
+    inverters: list[dict],
+    *,
+    old_battery_id: str,
+    new_battery_id: str,
+) -> tuple[list[dict], str]:
+    """Move ``wr_<old>`` to ``wr_<new>`` with its fields when a Powerstation is renamed.
+
+    Returns ``(inverters, old_inverter_id)``; the id is empty when nothing moved (no such
+    inverter, or ``wr_<new>`` exists already). ``inv.<old>.*`` bindings follow the id.
+    """
+    from house_config.entity_id_lock import rewrite_inv_bindings_slug
+
+    old_inv = owned_island_inverter_id(old_battery_id)
+    new_inv = owned_island_inverter_id(new_battery_id)
+    ids = {str(item.get("id") or "").strip() for item in inverters if isinstance(item, dict)}
+    if old_inv == new_inv or old_inv not in ids or new_inv in ids:
+        return inverters, ""
+    out: list[dict] = []
+    for item in inverters:
+        if not isinstance(item, dict):
+            continue
+        row = dict(item)
+        if str(row.get("id") or "").strip() == old_inv:
+            row["id"] = new_inv
+            row["ehal_bindings"] = rewrite_inv_bindings_slug(
+                row.get("ehal_bindings"), old_id=old_inv, new_id=new_inv
+            )
+        out.append(row)
+    return out, old_inv
+
+
 def rebind_owned_by(
     inverters: list[dict],
     *,

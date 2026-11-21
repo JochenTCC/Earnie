@@ -225,6 +225,12 @@ def _inverter_save_spec(
     for field in ("max_ac_power_kw", "max_pv_input_kw", "max_ac_charge_kw"):
         if field in raw_spec and raw_spec[field] not in (None, ""):
             save_spec[field] = float(raw_spec[field])
+    # No form edits regulates_on: keep what the payload or the stored entry carries.
+    regulates_on = raw_spec.get("regulates_on")
+    if regulates_on in (None, "") and isinstance(existing, dict):
+        regulates_on = existing.get("regulates_on")
+    if regulates_on not in (None, ""):
+        save_spec["regulates_on"] = regulates_on
     owned_by = str(raw_spec.get("owned_by") or "").strip()
     if not owned_by and isinstance(existing, dict):
         owned_by = str(existing.get("owned_by") or "").strip()

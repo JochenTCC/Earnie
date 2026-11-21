@@ -35,6 +35,7 @@ _SESSION_SYNC_KEY = "planning_wb_sync_id"
 _SESSION_FILE_STAMP_KEY = "planning_wb_file_stamp"
 _SESSION_SELECT_PENDING_KEY = "planning_wb_select_pending"
 _SESSION_SELECTED_ID_KEY = "planning_wb_selected_id"
+_SESSION_SUPPRESS_AUTOPERSIST_KEY = "planning_wb_suppress_autopersist"
 
 # Defaults of a new wallbox: 3 phases, 6–16 A at 230 V (11 kW).
 DEFAULT_WALLBOX = {
@@ -221,6 +222,9 @@ def _render_delete(stable_id: str, wallboxes: dict[str, dict]) -> None:
     st.session_state.pop(f"_auto_persist_fp::planning_wb::{stable_id}", None)
     st.session_state[_SESSION_SELECT_PENDING_KEY] = remaining[0] if remaining else NEW_OPTION
     st.session_state[_SESSION_SYNC_KEY] = None
+    if not remaining:
+        # The "— neu —" draft shown next must not auto-save the deleted wallbox back.
+        st.session_state[_SESSION_SUPPRESS_AUTOPERSIST_KEY] = True
     flash("success", "Wallbox entfernt.")
     st.rerun()
 
@@ -277,6 +281,9 @@ def render_wallbox_planning_tab() -> None:
         and all(existing.get(k) == v for k, v in fields.items())
     ):
         # First render of a stored wallbox: nothing to write until a real edit.
+        seed_persisted(persist_key, payload)
+    if st.session_state.pop(_SESSION_SUPPRESS_AUTOPERSIST_KEY, False) and not blockers:
+        # Mark the draft clean without writing so delete-of-last is not undone.
         seed_persisted(persist_key, payload)
     wrote = auto_persist(
         state_key=persist_key,

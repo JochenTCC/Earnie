@@ -231,6 +231,8 @@ def test_powerstation_rename_moves_consumer_link(components_env, monkeypatch):
         doc = load_house_profiles_document(str(profiles))
         return doc["profiles"]["home"]["consumers"][0]["appliance_recommendation"]
 
+    # A virtual Powerstation needs a house battery as carve-out base (refused otherwise).
+    upsert_battery(_house_battery_spec("Keller"), stable_id="")
     old_id = upsert_battery(ps_spec, stable_id="")
     assert _rec()["powerstation_id"] == old_id
 

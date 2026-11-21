@@ -116,6 +116,9 @@ def render_builtin_inverter_section(
         f"Kennung `{inv_id}` · owned_by `{battery_id}` · "
         "AC = Insel (nur angeschlossene Verbraucher; AC-Eingang am Netz)"
     )
+    # The inverter may be newer than the session seed (created by the save that made
+    # the Powerstation physical), or its widgets were hidden: fill from the stored entry.
+    seed_builtin_inverter_widgets(session_scope, inverter, only_missing=True)
     label = labeled_text_input(
         "WR-Bezeichnung",
         key=f"{session_scope}__planning_bat_inv_label",
@@ -165,38 +168,75 @@ def render_builtin_inverter_section(
     return payload
 
 
-def seed_builtin_inverter_widgets(session_scope: str, inverter: dict | None) -> None:
-    if not inverter:
-        return
-    st.session_state[f"{session_scope}__planning_bat_inv_label"] = str(
-        inverter.get("label") or inverter.get("id") or ""
-    )
+def _builtin_inverter_seed(inverter: dict) -> dict[str, object]:
+    """Widget values (key suffix → value) of a stored built-in inverter."""
     control = str(inverter.get("control") or DEFAULT_BATTERY_CONTROL).strip().lower()
     if control not in BATTERY_CONTROL_VALUES:
         control = DEFAULT_BATTERY_CONTROL
-    st.session_state[f"{session_scope}__planning_bat_inv_control"] = CONTROL_LABELS_DE[
-        control
-    ]
     efficiency = inverter.get("efficiency")
-    st.session_state[f"{session_scope}__planning_bat_inv_efficiency"] = (
-        float(efficiency)
-        if efficiency not in (None, "")
-        else DEFAULT_INVERTER_EFFICIENCY
-    )
     max_ac = inverter.get("max_ac_power_kw")
     max_pv = inverter.get("max_pv_input_kw")
-    st.session_state[f"{session_scope}__planning_bat_inv_max_ac"] = (
-        float(max_ac) if max_ac not in (None, "") else 0.0
-    )
-    st.session_state[f"{session_scope}__planning_bat_inv_max_pv"] = (
-        float(max_pv) if max_pv not in (None, "") else 0.0
-    )
+    return {
+        "planning_bat_inv_label": str(inverter.get("label") or inverter.get("id") or ""),
+        "planning_bat_inv_control": CONTROL_LABELS_DE[control],
+        "planning_bat_inv_efficiency": (
+            float(efficiency)
+            if efficiency not in (None, "")
+            else DEFAULT_INVERTER_EFFICIENCY
+        ),
+        "planning_bat_inv_max_ac": float(max_ac) if max_ac not in (None, "") else 0.0,
+        "planning_bat_inv_max_pv": float(max_pv) if max_pv not in (None, "") else 0.0,
+    }
+
+
+def seed_builtin_inverter_widgets(
+    session_scope: str, inverter: dict | None, *, only_missing: bool = False
+) -> None:
+    if not inverter:
+        return
+    for suffix, value in _builtin_inverter_seed(inverter).items():
+        key = f"{session_scope}__{suffix}"
+        if only_missing and key in st.session_state:
+            continue
+        st.session_state[key] = value
+
+
+# Inverter fields the built-in section does not edit; they stay as stored.
+_BUILTIN_KEPT_FIELDS = ("max_ac_charge_kw", "regulates_on")
 
 
 def persist_builtin_inverter(payload: dict | None, *, battery_id: str) -> None:
+    """Write the form's built-in inverter fields onto the battery's stored inverter.
+
+    The id and bindings come from the stored entry (a rename moved it to ``wr_<new>``),
+    fields the section does not show are kept.
+    """
+    from ui.house_config_entities_io import _load_components_document
+
     if not payload or not battery_id:
         return
-    upsert_inverter(payload, stable_id=str(payload.get("id") or "").strip())
+    # From the file just written by upsert_battery, not from the loaded config.
+    stored = next(
+        (
+            item
+            for item in _load_components_document().get("inverters") or []
+            if isinstance(item, dict)
+            and str(item.get("owned_by") or "").strip() == battery_id
+        ),
+        None,
+    )
+    if stored is None:
+        raise ValueError(
+            f"Powerstation '{battery_id}': eingebauter Wechselrichter fehlt in components.json."
+        )
+    merged = dict(payload)
+    merged["id"] = str(stored.get("id") or "").strip()
+    merged["owned_by"] = battery_id
+    merged["ehal_bindings"] = dict(stored.get("ehal_bindings") or {})
+    for field in _BUILTIN_KEPT_FIELDS:
+        if field in stored:
+            merged[field] = stored[field]
+    upsert_inverter(merged, stable_id=merged["id"])
 
 
 def render_ecoflow_preset_button(*, is_new: bool) -> bool:

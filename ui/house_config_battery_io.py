@@ -290,7 +290,13 @@ def _merge_existing_battery_fields(
                 break
     if "control" not in spec and existing_control is not None:
         spec["control"] = existing_control
-    if "regulates_on" not in spec and existing_regulates_on is not None:
+    # regulates_on belongs to house batteries only: a switch to Powerstation drops it.
+    target_type = str(spec.get("type") or "").strip().lower()
+    if (
+        "regulates_on" not in spec
+        and existing_regulates_on is not None
+        and target_type != "powerstation"
+    ):
         spec["regulates_on"] = existing_regulates_on
     for key, value in existing_type_fields.items():
         spec.setdefault(key, value)
@@ -304,6 +310,21 @@ def _merge_existing_battery_fields(
         spec["ehal_bindings"] = raw_spec["ehal_bindings"]
 
 
+def _rewrite_pv_inverter_refs(data: dict, old_id: str, new_id: str) -> None:
+    """Point PV ``inverter_id`` from ``old_id`` to ``new_id`` in ``data``."""
+    if "pv_systems" not in data:
+        return
+    rows = []
+    for item in data.get("pv_systems") or []:
+        if not isinstance(item, dict):
+            continue
+        row = dict(item)
+        if str(row.get("inverter_id") or "").strip() == old_id:
+            row["inverter_id"] = new_id
+        rows.append(row)
+    data["pv_systems"] = rows
+
+
 def _apply_battery_inverter_ownership(
     spec: dict, data: dict, *, entity_id: str, old_id: str
 ) -> dict:
@@ -312,11 +333,14 @@ def _apply_battery_inverter_ownership(
         drop_owned_inverters,
         ensure_owned_island_inverter,
         is_physical_powerstation,
+        owned_island_inverter_id,
         rebind_owned_by,
+        rename_owned_island_inverter,
     )
     from house_config.powerstation import (
         apply_virtual_powerstation_inheritance,
         is_virtual_powerstation,
+        primary_house_battery,
     )
 
     batteries = list(data.get("batteries") or [])
@@ -326,6 +350,13 @@ def _apply_battery_inverter_ownership(
         if str(item.get("id", "")).strip() not in {entity_id, old_id}
     ]
     siblings.append(spec)
+    if is_virtual_powerstation(spec) and primary_house_battery(siblings) is None:
+        # Reinit rejects it after the write (η_inv not derivable): refuse before.
+        raise ValueError(
+            f"Batterie '{entity_id}': eine virtuelle Powerstation braucht eine "
+            "Hausbatterie als Carve-out-Basis. Erst eine Hausbatterie anlegen oder "
+            "Backing „Physisch“ wählen."
+        )
     spec = apply_virtual_powerstation_inheritance(spec, siblings)
     inverters = list(data.get("inverters") or [])
     renamed = bool(old_id and old_id != entity_id)
@@ -339,6 +370,15 @@ def _apply_battery_inverter_ownership(
         if renamed:
             inverters = drop_owned_inverters(inverters, battery_id=old_id)
     elif is_physical_powerstation(spec):
+        if renamed:
+            # Keep the built-in inverter (limits, bindings) under its new id.
+            inverters, moved_from = rename_owned_island_inverter(
+                inverters, old_battery_id=old_id, new_battery_id=entity_id
+            )
+            if moved_from:
+                _rewrite_pv_inverter_refs(
+                    data, moved_from, owned_island_inverter_id(entity_id)
+                )
         inverters, inv_id = ensure_owned_island_inverter(
             inverters,
             battery_id=entity_id,

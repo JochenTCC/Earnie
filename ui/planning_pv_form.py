@@ -12,7 +12,7 @@ from house_config.entity_id_lock import (
 )
 from house_config.id_slug import slug_id
 from house_config.label_uniqueness import allocate_unique_label
-from runtime_store.persist_paths import resolve_config_json_path
+from runtime_store.persist_paths import resolve_components_json_path
 from house_config.inverter import INVERTER_TYPE_BATTERY
 from ui.flash import flash
 from ui.house_config_io import (
@@ -112,7 +112,7 @@ def _pv_session_scope(selected_id: str, *, is_new: bool) -> str:
 
 
 def _config_file_stamp() -> str:
-    path = resolve_config_json_path()
+    path = resolve_components_json_path()
     try:
         return f"{os.path.abspath(path)}:{os.path.getmtime(path)}"
     except OSError:
@@ -145,8 +145,8 @@ def _apply_profile_pv_defaults(session_scope: str, profiles: dict[str, dict]) ->
     if profile_id not in profiles:
         return
     tilt, azimuth = _profile_pv_defaults(profiles[profile_id])
-    st.session_state[_scoped_key(session_scope, "planning_pv_tilt")] = int(tilt)
-    st.session_state[_scoped_key(session_scope, "planning_pv_azimuth")] = int(azimuth)
+    st.session_state[_scoped_key(session_scope, "planning_pv_tilt")] = float(tilt)
+    st.session_state[_scoped_key(session_scope, "planning_pv_azimuth")] = float(azimuth)
 
 
 def _default_profile_for_pv(profiles: dict[str, dict]) -> dict:
@@ -170,14 +170,16 @@ def _seed_pv_widget_state(
     if existing:
         label = str(existing.get("label", "Dach Süd"))
         kwp = float(existing.get("pv_kwp", existing.get("kwp", 10.0)))
-        tilt = int(existing.get("pv_tilt", existing.get("tilt", default_tilt)))
-        azimuth = int(existing.get("pv_azimuth", existing.get("azimuth", default_azimuth)))
+        tilt = float(existing.get("pv_tilt", existing.get("tilt", default_tilt)))
+        azimuth = float(
+            existing.get("pv_azimuth", existing.get("azimuth", default_azimuth))
+        )
         inverter_id = str(existing.get("inverter_id") or "").strip() or _default_pv_inverter_id()
     else:
         label = allocate_unique_label("Dach Süd", list_pv_systems())
         kwp = 10.0
-        tilt = int(default_tilt)
-        azimuth = int(default_azimuth)
+        tilt = float(default_tilt)
+        azimuth = float(default_azimuth)
         inverter_id = _default_pv_inverter_id()
         if profiles:
             profile_ids = sorted(profiles.keys())
@@ -390,14 +392,18 @@ def _render_pv_fields(ctx: dict) -> dict:
     )
     tilt = labeled_number_input(
         "Dachneigung (°)",
-        min_value=0,
-        max_value=90,
+        min_value=0.0,
+        max_value=90.0,
+        step=1.0,
+        format="%g",
         key=_scoped_key(session_scope, "planning_pv_tilt"),
     )
     azimuth = labeled_number_input(
         "Ausrichtung Azimut (°)",
-        min_value=-180,
-        max_value=180,
+        min_value=-180.0,
+        max_value=180.0,
+        step=1.0,
+        format="%g",
         help="0 = Süd, -90 = Ost, 90 = West",
         key=_scoped_key(session_scope, "planning_pv_azimuth"),
     )

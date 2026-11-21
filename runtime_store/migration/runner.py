@@ -168,7 +168,13 @@ def run_migration(
     if chain.blockers:
         raise MigrationError(chain.blockers[0].message_de)
 
-    validate_migrated_docs(chain.docs)
+    try:
+        validate_migrated_docs(chain.docs)
+    except ValueError as exc:
+        # Before backup and replace: nothing is written; report it like the other stops.
+        raise MigrationError(
+            f"Migrierte Konfiguration ist ungültig, nichts wurde geändert: {exc}"
+        ) from exc
 
     from_model = _from_model(docs)
     to_model = CURRENT_DATA_MODEL
