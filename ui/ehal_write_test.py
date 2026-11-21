@@ -26,7 +26,9 @@ from integrations.ehal_write_test import (
 )
 from integrations.ehal_write_test_bounds import (
     FLEX_SET_ENABLE_KIND,
+    LIMIT_FIELDS,
     SOURCE_SELECT_FIELD,
+    limit_power_bound_kw,
 )
 
 _SESSION_PENDING = "ehal_write_test_pending"
@@ -227,6 +229,9 @@ def _render_probe_table(
             label_visibility="collapsed",
         )
         cols[1].markdown(f"`{field}`")
+        unit_note = _unit_note(field, max_power_kw=max_power_kw, kind=kind)
+        if unit_note:
+            cols[1].caption(unit_note)
         mapping = targets.get(field) or "—"
         if force_locked:
             cols[2].caption(f"{mapping} · Force nötig")
@@ -316,6 +321,19 @@ def _render_row_value(
         disabled=disabled,
         label_visibility="collapsed",
     )
+
+
+def _unit_note(field: str, *, max_power_kw: float, kind: str) -> str:
+    """Unit of a numeric probe (the value input has no visible label) and, for power
+    limits, which entity the upper bound comes from."""
+    if kind in LIMIT_FIELDS:
+        _bound_kw, source = limit_power_bound_kw(field, max_power_kw)
+        return f"W · max aus {source}"
+    if kind == FORCE_ESS_ACTIVE_POWER or kind == "set_grid_export_power_limit":
+        return "W"
+    if kind == "set_evcs_max_current":
+        return "A"
+    return ""
 
 
 def _default_probe_value(kind: str, *, hi: float) -> float:
@@ -415,7 +433,16 @@ def _render_execute_confirm(
             st.rerun()
 
 
-@st.dialog("Schreibtest bestätigen")
+def _discard_pending() -> None:
+    """Dialog closed with X / Esc / click outside: drop the queued write.
+
+    Without this the pending action survives and the dialog reopens with the old
+    values (and an already given force confirmation) on the next rerun.
+    """
+    st.session_state.pop(_SESSION_PENDING, None)
+
+
+@st.dialog("Schreibtest bestätigen", on_dismiss=_discard_pending)
 def _confirm_write_test_dialog() -> None:
     pending = st.session_state.get(_SESSION_PENDING) or {}
     action = str(pending.get("action") or "")
@@ -438,7 +465,8 @@ def _execute_pending() -> None:
     action = str(pending.get("action") or "")
     values = pending.get("values") if isinstance(pending.get("values"), dict) else {}
     force = bool(pending.get("force"))
-    wait_s = float(pending.get("wait_s") or DEFAULT_ROUNDTRIP_WAIT_S)
+    raw_wait = pending.get("wait_s")
+    wait_s = float(DEFAULT_ROUNDTRIP_WAIT_S if raw_wait is None else raw_wait)
     max_kw = float(config.get_battery_params().get("max_power_kw") or 0.0)
     ev_a = default_ev_nominal_a()
 
@@ -493,7 +521,8 @@ def _execute_pending() -> None:
         st.session_state[_SESSION_RESULT] = {"kind": "silent", "message": str(exc)}
     except WriteTestClampError as exc:
         st.session_state[_SESSION_RESULT] = {"kind": "clamp", "message": str(exc)}
-    except (ValueError, OSError, TypeError) as exc:
+    except (ValueError, OSError, TypeError, RuntimeError) as exc:
+        # RuntimeError: hub errors (HaHttpError, OpenemsHttpError, LoxoneAdapterError).
         st.session_state[_SESSION_RESULT] = {"kind": "error", "message": str(exc)}
 
 
@@ -510,7 +539,8 @@ def _run_restore() -> None:
         }
     except WriteTestSilentError as exc:
         st.session_state[_SESSION_RESULT] = {"kind": "silent", "message": str(exc)}
-    except (ValueError, OSError, TypeError) as exc:
+    except (ValueError, OSError, TypeError, RuntimeError) as exc:
+        # RuntimeError: hub errors (HaHttpError, OpenemsHttpError, LoxoneAdapterError).
         st.session_state[_SESSION_RESULT] = {"kind": "error", "message": str(exc)}
 
 

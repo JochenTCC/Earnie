@@ -24,6 +24,7 @@ from integrations.ehal_debug_mapping import (  # noqa: F401  (build_loxone_setpo
 )
 from integrations.loxone_connectivity import LoxoneCheck, loxone_env_configured
 from runtime_store import run_state
+from runtime_store.ehal_push_inbox import STATE_ZERO_ASSUMED_NEVER
 from runtime_store.main_daemon import status as daemon_status
 from ui.ehal_unit_display import live_read_pair
 from ui.sankey_produktiv import has_produktiv_run
@@ -249,6 +250,10 @@ def _read_row_from_check(
     field: str, item: LoxoneCheck, *, mapping: str, read_at: str
 ) -> dict[str, str]:
     wert = parse_check_wert(item.detail, passed=item.passed)
+    if not wert and item.state == STATE_ZERO_ASSUMED_NEVER:
+        # Soft warning, but the optimizer computes with this assumed 0: show it
+        # ("Wert=0; 0 angenommen (nie gesendet) — …").
+        wert = parse_check_wert(str(item.detail or "").split(";", 1)[0], passed=True)
     if wert and field.endswith("get_evcs_ready_by_time"):
         from integrations.ehal_live import format_ready_by_display
 

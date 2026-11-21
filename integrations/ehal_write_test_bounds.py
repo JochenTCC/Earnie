@@ -48,6 +48,39 @@ class WriteTestClampError(ValueError):
     """Raised when a probe value is outside allowed bounds or force is required."""
 
 
+def limit_power_bound_kw(field: str, default_kw: float) -> tuple[float, str]:
+    """Upper bound (kW) for a power-limit probe and where it comes from.
+
+    Entity-scoped battery fields use that battery's ``max_power_kw`` (live scenario),
+    inverter fields the inverter's ``max_ac_power_kw`` (components). When the entity
+    has no own value, the live battery's maximum (``default_kw``) applies and the
+    returned source says so, so the UI can show it.
+    """
+    import config
+    from ehal.ess_fields import parse_ess_entity_scoped
+    from ehal.inverter_fields import inv_field_kind, parse_inv_entity_scoped
+
+    name = canonical_probe_field(field)
+    ess = parse_ess_entity_scoped(name)
+    if ess is not None:
+        battery_id = ess[0]
+        for battery in config.get_battery_params_list():
+            if str(battery.get("id") or "") == battery_id:
+                kw = float(battery.get("max_power_kw") or 0.0)
+                if kw > 0.0:
+                    return kw, f"Batterie {battery_id}"
+    elif inv_field_kind(name):
+        inv = parse_inv_entity_scoped(name)
+        inverters = [i for i in config.get_inverters() if isinstance(i, dict)]
+        if inv is not None:
+            inverters = [i for i in inverters if str(i.get("id") or "") == inv[0]]
+        if len(inverters) == 1:
+            kw = float(inverters[0].get("max_ac_power_kw") or 0.0)
+            if kw > 0.0:
+                return kw, f"Wechselrichter {inverters[0].get('id')}"
+    return float(default_kw), "Live-Batterie"
+
+
 def canonical_probe_field(field: str) -> str:
     """Strip consumer prefix (``{id}:set_…`` → ``set_…``); keep entity-scoped."""
     name = str(field or "").strip()
@@ -101,7 +134,8 @@ def clamp_probe_value(
         return _clamp_ess_mode(value)
 
     if kind in LIMIT_FIELDS:
-        max_w = max(0.0, abs(float(max_power_kw)) * 1000.0)
+        bound_kw, _source = limit_power_bound_kw(field, max_power_kw)
+        max_w = max(0.0, abs(bound_kw) * 1000.0)
         raw = float(value)
         if raw < 0 or raw > max_w + 1e-9:
             raise WriteTestClampError(
@@ -206,7 +240,8 @@ def probe_value_bounds(
     if kind == FORCE_ESS_ACTIVE_POWER and force_ess_active:
         return -ACTIVE_POWER_MAX_ABS_W, ACTIVE_POWER_MAX_ABS_W, "W"
     if kind in LIMIT_FIELDS:
-        max_w = max(0.0, abs(float(max_power_kw)) * 1000.0)
+        bound_kw, _source = limit_power_bound_kw(field, max_power_kw)
+        max_w = max(0.0, abs(bound_kw) * 1000.0)
         return 0.0, max_w, "W"
     if kind == EXPORT_LIMIT_FIELD:
         return 0.0, float(EXPORT_LIMIT_UNCONSTRAINED_W), "W"
