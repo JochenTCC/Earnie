@@ -234,20 +234,23 @@ def previous_sunrise_before(
 
 
 def hourly_slots_inclusive(start: datetime, end: datetime) -> tuple[datetime, ...]:
-    """Planning slots from floor(start) to floor(end) inclusive (QH step since 2.5.e)."""
-    from optimizer.slot_duration import normalize_quarter_hour_slot, slot_step
+    """Planning slots from floor(start) to floor(end) inclusive (QH step since 2.5.e).
+
+    Stepped in real time: on DST days the slots carry the fixed local offset of their
+    instant (``optimizer.slot_duration.quarter_hour_grid``), so no hour is lost or doubled.
+    """
+    from optimizer.slot_duration import normalize_quarter_hour_slot, quarter_hour_grid, slot_step
 
     if start.tzinfo is None or end.tzinfo is None:
         raise ValueError("start und end müssen timezone-aware sein.")
     if end < start:
         raise ValueError(f"end ({end}) liegt vor start ({start}).")
-    slot = normalize_quarter_hour_slot(start)
-    end_slot = normalize_quarter_hour_slot(end)
-    step = slot_step()
-    slots: list[datetime] = []
-    while slot <= end_slot:
-        slots.append(slot)
-        slot += step
+    slots = quarter_hour_grid(
+        normalize_quarter_hour_slot(start),
+        normalize_quarter_hour_slot(end),
+        step=slot_step(),
+        include_end=True,
+    )
     if not slots:
         raise ValueError(f"Keine Planungs-Slots zwischen {start} und {end}.")
     return tuple(slots)

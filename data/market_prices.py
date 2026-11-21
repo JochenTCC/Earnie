@@ -35,17 +35,19 @@ _PRICE_SOURCE_BY_METHOD = {
 
 
 def normalize_price_slot(dt: datetime) -> datetime:
-    """Quarter-hour slot in planning timezone (config: runtime_settings.timezone_name)."""
+    """Quarter-hour slot in planning timezone (config: runtime_settings.timezone_name).
+
+    Returned with the fixed local offset of its instant (``fixed_offset_local``): the two
+    occurrences of the repeated autumn hour are different keys, a ``ZoneInfo`` key would
+    merge them. A naive ``dt`` is local wall clock (first occurrence when ambiguous).
+    """
     from zoneinfo import ZoneInfo
 
-    from optimizer.slot_duration import normalize_quarter_hour_slot
+    from optimizer.slot_duration import fixed_offset_local, normalize_quarter_hour_slot
 
     tz = ZoneInfo(config.get_planning_timezone())
-    if dt.tzinfo is None:
-        aligned = dt.replace(tzinfo=tz)
-    else:
-        aligned = dt.astimezone(tz)
-    return normalize_quarter_hour_slot(aligned)
+    aware = dt.replace(tzinfo=tz) if dt.tzinfo is None else dt
+    return normalize_quarter_hour_slot(fixed_offset_local(aware, tz))
 
 
 def index_market_data_by_slot(market_data: list[dict[str, Any]]) -> dict[datetime, dict[str, Any]]:
