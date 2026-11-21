@@ -90,7 +90,8 @@ def legend_entries_from_figure(fig) -> list[tuple[str, str]]:
     entries: list[tuple[str, str]] = []
     seen_groups: set[str] = set()
     for trace in fig.data:
-        if not getattr(trace, "showlegend", True):
+        # Plotly leaves ``showlegend`` at None for "default" (shown); only False hides.
+        if getattr(trace, "showlegend", None) is False:
             continue
         name = getattr(trace, "name", None)
         if not name:

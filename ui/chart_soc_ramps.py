@@ -24,9 +24,13 @@ from ui.chart_slot_axis import (
 
 
 def _resolve_battery_params(battery_params: dict | list[dict] | None) -> dict:
-    """Singular or multi-ESS list → plant battery of the simulated SoC line."""
+    """Singular or multi-ESS list → plant battery of the simulated SoC line.
+
+    Without explicit params (live) the configured battery list is used, so a
+    plant with several house batteries gets the plant capacity, not the first one's.
+    """
     if battery_params is None:
-        return config.get_battery_params()
+        battery_params = list(config.get_battery_params_list() or [])
     if isinstance(battery_params, list):
         from optimizer.milp_horizon import (
             coerce_battery_params_list,
@@ -235,20 +239,24 @@ def _slot_index_at_or_after(
 
 def _has_milp_slots_between(
     axis: ChartSlotAxis,
-    start_exclusive: datetime,
+    start_inclusive: datetime,
     end_exclusive: datetime,
     seg_start: int,
     seg_end: int,
     history_slot_count: int | None,
 ) -> bool:
-    """True if a MILP slot start lies in (start_exclusive, end_exclusive)."""
-    lo = pd.Timestamp(start_exclusive)
+    """True if a MILP slot start lies in [start_inclusive, end_exclusive).
+
+    Callers pass the end of the current quarter hour: the slot starting exactly
+    there (e.g. :45 while *Jetzt* is :30–:44) is a later MILP slot of the hour.
+    """
+    lo = pd.Timestamp(start_inclusive)
     hi = pd.Timestamp(end_exclusive)
     for index in range(seg_start, seg_end):
         if history_slot_count is not None and index < history_slot_count:
             continue
         stamp = axis.starts.iloc[index]
-        if lo < stamp < hi:
+        if lo <= stamp < hi:
             return True
     return False
 

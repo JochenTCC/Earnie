@@ -476,7 +476,12 @@ def _resolve_underlay_soc_column(
         for column, legend in series
         if column in df.columns
     }
-    params = battery_params or {}
+    # Backtesting logs carry a multi-ESS list; resolve it to the plant battery.
+    params = (
+        _resolve_battery_params(battery_params)
+        if isinstance(battery_params, list)
+        else battery_params or {}
+    )
     for key in ("label", "id"):
         token = str(params.get(key) or "").strip()
         if token and token in by_label:

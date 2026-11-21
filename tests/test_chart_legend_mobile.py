@@ -70,6 +70,15 @@ def test_legend_entries_use_marker_color_for_bars():
     assert entries == [("SwimSpa", "rgba(120, 80, 200, 0.9)")]
 
 
+def test_legend_entries_include_traces_with_default_showlegend():
+    """Plotly default (showlegend unset → None) shows the entry, e.g. the PV trace."""
+    fig = go.Figure(
+        data=[go.Scatter(x=[1], y=[1], name="PV", line=dict(color="#ffcc00"))]
+    )
+    assert fig.data[0].showlegend is None
+    assert legend_entries_from_figure(fig) == [("PV", "#ffcc00")]
+
+
 def test_legend_entries_preserve_plotly_trace_order():
     fig = go.Figure(
         data=[
