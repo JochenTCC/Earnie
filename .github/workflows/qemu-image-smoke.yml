@@ -62,3 +62,22 @@ jobs:
             -e QEMU_CPU="${{ matrix.qemu_cpu }}" \
             "$IMAGE" \
             python -m scripts.qemu_image_smoke
+
+      # GitHub organisation move, Step 1: the organisation copy must be the same image.
+      - name: Organisation namespace has the same image
+        if: matrix.arch == 'amd64'
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          IMAGE="ghcr.io/jochentcc/earnie-energy:${VERSION}"
+          ORG_IMAGE="ghcr.io/earnie-hems/earnie-energy:${VERSION}"
+          digest() { docker buildx imagetools inspect "$1" | awk '/^Digest:/ {print $2; exit}'; }
+          OLD="$(digest "$IMAGE")"
+          NEW="$(digest "$ORG_IMAGE")"
+          echo "${IMAGE} → ${OLD}"
+          echo "${ORG_IMAGE} → ${NEW}"
+          if [ -z "$OLD" ] || [ "$OLD" != "$NEW" ]; then
+            echo "::error::${ORG_IMAGE} is missing or differs from ${IMAGE}"
+            exit 1
+          fi

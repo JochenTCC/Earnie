@@ -6,6 +6,8 @@ from pathlib import Path
 from ui.truth_banner import (
     BANNER_LABEL,
     OFFICIAL_REPO_URL,
+    OFFICIAL_REPO_URLS,
+    ORG_REPO_URL,
     REQUIRED_PHRASE_NONCOMMERCIAL,
     REQUIRED_PHRASE_PRODUCT,
     is_unofficial_origin,
@@ -30,6 +32,24 @@ def test_is_unofficial_origin_accepts_official_https_and_ssh() -> None:
     assert is_unofficial_origin("https://github.com/JochenTCC/Earnie.git") is False
     assert is_unofficial_origin("git@github.com:JochenTCC/Earnie.git") is False
     assert is_unofficial_origin("git@github.com:JochenTCC/Earnie") is False
+
+
+def test_org_repo_is_official_too_but_not_displayed() -> None:
+    """GitHub organisation move, Step 1: both identities official; the old URL is still shown."""
+    assert ORG_REPO_URL == "https://github.com/Earnie-HEMS/Earnie"
+    assert OFFICIAL_REPO_URLS == (OFFICIAL_REPO_URL, ORG_REPO_URL)
+
+
+def test_is_unofficial_origin_accepts_org_repo_https_and_ssh() -> None:
+    assert is_unofficial_origin("https://github.com/Earnie-HEMS/Earnie") is False
+    assert is_unofficial_origin("https://github.com/earnie-hems/earnie.git") is False
+    assert is_unofficial_origin("git@github.com:Earnie-HEMS/Earnie.git") is False
+    assert is_unofficial_origin("git@github.com:Earnie-HEMS/Earnie") is False
+
+
+def test_is_unofficial_origin_rejects_other_repos_of_org() -> None:
+    assert is_unofficial_origin("https://github.com/Earnie-HEMS/Edibert") is True
+    assert is_unofficial_origin("https://github.com/Earnie-HEMS/Earnie-fork") is True
 
 
 def test_is_unofficial_origin_detects_other_repo() -> None:

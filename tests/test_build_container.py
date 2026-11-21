@@ -24,6 +24,26 @@ def test_default_tags_follow_version_py():
         assert "ghcr.io/jochentcc/ernie-energy:latest" in tags
 
 
+def test_default_tags_dual_publish_org_namespace_keeps_personal_namespace():
+    """GitHub organisation move, Step 1: both namespaces get every tag; the default stays personal."""
+    assert bc.DEFAULT_REGISTRY_IMAGE == "ghcr.io/jochentcc/earnie-energy"
+    for ver in ("2.8.0", "2.8.0-dev.3"):
+        tags = bc.default_tags(ver)
+        personal = [t.split("/", 2)[2] for t in tags if t.startswith("ghcr.io/jochentcc/earnie-energy:")]
+        org = [t.split("/", 2)[2] for t in tags if t.startswith("ghcr.io/earnie-hems/")]
+        assert personal and org == personal
+
+
+def test_promote_commands_set_org_floating_tags_from_org_version():
+    cmds = bc.promote_commands("2.8.0")
+    for tag in ("latest", "next"):
+        assert [
+            "docker", "buildx", "imagetools", "create",
+            "-t", f"ghcr.io/earnie-hems/earnie-energy:{tag}",
+            "ghcr.io/earnie-hems/earnie-energy:2.8.0",
+        ] in cmds
+
+
 def test_is_dev_version_only_for_dev_builds():
     assert bc.is_dev_version("2.8.0-dev.4") is True
     for version in ("2.8.0", "2.8.0-alpha.1", "2.8.0-beta.1", "2.8.0-rc.1"):
@@ -84,6 +104,8 @@ def test_default_tags_prerelease_omits_latest():
         "ghcr.io/jochentcc/earnie-energy:2.2.0-alpha.1",
         "ghcr.io/jochentcc/ernie-energy:next",
         "ghcr.io/jochentcc/ernie-energy:2.2.0-alpha.1",
+        "ghcr.io/earnie-hems/earnie-energy:next",
+        "ghcr.io/earnie-hems/earnie-energy:2.2.0-alpha.1",
     ]
 
 
@@ -102,6 +124,7 @@ def test_versioned_and_floating_tags_partition_default_tags():
         assert versioned == [
             f"ghcr.io/jochentcc/earnie-energy:{ver}",
             f"ghcr.io/jochentcc/ernie-energy:{ver}",
+            f"ghcr.io/earnie-hems/earnie-energy:{ver}",
         ]
 
 
@@ -109,6 +132,7 @@ def test_floating_tags_prerelease_only_next():
     assert bc.floating_tags("2.2.0-alpha.1") == [
         "ghcr.io/jochentcc/earnie-energy:next",
         "ghcr.io/jochentcc/ernie-energy:next",
+        "ghcr.io/earnie-hems/earnie-energy:next",
     ]
 
 

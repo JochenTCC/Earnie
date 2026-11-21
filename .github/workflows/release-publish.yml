@@ -195,6 +195,14 @@ jobs:
         # Tariff deploy-gate runs inside build_container when --push is set.
         # :next / :latest are set by the promote job after approval.
 
+      # GitHub organisation move, Step 1: the build already tags ghcr.io/earnie-hems/...
+      # (scripts/build_container.py REGISTRY_IMAGES); this copy also covers a re-run
+      # whose build was skipped by the gate above. Same digest, no rebuild.
+      - name: Copy base image to organisation namespace
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: python -m scripts.ghcr_mirror --image "ghcr.io/jochentcc/earnie-energy:${VERSION}"
+
       - name: Build and push HA add-on images (H6)
         if: steps.version.outputs.targets != 'docker'
         env:
@@ -209,21 +217,23 @@ jobs:
             GITHUB_OUTPUT="$GATE_OUT" python -m scripts.release_image_gate --image "$IMAGE" --revision "$REVISION"
             if grep -qx 'exists=true' "$GATE_OUT"; then
               echo "Reusing ${IMAGE} (already built from ${REVISION})"
-              continue
-            fi
-            if [ "$arch" = "amd64" ]; then
-              platform="linux/amd64"
             else
-              platform="linux/arm64"
+              if [ "$arch" = "amd64" ]; then
+                platform="linux/amd64"
+              else
+                platform="linux/arm64"
+              fi
+              docker buildx build \
+                --platform "$platform" \
+                --build-arg "EARNIE_VERSION=${VERSION}" \
+                -t "${IMAGE}" --label "org.opencontainers.image.revision=${REVISION}" \
+                -f "${CONTEXT}/Dockerfile" \
+                "${CONTEXT}" \
+                --push
+              echo "Pushed ${IMAGE}"
             fi
-            docker buildx build \
-              --platform "$platform" \
-              --build-arg "EARNIE_VERSION=${VERSION}" \
-              -t "${IMAGE}" --label "org.opencontainers.image.revision=${REVISION}" \
-              -f "${CONTEXT}/Dockerfile" \
-              "${CONTEXT}" \
-              --push
-            echo "Pushed ${IMAGE}"
+            # GitHub organisation move, Step 1: same image under ghcr.io/earnie-hems/.
+            python -m scripts.ghcr_mirror --image "$IMAGE"
           done
 
       - name: Prepare release notes

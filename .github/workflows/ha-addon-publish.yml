@@ -1,6 +1,7 @@
 # Manual HA add-on republish (wrapper-only fix, pin recovery, or retry after failed publish).
 # Default channel=auto: official X.Y.Z → earnie + earnie_prerelease; pre-release → earnie_prerelease only.
-# Optional rebuild_images: build/push ghcr.io/jochentcc/earnie-addon-{arch}:<version> (needs base earnie-energy:<version>).
+# Optional rebuild_images: build/push ghcr.io/jochentcc/earnie-addon-{arch}:<version> (needs base earnie-energy:<version>),
+# copied to ghcr.io/earnie-hems/earnie-addon-{arch}:<version> (GitHub organisation move, Step 1).
 name: HA Add-on publish
 
 on:
@@ -110,14 +111,17 @@ jobs:
             else
               platform="linux/arm64"
             fi
+            IMAGE="ghcr.io/jochentcc/earnie-addon-${arch}:${VERSION}"
             docker buildx build \
               --platform "$platform" \
               --build-arg "EARNIE_VERSION=${VERSION}" \
-              -t "ghcr.io/jochentcc/earnie-addon-${arch}:${VERSION}" \
+              -t "${IMAGE}" \
               -f "${CONTEXT}/Dockerfile" \
               "${CONTEXT}" \
               --push
-            echo "Pushed ghcr.io/jochentcc/earnie-addon-${arch}:${VERSION}"
+            echo "Pushed ${IMAGE}"
+            # GitHub organisation move, Step 1: same image under ghcr.io/earnie-hems/.
+            python -m scripts.ghcr_mirror --image "$IMAGE"
           done
 
       - name: Bump HA add-on pins
