@@ -72,7 +72,10 @@ jobs:
           set -euo pipefail
           IMAGE="ghcr.io/jochentcc/earnie-energy:${VERSION}"
           ORG_IMAGE="ghcr.io/earnie-hems/earnie-energy:${VERSION}"
-          digest() { docker buildx imagetools inspect "$1" | awk '/^Digest:/ {print $2; exit}'; }
+          # --format instead of `| awk '... exit'`: the early awk exit closed the pipe,
+          # buildx died on SIGPIPE and pipefail failed the step silently (exit 255, dev.31).
+          # A missing image fails loud here (inspect prints "not found", set -e stops).
+          digest() { docker buildx imagetools inspect "$1" --format '{{.Manifest.Digest}}'; }
           OLD="$(digest "$IMAGE")"
           NEW="$(digest "$ORG_IMAGE")"
           echo "${IMAGE} → ${OLD}"
