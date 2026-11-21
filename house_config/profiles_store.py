@@ -713,16 +713,18 @@ def save_house_profiles_document(path: str, doc: dict) -> None:
 
 
 def _refuse_shadow_config_write(path: str) -> None:
-    """Raise when Shadow would mutate files under the shared config dir."""
+    """Raise when Shadow would mutate the shared config: a file under the config dir, or
+    the active house profile wherever ``EARNIE_HOUSE_PROFILES_PATH`` puts it."""
     from pathlib import Path
 
-    from runtime_store.persist_paths import config_dir
+    from runtime_store.persist_paths import config_dir, resolve_house_profiles_json_path
     from runtime_store.shadow.errors import ConfigReadOnlyError
 
     try:
         target = Path(path).resolve()
         cfg_root = Path(config_dir()).resolve()
-        if target == cfg_root or cfg_root in target.parents:
+        active_house = Path(resolve_house_profiles_json_path()).resolve()
+        if target == cfg_root or cfg_root in target.parents or target == active_house:
             raise ConfigReadOnlyError(
                 f"Shadow Mode: Konfiguration schreibgeschützt ({path})"
             )
