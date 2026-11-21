@@ -563,9 +563,10 @@ Die Angabe ist Pflicht an jeder Wallbox, die ein dynamisches Auto nutzen darf. L
 **Regeln beim Laden des Hausprofils:**
 
 - Eine Wallbox ist innerhalb eines Hausprofils entweder einem Auto fest zugeordnet oder für dynamische Autos freigegeben, nicht beides.
-- Jede Wallbox eines dynamischen Autos braucht das Binding `sens_evcs_connected`, sonst erkennt Earnie kein angestecktes Auto.
 - Ein dynamisches Auto trägt keine Lade-Bindings; die stehen an den Wallboxen. Auf der Seite **EHAL-Com** hat jede solche Wallbox eine eigene Zeile (`evcs.<Wallbox>.*`), die Zeile des Autos zeigt nur die Auto-Felder.
 - Höchstens 8 Wallboxen, die sich dynamische Autos teilen, je zusammenhängender Gruppe.
+
+**Im Live-Betrieb** braucht jede Wallbox eines dynamischen Autos zusätzlich das Binding `sens_evcs_connected`, sonst erkennt Earnie kein angestecktes Auto. Fehlt es, startet der Optimierer-Dienst nicht, und fällt es im laufenden Betrieb weg, bricht jeder Zyklus mit dieser Meldung ab. Szenario-Explorer und Backtesting brauchen das Binding nicht; eine nur geplante Wallbox in einer Studie kommt ohne aus.
 
 **Szenario-Explorer und Backtesting:** Dort gibt es kein Anstecken. Earnie ordnet deshalb einmal pro Lauf zu:
 

@@ -65,6 +65,14 @@ def start() -> None:
     _engine = None
     _spec_key = None
     set_live_assignments({})
+    from house_config.wallboxes import require_plug_signals
+
+    _evs, wallboxes = _dynamic_setup()
+    try:
+        require_plug_signals(wallboxes)
+    except ValueError as exc:
+        logger.error("Abbruch: %s", exc)
+        raise SystemExit(1) from None
     stale = consume_picks()
     if stale:
         logger.info("EV-Zuordnung: %s Auswahl(en) von vor dem Start verworfen.", len(stale))
@@ -197,10 +205,13 @@ def _picks() -> list[Pick]:
 
 def tick(now: datetime | None = None, *, wake: bool = False) -> StepResult | None:
     """One engine step; ``None`` when no EV is dynamic (the overlay is then empty)."""
+    from house_config.wallboxes import require_plug_signals
     from runtime_store.ev_assignments import set_live_assignments, write_assignments_snapshot
 
     global _engine, _spec_key, _wallboxes
     evs, wallboxes = _dynamic_setup()
+    # A binding removed while the daemon runs: the cycle fails loud (main loop logs it).
+    require_plug_signals(wallboxes)
     if not evs:
         _engine = None
         _spec_key = None

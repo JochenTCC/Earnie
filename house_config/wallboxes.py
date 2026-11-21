@@ -388,7 +388,8 @@ def resolve_dynamic_ev_view(
     """Loader view of a dynamic EV (in place): no wallbox of its own, no charger bindings.
 
     Every wallbox it may use must exist, share a current range with the car and carry an
-    ``unknown_vehicle`` policy (D6). The limits are those of the pair with the smallest
+    ``unknown_vehicle`` policy (D6). The plug signal is checked by the live daemon only
+    (:func:`require_plug_signals`). The limits are those of the pair with the smallest
     maximum power (D8: a car that is not plugged in; ties by wallbox Kennung). The live
     daemon replaces this view by :func:`assigned_dynamic_ev_view` or :func:`pool_dynamic_ev_view`.
     """
@@ -412,11 +413,6 @@ def resolve_dynamic_ev_view(
                 "Wallbox, die ein dynamisch zugeordnetes E-Auto nutzen darf "
                 f"({', '.join(UNKNOWN_VEHICLE_POLICIES)})."
             )
-        if not wallbox_binding_key(wallbox, "sens_evcs_connected"):
-            raise ValueError(
-                f"wallboxes '{wallbox_id}': Binding sens_evcs_connected fehlt — ohne "
-                "Stecker-Signal erkennt Earnie kein angestecktes Auto (EHAL-Com)."
-            )
         resolved.append(dict(wallbox))
     smallest = min(
         resolved,
@@ -424,6 +420,27 @@ def resolve_dynamic_ev_view(
     )
     _apply_pair_limits(spec, pair_limits(spec, smallest, label=label))
     spec[VIEW_DYNAMIC_KEY] = resolved
+
+
+def require_plug_signals(wallboxes: dict[str, dict[str, Any]]) -> None:
+    """Live only: every wallbox open to dynamic EVs needs ``sens_evcs_connected``.
+
+    Without the plug signal the live assignment never sees a car plug in. The config loader
+    does not check it: the Scenario Explorer and backtesting assign by arrival (D9) and use no
+    plug signals, so a planned wallbox in a study needs no binding.
+    """
+    missing = sorted(
+        wallbox_id
+        for wallbox_id, wallbox in wallboxes.items()
+        if not wallbox_binding_key(wallbox, "sens_evcs_connected")
+    )
+    if missing:
+        raise ValueError(
+            "wallboxes "
+            + ", ".join(f"'{w}'" for w in missing)
+            + ": Binding sens_evcs_connected fehlt — ohne Stecker-Signal erkennt Earnie "
+            "kein angestecktes Auto (EHAL-Com)."
+        )
 
 
 def assigned_dynamic_ev_view(consumer: dict[str, Any], wallbox_id: str) -> dict[str, Any]:
