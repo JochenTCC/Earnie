@@ -2,6 +2,15 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix — HA add-on read `.env` from the data volume (2026-11-21)
+
+- [x] **Bugfix — HA add-on read `.env` from the data volume, not from `/config`** *(found 2026-11-18 in tester support; fixed 2026-11-18 on `main`, not on `release/2.7`, maintainer)*: `run.sh` sets `EARNIE_CONFIG_PATH=/config` and `EARNIE_ENV_PATH=/data/earnie_env`. `config.json` has the add-on exception (`persist_paths_base._effective_config_path_env`), `persist_paths.resolve_dotenv_path` had none: because `EARNIE_ENV_PATH` is set it always took `/data/earnie_env/config/.env`. The config migration in `run.sh` copied the old `.env` to `/config`, bootstrap then created a template `.env` on the data volume, and credentials entered since then landed there; `/config/.env` (named in `DOCS.md` and `docs/einrichtung/homeassistant-addon.md`) was never read.
+  - **Fix:** `persist_paths.addon_config_dotenv_path` (add-on context + `EARNIE_CONFIG_PATH`) makes `resolve_dotenv_path` return `/config/.env`; `EARNIE_DOTENV_PATH` still wins. `runtime_store/addon_dotenv_migrate.py::migrate_addon_dotenv` runs once in bootstrap before the `.env` template step: it carries the data-volume values over to `/config/.env` and renames the old file to `.env.migrated-<date>`. Rule (maintainer, 2026-11-18): the data-volume value wins on a conflict, because Earnie ran with it; empty values and values equal to `.env.example` (placeholders, default IP) are not taken over. Keys are logged by name, never with values.
+  - **Docs:** `docs/einrichtung/homeassistant-addon.md` (migration paragraph); release-notes draft `v2.8.0-addon-dotenv.draft.md`.
+  - **Tests:** `tests/test_addon_dotenv_migrate.py` (path in and outside the add-on, data volume wins, template values ignored, missing `/config/.env` created, runs once, `EARNIE_DOTENV_PATH` skips the move).
+  - **Verify:** own HA add-on on the next 2.8 dev build: log shows `addon_dotenv: … übernommen` once, `/config/.env` holds the working credentials, `/data/earnie_env/config/.env.migrated-<date>` exists, the backend connects after a restart.
+  - **Closed (2026-11-19, maintainer):** considered done without an own live check on a 2.8 dev build; fix `ccfe8ae4` on `main`.
+
 ### Bugfix — Wallbox power on HA logged 1000× too large (2026-11-20)
 
 - [x] **Bugfix — Wallbox power on HA logged 1000× too large in the slot log** *(found 2026-11-17 while fixing the heating rod base load; fixed 2026-11-17 on `main`)*: `integrations/ha_flex_power.py::read_ha_flex_chart_kw` (Ledger P9e) took the pushed `sens_evcs_active_power` as kW. The HA carrier pushes it in its EHAL unit W (`ehal_base_unit` = `W`, Jinja conversion from the entity unit; HouseSim projects `evcs_power_w` with factor 1), so a car charging at 7.4 kW was booked as 7400 kW in `closed_interval.flex_kw`, the savings ledger (`kw × dt_h`) and Chart 1 "Ist". Planning was not affected (only heating rods come from this reader there).
