@@ -257,9 +257,26 @@ def test_link_alive_from_fresh_nonzero_analog_or_heartbeat() -> None:
     assert not inbox.link_alive({}, now=_now())
 
 
+def test_derive_state_non_power_analog_is_never_assumed_zero() -> None:
+    # Same rule as the optimizer read path: a silent SoC, limit or temperature has no value.
+    for ehal_id in (
+        "ess.house.sens_ess_soc",
+        "get_grid_export_power_limit",
+        "ess.house.get_ess_max_charge_power",
+        "sens_temperature_outside",
+    ):
+        def d(row, link):
+            return inbox.derive_state(ehal_id, row, link=link, now=_now())
+
+        assert d(_row(55.0, 20), True) == (inbox.STATE_OK, 55.0)
+        assert d(_row(55.0, 200), True) == (inbox.STATE_READ_ERROR, None)
+        assert d(None, True) == (inbox.STATE_UNKNOWN, None)
+        assert d(_row(0.0, 500), True) == (inbox.STATE_ZERO_HELD, 0.0)  # explicit 0 (Off command)
+
+
 def test_derive_state_analog() -> None:
     def d(row, link):
-        return inbox.derive_state("ess.house.sens_ess_soc", row, link=link, now=_now())
+        return inbox.derive_state("sens_grid_power_active", row, link=link, now=_now())
 
     assert d(_row(55.0, 20), True) == (inbox.STATE_OK, 55.0)
     assert d(_row(55.0, 200), True) == (inbox.STATE_ZERO_ASSUMED_SILENT, 0.0)

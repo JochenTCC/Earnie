@@ -20,7 +20,7 @@
         "unit": "W",
         "ehal_unit": "W",
         "factor": 1,
-        "sign": -1
+        "sign": 1
       }
     },
     {

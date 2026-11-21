@@ -406,20 +406,23 @@ def fetch_heat_feedback(
 ) -> dict[str, float | None]:
     """Mapped heat pump / heat store reads in EHAL units; unmapped kinds are left out.
 
-    A mapped kind without a value is ``None``. Hub units come from the role file
-    (``ehal.field_registry``), e.g. ``sens_heat_power`` kW → W.
+    A mapped kind without a value is ``None``. On Loxone the hub units come from the role
+    file (``ehal.field_registry``), e.g. ``sens_heat_power`` kW → W. A network backend (the
+    HA carrier) already pushes EHAL units, so the Loxone block is not applied there.
     """
     from ehal.field_registry import apply_loxone_read, loxone_spec
     from ehal.heat_fields import HEAT_FEEDBACK_KINDS
+    from integrations import ehal_live
     from settings.ehal_marker_resolve import marker_thermal_annual_read
 
+    hub_is_loxone = not ehal_live.is_ehal_network_backend()
     out: dict[str, float | None] = {}
     for kind in kinds if kinds is not None else HEAT_FEEDBACK_KINDS:
         address = marker_thermal_annual_read(consumer, kind)
         if not address:
             continue
         raw = fetch_loxone_generic_value(address)
-        spec = loxone_spec(kind)
+        spec = loxone_spec(kind) if hub_is_loxone else None
         out[kind] = apply_loxone_read(raw, spec) if spec is not None else raw
     return out
 

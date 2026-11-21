@@ -8,7 +8,15 @@
       "field": "flex.{hk_id}.sens_power_act",
       "required": false,
       "kind": "stub",
-      "notes": "entity-scoped power. Legacy binding key flex.power_name migrates on load. Zähler id zaehler_<slug> uses slug without prefix."
+      "notes": "entity-scoped power, W on the EHAL wire (≥ 0). Legacy binding key flex.power_name migrates on load. Zähler id zaehler_<slug> uses slug without prefix.",
+      "loxone": {
+        "unit": "kW",
+        "ehal_unit": "W",
+        "factor": 1000,
+        "sign": 1,
+        "clamp_min": 0,
+        "read_required": false
+      }
     },
     {
       "field": "flex.{hk_id}.sens_consumer_active",

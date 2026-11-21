@@ -70,7 +70,7 @@ def test_ev_qid_keeps_its_wallbox():
 
 def test_measured_values_give_kw_per_consumer():
     values = {
-        HP_POWER: (2.4, inbox.STATE_OK),
+        HP_POWER: (2400.0, inbox.STATE_OK),
         DRYER_ACTIVE: (1.0, inbox.STATE_DIGITAL_HELD),
         EV_POWER: (0.0, inbox.STATE_ZERO_HELD),
     }
@@ -90,7 +90,7 @@ def test_measured_values_give_kw_per_consumer():
     ],
 )
 def test_stale_or_assumed_power_gives_no_key_never_zero(state):
-    values = {HP_POWER: (0.0 if "0" in state else 2.4, state)}
+    values = {HP_POWER: (0.0 if "0" in state else 2400.0, state)}
     out = hfp.read_ha_flex_chart_kw([HP], read_value=_read(values), apply_sign=_no_sign)
     assert out == {}
 
@@ -119,9 +119,9 @@ def test_wallbox_power_is_pushed_in_w_and_logged_in_kw():
     from integrations.ha_carrier_yaml import ehal_base_unit
 
     assert ehal_base_unit(EV_POWER) == "W"
-    values = {EV_POWER: (7400.0, inbox.STATE_OK), HP_POWER: (2.4, inbox.STATE_OK)}
+    values = {EV_POWER: (7400.0, inbox.STATE_OK), HP_POWER: (2400.0, inbox.STATE_OK)}
     out = hfp.read_ha_flex_chart_kw([EV, HP], read_value=_read(values), apply_sign=_no_sign)
-    # sens_power_act has no EHAL unit: pushed as the entity's number, taken as kW
+    # sens_power_act is a power too: the carrier pushes W whatever unit the entity has
     assert out == {"auto": 7.4, "wp": 2.4}
 
 
@@ -133,7 +133,7 @@ def test_sign_is_applied_with_the_binding_key():
         return -value
 
     out = hfp.read_ha_flex_chart_kw(
-        [HP], read_value=_read({HP_POWER: (2.0, inbox.STATE_OK)}), apply_sign=flip
+        [HP], read_value=_read({HP_POWER: (2000.0, inbox.STATE_OK)}), apply_sign=flip
     )
     assert out == {"wp": -2.0}
     assert seen == ["flex.wp.sens_power_act"]
@@ -206,7 +206,7 @@ def test_rod_qids_are_its_qualified_bindings():
 
 
 def test_rod_power_is_read_and_other_consumers_are_left_out():
-    values = {ROD_POWER: (3.0, inbox.STATE_OK), HP_POWER: (2.4, inbox.STATE_OK)}
+    values = {ROD_POWER: (3000.0, inbox.STATE_OK), HP_POWER: (2400.0, inbox.STATE_OK)}
     out = hfp.read_ha_heating_rod_kw([HP, ROD], read_value=_read(values), apply_sign=_no_sign)
     assert out == {ROD_ID: 3.0}
 

@@ -33,9 +33,10 @@ def _ok_response(value):
     return response
 
 
-def test_grid_sign_flip():
-    assert openems_grid_to_ehal_w(-77) == 77.0
-    assert openems_grid_to_ehal_w(50) == -50.0
+def test_grid_keeps_the_sign():
+    # OpenEMS sell-to-grid is negative, like EHAL export.
+    assert openems_grid_to_ehal_w(-77) == -77.0
+    assert openems_grid_to_ehal_w(50) == 50.0
 
 
 def test_ess_limit_mapping():
@@ -70,14 +71,14 @@ def test_read_telemetry_normalizes(get_mock):
     get_mock.side_effect = _get
     adapter = OpenemsAdapter(_cfg(evcs_channels=(("e_auto", "evcs0", "SetChargePowerLimit"),)))
     telemetry = adapter.read_telemetry()
-    assert telemetry["sens_grid_power_active"] == 100.0
+    assert telemetry["sens_grid_power_active"] == -100.0
     assert "sens_pv_production_active" not in telemetry
     assert "sens_ess_soc" not in telemetry
     assert adapter.read_ess_soc_pct() == pytest.approx(55.0)
     assert telemetry["sens_ess_power"] == 200.0
     assert telemetry["sens_evcs_active_power"] == 1200.0
-    # Plant AC PV from _sum (500) + import 100 + discharge 200
-    assert telemetry["sens_power_consumers"] == pytest.approx(800.0)
+    # Plant AC PV from _sum (500) − export 100 + discharge 200
+    assert telemetry["sens_power_consumers"] == pytest.approx(600.0)
 
 
 _TWO_CHARGERS = (

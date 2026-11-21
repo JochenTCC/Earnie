@@ -8,7 +8,15 @@
       "field": "sens_evcs_active_power",
       "required": false,
       "kind": "telemetry",
-      "notes": "Optional W; charge power ≥ 0 when present."
+      "notes": "Optional W; charge power ≥ 0 when present.",
+      "loxone": {
+        "unit": "kW",
+        "ehal_unit": "W",
+        "factor": 1000,
+        "sign": 1,
+        "clamp_min": 0,
+        "read_required": false
+      }
     },
     {
       "field": "sens_evcs_connected",

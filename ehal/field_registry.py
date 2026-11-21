@@ -88,6 +88,11 @@ def _clamp_ehal(value: float, clamp_min: float | None, clamp_max: float | None) 
     return out
 
 
+def _spec_key(field: str) -> str:
+    """Bare kind of a role field: ``flex.{hk_id}.sens_power_act`` → ``sens_power_act``."""
+    return field.rsplit(".", 1)[-1] if "{" in field else field
+
+
 @lru_cache(maxsize=1)
 def _loxone_specs() -> dict[str, LoxoneConversionSpec]:
     out: dict[str, LoxoneConversionSpec] = {}
@@ -99,7 +104,7 @@ def _loxone_specs() -> dict[str, LoxoneConversionSpec]:
             block = entry.get("loxone")
             if not isinstance(block, dict):
                 continue
-            field = str(entry.get("field") or "").strip()
+            field = _spec_key(str(entry.get("field") or "").strip())
             if not field:
                 continue
             out[field] = LoxoneConversionSpec(

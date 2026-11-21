@@ -59,7 +59,10 @@ def _utc_ts() -> str:
 
 
 def openems_grid_to_ehal_w(openems_grid_w: float) -> float:
-    """OpenEMS: − = sell-to-grid; EHAL: + = import (role ``openems`` block)."""
+    """OpenEMS ``_sum/GridActivePower``: + = buy-from-grid, − = sell-to-grid.
+
+    EHAL uses the same convention (+ = import), so the role ``openems`` block keeps the sign.
+    """
     from ehal.field_registry import apply_openems_read, openems_spec
 
     spec = openems_spec("sens_grid_power_active")
