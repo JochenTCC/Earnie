@@ -175,7 +175,11 @@ def test_ha_missing_binding_does_not_block_the_force_release(caplog):
     assert "Missing HA push setpoint binding" in error["message"]
     assert any("HA setpoint publish failed" in r.getMessage() for r in caplog.records)
     assert load_published()["ess.house.set_ess_active_power"] == pytest.approx(-2000.0)
-    assert adapter.capabilities() == {**caps_before, "ts": adapter.capabilities()["ts"]}
+    # One call only: ``ts`` is the call time and may tick between two calls.
+    caps_after = adapter.capabilities()
+    assert {k: v for k, v in caps_after.items() if k != "ts"} == {
+        k: v for k, v in caps_before.items() if k != "ts"
+    }
 
     release = _ess(
         "test",
