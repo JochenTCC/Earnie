@@ -58,7 +58,15 @@ _SHARE_OFF_TEXT = {
 
 def request_tariff_page(profile_id: str, open_tariff: tuple[str, str] | None = None) -> None:
     """Ask the Tarife page to show ``profile_id`` and open ``open_tariff`` (call before switch_page)."""
-    st.session_state[REQUEST_KEY] = {"profile_id": profile_id, "open": open_tariff}
+    st.session_state[REQUEST_KEY] = {"profile_id": profile_id, "open": open_tariff, "fresh": True}
+
+
+def _reset_opened_tariff() -> None:
+    """Forget which tariff the editor opened last, so a new request for it opens it again."""
+    from edibert.ui import state as edibert_state
+
+    with edibert_state.scope(KEY_PREFIX):
+        edibert_state.set_opened(None)
 
 
 def _select_profile(profiles: dict[str, dict], request: dict | None) -> str:
@@ -187,8 +195,12 @@ def render() -> None:
     # Kept across reruns: the editor opens a requested tariff only once per distinct request.
     request = st.session_state.get(REQUEST_KEY)
     profile_id = _select_profile(profiles, request)
-    if request is not None and request.get("profile_id") is not None:
-        st.session_state[REQUEST_KEY] = {**request, "profile_id": None}
+    if request is not None and request.get("fresh"):
+        # Edibert adopts a request only when it differs from the last one; a new click on
+        # "Benutzertarif bearbeiten" for the same tariff must open it again.
+        _reset_opened_tariff()
+    if request is not None and (request.get("profile_id") is not None or request.get("fresh")):
+        st.session_state[REQUEST_KEY] = {**request, "profile_id": None, "fresh": False}
     try:
         host = host_house_for_profile(
             profile_id, profiles[profile_id], resolve_grid_fees_json_path()

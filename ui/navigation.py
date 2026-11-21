@@ -314,17 +314,25 @@ def build_page_specs(enabled_mode_keys: list[str]) -> list[PageSpec]:
 
 
 # Populated each script run by ``build_navigation`` (callable pages have no
-# file path, so ``st.switch_page`` must receive the ``st.Page`` object).
-_NAV_PAGES_BY_URL: dict[str, object] = {}
+# file path, so ``st.switch_page`` must receive the ``st.Page`` object). Kept in the
+# session: sessions with other enabled pages must not see each other's map.
+_NAV_PAGES_SESSION_KEY = "_nav_pages_by_url"
+
+
+def _nav_pages_by_url() -> dict[str, object]:
+    import streamlit as st
+
+    return st.session_state.setdefault(_NAV_PAGES_SESSION_KEY, {})
 
 
 def switch_to_page(url_path: str) -> None:
     """Switch to a registered nav page by stable ``url_path`` (not a file path)."""
     import streamlit as st
 
-    page = _NAV_PAGES_BY_URL.get(url_path)
+    pages = _nav_pages_by_url()
+    page = pages.get(url_path)
     if page is None:
-        available = ", ".join(sorted(_NAV_PAGES_BY_URL)) or "(none)"
+        available = ", ".join(sorted(pages)) or "(none)"
         raise RuntimeError(
             f"Page {url_path!r} is not in the current navigation. "
             f"Available: {available}"
@@ -337,7 +345,7 @@ def build_navigation(enabled_mode_keys: list[str]):
     import streamlit as st
 
     sections: dict[str, list] = {}
-    _NAV_PAGES_BY_URL.clear()
+    pages_by_url: dict[str, object] = {}
     for spec in build_page_specs(enabled_mode_keys):
         page = st.Page(
             spec.render,
@@ -347,5 +355,6 @@ def build_navigation(enabled_mode_keys: list[str]):
             default=spec.default,
         )
         sections.setdefault(spec.section, []).append(page)
-        _NAV_PAGES_BY_URL[spec.url_path] = page
+        pages_by_url[spec.url_path] = page
+    st.session_state[_NAV_PAGES_SESSION_KEY] = pages_by_url
     return st.navigation(sections)

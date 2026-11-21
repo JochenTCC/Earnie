@@ -147,7 +147,8 @@ def _battery_params_from_snapshot(snapshot: dict) -> dict | list[dict]:
     stored = snapshot.get("battery_params")
     if isinstance(stored, list) and stored:
         return [dict(item) for item in stored if isinstance(item, dict)]
-    if isinstance(stored, dict) and float(stored.get("battery_capacity_kwh", 0.0)) > 0:
+    # Also a stored capacity of 0: the scenario had no battery in this run.
+    if isinstance(stored, dict) and "battery_capacity_kwh" in stored:
         return {
             "battery_capacity_kwh": float(stored["battery_capacity_kwh"]),
             "min_soc": float(stored["min_soc"]),

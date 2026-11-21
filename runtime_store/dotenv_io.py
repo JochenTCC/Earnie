@@ -41,7 +41,8 @@ def read_loxone_credentials() -> tuple[str, str, str]:
     return (
         _normalized_env_value("LOXONE_IP"),
         _normalized_env_value("LOXONE_USER"),
-        _normalized_env_value("LOXONE_PASS"),
+        # The password as stored: edge spaces and quotes are part of it.
+        str(os.getenv("LOXONE_PASS", "")),
     )
 
 
@@ -151,7 +152,7 @@ def _dotenv_values_safe(path: str) -> dict:
     from dotenv import dotenv_values
 
     try:
-        vals = dotenv_values(path)
+        vals = dotenv_values(path, interpolate=False)
     except OSError:
         return {}
     return vals if isinstance(vals, dict) else {}

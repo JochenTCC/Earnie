@@ -1,6 +1,7 @@
 """Gemeinsame Repro-Inputs fuer Debug-Dumps und Prod-Archive."""
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import zipfile
@@ -92,9 +93,20 @@ def write_inputs_to_zip(archive: zipfile.ZipFile) -> list[str]:
     """Schreibt vorhandene Repro-Inputs in ein ZIP und liefert deren Arcnames."""
     written: list[str] = []
     for source_path, archive_name in iter_input_files():
-        archive.write(source_path, arcname=archive_name)
+        if archive_name.endswith(".json"):
+            # Support packages leave the machine: no passwords or tokens from config files.
+            archive.writestr(archive_name, _redacted_json_text(source_path))
+        else:
+            archive.write(source_path, arcname=archive_name)
         written.append(archive_name)
     return written
+
+
+def _redacted_json_text(path: str) -> str:
+    from runtime_store.secret_redaction import redact_secrets
+    from settings.json_io import read_json_dict
+
+    return json.dumps(redact_secrets(read_json_dict(path)), indent=4, ensure_ascii=False) + "\n"
 
 
 def copy_inputs_to_directory(target_dir: str | Path) -> list[str]:

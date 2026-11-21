@@ -100,9 +100,11 @@ def maybe_prompt_consent_on_explorer() -> None:
     if is_kill_switch_off() or is_cloud_demo():
         return
 
-    choice = st.session_state.pop(_SESSION_DIALOG_CHOICE, None)
+    choice = st.session_state.get(_SESSION_DIALOG_CHOICE)
     if choice == "cancel":
+        # Abbrechen holds for this session: the dialog does not come back on every rerun.
         return
+    st.session_state.pop(_SESSION_DIALOG_CHOICE, None)
 
     if choice == "answered" or not consent_is_unset():
         if not st.session_state.get(_SESSION_EXPLORER_ACTIVATED):
@@ -127,6 +129,12 @@ def maybe_prompt_consent_on_editor() -> None:
     maybe_prompt_consent_on_explorer()
 
 
+def _save_usage_ping_toggle() -> None:
+    if is_kill_switch_off():
+        return
+    _apply_consent("on" if st.session_state["usage_ping_settings_toggle"] else "off")
+
+
 def render_usage_ping_settings() -> None:
     """Toggle + payload expander on Optimierer-Dienst."""
     st.subheader("Nutzungsstatistik")
@@ -147,21 +155,20 @@ def render_usage_ping_settings() -> None:
             "weiterzuentwickeln. Zustand in `runtime/usage_ping.json`."
         )
 
-    enabled = consent == "on"
-    toggled = st.toggle(
+    # The file leads: only a click changes consent (callback), so a tab with an old widget
+    # value cannot grant consent again after it was withdrawn elsewhere.
+    st.session_state["usage_ping_settings_toggle"] = consent == "on"
+    st.toggle(
         "Anonyme Nutzungsstatistik senden",
-        value=enabled,
         disabled=kill,
         key="usage_ping_settings_toggle",
+        on_change=_save_usage_ping_toggle,
         help=(
             "Bei Zustimmung sendet Earnie täglich ein anonymes JSON-Paket "
             "ohne persönliche Daten — wenn die Installation aktiv ist oder "
             "Szenarien erstellt wurden."
         ),
     )
-    if not kill and toggled != enabled:
-        if _apply_consent("on" if toggled else "off"):
-            st.rerun()
 
     with st.expander("Was wird gesendet?", expanded=False):
         st.caption(

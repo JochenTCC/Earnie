@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 def _values(path: str) -> dict[str, str]:
     from dotenv import dotenv_values
 
-    return {k: v for k, v in dotenv_values(path).items() if v is not None}
+    return {k: v for k, v in dotenv_values(path, interpolate=False).items() if v is not None}
 
 
 def _template_values() -> dict[str, str]:

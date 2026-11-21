@@ -29,8 +29,14 @@ _SESSION_SYNC_KEY = "scenario_editor_sync_id"
 _SESSION_TEMPLATE_SOURCE_KEY = "scenario_editor_template_source"
 from ui.scenario_form_helpers import (
     NEW_SCENARIO_OPTION,
+    REF_FIELD_LABELS_DE,
     backtesting_scenarios_file_stamp,
     build_scenario_settings,
+    carry_missing_refs,
+    drop_missing_refs,
+    hidden_scenario_settings,
+    missing_scenario_refs,
+    normalize_scenario_form_snapshot,
     lookup_entity_id,
     new_scenario_template,
     ordered_user_scenario_ids,
@@ -432,15 +438,87 @@ def _scenario_persist_payload(
             scoped_widget_key(session_scope, "scenario_import_cap_mode")
         ),
     )
-    payload = {
-        "id": save_id,
-        "label": str(label or "").strip() or save_id,
-        "enabled": bool(
-            st.session_state.get(scoped_widget_key(session_scope, "scenario_enabled"), True)
-        ),
-        "settings": settings,
+    template = ctx["scenario_template"]
+    stored_settings = dict(template.get("settings") or {})
+    # The form shows only part of a scenario: settings it does not show (flat overrides such as
+    # pv_kwp) and references it cannot offer (deleted entries) are written back unchanged.
+    settings = {
+        **hidden_scenario_settings(stored_settings),
+        **carry_missing_refs(settings, _missing_refs(ctx, stored_settings)),
     }
+    payload = {
+        key: value
+        for key, value in template.items()
+        if key not in ("id", "label", "enabled", "settings")
+    }
+    payload.update(
+        {
+            "id": save_id,
+            "label": str(label or "").strip() or save_id,
+            "enabled": bool(
+                st.session_state.get(scoped_widget_key(session_scope, "scenario_enabled"), True)
+            ),
+            "settings": settings,
+        }
+    )
     return save_id, ready, payload
+
+
+def _missing_refs(ctx: dict, stored_settings: dict) -> dict[str, list[str]]:
+    return missing_scenario_refs(
+        stored_settings,
+        profiles=ctx["profiles"],
+        batteries=ctx["batteries"],
+        pv_systems=ctx["pv_systems"],
+        import_tariffs=ctx["import_tariffs"],
+        export_tariffs=ctx["export_tariffs"],
+    )
+
+
+def _render_missing_refs_notice(ctx: dict) -> None:
+    """Name references to entries the form cannot offer; remove them only on request."""
+    stored_settings = dict(ctx["scenario_template"].get("settings") or {})
+    missing = _missing_refs(ctx, stored_settings)
+    if not missing:
+        return
+    names = ", ".join(
+        f"{REF_FIELD_LABELS_DE[field]} „{ref}“" for field, ids in missing.items() for ref in ids
+    )
+    st.warning(
+        f"Dieses Szenario verweist auf Einträge, die es nicht (mehr) gibt oder die hier nicht "
+        f"wählbar sind: {names}. Sie bleiben im Szenario, bis du einen anderen Eintrag wählst "
+        "oder sie hier entfernst."
+    )
+    if ctx["is_new"] or not ctx["existing"]:
+        return
+    if not st.button(
+        "Fehlende Verweise entfernen",
+        key=scoped_widget_key(ctx["session_scope"], "scenario_drop_missing_refs"),
+    ):
+        return
+    existing = dict(ctx["existing"])
+    existing["settings"] = drop_missing_refs(stored_settings, missing)
+    try:
+        upsert_scenario(existing)
+    except ValueError as exc:
+        st.error(str(exc))
+        return
+    flash("success", "Fehlende Verweise entfernt.")
+    st.rerun()
+
+
+def _matches_stored_scenario(ctx: dict, payload: dict) -> bool:
+    """True when a save would write what the file already holds for this scenario."""
+    existing = ctx["existing"]
+    if ctx["is_new"] or not existing:
+        return False
+    if hidden_scenario_settings(existing.get("settings") or {}) != hidden_scenario_settings(
+        payload["settings"]
+    ):
+        return False
+    return normalize_scenario_form_snapshot(payload) == normalize_scenario_form_snapshot(
+        existing
+    )
 
 
 def _auto_persist_scenario(
@@ -449,7 +527,14 @@ def _auto_persist_scenario(
     payload: dict,
     ready: bool,
 ) -> None:
-    from ui.auto_persist import PersistRejected, auto_persist
+    from ui.auto_persist import PersistRejected, auto_persist, seed_persisted
+
+    state_key = f"scenario::{save_id}"
+    if _matches_stored_scenario(ctx, payload):
+        # Opening a scenario (or editing back to the file) writes nothing; auto_persist below
+        # still shows the "Gespeichert" flash of the write before.
+        seed_persisted(state_key, payload)
+        ready = False
 
     def _save_scenario() -> None:
         try:
@@ -462,7 +547,7 @@ def _auto_persist_scenario(
             st.rerun()
 
     wrote = auto_persist(
-        state_key=f"scenario::{save_id}",
+        state_key=state_key,
         payload=payload,
         save=_save_scenario,
         ready=ready,
@@ -481,11 +566,15 @@ def _render_scenario_delete_button(ctx: dict) -> None:
         return
     if not st.button("Szenario entfernen", key="scenario_delete"):
         return
+    from ui.auto_persist import forget_persisted
+
     try:
         delete_scenario(ctx["stable_scenario_id"])
     except ValueError as exc:
         st.error(str(exc))
         return
+    # A new scenario with the same id and content must be written again.
+    forget_persisted(f"scenario::{ctx['stable_scenario_id']}")
     st.session_state[_SESSION_SELECT_PENDING_KEY] = ctx["live_id"]
     st.session_state[_SESSION_SYNC_KEY] = None
     st.session_state[_SESSION_FILE_STAMP_KEY] = None
@@ -500,6 +589,7 @@ def _persist_or_delete_scenario(
     tariffs: dict,
     import_cap_errors: tuple[str, ...] = (),
 ) -> None:
+    _render_missing_refs_notice(ctx)
     save_id, ready, payload = _scenario_persist_payload(ctx, label, picks, tariffs)
     _auto_persist_scenario(ctx, save_id, payload, ready and not import_cap_errors)
     _render_scenario_delete_button(ctx)

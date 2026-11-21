@@ -100,7 +100,7 @@ def backtesting_base_year() -> int:
 
 
 def _month_arg_help() -> str:
-    return f"Monatsnummer 1–12 (Basisjahr {backtesting_base_year()})"
+    return f"Monatsnummer 1–12 (Basisjahr {backtesting_base_year()}) oder JJJJ-MM"
 
 
 def _format_month_period(start: pd.Timestamp, end: pd.Timestamp) -> str:
@@ -109,10 +109,40 @@ def _format_month_period(start: pd.Timestamp, end: pd.Timestamp) -> str:
     return f"Monat {start.month}–{end.month}/{start.year}"
 
 
+def calendar_window_anchors(
+    start: pd.Timestamp,
+    end: pd.Timestamp,
+    horizon_mode: str,
+) -> dict[str, str]:
+    """Calendar date → window anchor of this run (``window_anchor_for_date``).
+
+    Saved in the log, so the SE calendar maps its days as the run did, not as a later
+    charging plan would. Sunrise covers the dates of ``list_sunrise_step_anchors``.
+    """
+    first = start.normalize()
+    last = end.normalize()
+    if horizon_mode == SUNRISE_WINDOW:
+        days = pd.date_range(first - pd.Timedelta(days=1), last + pd.Timedelta(days=1), freq="D")
+        allowed = (first.date(), (last + pd.Timedelta(days=1)).date())
+    else:
+        days = pd.date_range(first, last, freq="D")
+        allowed = None
+    anchors: dict[str, str] = {}
+    for day in days:
+        anchor = window_anchor_for_date(day.date())
+        if allowed is not None and not allowed[0] <= anchor.date() <= allowed[1]:
+            continue
+        anchors[day.date().isoformat()] = anchor.isoformat()
+    return anchors
+
+
 def _parse_month(value: str) -> pd.Timestamp:
-    """Parst Monatsnummer 1–12 zum ersten Tag im cons_data-Basisjahr."""
+    """Parst ``JJJJ-MM`` oder eine Monatsnummer 1–12 (dann im cons_data-Basisjahr)."""
+    text = value.strip()
+    year_text, dash, month_text = text.partition("-")
     try:
-        month = int(value.strip())
+        year = int(year_text) if dash else None
+        month = int(month_text) if dash else int(text)
     except ValueError as exc:
         raise argparse.ArgumentTypeError(
             f"Ungültiger Monat '{value}'. Erwartet wird {_month_arg_help()}."
@@ -121,7 +151,7 @@ def _parse_month(value: str) -> pd.Timestamp:
         raise argparse.ArgumentTypeError(
             f"Monat muss zwischen 1 und 12 liegen, nicht {value}."
         )
-    return pd.Timestamp(backtesting_base_year(), month, 1)
+    return pd.Timestamp(backtesting_base_year() if year is None else year, month, 1)
 
 
 def resolve_backtesting_window(
@@ -1357,6 +1387,7 @@ def main(argv: list[str] | None = None):
         "start": start.date().isoformat(),
         "end": end.date().isoformat(),
         "windows": len(anchors),
+        "window_anchors": calendar_window_anchors(start, end, horizon_mode),
         "horizon_mode": horizon_mode,
         "start_month": args.start_month.month if args.start_month is not None else None,
         "end_month": args.end_month.month if args.end_month is not None else None,

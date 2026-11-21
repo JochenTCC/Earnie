@@ -74,6 +74,8 @@ _SESSION_ACTIVE_SELECT_KEY = "scenario_editor_active_select"
 _SESSION_TEMPLATE_SOURCE_KEY = "scenario_editor_template_source"
 _SESSION_SWITCH_TARGET_KEY = "scenario_editor_switch_target"
 _SESSION_SWITCH_DISCARD_KEY = "scenario_editor_switch_discard"
+# Set by the dirty-switch prompt: its pending select resets the radio, the target stays.
+_SESSION_KEEP_SWITCH_TARGET_KEY = "scenario_editor_keep_switch_target"
 
 
 
@@ -82,7 +84,8 @@ def _apply_pending_scenario_select() -> None:
     if pending is not None:
         st.session_state["scenario_select"] = pending
         st.session_state[_SESSION_ACTIVE_SELECT_KEY] = pending
-        st.session_state.pop(_SESSION_SWITCH_TARGET_KEY, None)
+        if not st.session_state.pop(_SESSION_KEEP_SWITCH_TARGET_KEY, False):
+            st.session_state.pop(_SESSION_SWITCH_TARGET_KEY, None)
         _remember_template_source(pending)
 
 def _seed_user_tariff_cent_widgets(session_scope: str, settings: dict) -> None:
@@ -378,6 +381,7 @@ def _render_dirty_switch_prompt(*, active: str, requested: str) -> None:
     if requested != active and switch_target != requested:
         st.session_state[_SESSION_SELECT_PENDING_KEY] = active
         st.session_state[_SESSION_SWITCH_TARGET_KEY] = requested
+        st.session_state[_SESSION_KEEP_SWITCH_TARGET_KEY] = True
         st.rerun()
     st.warning(
         "Es gibt ungespeicherte Änderungen am aktuellen Szenario. "

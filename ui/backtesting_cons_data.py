@@ -84,11 +84,17 @@ def _render_cons_data_balance(df) -> None:
         st.warning(balance["message"])
 
 
-def _render_cons_data_generate_button() -> None:
-    if not st.button(
+def _render_cons_data_generate_button(*, run_active: bool) -> None:
+    clicked = st.button(
         "Verbrauchsdaten generieren (synthetisch)",
         key="backtesting_cons_data_generate_btn",
-    ):
+        disabled=run_active,
+    )
+    if run_active:
+        # The running SE subprocess reads cons_data.csv; a new file would mix into its result.
+        st.caption("Gesperrt, solange der Szenario-Explorer rechnet.")
+        return
+    if not clicked:
         return
     with st.status("Generiere Verbrauchsdaten…", expanded=True) as status:
         try:
@@ -102,13 +108,17 @@ def _render_cons_data_generate_button() -> None:
 
 
 def _pv_scenario_context() -> tuple[list | None, str | None]:
-    """Szenarien + Live-ID für die PV-Overlays; (None, None) wenn nicht auflösbar."""
+    """Szenarien + Live-ID für die PV-Overlays; (None, None) mit Hinweis, wenn nicht auflösbar."""
     try:
         return (
             config.get_backtesting_scenarios(),
             config.get_live_scenario_id() or DEFAULT_LIVE_SCENARIO_ID,
         )
-    except Exception:
+    except ValueError:
+        st.caption(
+            "PV-Vergleich ausgeblendet: Die Szenarien sind nicht auflösbar "
+            "(Fehler unter „Konfigurierte Szenarien“)."
+        )
         return None, None
 
 
@@ -133,8 +143,11 @@ def _render_cons_data_charts(path: str) -> None:
         st.error(f"Verbrauchsdaten konnten nicht visualisiert werden: {exc}")
 
 
-def render_cons_data_section() -> bool:
-    """Zeigt Verbrauchsdaten-Abschnitt; gibt True zurück wenn Backtesting starten kann."""
+def render_cons_data_section(*, run_active: bool = False) -> bool:
+    """Zeigt Verbrauchsdaten-Abschnitt; gibt True zurück wenn Backtesting starten kann.
+
+    ``run_active``: an SE run of this session is going, so generating is locked.
+    """
     path = cons_data_store.get_output_path()
     st.subheader("Verbrauchsdaten (`cons_data.csv`)")
     st.caption(f"Pfad: `{path}`")
@@ -142,7 +155,7 @@ def render_cons_data_section() -> bool:
     render_time_range_help(key="backtesting_time_ranges_cons_data")
 
     populated = _render_cons_data_status(path)
-    _render_cons_data_generate_button()
+    _render_cons_data_generate_button(run_active=run_active)
     if populated:
         _render_cons_data_charts(path)
 

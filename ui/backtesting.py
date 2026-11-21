@@ -68,8 +68,9 @@ _BACKTESTING_LOG_ANCHOR_KEY = "_backtesting_log_anchor"
 
 
 @st.cache_data(ttl=60, show_spinner="Lade Szenario-Explorer-Log...")
-def load_backtesting_data():
-    return backtesting_log.load_backtesting_log()
+def load_backtesting_data(log_dir: str):
+    """``log_dir`` is part of the cache key: cloud-demo sessions each have their own log."""
+    return backtesting_log.load_backtesting_log(log_dir)
 
 
 def scenario_labels_map() -> dict[str, str]:
@@ -188,21 +189,22 @@ def sync_horizon_selectbox_from_log(meta: dict) -> None:
 
 
 def render_backtesting_block() -> None:
-    log_exists = backtesting_log.log_exists()
+    log_dir = resolve_backtesting_log_dir()
+    log_exists = backtesting_log.log_exists(log_dir)
     meta: dict | None = None
     log_stale = False
     stale_reason: str | None = None
 
     if log_exists:
         try:
-            meta, _hourly = load_backtesting_data()
+            meta, _hourly = load_backtesting_data(log_dir)
             stale_reason = log_stale_reason(meta)
             log_stale = stale_reason is not None
         except Exception as exc:
             st.error(f"Szenario-Explorer-Log konnte nicht geladen werden: {exc}")
             log_exists = False
 
-    cons_ready = render_cons_data_section()
+    cons_ready = render_cons_data_section(run_active=active_backtesting_run() is not None)
     _warn_if_house_profile_imports_short_for_se()
 
     render_configured_scenarios()
@@ -241,6 +243,7 @@ from ui.backtesting_run import (
     _format_config_error,
     _render_imported_pv_run_notice,
     _warn_if_house_profile_imports_short_for_se,
+    active_backtesting_run,
     render_backtesting_run_controls,
     validate_backtesting_config,
 )

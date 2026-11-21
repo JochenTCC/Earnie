@@ -58,6 +58,11 @@ def seed_persisted(state_key: str, payload: Any) -> None:
     st.session_state[f"_auto_persist_fp::{state_key}"] = payload_fingerprint(payload)
 
 
+def forget_persisted(state_key: str) -> None:
+    """Drop the saved fingerprint of ``state_key`` (its entry was deleted from the file)."""
+    st.session_state.pop(f"_auto_persist_fp::{state_key}", None)
+
+
 def auto_persist(
     *,
     state_key: str,

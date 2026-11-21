@@ -15,47 +15,58 @@ from simulation.engine import (
     _simulate_anchor_step,
     window_slot_datetimes,
 )
-from simulation.horizon_mode import parse_horizon_mode
+from simulation.horizon_mode import FIXED_24H, SUNRISE_WINDOW, parse_horizon_mode
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_INITIAL_SOC = 50.0
+# Start SoC of the year run (``simulate_backtesting``'s default): the first window of the
+# period starts with it, its start slot lies before the first booked slot.
+RUN_START_SOC = 50.0
+
+
+def _window_start_slot(anchor: datetime, scenario_id: str, horizon_mode: str) -> pd.Timestamp:
+    """First booked slot of the window: anchor − 24 h, or the sunrise book start."""
+    if parse_horizon_mode(horizon_mode) != SUNRISE_WINDOW:
+        return pd.Timestamp(window_slot_datetimes(anchor)[0])
+    from simulation.backtesting_horizon import (
+        naive_backtesting_slot,
+        resolve_sunrise_book_step_for_scenario,
+    )
+
+    scenarios = config.get_backtesting_scenarios()
+    if scenario_id not in scenarios:
+        raise ValueError(f"Szenario {scenario_id!r} nicht in backtesting_scenarios.json.")
+    step = resolve_sunrise_book_step_for_scenario(anchor, scenarios[scenario_id])
+    return pd.Timestamp(naive_backtesting_slot(step.book_slots[0]))
 
 
 def initial_soc_for_anchor(
     anchor: datetime,
     scenario_id: str,
     hourly_df: pd.DataFrame,
+    *,
+    horizon_mode: str = FIXED_24H,
 ) -> float:
-    """SOC am Fensterstart aus backtesting.csv; Fallback 50 %."""
-    slots = window_slot_datetimes(anchor)
-    first_slot = slots[0]
-    if hourly_df is None or hourly_df.empty:
-        logger.warning(
-            "Kein hourly_df für SOC-Lookup — Fallback %.1f%% (Anker %s, Szenario %s).",
-            _DEFAULT_INITIAL_SOC,
-            anchor,
-            scenario_id,
-        )
-        return _DEFAULT_INITIAL_SOC
-    part = hourly_df.loc[hourly_df["scenario_id"] == scenario_id].copy()
-    if part.empty or "ts" not in part.columns or "sim_soc" not in part.columns:
-        logger.warning(
-            "Keine sim_soc-Zeilen für Szenario %s — Fallback %.1f%%.",
-            scenario_id,
-            _DEFAULT_INITIAL_SOC,
-        )
-        return _DEFAULT_INITIAL_SOC
-    part["ts"] = pd.to_datetime(part["ts"])
-    match = part.loc[part["ts"] == pd.Timestamp(first_slot)]
+    """SoC at the window's first booked slot, from backtesting.csv.
+
+    Before the first booked slot of the scenario: ``RUN_START_SOC``, as in the year run.
+    Raises ``ValueError`` when the series has no SoC for that slot.
+    """
+    start_slot = _window_start_slot(anchor, scenario_id, horizon_mode)
+    if hourly_df is None or hourly_df.empty or "sim_soc" not in hourly_df.columns:
+        raise ValueError("Backtesting-Log ohne SoC-Reihe: Start-SoC des Fensters unbekannt.")
+    part = hourly_df.loc[hourly_df["scenario_id"] == scenario_id]
+    if part.empty:
+        raise ValueError(f"Backtesting-Log ohne Reihe für {scenario_id!r}.")
+    stamps = pd.to_datetime(part["ts"])
+    if start_slot < stamps.min():
+        return RUN_START_SOC
+    match = part.loc[stamps == start_slot]
     if match.empty:
-        logger.warning(
-            "Kein hourly-Eintrag für %s (Szenario %s) — Fallback %.1f%%.",
-            first_slot,
-            scenario_id,
-            _DEFAULT_INITIAL_SOC,
+        raise ValueError(
+            f"Backtesting-Log ohne SoC für {start_slot} (Szenario {scenario_id!r}): "
+            "Start-SoC des Fensters unbekannt."
         )
-        return _DEFAULT_INITIAL_SOC
     return float(match.iloc[0]["sim_soc"])
 
 

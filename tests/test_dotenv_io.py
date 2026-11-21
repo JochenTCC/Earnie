@@ -332,3 +332,23 @@ def test_loxone_dotenv_conflict_skips_unreadable_canonical(monkeypatch, tmp_path
     monkeypatch.setenv("EARNIE_ENV_PATH", str(tmp_path / "earnie_env"))
     monkeypatch.setattr(dotenv_io, "_dotenv_values_safe", lambda _p: {})
     assert dotenv_io.loxone_dotenv_conflict() is None
+
+
+def test_dotenv_roundtrip_keeps_password_literal(tmp_path):
+    """``${...}``, edge spaces and quotes survive write and read (UI review 4d)."""
+    from runtime_store.dotenv_io import _merge_dotenv_content, read_loxone_dotenv_file
+
+    password = r' p${HOME}a"ss\x '
+    path = tmp_path / ".env"
+    path.write_text(
+        _merge_dotenv_content(
+            None, {"LOXONE_USER": "admin", "LOXONE_PASS": password, "LOXONE_IP": "192.168.1.2"}
+        ),
+        encoding="utf-8",
+    )
+    assert read_loxone_dotenv_file(str(path))[2] == password
+
+
+def test_loxone_credentials_keep_password_edges(monkeypatch):
+    monkeypatch.setenv("LOXONE_PASS", ' pw" ')
+    assert dotenv_io.read_loxone_credentials()[2] == ' pw" '
