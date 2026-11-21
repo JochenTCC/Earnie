@@ -1071,6 +1071,22 @@
           ],
           "description": "Importmodus: getrennte CSVs, Loxone-Energiemonitor (PV+Batterie+Netz+Verbrauch) oder Bilanz PV+Batt+Netz."
         },
+        "balance_sign_inverts": {
+          "type": "object",
+          "description": "Bilanz-Import: Vorzeichen-Umkehr, mit der das Lastprofil abgeleitet wurde. Fehlt = unbekannt (älteres Profil).",
+          "additionalProperties": false,
+          "properties": {
+            "pv": {
+              "type": "boolean"
+            },
+            "battery": {
+              "type": "boolean"
+            },
+            "grid": {
+              "type": "boolean"
+            }
+          }
+        },
         "baseload_distribution": {
           "type": "string",
           "enum": [

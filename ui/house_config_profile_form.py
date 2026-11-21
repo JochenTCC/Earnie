@@ -283,17 +283,19 @@ def _render_baseload_preview(
     annual_kwh: float,
     resolved_for_preview: list,
     existing: dict,
-    preview_id: str,
+    session_scope: str,
     *,
     cooling_kwh: float = 0.0,
 ) -> dict:
+    from ui.house_config_historical_csv import session_keys
+
     try:
         preview = preview_baseload(annual_kwh, resolved_for_preview, cooling_kwh=cooling_kwh)
     except (ValueError, OSError) as exc:
         # e.g. a consumer CSV that does not span 12 whole months, or an unreadable file
         st.error(f"Grundlast nicht berechenbar: {exc}")
         st.stop()
-    csv_session_key = f"house_profile_csv_path_{preview_id}"
+    csv_session_key = session_keys(session_scope)["verbrauch"]
     preview["total_profile_csv"] = str(
         st.session_state.get(
             csv_session_key,
@@ -513,7 +515,11 @@ def render_house_profile_tab() -> None:
         st.stop()
     render_cooling_metric(cooling_kwh)
     preview = _render_baseload_preview(
-        annual_kwh, resolved_for_preview, ctx["existing"], preview_id, cooling_kwh=cooling_kwh
+        annual_kwh,
+        resolved_for_preview,
+        ctx["existing"],
+        ctx["session_scope"],
+        cooling_kwh=cooling_kwh,
     )
     # The charts (Gesamt-Lastverhalten) model the cooling from these keys; the preview
     # Grundlast above already has it taken out.
@@ -537,8 +543,7 @@ def render_house_profile_tab() -> None:
         profile_id=ctx["stable_profile_id"],
         annual_kwh=annual_kwh,
         resolved=resolved,
-        hist=historical_csv_save_fields(preview_id, ctx["existing"]),
-        preview_id=preview_id,
+        hist=historical_csv_save_fields(ctx["session_scope"], ctx["existing"]),
     )
     save_kwargs = {
         "held": held,
@@ -558,6 +563,7 @@ def render_house_profile_tab() -> None:
     _render_house_profile_save(**save_kwargs)
     _render_consumption_csv_section(
         existing=ctx["existing"],
+        session_scope=ctx["session_scope"],
         preview_id=preview_id,
         annual_kwh=annual_kwh,
         resolved=resolved_for_preview,

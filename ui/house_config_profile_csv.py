@@ -376,12 +376,13 @@ def _render_consumer_profile_csv_fields(
 def _render_consumption_csv_section(
     *,
     existing: dict,
+    session_scope: str,
     preview_id: str,
     annual_kwh: float,
     resolved: list[dict],
     preview: dict,
 ) -> None:
-    from ui.house_config_historical_csv import render_historical_csv_section
+    from ui.house_config_historical_csv import render_historical_csv_section, session_keys
     from house_config.consumption_csv import consumer_uses_profile_csv
     from house_config.profile_csv_policy import (
         controllable_generics,
@@ -391,19 +392,21 @@ def _render_consumption_csv_section(
 
     render_historical_csv_section(
         existing=existing,
+        session_scope=session_scope,
         preview_id=preview_id,
         annual_kwh=annual_kwh,
         resolved=resolved,
         preview=preview,
     )
+    keys = session_keys(session_scope)
     probe = {
         **existing,
         "total_profile_csv": st.session_state.get(
-            f"house_profile_csv_path_{preview_id}",
+            keys["verbrauch"],
             existing.get("total_profile_csv", ""),
         ),
         "baseload_distribution": st.session_state.get(
-            f"house_profile_baseload_dist_{preview_id}",
+            keys["baseload_dist"],
             existing.get("baseload_distribution", "equal"),
         ),
         "consumers": resolved,

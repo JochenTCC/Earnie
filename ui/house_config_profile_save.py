@@ -214,6 +214,13 @@ def _vat_payload(existing: dict) -> dict:
     value = existing.get(VAT_DEDUCTIBLE_KEY, profile_default(VAT_DEDUCTIBLE_KEY))
     return {VAT_DEDUCTIBLE_KEY: bool(value)}
 
+def _balance_signs_payload(hist: dict) -> dict:
+    """Bilanz sign flags (2c-1), only when the form has them (Bilanz source)."""
+    from ui.house_config_historical_modes import BALANCE_SIGN_INVERTS_KEY
+
+    signs = hist.get(BALANCE_SIGN_INVERTS_KEY)
+    return {BALANCE_SIGN_INVERTS_KEY: dict(signs)} if signs else {}
+
 def _perform_house_profile_save(
     *,
     is_new: bool,
@@ -224,7 +231,7 @@ def _perform_house_profile_save(
     location: dict,
     resolved: list[dict],
     existing: dict,
-    preview_id: str,
+    session_scope: str,
     heating: dict,
     absent_mode: bool = False,
     from_auto: bool = False,
@@ -240,7 +247,7 @@ def _perform_house_profile_save(
 
         from house_config.own_grid_fee import persist_own_grid_fee
 
-        hist = historical_csv_save_fields(preview_id, existing)
+        hist = historical_csv_save_fields(session_scope, existing)
         netznutzung = persist_own_grid_fee(
             location["netznutzung"],
             profile_id=profile_id,
@@ -270,6 +277,7 @@ def _perform_house_profile_save(
                 "baseload_distribution": hist.get(
                     "baseload_distribution", "equal"
                 ),
+                **_balance_signs_payload(hist),
                 **house_heating_payload(heating),
                 **_vat_payload(existing),
             }
@@ -322,7 +330,7 @@ def _render_house_profile_save(
     ready = bool(str(label or "").strip()) and location.get("latitude") is not None
     if not ready or held:
         return
-    hist = historical_csv_save_fields(preview_id, existing)
+    hist = historical_csv_save_fields(session_scope, existing)
     profile_id = _resolve_profile_id(
         is_new=is_new,
         existing_id=stable_profile_id,
@@ -349,6 +357,7 @@ def _render_house_profile_save(
         "grid_profile_csv": hist.get("grid_profile_csv", ""),
         "historical_csv_source": hist["historical_csv_source"],
         "baseload_distribution": hist.get("baseload_distribution", "equal"),
+        **_balance_signs_payload(hist),
         **house_heating_payload(heating),
         **_vat_payload(existing),
     }
@@ -376,7 +385,7 @@ def _render_house_profile_save(
             location=location,
             resolved=resolved,
             existing=existing,
-            preview_id=preview_id,
+            session_scope=session_scope,
             heating=heating,
             from_auto=True,
         )

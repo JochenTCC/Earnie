@@ -43,10 +43,11 @@ _DIST_LABELS = {
 
 
 
-def init_historical_csv_session(preview_id: str, existing: dict) -> None:
+def init_historical_csv_session(session_scope: str, existing: dict) -> None:
     from house_config.baseload import normalize_baseload_distribution
 
-    keys = session_keys(preview_id)
+    keys = session_keys(session_scope)
+    _init_balance_sign_session(keys, existing)
     if keys["source"] not in st.session_state:
         raw = str(existing.get("historical_csv_source", "") or "").strip().lower()
         st.session_state[keys["source"]] = (
@@ -72,12 +73,65 @@ def init_historical_csv_session(preview_id: str, existing: dict) -> None:
         )
 
 
-def historical_csv_save_fields(preview_id: str, existing: dict) -> dict[str, str]:
-    """Fields to persist on house-profile save."""
+def _stored_balance_signs(existing: dict) -> dict[str, bool] | None:
+    raw = existing.get(BALANCE_SIGN_INVERTS_KEY)
+    if not isinstance(raw, dict):
+        return None
+    return {part: bool(raw.get(part, False)) for part in _BALANCE_SIGN_PARTS}
+
+
+def _init_balance_sign_session(keys: dict[str, str], existing: dict) -> None:
+    """Sign checkboxes and the Bilanz fingerprint from the saved profile.
+
+    With the fingerprint of the saved inputs an unchanged profile is not re-derived on
+    open; before, the checkboxes started unticked and the load was rewritten without them.
+    A profile saved before the flags existed keeps its load until the user changes a path
+    or a sign (the flags it was derived with are unknown).
+    """
+    if keys["balance_fp"] in st.session_state:
+        return
+    signs = _stored_balance_signs(existing)
+    st.session_state[keys["balance_flags_unknown"]] = signs is None and bool(
+        str(existing.get("total_profile_csv", "") or "").strip()
+        and existing.get("historical_csv_source") == _SOURCE_BALANCE
+    )
+    signs = signs or {part: False for part in _BALANCE_SIGN_PARTS}
+    st.session_state[keys["invert_pv"]] = signs["pv"]
+    st.session_state[keys["invert_battery"]] = signs["battery"]
+    st.session_state[keys["invert_grid"]] = signs["grid"]
+    st.session_state[keys["balance_fp"]] = balance_fingerprint(
+        str(existing.get("pv_profile_csv", "") or "").strip(),
+        str(existing.get("battery_profile_csv", "") or "").strip(),
+        str(existing.get("grid_profile_csv", "") or "").strip(),
+        invert_pv=signs["pv"],
+        invert_battery=signs["battery"],
+        invert_grid=signs["grid"],
+    )
+
+
+def historical_csv_save_fields(session_scope: str, existing: dict) -> dict:
+    """Fields to persist on house-profile save.
+
+    The Bilanz sign flags go with the Bilanz source only, so other profiles keep their
+    exact stored shape.
+    """
     from house_config.baseload import normalize_baseload_distribution
 
-    keys = session_keys(preview_id)
+    keys = session_keys(session_scope)
+    source = st.session_state.get(
+        keys["source"], existing.get("historical_csv_source", _SOURCE_SEPARATE)
+    )
+    signs: dict[str, object] = {}
+    # An older profile's load was derived with unknown flags: write none until the load
+    # is derived again (then the flags in the form are the ones it was derived with).
+    if source == _SOURCE_BALANCE and not st.session_state.get(keys["balance_flags_unknown"]):
+        stored = _stored_balance_signs(existing) or {}
+        signs[BALANCE_SIGN_INVERTS_KEY] = {
+            part: bool(st.session_state.get(keys[f"invert_{part}"], stored.get(part, False)))
+            for part in _BALANCE_SIGN_PARTS
+        }
     return {
+        **signs,
         "total_profile_csv": st.session_state.get(
             keys["verbrauch"], existing.get("total_profile_csv", "")
         ),
@@ -90,9 +144,7 @@ def historical_csv_save_fields(preview_id: str, existing: dict) -> dict[str, str
         "grid_profile_csv": st.session_state.get(
             keys["grid"], existing.get("grid_profile_csv", "")
         ),
-        "historical_csv_source": st.session_state.get(
-            keys["source"], existing.get("historical_csv_source", _SOURCE_SEPARATE)
-        ),
+        "historical_csv_source": source,
         "baseload_distribution": normalize_baseload_distribution(
             st.session_state.get(
                 keys["baseload_dist"],
@@ -102,26 +154,16 @@ def historical_csv_save_fields(preview_id: str, existing: dict) -> dict[str, str
     }
 
 
-def _historical_csv_state(preview_id: str, keys: dict[str, str]) -> dict:
+def _historical_csv_state(keys: dict[str, str]) -> dict:
     """Current CSV paths and Bilanz sign flags from session state."""
     return {
         "verbrauch": str(st.session_state.get(keys["verbrauch"], "") or "").strip(),
         "pv": str(st.session_state.get(keys["pv"], "") or "").strip(),
         "battery": str(st.session_state.get(keys["battery"], "") or "").strip(),
         "grid": str(st.session_state.get(keys["grid"], "") or "").strip(),
-        "invert_pv": bool(
-            st.session_state.get(f"house_profile_balance_invert_pv_{preview_id}", False)
-        ),
-        "invert_battery": bool(
-            st.session_state.get(
-                f"house_profile_balance_invert_batt_{preview_id}", False
-            )
-        ),
-        "invert_grid": bool(
-            st.session_state.get(
-                f"house_profile_balance_invert_grid_{preview_id}", False
-            )
-        ),
+        "invert_pv": bool(st.session_state.get(keys["invert_pv"], False)),
+        "invert_battery": bool(st.session_state.get(keys["invert_battery"], False)),
+        "invert_grid": bool(st.session_state.get(keys["invert_grid"], False)),
     }
 
 
@@ -164,7 +206,7 @@ def _render_csv_import_expander(preview_id: str, keys: dict[str, str]) -> None:
         else:
             _render_separate_mode(preview_id, keys)
 
-        state = _historical_csv_state(preview_id, keys)
+        state = _historical_csv_state(keys)
         if state["verbrauch"] or state["pv"] or state["battery"] or state["grid"]:
             from ui.house_config_import_qc import render_import_power_qc
 
@@ -180,8 +222,13 @@ def _render_csv_import_expander(preview_id: str, keys: dict[str, str]) -> None:
             )
 
 
-def _load_balance_series(state: dict) -> list[tuple[str, float]] | None:
-    if not (state["pv"] and state["grid"]):
+def _load_balance_series(state: dict, source: str) -> list[tuple[str, float]] | None:
+    """Derived PV+Batterie+Netz load, only in Bilanz mode.
+
+    Energiemonitor and Getrennte CSVs also keep PV and Netz paths; there the measured
+    Verbrauch file is the Ist (it is what gets saved and planned with).
+    """
+    if source != _SOURCE_BALANCE or not (state["pv"] and state["grid"]):
         return None
     from ui.house_config_import_qc import load_balance_gesamt_series
 
@@ -206,23 +253,28 @@ def _balance_reset_extra(state: dict) -> str:
 def render_historical_csv_section(
     *,
     existing: dict,
+    session_scope: str,
     preview_id: str,
     annual_kwh: float,
     resolved: list[dict],
     preview: dict,
 ) -> None:
-    """CSV imports (collapsible) + always-visible Gesamt-Lastverhalten charts."""
-    init_historical_csv_session(preview_id, existing)
-    keys = session_keys(preview_id)
+    """CSV imports (collapsible) + always-visible Gesamt-Lastverhalten charts.
+
+    ``preview_id`` names the uploaded files; the session keys follow ``session_scope``.
+    """
+    init_historical_csv_session(session_scope, existing)
+    keys = session_keys(session_scope)
 
     _render_historical_csv_intro()
     _render_csv_import_expander(preview_id, keys)
 
-    state = _historical_csv_state(preview_id, keys)
-    balance_series = _load_balance_series(state)
+    state = _historical_csv_state(keys)
+    balance_series = _load_balance_series(state, str(st.session_state.get(keys["source"])))
 
     _render_gesamtverbraeuche(
         preview_id=preview_id,
+        baseload_dist_key=keys["baseload_dist"],
         annual_kwh=annual_kwh,
         resolved=resolved,
         preview=preview,
@@ -274,12 +326,12 @@ def _load_ist_series(
         return normalize_profile_csv_file(active_path)
 
 
-def _render_baseload_dist_radio(preview_id: str) -> str:
+def _render_baseload_dist_radio(key: str) -> str:
     return st.radio(
         "Basislast-Verteilung",
         options=[_DIST_EQUAL, _DIST_MONTHLY],
         format_func=lambda value: _DIST_LABELS[value],
-        key=f"house_profile_baseload_dist_{preview_id}",
+        key=key,
         horizontal=True,
         help=(
             "Jahres-Rest: konstante Grundlast (SE-Pfad A flat). "
@@ -316,6 +368,7 @@ def _render_ist_vs_modell(
     resolved: list[dict],
     preview: dict,
     pv_path: str,
+    baseload_dist_key: str,
     csv_series: list[tuple[str, float]] | None = None,
     reset_extra: str = "",
 ) -> None:
@@ -350,7 +403,7 @@ def _render_ist_vs_modell(
             probe_key,
             lambda: bundle_from_csv_validation(series, probe_profile),
         )
-        dist_mode = _render_baseload_dist_radio(preview_id)
+        dist_mode = _render_baseload_dist_radio(baseload_dist_key)
         display_bundle, display_bl_kwh, caption = _resolve_baseload_display(
             probe,
             series,
@@ -378,7 +431,10 @@ def _render_ist_vs_modell(
         st.error(f"CSV konnte nicht ausgewertet werden: {exc}")
 
 from ui.house_config_historical_modes import (  # noqa: E402
+    BALANCE_SIGN_INVERTS_KEY,
+    _BALANCE_SIGN_PARTS,
     _SOURCE_BALANCE,
+    balance_fingerprint,
     _SOURCE_ENERGIEMONITOR,
     _SOURCE_LABELS,
     _SOURCE_SEPARATE,

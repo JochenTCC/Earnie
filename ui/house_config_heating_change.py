@@ -22,13 +22,14 @@ _ACCEPT_PREFIX = "house_heating_change_ok::"
 # Per-run container under the heat-source select box; the gate renders its warning there.
 _SLOT_PREFIX = "house_heating_change_slot::"
 # Heat-source widgets of the „Heizsystem“ section (ui/house_config_profile_thermal_annual.py).
+# The efficiency and fuel-price keys carry the source type: an own value belongs to one type.
 _HEAT_SOURCE_WIDGETS = (
     "hc_heat_source_{index}",
     "hc_wp_{index}",
-    "hc_heat_eff_use_{index}",
-    "hc_heat_eff_{index}",
-    "hc_fuel_price_use_{index}",
-    "hc_fuel_price_{index}",
+    "hc_heat_eff_use_{index}_{type}",
+    "hc_heat_eff_{index}_{type}",
+    "hc_fuel_price_use_{index}_{type}",
+    "hc_fuel_price_{index}_{type}",
 )
 
 
@@ -89,12 +90,12 @@ def _accept(accept_key: str, token: str) -> None:
 
 
 def _remove_csv_data(
-    accept_key: str, token: str, preview_id: str, index: int, use_key: str
+    accept_key: str, token: str, session_scope: str, index: int, use_key: str
 ) -> None:
     """Drop the measured data of the old system: house load CSVs and the consumer's meter."""
     from ui.house_config_historical_modes import _component_upload_keys
 
-    keys = session_keys(preview_id)
+    keys = session_keys(session_scope)
     for name in ("verbrauch", "battery", "grid"):
         st.session_state[keys[name]] = ""
         # The path inputs re-sync from their pending key before they render.
@@ -128,13 +129,13 @@ def _keep_heating_system(session_scope: str, index: int, old_heat_source: dict) 
     values = {
         "hc_heat_source_{index}": source_type,
         "hc_wp_{index}": hp_type,
-        "hc_heat_eff_use_{index}": efficiency not in (None, ""),
-        "hc_heat_eff_{index}": None if efficiency in (None, "") else float(efficiency),
-        "hc_fuel_price_use_{index}": fuel_price not in (None, ""),
-        "hc_fuel_price_{index}": None if fuel_price in (None, "") else float(fuel_price),
+        "hc_heat_eff_use_{index}_{type}": efficiency not in (None, ""),
+        "hc_heat_eff_{index}_{type}": None if efficiency in (None, "") else float(efficiency),
+        "hc_fuel_price_use_{index}_{type}": fuel_price not in (None, ""),
+        "hc_fuel_price_{index}_{type}": None if fuel_price in (None, "") else float(fuel_price),
     }
     for pattern in _HEAT_SOURCE_WIDGETS:
-        key = _scoped_key(session_scope, pattern.format(index=index))
+        key = _scoped_key(session_scope, pattern.format(index=index, type=source_type))
         value = values[pattern]
         if value is None:
             st.session_state.pop(key, None)
@@ -150,7 +151,6 @@ def render_reference_change_gate(
     annual_kwh: float,
     resolved: list[dict],
     hist: dict,
-    preview_id: str,
 ) -> bool:
     """Warning with the two choices; True while the change holds the auto-save."""
     from house_config.heating_systems import consumption_data_kind
@@ -194,7 +194,7 @@ def render_reference_change_gate(
             args=(
                 accept_key,
                 token,
-                preview_id,
+                session_scope,
                 index,
                 _scoped_key(session_scope, f"hc_use_profile_csv_{index}"),
             ),

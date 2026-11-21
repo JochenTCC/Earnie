@@ -15,7 +15,11 @@ logger = logging.getLogger(__name__)
 MIN_HOURS_FULL_YEAR = 8760
 # Soft floor for Hauskonfigurator import/normalize (short CSVs allowed for QC).
 MIN_HOURS_IMPORT = 1
-_WATT_MEDIAN_THRESHOLD_KW = 50.0
+# Unit detection on the 99th percentile of |P|: above 100 it is W, up to 50 it is kW, in
+# between it is unclear (fails loud).
+_UNIT_QUANTILE = 0.99
+_WATT_HIGH_THRESHOLD = 100.0
+_KW_HIGH_LIMIT = 50.0
 _DIGITAL_MATCH_FRACTION = 0.95
 _DIGITAL_TOLERANCE = 1e-6
 _POWER_HEADER_NAMES = frozenset({"power_kw", "kw", "leistung_kw", "leistung"})
@@ -614,7 +618,26 @@ def _parse_canonical_row(
             f"{path} Zeile {line_no}: power_kw ungültig ({kw_raw!r})."
         ) from exc
     datetime.fromisoformat(ts_raw.replace(" ", "T", 1)[:19])
+    _reject_timezone_offset(ts_raw, path, line_no)
     return ts_raw, power_kw
+
+
+def _reject_timezone_offset(ts_raw: str, path: str, line_no: int) -> None:
+    """Profile CSVs hold naive local time; an offset (``+00:00``, ``Z``) was cut off.
+
+    Cutting ``2024-06-01T12:00:00+00:00`` to 12:00 shifted UTC exports (Home Assistant)
+    by one to two hours without a word.
+    """
+    try:
+        parsed = datetime.fromisoformat(ts_raw.replace(" ", "T", 1))
+    except ValueError:
+        return
+    if parsed.tzinfo is not None:
+        raise ValueError(
+            f"{path} Zeile {line_no}: Zeitstempel {ts_raw!r} hat eine Zeitzone. "
+            "Profil-CSVs brauchen Ortszeit ohne Zeitzonen-Angabe "
+            "(z. B. 2024-06-01 14:00:00)."
+        )
 
 
 def _looks_like_loxone_meter(path: Path) -> bool:
@@ -673,14 +696,27 @@ def _load_canonical_raw_series(path: str) -> pd.Series:
 
 
 def _normalize_power_unit(series: pd.Series, *, source: str) -> pd.Series:
-    median_abs = float(series.abs().median())
-    if median_abs > _WATT_MEDIAN_THRESHOLD_KW:
+    """W or kW from the high end of |P|, not the median.
+
+    The median of a PV series (night), an idle battery or a heat pump with short runtime is
+    near 0 even in W, so it read W as kW (factor 1000). The 99th percentile sees the load
+    itself. Between the two bounds the unit is unclear and the import fails.
+    """
+    p99_abs = float(series.abs().quantile(_UNIT_QUANTILE))
+    if p99_abs > _WATT_HIGH_THRESHOLD:
         logger.info(
-            "Profil-CSV '%s': Median |P|=%.1f wirkt wie Watt — Division durch 1000.",
+            "Profil-CSV '%s': 99%%-Wert |P|=%.1f wirkt wie Watt — Division durch 1000.",
             source,
-            median_abs,
+            p99_abs,
         )
         return series / 1000.0
+    if p99_abs > _KW_HIGH_LIMIT:
+        raise ValueError(
+            f"Profil-CSV '{source}': Einheit unklar (99 %-Wert |P| = {p99_abs:.1f}). "
+            f"Als Watt wären das höchstens {p99_abs / 1000.0:.3f} kW, als Kilowatt ein "
+            "ungewöhnlich hoher Verbrauch. Die Werte bitte in kW (oder W mit größeren "
+            "Werten) hochladen."
+        )
     return series
 
 
