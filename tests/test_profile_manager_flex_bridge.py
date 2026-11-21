@@ -5,6 +5,7 @@ from datetime import datetime
 from unittest.mock import patch
 
 import pandas as pd
+import pytest
 
 from data import profile_manager as pm
 
@@ -20,6 +21,11 @@ def _write_profile_csv(csv_path, column: str) -> None:
     ).to_csv(csv_path, sep=";", index=False)
 
 
+@pytest.fixture(autouse=True)
+def profiled_ev(monkeypatch):
+    monkeypatch.setattr("data.cons_data_house_profile.expected_cons_data_consumer_ids", lambda: ["ev"])
+
+
 def test_load_flex_profiles_reads_canonical_csv_column(tmp_path):
     csv_path = tmp_path / "flexible_consumer_profiles.csv"
     _write_profile_csv(csv_path, "ev")
@@ -33,7 +39,7 @@ def test_load_flex_profiles_reads_canonical_csv_column(tmp_path):
     assert profiles["ev"] == [0.55]
 
 
-def test_load_flex_profiles_ignores_legacy_csv_column(tmp_path):
+def test_load_flex_profiles_rejects_legacy_csv_column(tmp_path):
     csv_path = tmp_path / "flexible_consumer_profiles.csv"
     _write_profile_csv(csv_path, "eauto")
     consumer = {"id": "ev", "name": "Smart"}
@@ -41,6 +47,5 @@ def test_load_flex_profiles_ignores_legacy_csv_column(tmp_path):
 
     with patch.object(pm.config, "get_flexible_consumers", return_value=[consumer]):
         with patch.object(pm, "flexible_consumer_profiles_file", return_value=str(csv_path)):
-            profiles = pm._load_flexible_consumer_hourly_profiles([target])
-
-    assert profiles["ev"] == [0.0]
+            with pytest.raises(pm.ConsumptionProfileUnavailableError, match="ohne Spalte"):
+                pm._load_flexible_consumer_hourly_profiles([target])

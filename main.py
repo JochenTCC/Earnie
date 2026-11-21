@@ -359,7 +359,11 @@ def _main_cycle(
                 "Loxone Silent-Modus aktiv: Optimierung ohne Schreibzugriffe auf den Miniserver."
             )
 
-    profile_manager.check_and_update_profile_if_new_month()
+    try:
+        profile_manager.check_and_update_profile_if_new_month()
+    except profile_manager.ConsumptionProfileUnavailableError as exc:
+        logger.error("Optimierung abgebrochen: %s", exc)
+        return False
 
     with timing.phase("ehal_read"):
         current_soc = ehal_live.read_ess_soc()
@@ -397,7 +401,10 @@ def _main_cycle(
             optimization_matrix = profile_manager.build_live_planning_matrix(
                 market_data, planning_window
             )
-        except pv_forecast.PvForecastUnavailableError as exc:
+        except (
+            pv_forecast.PvForecastUnavailableError,
+            profile_manager.ConsumptionProfileUnavailableError,
+        ) as exc:
             logger.error("Optimierung abgebrochen: %s", exc)
             return False
         cycle_duration_stats.set_horizon_slots(len(optimization_matrix))
