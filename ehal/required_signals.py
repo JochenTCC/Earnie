@@ -22,7 +22,9 @@ from house_config.battery_control import (
 )
 from house_config.inverter import DEFAULT_INVERTER_CONTROL
 
-ComponentKind = Literal["plant", "battery", "inverter", "pv_system", "consumer"]
+# ``wallbox``: Signal-list entity only (``components.wallboxes``, charger signals
+# ``evcs.<Wallbox>.*``); its required keys come from ``wallbox_required_keys``.
+ComponentKind = Literal["plant", "battery", "inverter", "pv_system", "consumer", "wallbox"]
 
 # Plant bare keys from telemetry (sens_ess_soc lives on the battery entity).
 # Plant PV is derived from inv.*.sens_inv_power_pv — not a plant binding.

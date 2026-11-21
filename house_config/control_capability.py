@@ -27,14 +27,12 @@ def control_capability_warnings(
         return []
 
     vendor = ha_ess_force_enables_ess_active(ha_ess_force)
-    # Q8: Loxone activation-flag maps (all empty values) still count as mapped.
-    empty_only = bool(ehal_map) and not any(
-        str(v or "").strip() for v in (ehal_map or {}).values()
-    )
+    # Activation = key present (Q8, all backends since 2026-10-18): an empty value counts,
+    # also next to a kept hub address on another key.
     available = available_functions(
         ehal_map or {},
         vendor_ess_active=vendor,
-        require_nonempty_value=not empty_only,
+        require_nonempty_value=False,
     )
     warnings: list[str] = []
 
@@ -64,12 +62,9 @@ def inverter_control_capability_warnings(
     level = str(control or DEFAULT_INVERTER_CONTROL).strip().lower()
     if level != "full":
         return []
-    empty_only = bool(ehal_map) and not any(
-        str(v or "").strip() for v in (ehal_map or {}).values()
-    )
     available = available_functions(
         ehal_map or {},
-        require_nonempty_value=not empty_only,
+        require_nonempty_value=False,
     )
     if "inverter_limit" in available:
         return []

@@ -162,11 +162,14 @@ def function_statuses(
         if fields is not None
         else None
     )
+    flat, entities = _entity_kinds(mapped, require_nonempty_value=require_nonempty_value)
+    if vendor_ess_active:
+        flat.add("set_ess_active_power")
     out: list[FunctionStatus] = []
     for function in EHAL_FUNCTIONS:
         if scope is not None and not set(function.required) <= scope:
             continue
-        missing = tuple(f for f in function.required if f not in present)
+        missing = _missing_fields(function, present, flat, entities)
         if not missing:
             state: FunctionState = "available"
         elif _not_started(function, present) or len(missing) == len(function.required):
@@ -175,6 +178,93 @@ def function_statuses(
             state = "incomplete"
         out.append(FunctionStatus(function, state, missing))
     return out
+
+
+def _active_keys(
+    mapped: Mapping[str, object] | Iterable[str], *, require_nonempty_value: bool
+) -> set[str]:
+    if isinstance(mapped, Mapping):
+        if require_nonempty_value:
+            return {str(k) for k, v in mapped.items() if str(v or "").strip()}
+        return {str(k) for k in mapped if str(k or "").strip()}
+    return {str(k) for k in mapped}
+
+
+def _kind_namespace(kind: str) -> str | None:
+    """Device type whose fields must come from one entity (battery, inverter, …)."""
+    from ehal.ess_fields import ESS_FIELD_KINDS
+    from ehal.inverter_fields import INVERTER_FIELD_KINDS
+    from ehal.pv_fields import PV_FIELD_KINDS
+    from ehal.qualified_ids import EVCS_KINDS
+
+    if kind in ESS_FIELD_KINDS:
+        return "ess"
+    if kind in INVERTER_FIELD_KINDS:
+        return "inv"
+    if kind in PV_FIELD_KINDS:
+        return "pv"
+    if kind in EVCS_KINDS:
+        return "evcs"
+    return None
+
+
+def _entity_kinds(
+    mapped: Mapping[str, object] | Iterable[str], *, require_nonempty_value: bool
+) -> tuple[set[str], dict[str, dict[str, set[str]]]]:
+    """(flat keys, namespace → Kennung → kinds) of the active keys."""
+    from ehal.ess_fields import parse_ess_entity_scoped
+    from ehal.inverter_fields import parse_inv_entity_scoped
+    from ehal.pv_fields import parse_pv_entity_scoped
+    from ehal.qualified_ids import evcs_field_kind
+
+    flat: set[str] = set()
+    entities: dict[str, dict[str, set[str]]] = {}
+    for key in _active_keys(mapped, require_nonempty_value=require_nonempty_value):
+        scoped = None
+        for namespace, parse in (
+            ("ess", parse_ess_entity_scoped),
+            ("inv", parse_inv_entity_scoped),
+            ("pv", parse_pv_entity_scoped),
+        ):
+            parsed = parse(key)
+            if parsed:
+                scoped = (namespace, parsed[0], parsed[1])
+                break
+        if scoped is None and evcs_field_kind(key):
+            scoped = ("evcs", key.split(".")[1], evcs_field_kind(key))
+        if scoped is None:
+            flat.add(key)
+        else:
+            entities.setdefault(scoped[0], {}).setdefault(scoped[1], set()).add(scoped[2])
+    return flat, entities
+
+
+def _missing_fields(
+    function: EhalFunction,
+    present: set[str],
+    flat: set[str],
+    entities: dict[str, dict[str, set[str]]],
+) -> tuple[str, ...]:
+    """Required fields that are not mapped, in the order of ``function.required``.
+
+    Fields of one device type must sit on one entity: the charge limit of one battery
+    and the discharge limit of another do not make a function. Of several entities the
+    one with the fewest missing fields counts (a second, read-only battery is no gap).
+    """
+    missing: set[str] = set()
+    by_namespace: dict[str, list[str]] = {}
+    for field in function.required:
+        namespace = _kind_namespace(field)
+        if namespace is None:
+            if field not in present:
+                missing.add(field)
+        else:
+            by_namespace.setdefault(namespace, []).append(field)
+    for namespace, fields in by_namespace.items():
+        candidates = [flat] + [flat | kinds for kinds in entities.get(namespace, {}).values()]
+        gaps = [[f for f in fields if f not in candidate] for candidate in candidates]
+        missing.update(min(gaps, key=len))
+    return tuple(f for f in function.required if f in missing)
 
 
 def _not_started(function: EhalFunction, present: set[str]) -> bool:

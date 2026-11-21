@@ -4,6 +4,8 @@ from __future__ import annotations
 import json
 import os
 
+from ehal.flex_fields import flex_ehal_slug
+from ehal.qualified_ids import consumer_namespace
 from house_config.wallboxes import reject_shared_fixed_wallboxes
 from house_config.netznutzung import normalize_netznutzung_config
 from house_config.baseload import normalize_baseload_distribution
@@ -108,6 +110,7 @@ def _normalize_profile_consumers(
 ) -> list[dict]:
     consumers: list[dict] = []
     seen: set[str] = set()
+    seen_kennung: dict[tuple[str, str], str] = {}
     thermal_consumer_indices: list[int] = []
     for c_index, item in enumerate(consumers_raw):
         consumer = _normalize_consumer(
@@ -136,6 +139,20 @@ def _normalize_profile_consumers(
                 f"profiles '{profile_id}': doppelte consumer id '{consumer['id']}'."
             )
         seen.add(consumer["id"])
+        # ``zaehler_<slug>`` and ``<slug>`` share one EHAL Kennung: one qualified ID would
+        # carry the values of two consumers.
+        kennung = (
+            consumer_namespace(consumer["id"], consumer["type"]),
+            flex_ehal_slug(consumer["id"]),
+        )
+        other = seen_kennung.get(kennung)
+        if other is not None:
+            raise ValueError(
+                f"profiles '{profile_id}': die Verbraucher '{other}' und '{consumer['id']}' "
+                f"haben dieselbe EHAL-Kennung '{kennung[0]}.{kennung[1]}' (das Präfix "
+                "'zaehler_' zählt nicht zur Kennung) — eine der beiden ids umbenennen."
+            )
+        seen_kennung[kennung] = consumer["id"]
         consumers.append(consumer)
     if len(thermal_consumer_indices) > 1:
         raise ValueError(

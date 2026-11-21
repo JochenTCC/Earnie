@@ -23,7 +23,7 @@ from ehal.push_signals import (
     heartbeat_write_signal,
     request_optimize_signal,
 )
-from ehal.qualified_ids import field_kind, parse_qualified_id
+from ehal.qualified_ids import field_kind, is_digital_id, parse_qualified_id
 from ehal.signal_catalog import CatalogEntry, catalog_to_signals, iter_catalog_entries
 
 Direction = Literal["read", "write"]
@@ -86,7 +86,8 @@ def _read_match(ehal_id: str, inbox: dict[str, dict[str, Any]]) -> tuple[MatchKi
     if age is None:
         return "ok", last_ts
     # Rare control receipts (request_optimize): keep OK with age — not a repeating VO.
-    if ehal_id == REQUEST_OPTIMIZE_ID:
+    # Digital kinds are pushed on edges only: the last value stays valid, whatever its age.
+    if ehal_id == REQUEST_OPTIMIZE_ID or is_digital_id(ehal_id):
         return "ok", f"vor {int(age)} s"
     if age > 300:
         return "stale", f"vor {int(age)} s"
@@ -110,6 +111,10 @@ def _write_match(
     pub_at = str(rec.get("published_at") or "").strip()
     if not fetched_at:
         return "awaiting_fetch", f"publiziert {pub_at or '—'}; MS noch nicht"
+    # A value published after the last fetch has not reached the hub yet.
+    pub_age, fetch_age = _age_seconds(pub_at), _age_seconds(fetched_at)
+    if pub_age is not None and fetch_age is not None and pub_age < fetch_age:
+        return "awaiting_fetch", f"publiziert {pub_at}; letzter MS-Abruf {fetched_at}"
     return "published", f"MS-Abruf {fetched_at}"
 
 
