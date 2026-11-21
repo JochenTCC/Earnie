@@ -193,13 +193,11 @@ def test_get_historical_date_picker_bounds_without_cons_data(monkeypatch):
     assert lo < hi
 
 
-def test_get_historical_day_data_empty_cons(monkeypatch):
+def test_get_historical_day_data_empty_cons_has_no_totals(monkeypatch):
     monkeypatch.setattr(pm, "_load_profile_source_dataframe", lambda: None)
     with patch.object(pm.config, "get_flexible_consumers", return_value=[{"id": "ev", "name": "EV"}]):
         base, totals, total = pm.get_historical_day_data("2024-06-01")
-    assert base == [0.5] * 24
-    assert totals == {"ev": 0.0}
-    assert total == [0.5] * 24
+    assert (base, totals, total) == ([], {}, [])
 
 
 def test_get_historical_day_data_from_frame(monkeypatch):

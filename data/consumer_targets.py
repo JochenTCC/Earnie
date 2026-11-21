@@ -50,8 +50,15 @@ def _loxone_remaining_hours_target_kwh(consumer: dict, hours: float | None) -> f
 
 
 def _historical_totals_for_date(target_date: date, cache: dict) -> dict[str, float]:
+    """Logged day totals; empty for a day without cons_data rows (caller: configured target)."""
     if target_date not in cache:
         _, totals, _ = profile_manager.get_historical_day_data(target_date)
+        if not totals:
+            logger.warning(
+                "Keine Verbrauchsdaten für %s in cons_data.csv — Tagesziele aus der "
+                "Konfiguration (daily_target_kwh).",
+                target_date,
+            )
         cache[target_date] = totals
     return cache[target_date]
 
@@ -193,13 +200,17 @@ def _resolve_single_consumer_daily_target_kwh(
 
 
 def resolve_historical_consumer_daily_targets(target_date: date) -> dict[str, float]:
-    """Geloggte Tagesenergie je Verbraucher aus cons_data."""
+    """Geloggte Tagesenergie je Verbraucher aus cons_data (Szenario-Explorer / Backtesting).
+
+    Raises :class:`data.profile_manager.MissingConsumptionDataError` when the day has no rows
+    or misses hours in cons_data.csv: a logged day is not planned with invented zeros.
+    """
     if isinstance(target_date, str):
         target_date = pd.to_datetime(target_date).date()
     elif isinstance(target_date, datetime):
         target_date = target_date.date()
 
-    _, totals, _ = profile_manager.get_historical_day_data(target_date)
+    _, totals, _ = profile_manager.get_historical_day_data(target_date, require_complete=True)
     consumers = config.get_flexible_consumers(optimizer_only=True)
     return {c["id"]: float(totals.get(c["id"], 0.0)) for c in consumers}
 

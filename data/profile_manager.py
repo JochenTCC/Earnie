@@ -30,6 +30,10 @@ class ConsumptionProfileUnavailableError(RuntimeError):
     """A consumption profile the plan needs is missing, unreadable or incomplete (cycle aborts)."""
 
 
+class MissingConsumptionDataError(ValueError):
+    """cons_data.csv has no rows, or not every hour, for a day a logged-day run needs."""
+
+
 def _remedy_delete_profile(profile_path: str) -> str:
     return (
         f"Abhilfe: '{profile_path}' löschen; Earnie berechnet die Datei im nächsten Zyklus "
@@ -537,25 +541,65 @@ def get_forecast_vectors(market_data) -> Tuple[List[float], List[float], List[di
 # ==============================================================================
 # NEU: EXTRAKTION DER GRUNDLAST UND TAGESSUMMEN FÜR DEN OPTIMIZER (SIMULATION)
 # ==============================================================================
-def get_historical_day_data(target_date) -> Tuple[List[float], dict, List[float]]:
+def _local_hours_of_day(day: date) -> list[int]:
+    """Clock hours that exist on ``day`` in the planning timezone (spring DST day: 23)."""
+    from datetime import time, timezone
+    from zoneinfo import ZoneInfo
+
+    tz = ZoneInfo(config.get_planning_timezone())
+    hours = []
+    for hour in range(24):
+        naive = datetime.combine(day, time(hour))
+        round_trip = naive.replace(tzinfo=tz).astimezone(timezone.utc).astimezone(tz)
+        if round_trip.replace(tzinfo=None) == naive:
+            hours.append(hour)
+    return hours
+
+
+def get_historical_day_data(
+    target_date, *, require_complete: bool = False
+) -> Tuple[List[float], dict, List[float]]:
     """
     Extrahiert für ein bestimmtes Datum die 24-stündige Grundlast, die Tages-Summen
     der steuerbaren Verbraucher sowie den geloggten Gesamtverbrauch (kW pro Stunde).
+
+    A day without rows in cons_data returns ``([], {}, [])``: no totals, the caller decides
+    (Live: configured ``daily_target_kwh``). Hours missing inside a day count as 0 kW with a
+    warning. ``require_complete=True`` (Szenario-Explorer / Backtesting, logged day) raises
+    :class:`MissingConsumptionDataError` for a day without rows or with missing hours.
     """
     if isinstance(target_date, str):
         target_date = pd.to_datetime(target_date).date()
     elif isinstance(target_date, datetime):
         target_date = target_date.date()
-        
-    df = _load_profile_source_dataframe()
-    if df is None or df.empty:
-        print(
-            f"[WARN] Keine historischen Daten in cons_data für das Datum {target_date}."
-        )
-        empty_totals = {c["id"]: 0.0 for c in config.get_flexible_consumers()}
-        return [0.5] * 24, empty_totals, [0.5] * 24
 
-    df_day = df[df.index.date == target_date]
+    df = _load_profile_source_dataframe()
+    df_day = df[df.index.date == target_date] if df is not None and not df.empty else None
+    expected_hours = _local_hours_of_day(target_date)
+    present_hours = set() if df_day is None else set(df_day.index.hour)
+    missing_hours = [hour for hour in expected_hours if hour not in present_hours]
+    if missing_hours and require_complete:
+        what = (
+            "keine Daten"
+            if len(missing_hours) == len(expected_hours)
+            else f"{len(missing_hours)} von {len(expected_hours)} Stunden fehlen "
+            f"({', '.join(f'{hour:02d}' for hour in missing_hours)} Uhr)"
+        )
+        raise MissingConsumptionDataError(
+            f"cons_data.csv: für den {target_date:%d.%m.%Y} {what}. Den Zeitraum auf Tage mit "
+            "vollständigen Verbrauchsdaten einschränken oder die Verbrauchsdaten neu erzeugen."
+        )
+    if df_day is None or df_day.empty:
+        logger.warning("cons_data.csv: keine Daten für %s.", target_date)
+        return [], {}, []
+    if missing_hours:
+        logger.warning(
+            "cons_data.csv: für %s fehlen %d Stunden (%s Uhr); sie zählen mit 0 kW.",
+            target_date,
+            len(missing_hours),
+            ", ".join(f"{hour:02d}" for hour in missing_hours),
+        )
+
     full_day_range = pd.date_range(
         start=f"{target_date} 00:00:00",
         end=f"{target_date} 23:00:00",

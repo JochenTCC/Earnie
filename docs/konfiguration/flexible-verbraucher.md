@@ -173,6 +173,8 @@ Bis Datenmodell 5 gab es das Verbraucherfeld `appliance_kind: "air_conditioner"`
 | `signal_type` | `power` (kW) oder `binary` (Ein/Aus × `nominal_power_kw`) |
 | `log_signal_type` | Optional: abweichendes Format nur für `path_historical_log` |
 
+**Tage ohne Verbrauchsdaten:** Holt sich ein Ziel einen vergangenen Tag aus `cons_data.csv` (`historical`, oder `loxone` / `loxone_remaining_hours` für einen anderen Tag als heute) und hat dieser Tag dort keine Zeilen, nimmt Earnie im Live-Betrieb `daily_target_kwh` und schreibt eine Warnung ins Log. Fehlen an einem Tag nur einzelne Stunden, zählen sie mit 0 kW, ebenfalls mit Warnung. Wo Earnie die Tagesziele eines geloggten Tages direkt aus `cons_data.csv` liest (Kostenvergleich eines historischen Tages), braucht es vollständige Daten: Fehlt der Tag oder eine Stunde, bricht die Rechnung mit Datum und fehlenden Stunden ab. Am Tag der Sommerzeit-Umstellung gelten 23 Stunden als vollständig.
+
 ## Smarthome-Anbindung pro Verbraucher (EHAL)
 
 | Verbraucher | Lesen (EHAL) | Schreiben (EHAL) |
