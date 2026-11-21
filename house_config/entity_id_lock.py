@@ -59,7 +59,10 @@ def rewrite_ess_bindings_slug(
     old_id: str,
     new_id: str,
 ) -> dict[str, str]:
-    """Rewrite entity-scoped keys ``ess.{old}.*`` → ``ess.{new}.*``."""
+    """Rewrite entity-scoped keys ``ess.{old}.*`` → ``ess.{new}.*``.
+
+    Empty addresses (Loxone activation flags) are kept.
+    """
     if not isinstance(bindings, dict):
         return {}
     old_slug = ess_ehal_slug(old_id)
@@ -67,8 +70,6 @@ def rewrite_ess_bindings_slug(
     out: dict[str, str] = {}
     for key, value in bindings.items():
         addr = str(value or "").strip()
-        if not addr:
-            continue
         field = str(key)
         parsed = parse_ess_entity_scoped(field)
         if parsed and parsed[0] == old_slug:

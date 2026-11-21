@@ -1,6 +1,7 @@
 """Laden und Validieren von config/components.json (Batterien, PV, Wechselrichter)."""
 from __future__ import annotations
 
+import copy
 import json
 import os
 
@@ -118,6 +119,12 @@ def _components_stamp(path: str, *, shadow: bool) -> tuple[int, bool, int]:
 
 
 def load_components_document(path: str) -> dict:
+    """The document as a fresh copy: callers edit it before validation, and a
+    rejected save must not leave their edit in the process-wide memo."""
+    return copy.deepcopy(_load_components_document_cached(path))
+
+
+def _load_components_document_cached(path: str) -> dict:
     try:
         from runtime_store.shadow.mode import is_shadow_config_readonly
 

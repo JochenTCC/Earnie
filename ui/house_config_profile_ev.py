@@ -358,7 +358,9 @@ def _render_dynamic_wallboxes(consumer: dict, index: int, *, session_scope: str)
         )
     )
     if not chosen:
-        st.warning("Mindestens eine Wallbox wählen — sonst wird das E-Auto nicht gespeichert.")
+        st.warning(
+            "Mindestens eine Wallbox wählen — sonst wird das Hausprofil nicht gespeichert."
+        )
     missing = [w for w in chosen if not wallboxes[w].get("unknown_vehicle")]
     if missing:
         st.warning(
@@ -433,11 +435,12 @@ def _render_ev_power_fields(consumer: dict, index: int, *, session_scope: str) -
     mode = _render_assignment_mode(consumer, index, session_scope=session_scope)
     if mode == ASSIGNMENT_DYNAMIC:
         wallbox_ids = _render_dynamic_wallboxes(consumer, index, session_scope=session_scope)
-        if wallbox_ids:
-            item[WALLBOX_ASSIGNMENT_KEY] = {
-                "mode": ASSIGNMENT_DYNAMIC,
-                "wallbox_ids": wallbox_ids,
-            }
+        # Sent even when empty: the save then fails loudly ("mindestens eine Wallbox")
+        # instead of the legacy default "fixed to wallbox <EV id>".
+        item[WALLBOX_ASSIGNMENT_KEY] = {
+            "mode": ASSIGNMENT_DYNAMIC,
+            "wallbox_ids": wallbox_ids,
+        }
     else:
         wallbox_id = _render_wallbox_choice(consumer, car, index, session_scope=session_scope)
         if wallbox_id:

@@ -290,7 +290,13 @@ def _merge_existing_battery_fields(
                 break
     if "control" not in spec and existing_control is not None:
         spec["control"] = existing_control
-    if "regulates_on" not in spec and existing_regulates_on is not None:
+    # regulates_on belongs to house batteries only: a switch to Powerstation drops it.
+    target_type = str(spec.get("type") or "").strip().lower()
+    if (
+        "regulates_on" not in spec
+        and existing_regulates_on is not None
+        and target_type != "powerstation"
+    ):
         spec["regulates_on"] = existing_regulates_on
     for key, value in existing_type_fields.items():
         spec.setdefault(key, value)
@@ -304,6 +310,21 @@ def _merge_existing_battery_fields(
         spec["ehal_bindings"] = raw_spec["ehal_bindings"]
 
 
+def _rewrite_pv_inverter_refs(data: dict, old_id: str, new_id: str) -> None:
+    """Point PV ``inverter_id`` from ``old_id`` to ``new_id`` in ``data``."""
+    if "pv_systems" not in data:
+        return
+    rows = []
+    for item in data.get("pv_systems") or []:
+        if not isinstance(item, dict):
+            continue
+        row = dict(item)
+        if str(row.get("inverter_id") or "").strip() == old_id:
+            row["inverter_id"] = new_id
+        rows.append(row)
+    data["pv_systems"] = rows
+
+
 def _apply_battery_inverter_ownership(
     spec: dict, data: dict, *, entity_id: str, old_id: str
 ) -> dict:
@@ -312,11 +333,14 @@ def _apply_battery_inverter_ownership(
         drop_owned_inverters,
         ensure_owned_island_inverter,
         is_physical_powerstation,
+        owned_island_inverter_id,
         rebind_owned_by,
+        rename_owned_island_inverter,
     )
     from house_config.powerstation import (
         apply_virtual_powerstation_inheritance,
         is_virtual_powerstation,
+        primary_house_battery,
     )
 
     batteries = list(data.get("batteries") or [])
@@ -326,6 +350,13 @@ def _apply_battery_inverter_ownership(
         if str(item.get("id", "")).strip() not in {entity_id, old_id}
     ]
     siblings.append(spec)
+    if is_virtual_powerstation(spec) and primary_house_battery(siblings) is None:
+        # Reinit rejects it after the write (η_inv not derivable): refuse before.
+        raise ValueError(
+            f"Batterie '{entity_id}': eine virtuelle Powerstation braucht eine "
+            "Hausbatterie als Carve-out-Basis. Erst eine Hausbatterie anlegen oder "
+            "Backing „Physisch“ wählen."
+        )
     spec = apply_virtual_powerstation_inheritance(spec, siblings)
     inverters = list(data.get("inverters") or [])
     renamed = bool(old_id and old_id != entity_id)
@@ -339,6 +370,15 @@ def _apply_battery_inverter_ownership(
         if renamed:
             inverters = drop_owned_inverters(inverters, battery_id=old_id)
     elif is_physical_powerstation(spec):
+        if renamed:
+            # Keep the built-in inverter (limits, bindings) under its new id.
+            inverters, moved_from = rename_owned_island_inverter(
+                inverters, old_battery_id=old_id, new_battery_id=entity_id
+            )
+            if moved_from:
+                _rewrite_pv_inverter_refs(
+                    data, moved_from, owned_island_inverter_id(entity_id)
+                )
         inverters, inv_id = ensure_owned_island_inverter(
             inverters,
             battery_id=entity_id,
@@ -419,7 +459,8 @@ def _update_scenarios_for_battery_save(
     if renamed:
         _ent()._rewrite_id_list_in_scenarios("battery_ids", old_id, entity_id)
         _rewrite_shadow_battery_overlay(old_id, entity_id)
-    # Scrub before components save: reinit rejects Powerstations in battery_ids.
+    # Reinit rejects Powerstations in battery_ids: runs inside the caller's
+    # ``deferred_reinit`` together with the components save.
     if is_powerstation:
         _scrub_battery_ids_from_scenarios(entity_id)
         if renamed:
@@ -491,9 +532,7 @@ def upsert_battery(
         in grid_tied_house_battery_ids([save_spec], data.get("inverters")),
     )
     is_powerstation = str(save_spec.get("type") or "") == "powerstation"
-    _update_scenarios_for_battery_save(
-        entity_id, old_id, is_powerstation=is_powerstation
-    )
+    renamed = bool(old_id and old_id != entity_id)
     prev_attached = _previous_attached_ids(batteries, {entity_id, old_id})
     batteries = [
         item
@@ -502,13 +541,22 @@ def upsert_battery(
     ]
     batteries.append(save_spec)
     data["batteries"] = batteries
-    _ent()._save_components_document(data)
-    if is_powerstation:
-        new_attached = list(save_spec.get("attached_consumer_ids") or [])
-        # Only push battery→consumer when the attached list itself changed;
-        # otherwise auto-persist of inherited fields would detach consumers.
-        if new_attached != prev_attached:
-            sync_consumers_from_powerstation_attached(entity_id, new_attached)
+    from ui import house_config_io as _io
+
+    # Components first (validated on save), then scenarios and consumers; one reinit
+    # at the end, so no reinit sees the new id in one file and the old in the other.
+    with _io.deferred_reinit():
+        _ent()._save_components_document(data)
+        _update_scenarios_for_battery_save(
+            entity_id, old_id, is_powerstation=is_powerstation
+        )
+        if is_powerstation:
+            new_attached = list(save_spec.get("attached_consumer_ids") or [])
+            # Push battery→consumer when the attached list changed or the id did
+            # (consumers carry the powerstation id); not otherwise, or auto-persist
+            # of inherited fields would detach consumers.
+            if new_attached != prev_attached or renamed:
+                sync_consumers_from_powerstation_attached(entity_id, new_attached)
     return entity_id
 
 
@@ -522,8 +570,6 @@ def delete_battery(entity_id: str) -> None:
     target = str(entity_id or "").strip()
     if not target:
         raise ValueError("Batterie-ID fehlt.")
-    # Scrub first so components save → reinit does not see a dangling id.
-    _scrub_battery_ids_from_scenarios(target)
     data = _ent()._load_components_document()
     batteries = list(data.get("batteries") or [])
     remaining = [item for item in batteries if str(item.get("id", "")).strip() != target]
@@ -552,4 +598,10 @@ def delete_battery(entity_id: str) -> None:
             )
     data["batteries"] = remaining
     data["inverters"] = drop_owned_inverters(inverters, battery_id=target)
-    _ent()._save_components_document(data)
+    from ui import house_config_io as _io
+
+    # Checks above run before anything is written; components first, then the
+    # scenarios, one reinit for both (none sees a dangling id).
+    with _io.deferred_reinit():
+        _ent()._save_components_document(data)
+        _scrub_battery_ids_from_scenarios(target)

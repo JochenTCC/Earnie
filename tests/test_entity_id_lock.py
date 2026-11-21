@@ -93,6 +93,21 @@ def test_rewrite_ess_bindings_slug():
     assert ess_field(old, "sens_ess_soc") not in out
 
 
+def test_rewrite_ess_bindings_slug_keeps_empty_activation_flags():
+    """Loxone activation flags are keys with an empty address; a rename keeps them."""
+    old = "ugly_copy_3"
+    new = "garage"
+    bindings = {
+        ess_field(old, "sens_ess_soc"): "Merker1",
+        ess_field(old, "sens_ess_power"): "",
+    }
+    out = rewrite_ess_bindings_slug(bindings, old_id=old, new_id=new)
+    assert out == {
+        ess_field(new, "sens_ess_soc"): "Merker1",
+        ess_field(new, "sens_ess_power"): "",
+    }
+
+
 def test_rewrite_consumer_bindings_slug():
     old = "waschmaschine_copy"
     new = "waschmaschine"

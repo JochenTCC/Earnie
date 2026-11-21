@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import config
 from ui.number_format import format_decimal
-from ui.house_config_historical_csv import _render_ist_vs_modell
 
 from pathlib import Path
 
@@ -46,19 +45,54 @@ _DIST_LABELS = {
 
 
 
-def session_keys(preview_id: str) -> dict[str, str]:
+def session_keys(session_scope: str) -> dict[str, str]:
+    """Keys under the profile form's session scope (``<scope>__…``).
+
+    Like the other form widgets they are cleared and refilled from the file when the
+    profile, the file or the widget state changes (``_sync_profile_session``). Keyed by
+    the label slug they outlived a deleted profile, ignored outside changes and lost
+    their upload when a new profile was renamed.
+    """
+    prefix = f"{session_scope}__house_hist_"
     return {
-        "source": f"house_profile_hist_source_{preview_id}",
-        "verbrauch": f"house_profile_csv_path_{preview_id}",
-        "pv": f"house_profile_pv_csv_path_{preview_id}",
-        "battery": f"house_profile_battery_csv_path_{preview_id}",
-        "grid": f"house_profile_grid_csv_path_{preview_id}",
-        "baseload_dist": f"house_profile_baseload_dist_{preview_id}",
+        "source": f"{prefix}source",
+        "verbrauch": f"{prefix}csv_path",
+        "pv": f"{prefix}pv_csv_path",
+        "battery": f"{prefix}battery_csv_path",
+        "grid": f"{prefix}grid_csv_path",
+        "baseload_dist": f"{prefix}baseload_dist",
+        "invert_pv": f"{prefix}balance_invert_pv",
+        "invert_battery": f"{prefix}balance_invert_batt",
+        "invert_grid": f"{prefix}balance_invert_grid",
+        "balance_fp": f"{prefix}balance_fp",
+        "balance_flags_unknown": f"{prefix}balance_flags_unknown",
     }
+
+
+# Profile field with the Bilanz sign flags; written only for the Bilanz source.
+BALANCE_SIGN_INVERTS_KEY = "balance_sign_inverts"
+_BALANCE_SIGN_PARTS = ("pv", "battery", "grid")
+
+
+def balance_fingerprint(
+    pv_path: str,
+    battery_path: str,
+    grid_path: str,
+    *,
+    invert_pv: bool,
+    invert_battery: bool,
+    invert_grid: bool,
+) -> str:
+    """Inputs of the derived Bilanz load; a change re-derives it."""
+    return (
+        f"{pv_path}|{battery_path}|{grid_path}|"
+        f"{invert_pv:d}|{invert_battery:d}|{invert_grid:d}"
+    )
 
 def _render_gesamtverbraeuche(
     *,
     preview_id: str,
+    baseload_dist_key: str,
     annual_kwh: float,
     resolved: list[dict],
     preview: dict,
@@ -72,6 +106,8 @@ def _render_gesamtverbraeuche(
     """Monatsverbrauch + stündlicher Verlauf — always visible."""
     from runtime_store.persist_paths import resolve_config_prefixed_path
     from ui.consumption_display import ConsumptionDisplayMode, render_consumption_display
+    # Local: ui.house_config_historical_csv imports this module at its end.
+    from ui.house_config_historical_csv import _render_ist_vs_modell
 
     st.subheader("Gesamt-Lastverhalten")
     st.caption(
@@ -96,6 +132,7 @@ def _render_gesamtverbraeuche(
             resolved=resolved,
             preview=preview,
             pv_path=pv_path,
+            baseload_dist_key=baseload_dist_key,
             csv_series=balance_series,
             reset_extra=reset_extra,
         )
@@ -148,12 +185,10 @@ def _render_component_path_input(
         [1.6, 1.4, 3.0],
         vertical_alignment="center",
     )
+    # Seeded from the profile (init_historical_csv_session), never a fixed False.
+    st.session_state.setdefault(invert_key, False)
     with invert_col:
-        st.checkbox(
-            f"Vorzeichen {label} umkehren",
-            value=False,
-            key=invert_key,
-        )
+        st.checkbox(f"Vorzeichen {label} umkehren", key=invert_key)
     label_col.markdown(path_label)
     return input_col.text_input(
         path_label,
@@ -320,9 +355,15 @@ def _render_balance_mode(preview_id: str, keys: dict[str, str]) -> None:
         "Sobald PV und Netz vorliegen, wird das Lastprofil automatisch "
         "abgeleitet und als Gesamt-CSV gespeichert."
     )
-    invert_pv_key = f"house_profile_balance_invert_pv_{preview_id}"
-    invert_batt_key = f"house_profile_balance_invert_batt_{preview_id}"
-    invert_grid_key = f"house_profile_balance_invert_grid_{preview_id}"
+    if st.session_state.get(keys["balance_flags_unknown"]):
+        st.info(
+            "Für dieses Profil sind keine Vorzeichen-Einstellungen gespeichert (älteres "
+            "Profil). Das gespeicherte Lastprofil bleibt, bis ein Pfad oder ein Vorzeichen "
+            "geändert wird. Bitte die Häkchen prüfen."
+        )
+    invert_pv_key = keys["invert_pv"]
+    invert_batt_key = keys["invert_battery"]
+    invert_grid_key = keys["invert_grid"]
 
     st.markdown("**PV-Erzeugungsprofil [kW] (Pflicht)**")
     _render_component_upload(
@@ -391,11 +432,16 @@ def _maybe_persist_balance_total(
     """Write derived Gesamtverbrauch when PV + Netz are present (Batterie optional)."""
     if not (pv_path and grid_path):
         return
-    fingerprint = (
-        f"{pv_path}|{battery_path}|{grid_path}|"
-        f"{invert_pv:d}|{invert_battery:d}|{invert_grid:d}"
+    fingerprint = balance_fingerprint(
+        pv_path,
+        battery_path,
+        grid_path,
+        invert_pv=invert_pv,
+        invert_battery=invert_battery,
+        invert_grid=invert_grid,
     )
-    fp_key = f"house_profile_balance_fp_{preview_id}"
+    # Seeded from the saved profile: an unchanged profile is not re-derived on open.
+    fp_key = keys["balance_fp"]
     current = str(st.session_state.get(keys["verbrauch"], "") or "").strip()
     if st.session_state.get(fp_key) == fingerprint and current:
         return
@@ -418,6 +464,7 @@ def _maybe_persist_balance_total(
     if input_key in st.session_state:
         st.session_state[input_key] = total
     st.session_state[fp_key] = fingerprint
+    st.session_state[keys["balance_flags_unknown"]] = False
     clipped = int(result.get("clipped_hours", 0) or 0)
     if clipped:
         st.warning(

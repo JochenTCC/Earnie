@@ -116,8 +116,24 @@ def test_components_doc_cache_skips_reread(tmp_path, monkeypatch):
 
     monkeypatch.setattr("builtins.open", _counting_open)
     second = components_store.load_components_document(str(path))
-    assert second is first
+    assert second == first
     assert open_count["n"] == 0
+
+
+def test_components_doc_cache_hands_out_copies(tmp_path, monkeypatch):
+    """An edit of a loaded document (e.g. before a rejected save) stays out of the memo."""
+    components_store.clear_components_doc_cache()
+    path = tmp_path / "components.json"
+    path.write_text(json.dumps(_minimal_components()), encoding="utf-8")
+    monkeypatch.setattr(
+        "runtime_store.shadow.mode.is_shadow_config_readonly",
+        lambda: False,
+    )
+
+    first = components_store.load_components_document(str(path))
+    first["inverters"].append({"id": "edited", "type": "pv_string"})
+    second = components_store.load_components_document(str(path))
+    assert second["inverters"] == []
 
 
 def test_components_save_clears_cache(tmp_path, monkeypatch):

@@ -413,7 +413,8 @@ def test_run_rejects_unknown_house_profile_ref_before_writing(tmp_path):
     doc["scenarios"][0]["settings"]["house_profile_id"] = "example_efh"
     path.write_text(json.dumps(doc, indent=2), encoding="utf-8")
     before = {p.name: p.read_text(encoding="utf-8") for p in config_dir.glob("*.json")}
-    with pytest.raises(ValueError, match="example_efh"):
+    # 2d-9: a MigrationError, so the wizard and the CLI show it instead of a traceback.
+    with pytest.raises(MigrationError, match="ungültig.*example_efh"):
         run_migration(config_dir, KEEP_NAMES)
     after = {p.name: p.read_text(encoding="utf-8") for p in config_dir.glob("*.json")}
     assert after == before

@@ -164,16 +164,18 @@ def _render_pv_default_row(*, session_scope: str) -> tuple[float, float]:
     with col_c:
         default_pv_tilt = labeled_number_input(
             "PV-Default Neigung (°)",
-            min_value=0,
-            max_value=90,
+            min_value=0.0,
+            max_value=90.0,
+            step=1.0,
             help="Vorschlag für ein neues PV-Feld im Tab PV-Felder (überschreibbar).",
             key=_scoped_key(session_scope, "house_profile_default_pv_tilt"),
         )
     with col_d:
         default_pv_azimuth = labeled_number_input(
             "PV-Default Azimut (°)",
-            min_value=-180,
-            max_value=180,
+            min_value=-180.0,
+            max_value=180.0,
+            step=1.0,
             help="0 = Süd, -90 = Ost, 90 = West. Überschreibbar im Tab PV-Felder.",
             key=_scoped_key(session_scope, "house_profile_default_pv_azimuth"),
         )

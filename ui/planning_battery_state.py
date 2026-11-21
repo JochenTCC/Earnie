@@ -17,7 +17,7 @@ from house_config.battery_control import (
 from house_config.entity_id_lock import ID_PROVISIONAL_LABEL_KEY, is_id_locked
 from house_config.label_uniqueness import allocate_unique_label
 from house_config.topology_regulates import REGULATES_ON_GRID, REGULATES_ON_NONE
-from runtime_store.persist_paths import resolve_config_json_path
+from runtime_store.persist_paths import resolve_components_json_path
 from ui.house_config_io import list_batteries
 from ui.label_select import NEW_OPTION
 from ui.planning_battery_inverter import (
@@ -102,7 +102,7 @@ def _battery_session_scope(selected_id: str, *, is_new: bool) -> str:
 
 
 def _config_file_stamp() -> str:
-    path = resolve_config_json_path()
+    path = resolve_components_json_path()
     try:
         return f"{os.path.abspath(path)}:{os.path.getmtime(path)}"
     except OSError:
@@ -257,6 +257,43 @@ def _seed_battery_widget_state(session_scope: str, existing: dict) -> None:
     st.session_state[_scoped_key(session_scope, "planning_battery_regulates_on")] = (
         _REGULATES_LABELS.get(values["regulates_on"], _REGULATES_LABELS[REGULATES_ON_GRID])
     )
+
+
+# Widgets the form shows only for some type / backing / wear choices. Streamlit drops a
+# widget's key in the run it is not rendered; without a copy it came back at its
+# min_value and auto-persist saved that at once.
+_HIDEABLE_WIDGET_SUFFIXES = (
+    "planning_battery_backing",
+    "planning_battery_role",
+    "planning_battery_attached",
+    "planning_battery_attached_ids",
+    "planning_battery_inverter",
+    "planning_battery_control",
+    "planning_battery_regulates_on",
+    *(suffix for suffix, _ in _BATTERY_DIRECT_WIDGETS),
+)
+
+
+def _kept_key(session_scope: str, suffix: str) -> str:
+    # Under the scope prefix, so a reseed clears the copies with the widget keys.
+    return _scoped_key(session_scope, f"_kept_{suffix}")
+
+
+def restore_hidden_battery_widgets(session_scope: str) -> None:
+    """Put back the last value of widgets that were hidden in the previous run."""
+    for suffix in _HIDEABLE_WIDGET_SUFFIXES:
+        key = _scoped_key(session_scope, suffix)
+        kept = _kept_key(session_scope, suffix)
+        if key not in st.session_state and kept in st.session_state:
+            st.session_state[key] = st.session_state[kept]
+
+
+def remember_battery_widgets(session_scope: str) -> None:
+    """Copy the current widget values so a later hide/show can restore them."""
+    for suffix in _HIDEABLE_WIDGET_SUFFIXES:
+        key = _scoped_key(session_scope, suffix)
+        if key in st.session_state:
+            st.session_state[_kept_key(session_scope, suffix)] = st.session_state[key]
 
 
 def _battery_widget_state_missing(session_scope: str) -> bool:

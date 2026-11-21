@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import streamlit as st
 
+from runtime_store.shadow.errors import ConfigReadOnlyError
+from ui.auto_persist import SHADOW_READONLY_CAPTION
 import config
 from ui.house_config_io import reorder_scenarios
 from ui.pages.scenario_editor_sections import (
@@ -67,6 +69,9 @@ def _render_scenario_reorder_controls(
         ordered[idx - 1], ordered[idx] = ordered[idx], ordered[idx - 1]
         try:
             reorder_scenarios(ordered)
+        except ConfigReadOnlyError:
+            st.caption(SHADOW_READONLY_CAPTION)
+            return
         except ValueError as exc:
             st.error(str(exc))
             return
@@ -83,6 +88,9 @@ def _render_scenario_reorder_controls(
         ordered[idx + 1], ordered[idx] = ordered[idx], ordered[idx + 1]
         try:
             reorder_scenarios(ordered)
+        except ConfigReadOnlyError:
+            st.caption(SHADOW_READONLY_CAPTION)
+            return
         except ValueError as exc:
             st.error(str(exc))
             return

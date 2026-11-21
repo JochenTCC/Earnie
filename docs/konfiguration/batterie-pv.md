@@ -22,7 +22,7 @@ Im **Szenario-Explorer** (Verbrauchsdaten / cons_data) gilt für die PV-Linien:
 | `backing` / `role` / `attached_consumer_ids` | – | `components.json` → Powerstation | Nur bei `type: powerstation`: `virtual`\|`physical` bzw. `single_use`\|`standby_backup`. `attached_consumer_ids` (Liste) ist optional; die Zuordnung ist auch über manuelle Geräte mit `mode: reserve` + `powerstation_id` möglich. Ältere Konfigurationen: `attached_consumer_id` entspricht dem ersten Listenelement. |
 | `inverter_id` | – | `components.json` → `batteries[]` / `pv_systems[]` | Referenz auf `inverters[].id`. Pflicht für Hausbatterien, physische Powerstations und alle PV-Felder. Virtuelle Powerstations haben **keinen** Wechselrichter. |
 | `kwp` | kWp | `components.json` → `pv_systems[]` | Installierte PV-Leistung je Anlage; die Summe ergibt `pv_kwp` |
-| `pv_tilt` | ° | `components.json` → `pv_systems[]` | Dachneigung **je Anlage** (bei mehreren Anlagen gibt es keine gemeinsame Neigung) |
+| `pv_tilt` | ° | `components.json` → `pv_systems[]` | Dachneigung **je Anlage** (bei mehreren Anlagen gibt es keine gemeinsame Neigung). Nachkommastellen sind erlaubt (z. B. `17.5`) |
 | `pv_azimuth` | ° | `components.json` → `pv_systems[]` | Ausrichtung je Anlage: `0` = Süd, `-90` = Ost, `90` = West |
 | `latitude`, `longitude` | ° | `house_profiles.json` (über das Szenario) | Standort für die PV-Prognose (Forecast.Solar / Open-Meteo) |
 | `horizon_source`, `horizon` | – / ° | `house_profiles.json` | Horizont am Standort (Gelände, Gebäude, Bäume), siehe [Horizont](#horizont). Ohne die Felder rechnet Earnie mit freiem Horizont. |
@@ -66,13 +66,13 @@ Solange ein Gerät aktiv ist, gibt Earnie die gehaltene Reserve frei, der SoC-Fl
 - Im Modus **Automatik** begrenzt Earnie das geschriebene Entladelimit auf die Energie über diesem Floor, die in einer Viertelstunde abfließen darf. Bei 13 % SoC sind das rund 0,4 kW. So kann ein großer Verbraucher (z. B. SwimSpa) die Reserve nicht innerhalb eines Slots leeren, die danach aus dem Netz nachgeladen werden müsste. Weiter über dem Floor bleibt das volle Entladelimit.
 - Die Anlage meldet den SoC in ganzen Prozent. Liegt die Anzeige höchstens 1 % unter dem Floor (z. B. 12 % bei 12,3 %), nimmt Earnie die Anzeige als Floor und lädt nicht sofort nach. Liegt der SoC weiter darunter, lädt Earnie die Reserve wie bisher nach.
 
-Einige Felder sind ausgeblendet: Max. Lade-/Entladeleistung, Wirkungsgrad, SoC-Grenzen, Leistungsschwelle, Standby, Steuerbarkeit, `limits_from_live` und Verschleiß. Beim Speichern bzw. Normalisieren übernimmt Earnie diese Werte von der Hausbatterie. Ohne Hausbatterie gelten feste Defaults.
+Einige Felder sind ausgeblendet: Max. Lade-/Entladeleistung, Wirkungsgrad, SoC-Grenzen, Leistungsschwelle, Standby, Steuerbarkeit, `limits_from_live` und Verschleiß. Beim Speichern bzw. Normalisieren übernimmt Earnie diese Werte von der Hausbatterie. Ohne Hausbatterie speichert der Hauskonfigurator die virtuelle Powerstation nicht. Er zeigt dann einen Fehler; lege zuerst eine Hausbatterie an oder wähle Backing „Physisch“.
 
 - Die Entladeleistung der virtuellen Powerstation ist immer `0`.
 - Der Verschleiß bleibt aus, weil die Zyklen auf der Hausbatterie zählen.
 - Ein `inverter_id` gibt es nicht.
 
-Physische Powerstations (`backing: physical`) behalten das volle Batterie-Formular. Sie bekommen einen **integrierten Powerstation-Wechselrichter** (`owned_by` = Batterie-ID, Abschnitt „Integrierter Wechselrichter“ im Hauskonfigurator). Dieser speist nur die angeschlossenen Verbraucher, nicht den AC-Bus des Hauses. Sein AC-Eingang kann am Netz hängen (einseitige Last), das Gerät ist also **nicht** „netzlos“.
+Physische Powerstations (`backing: physical`) behalten das volle Batterie-Formular. Sie bekommen einen **integrierten Powerstation-Wechselrichter** (`owned_by` = Batterie-ID, Abschnitt „Integrierter Wechselrichter“ im Hauskonfigurator). Dieser speist nur die angeschlossenen Verbraucher, nicht den AC-Bus des Hauses. Sein AC-Eingang kann am Netz hängen (einseitige Last), das Gerät ist also **nicht** „netzlos“. Der Wechselrichter heißt `wr_<Batterie-ID>`. Ändert sich die Batterie-ID, zieht er mit allen Feldern und Bindings auf die neue ID um. Felder, die der Abschnitt nicht zeigt (z. B. `max_ac_charge_kw`), bleiben beim Speichern erhalten.
 
 ### Standby-Backup (`role: standby_backup`)
 

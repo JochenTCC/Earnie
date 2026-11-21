@@ -88,13 +88,15 @@ def _render_heat_source_fields(thermal: dict, index: int, *, session_scope: str)
                 f"COP-Kennlinie: {len(heat_source['cop_points'])} Punkte aus `components.json` "
                 "(`heat_source.cop_points`). Live plant den Wärmespeicher damit statt mit der JAZ."
             )
+    # The own values are keyed per source type: Streamlit ignores ``value=`` once a key
+    # holds state, so a shared key kept the old type's JAZ / price after a switch.
     same_type = existing.get("type") == source_type
     default_eff = default_efficiency(heat_source)
     eff_label = "JAZ" if source_type == "heat_pump" else "Nutzungsgrad"
     own_eff = labeled_checkbox(
         f"Eigene {eff_label} (Standard {format_decimal(default_eff)})",
         value=same_type and existing.get("efficiency") not in (None, ""),
-        key=_scoped_key(session_scope, f"hc_heat_eff_use_{index}"),
+        key=_scoped_key(session_scope, f"hc_heat_eff_use_{index}_{source_type}"),
     )
     if own_eff:
         heat_source["efficiency"] = labeled_number_input(
@@ -102,7 +104,7 @@ def _render_heat_source_fields(thermal: dict, index: int, *, session_scope: str)
             min_value=0.05,
             value=float((existing.get("efficiency") if same_type else None) or default_eff),
             step=0.05,
-            key=_scoped_key(session_scope, f"hc_heat_eff_{index}"),
+            key=_scoped_key(session_scope, f"hc_heat_eff_{index}_{source_type}"),
         )
     if not heat_source_is_electric(heat_source):
         unit = _FUEL_UNIT_LABELS[str(fuel_unit(heat_source))]
@@ -111,7 +113,7 @@ def _render_heat_source_fields(thermal: dict, index: int, *, session_scope: str)
         own_price = labeled_checkbox(
             f"Eigener Brennstoffpreis (Standard {format_general(default_price)} {unit}, Stand {as_of})",
             value=same_type and existing.get("fuel_price") not in (None, ""),
-            key=_scoped_key(session_scope, f"hc_fuel_price_use_{index}"),
+            key=_scoped_key(session_scope, f"hc_fuel_price_use_{index}_{source_type}"),
         )
         if own_price:
             heat_source["fuel_price"] = labeled_number_input(
@@ -119,7 +121,7 @@ def _render_heat_source_fields(thermal: dict, index: int, *, session_scope: str)
                 min_value=0.01,
                 value=float((existing.get("fuel_price") if same_type else None) or default_price),
                 step=0.5,
-                key=_scoped_key(session_scope, f"hc_fuel_price_{index}"),
+                key=_scoped_key(session_scope, f"hc_fuel_price_{index}_{source_type}"),
             )
     return heat_source
 

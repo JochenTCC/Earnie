@@ -34,8 +34,8 @@ def _is_tariff_track_path(path: str) -> bool:
     return is_tariff_track_file(Path(path).name)
 
 
-def write_json_dict(path: str, data: dict) -> None:
-    from runtime_store.data_model import stamp_data_model
+def refuse_shadow_config_write(path: str) -> None:
+    """Raise ``ConfigReadOnlyError`` when Shadow mode protects ``path`` (config dir)."""
     from runtime_store.shadow.mode import is_shadow_config_readonly
 
     if is_shadow_config_readonly():
@@ -62,6 +62,11 @@ def write_json_dict(path: str, data: dict) -> None:
                     f"Shadow Mode: Konfiguration schreibgeschützt ({path})"
                 )
 
+
+def write_json_dict(path: str, data: dict) -> None:
+    from runtime_store.data_model import stamp_data_model
+
+    refuse_shadow_config_write(path)
     if not _is_tariff_track_path(path):
         stamp_data_model(data)
     with open(path, "w", encoding="utf-8") as f:

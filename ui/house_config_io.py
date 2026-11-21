@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import json
 import os
+from contextlib import contextmanager
+from contextvars import ContextVar
 from pathlib import Path
 
 import config
@@ -22,6 +24,48 @@ from runtime_store.persist_paths import (
 )
 from settings.json_io import read_json_dict, write_json_dict
 
+# Writers that touch components.json and backtesting_scenarios.json in one action
+# (rename / delete of a battery or PV system) must reinit once, after both files are
+# written: a reinit between the two resolves the Live scenario against the stale file.
+_reinit_deferral: ContextVar[list[bool] | None] = ContextVar(
+    "house_config_reinit_deferral", default=None
+)
+
+
+def reinit_after_write() -> None:
+    """``config.reinit_config()`` now, or at the end of the enclosing ``deferred_reinit``."""
+    pending = _reinit_deferral.get()
+    if pending is not None:
+        pending[0] = True
+        return
+    config.reinit_config()
+
+
+@contextmanager
+def deferred_reinit():
+    """Collect the reinits of several config writes into one at the end of the block."""
+    if _reinit_deferral.get() is not None:
+        yield
+        return
+    pending = [False]
+    token = _reinit_deferral.set(pending)
+    try:
+        yield
+    except BaseException as exc:
+        _reinit_deferral.reset(token)
+        if pending[0]:
+            # A file was written before the failure: the runtime config must follow
+            # the disk. A reinit error is reported with the original one.
+            try:
+                config.reinit_config()
+            except Exception as reinit_exc:  # noqa: BLE001 — attached to ``exc``
+                exc.add_note(f"Config-Reinit nach dem Fehler gescheitert: {reinit_exc}")
+        raise
+    _reinit_deferral.reset(token)
+    if pending[0]:
+        config.reinit_config()
+
+
 def read_json_document(path: str) -> dict:
     for encoding in ("utf-8-sig", "utf-8", "cp1252"):
         try:
@@ -32,7 +76,9 @@ def read_json_document(path: str) -> dict:
 
 def write_json_document(path: str, data: dict) -> None:
     from runtime_store.data_model import stamp_data_model
+    from settings.json_io import refuse_shadow_config_write
 
+    refuse_shadow_config_write(path)
     stamp_data_model(data)
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -151,7 +197,7 @@ def load_backtesting_scenarios_raw() -> dict:
 
 def save_backtesting_scenarios(doc: dict) -> None:
     write_json_document(resolve_backtesting_scenarios_json_path(), doc)
-    config.reinit_config()
+    reinit_after_write()
 
 def list_batteries() -> list[dict]:
     return config.get_batteries()
@@ -239,8 +285,16 @@ def _house_profiles_payload(profile: dict) -> dict:
         wallboxes=wallboxes_by_id({WALLBOXES_KEY: wallboxes}),
     )
     ensure_baseload_not_over_allocated(normalized["profiles"][profile_id])
+    # Replace in place (order decides the default profile of a scenario without
+    # house_profile_id); only a new profile is appended.
+    index = next(
+        (i for i, p in enumerate(profiles) if p.get("id") == profile["id"]), None
+    )
     profiles = [p for p in profiles if p.get("id") != profile["id"]]
-    profiles.append(profile)
+    if index is None:
+        profiles.append(profile)
+    else:
+        profiles.insert(index, profile)
     # Checked again on save; here before the catalog is written.
     assert_reference_systems_unshared({"profiles": profiles})
     payload: dict = {"profiles": profiles}

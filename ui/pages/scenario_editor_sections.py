@@ -5,6 +5,8 @@ from datetime import date
 
 import streamlit as st
 
+from runtime_store.shadow.errors import ConfigReadOnlyError
+from ui.auto_persist import SHADOW_READONLY_CAPTION
 from ui.flash import flash
 from ui.form_layout import labeled_checkbox
 from ui.house_config_io import (
@@ -570,6 +572,9 @@ def _render_scenario_delete_button(ctx: dict) -> None:
 
     try:
         delete_scenario(ctx["stable_scenario_id"])
+    except ConfigReadOnlyError:
+        st.caption(SHADOW_READONLY_CAPTION)
+        return
     except ValueError as exc:
         st.error(str(exc))
         return

@@ -97,7 +97,10 @@ def normalize_appliance_recommendation_block(
     consumer_id: str,
     nominal_power_kw: float,
     loxone_power_name: str = "",
+    power_binding: bool = False,
 ) -> dict | None:
+    """``power_binding``: the consumer has a ``sens_power_act`` EHAL binding, which
+    serves ``power_source=loxone`` like a Loxone marker does."""
     if raw is None:
         return None
     if not isinstance(raw, dict):
@@ -112,10 +115,11 @@ def normalize_appliance_recommendation_block(
             "appliance_recommendation.power_source muss 'loxone' oder 'manual' sein."
         )
     marker = str(loxone_power_name or raw.get("loxone_power_name", "")).strip()
-    if power_source == "loxone" and not marker:
+    if power_source == "loxone" and not (marker or power_binding):
         raise ValueError(
             f"Kritischer Konfigurationsfehler: consumers '{consumer_id}': "
-            "power_source=loxone erfordert loxone_inputs.power_name."
+            "power_source=loxone erfordert loxone_inputs.power_name oder ein "
+            "sens_power_act-Binding (EHAL-Com)."
         )
     default_power_kw = optional_positive(
         raw.get("default_power_kw", nominal_power_kw),
@@ -162,6 +166,19 @@ def _loxone_power_name_from_consumer(consumer: dict) -> str:
     return ""
 
 
+def has_power_binding(consumer: dict) -> bool:
+    """True when ``ehal_bindings`` maps a consumer ``sens_power_act`` field."""
+    from ehal.flex_fields import is_flex_sens_power_act_field
+
+    bindings = consumer.get("ehal_bindings")
+    if not isinstance(bindings, dict):
+        return False
+    return any(
+        is_flex_sens_power_act_field(str(key)) and str(value or "").strip()
+        for key, value in bindings.items()
+    )
+
+
 def _runtime_h_from_schedule(consumer: dict, *, consumer_id: str) -> float:
     """Laufzeit für Advice/Reserve = schedule.duration_h (single source of truth)."""
     schedule = consumer.get("schedule") or {}
@@ -194,6 +211,7 @@ def appliance_from_profile_consumer(consumer: dict) -> dict:
         consumer_id=consumer_id,
         nominal_power_kw=float(consumer.get("nominal_power_kw", 0.0) or 0.0),
         loxone_power_name=loxone_power_name,
+        power_binding=has_power_binding(consumer),
     )
     if normalized is None:
         raise ValueError(
@@ -313,6 +331,7 @@ def update_appliance_defaults_in_house_profile(
         consumer_id=appliance_id,
         nominal_power_kw=float(power_kw),
         loxone_power_name=loxone_power_name,
+        power_binding=has_power_binding(entry),
     )
     entry["appliance_recommendation"] = rec
     consumers[target_index] = entry

@@ -20,15 +20,17 @@ timestamp;power_kw
 | Regel        | Bedeutung                                                                                                                                                          |
 | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Trennzeichen | Semikolon (`;`)                                                                                                                                                    |
-| Zeitstempel  | ISO-ähnlich `YYYY-MM-DD HH:MM:SS`                                                                                                                                  |
+| Zeitstempel  | ISO-ähnlich `YYYY-MM-DD HH:MM:SS`, in Ortszeit. Zeitstempel mit Zeitzonen-Angabe (`+00:00`, `Z`, z. B. aus einem Home-Assistant-Export) lehnt der Import mit einer Fehlermeldung ab. |
 | Leistung     | Last bzw. PV-Erzeugung als **Leistungsprofil in kW**, positiv                                                                                                      |
+| Einheit      | Earnie erkennt Watt am 99-%-Wert der Beträge: über 100 gilt die Datei als Watt und wird durch 1000 geteilt, bis 50 als kW. Liegt der Wert dazwischen, ist die Einheit unklar und der Import bricht mit einer Fehlermeldung ab. |
 | Länge        | Kurze Serien sind zur visuellen Kontrolle erlaubt. Für den **Szenario-Explorer** mit importiertem PV bzw. Meter-Bezug sind **≥8760 Stunden** (ca. 12 Monate) nötig, sonst rechnet er mit synthetischen Werten. |
 | Abtastung    | Beliebig. Beim Import rechnet Earnie auf Stundenwerte um: zuerst Zero-Order-Hold auf ein 1‑Minuten-Raster, dann Stundenmittel = ∫P·dt / 1 h. Bei Lücken gilt der letzte Wert bis zum nächsten Sample. |
 
 
-Beim Upload schreibt Earnie eine **normalisierte** Datei nach `earnie_env/config/uploads/` (im Container: `config/uploads/`). Der Dateiname leitet sich vom Original ab: `{Originalname}_resampled.csv` (z. B. `BEZUG-2025-22.7.2026_resampled.csv`).
+Beim Upload schreibt Earnie eine **normalisierte** Datei nach `earnie_env/config/uploads/` (im Container: `config/uploads/`). Der Dateiname setzt sich aus Hausprofil, Rolle bzw. Verbraucher und Originalname zusammen: `{Profil}_{Rolle oder Verbraucher}_{Originalname}_resampled.csv` (z. B. `mein_haus_verbrauch_BEZUG-2025-22.7.2026_resampled.csv`).
 
-- **Gleicher Originalname:** Ein erneuter Upload überschreibt die vorhandene resampled-Datei.
+- **Gleicher Originalname, gleiches Ziel:** Ein erneuter Upload überschreibt die vorhandene resampled-Datei, aber erst, wenn die neue Datei gültig ist. Ist sie ungültig, bleibt die bisherige Datei unverändert.
+- **Gleicher Originalname, anderes Profil, andere Rolle oder anderer Verbraucher:** Jedes Ziel bekommt eine eigene Datei.
 - **Anderer Originalname:** Earnie legt eine neue Datei an, und der Profil-Pfad zeigt auf diese neue Datei.
 
 ## Importmodus (Hausprofil)
@@ -50,7 +52,8 @@ Unter **Historische Jahres-Leistungsprofile [kW] (CSV)** stehen drei Modi zur Wa
 - **Positiv** bei Batterie und Netz bedeutet Leistung **in** das Haussystem (Entladen bzw. Netzbezug).
 - **Negativ** bedeutet Laden bzw. Einspeisung.
 - Ein negatives \(P_\mathrm{Ges}\) setzt Earnie auf 0 und gibt eine Warnung aus.
-- Optional lässt sich das Vorzeichen je Serie umkehren.
+- Optional lässt sich das Vorzeichen je Serie umkehren. Earnie speichert diese Einstellung im Hausprofil und leitet das Lastprofil beim nächsten Öffnen nicht neu ab, solange sich weder ein Pfad noch ein Vorzeichen geändert hat.
+- Bei einem Profil aus einer älteren Version ist die Vorzeichen-Einstellung nicht gespeichert. Der Hauskonfigurator weist darauf hin und behält das gespeicherte Lastprofil, bis ein Pfad oder ein Vorzeichen geändert wird.
 
 Gespeicherte Pfade im Hausprofil:
 
@@ -58,6 +61,7 @@ Gespeicherte Pfade im Hausprofil:
 - `pv_profile_csv`: optionales PV-Erzeugungsprofil
 - `battery_profile_csv` / `grid_profile_csv`: Serien für den Modus Bilanz
 - `historical_csv_source`: gewählter Modus (`separate` / `energiemonitor` / `balance`)
+- `balance_sign_inverts`: nur im Modus Bilanz, Vorzeichen-Umkehr je Serie (`pv`, `battery`, `grid`)
 
 ### Historische Jahres-Leistungsprofile [kW] (CSV)
 
@@ -67,7 +71,7 @@ Die Überschrift **Historische Jahres-Leistungsprofile [kW]** weist darauf hin, 
 
 Der Abschnitt **Gesamt-Lastverhalten** ist immer sichtbar, unabhängig von den CSV-Importen:
 
-- **Mit Lastprofil-CSV** (direkt, Energiemonitor oder Bilanz): Der Abschnitt zeigt den **Monatsverbrauch** (Ist vs. gestapeltes Modell, Energie in kWh) und den **stündlichen Verlauf** (Leistung).
+- **Mit Lastprofil-CSV** (direkt, Energiemonitor oder Bilanz): Der Abschnitt zeigt den **Monatsverbrauch** (Ist vs. gestapeltes Modell, Energie in kWh) und den **stündlichen Verlauf** (Leistung). „Ist“ ist im Modus Bilanz das aus PV, Batterie und Netz abgeleitete Lastprofil, in den anderen Modi die hochgeladene Verbrauchsdatei.
 - **Ohne CSV:** Der Abschnitt zeigt nur das modellierte Hausprofil (Monats- und Wochencharts).
 
 ## Loxone-CSV (Einzelserie)

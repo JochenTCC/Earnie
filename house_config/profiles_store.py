@@ -366,12 +366,43 @@ def _normalize_profile(
         spec[HOUSE_THERMAL_KEY] = house_thermal
     if inactive:
         spec[INACTIVE_CONSUMERS_KEY] = inactive
+    signs = _normalize_balance_sign_inverts(raw, where)
+    if signs is not None:
+        spec[BALANCE_SIGN_INVERTS_KEY] = signs
     # Only when set, so profiles without a region keep their exact normalized shape.
     if region:
         spec["region"] = region
     # Only with a stored horizon (SUSI P3a): no field means no horizon, as before.
     spec.update(stored_horizon_fields(horizon_fields))
     return spec
+
+
+BALANCE_SIGN_INVERTS_KEY = "balance_sign_inverts"
+_BALANCE_SIGN_PARTS = ("pv", "battery", "grid")
+
+
+def _normalize_balance_sign_inverts(raw: dict, where: str) -> dict[str, bool] | None:
+    """Sign flags the Bilanz load was derived with (optional; absent = unknown)."""
+    value = raw.get(BALANCE_SIGN_INVERTS_KEY)
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise ValueError(f"{where}: {BALANCE_SIGN_INVERTS_KEY} muss ein Objekt sein.")
+    unknown = sorted(set(value) - set(_BALANCE_SIGN_PARTS))
+    if unknown:
+        raise ValueError(
+            f"{where}: {BALANCE_SIGN_INVERTS_KEY} hat unbekannte Felder {unknown} "
+            f"(erlaubt: {', '.join(_BALANCE_SIGN_PARTS)})."
+        )
+    out: dict[str, bool] = {}
+    for part in _BALANCE_SIGN_PARTS:
+        flag = value.get(part, False)
+        if not isinstance(flag, bool):
+            raise ValueError(
+                f"{where}: {BALANCE_SIGN_INVERTS_KEY}.{part} muss true oder false sein."
+            )
+        out[part] = flag
+    return out
 
 
 def _attach_internal_gains(
@@ -672,7 +703,9 @@ def _serialize_profile(profile: dict) -> dict:
     }
     if profile.get(HOUSE_THERMAL_KEY):
         out[HOUSE_THERMAL_KEY] = serialize_house_thermal(profile[HOUSE_THERMAL_KEY])
-    land = str(profile.get("land") or "AT").strip().upper()
+    if profile.get(BALANCE_SIGN_INVERTS_KEY) is not None:
+        out[BALANCE_SIGN_INVERTS_KEY] = dict(profile[BALANCE_SIGN_INVERTS_KEY])
+    land =str(profile.get("land") or "AT").strip().upper()
     out["land"] = land if land in {"AT", "DE", "CH"} else "AT"
     if profile.get("region"):
         out["region"] = profile["region"]

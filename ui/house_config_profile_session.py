@@ -236,8 +236,8 @@ def _seed_profile_widget_state(
         region = str(existing.get("region") or "").strip()
         latitude = float(existing.get("latitude", profile_default("latitude")))
         longitude = float(existing.get("longitude", profile_default("longitude")))
-        default_pv_tilt = int(existing.get("default_pv_tilt", profile_default("default_pv_tilt")))
-        default_pv_azimuth = int(
+        default_pv_tilt = float(existing.get("default_pv_tilt", profile_default("default_pv_tilt")))
+        default_pv_azimuth = float(
             existing.get("default_pv_azimuth", profile_default("default_pv_azimuth"))
         )
         netznutzung = normalize_netznutzung_config(existing.get("netznutzung"))
@@ -250,8 +250,8 @@ def _seed_profile_widget_state(
         region = ""
         latitude = float(profile_default("latitude"))
         longitude = float(profile_default("longitude"))
-        default_pv_tilt = int(profile_default("default_pv_tilt"))
-        default_pv_azimuth = int(profile_default("default_pv_azimuth"))
+        default_pv_tilt = float(profile_default("default_pv_tilt"))
+        default_pv_azimuth = float(profile_default("default_pv_azimuth"))
         # No grid area preselected: the user picks one (no implicit "no grid fee").
         netznutzung = default_netznutzung_config()
         profile_id = ""

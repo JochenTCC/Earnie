@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import streamlit as st
 
+from runtime_store.shadow.errors import ConfigReadOnlyError
+from ui.auto_persist import SHADOW_READONLY_CAPTION
 from house_config.battery_control import DEFAULT_BATTERY_CONTROL
 from house_config.entity_id_lock import ID_PROVISIONAL_LABEL_KEY
 from house_config.id_slug import slug_id
@@ -302,6 +304,9 @@ def _render_battery_delete(stable_id: str) -> None:
         return
     try:
         delete_battery(stable_id)
+    except ConfigReadOnlyError:
+        st.caption(SHADOW_READONLY_CAPTION)
+        return
     except ValueError as exc:
         st.error(str(exc))
         return
