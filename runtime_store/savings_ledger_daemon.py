@@ -104,7 +104,8 @@ def _planning_shadow_soc(closed_interval: dict[str, Any] | None) -> float | None
     if not batteries:
         return None
     _ensure_loaded()
-    if _state is None:
+    if _state is None or _battery_presence_changed(_state, with_battery=True):
+        # No chain, or a chain without shadow battery: ``on_cycle`` starts a new one.
         return None
     if not isinstance(closed_interval, dict) or not closed_interval.get("interval_start"):
         return _state.shadow_soc
@@ -125,6 +126,11 @@ def _planning_shadow_soc(closed_interval: dict[str, Any] | None) -> float | None
         day_flex=store.flex_day_provider(timezone_name),
     )
     return advanced.shadow_soc
+
+
+def _battery_presence_changed(state: sl.LedgerState, *, with_battery: bool) -> bool:
+    """True when the chain of ``state`` has a shadow battery and the house no longer one, or vice versa."""
+    return with_battery != (state.shadow_soc_day_start is not None)
 
 
 def _book_error_slot(closed_interval: dict[str, Any] | None) -> None:
@@ -166,7 +172,7 @@ def _on_cycle(
     *,
     now: datetime | None,
 ) -> dict[str, Any] | None:
-    global _state, _pending_without_chain
+    global _state, _pending_without_chain, _restart_reason
     batteries = _house_batteries()
     _ensure_loaded()
     timezone_name = config.get_planning_timezone()
@@ -178,6 +184,19 @@ def _on_cycle(
     # Without a house battery the shadow plant has none either (v2, spec § 7): grid = load − pv.
     battery = sl.shadow_battery_params(batteries) if batteries else None
     pending = _state.pending_slot if _state is not None else _pending_without_chain
+    if _state is not None and _battery_presence_changed(_state, with_battery=battery is not None):
+        # The shadow plant of the chain no longer matches the house (spec § 4): the open day
+        # cannot be closed with either plant, so it is dropped and a new chain starts.
+        logger.warning(
+            "savings ledger: house battery %s; chain from %s ends, the open day %s (%d slots) "
+            "is not booked, a new chain starts.",
+            "added" if battery is not None else "removed",
+            _state.chain_start.isoformat(),
+            _state.day_start.isoformat(),
+            len(_state.slots),
+        )
+        _state = None
+        _restart_reason = sl.CHAIN_BATTERY_CHANGED
     row = None
     if isinstance(closed_interval, dict) and closed_interval.get("interval_start"):
         slot_start = _closed_slot_start(closed_interval, timezone_name)
