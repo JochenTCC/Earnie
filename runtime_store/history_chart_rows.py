@@ -430,21 +430,6 @@ def _zero_flex_power(row: dict[str, Any]) -> None:
     )
 
 
-def _hold_forward_row(
-    previous: dict[str, Any],
-    slot_start: datetime,
-    *,
-    include_date: bool = False,
-) -> dict[str, Any]:
-    row = dict(previous)
-    row["slot_datetime"] = slot_start
-    row["Uhrzeit"] = _format_slot_time(slot_start, include_date=include_date)
-    row.pop(CHART_IST_BATTERY_KW_COLUMN, None)
-    row.pop(PV_IST_COLUMN, None)
-    _zero_flex_power(row)
-    return row
-
-
 def _missing_chart_row(
     slot_start: datetime,
     *,
@@ -650,7 +635,6 @@ def _build_rows_for_slot_starts(
     slot_starts: tuple[datetime, ...] | list[datetime],
     *,
     include_date: bool = False,
-    hold_forward: bool = True,
 ) -> tuple[
     list[dict[str, Any]],
     tuple[str, ...],
@@ -676,8 +660,8 @@ def _build_rows_for_slot_starts(
     rows: list[dict[str, Any]] = []
     qualities: list[str] = []
     mean_usable_flags: list[bool] = []
-    present = held = missing = 0
-    last_row: dict[str, Any] | None = None
+    present = missing = 0
+    held = 0  # no hold-forward: a slot without a log entry stays empty
     for slot_start in starts:
         slot = _coerce_slot_start(slot_start)
         entry = by_slot.get(slot)
@@ -691,19 +675,8 @@ def _build_rows_for_slot_starts(
                 house_batteries=house,
             )
             present += 1
-            last_row = row
             qualities.append(SLOT_PRESENT)
             mean_usable_flags.append(source == IST_SOURCE_MEAN)
-        elif hold_forward and last_row is not None:
-            row = _hold_forward_row(last_row, slot, include_date=include_date)
-            held += 1
-            qualities.append(SLOT_HELD)
-            mean_usable_flags.append(False)
-        elif hold_forward:
-            row = _empty_chart_row(slot, include_date=include_date)
-            missing += 1
-            qualities.append(SLOT_MISSING)
-            mean_usable_flags.append(False)
         else:
             row = _missing_chart_row(slot, include_date=include_date)
             missing += 1
