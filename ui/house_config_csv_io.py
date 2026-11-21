@@ -1,6 +1,7 @@
 """CSV upload / path-queue helpers for Hauskonfigurator."""
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import streamlit as st
@@ -39,6 +40,16 @@ def _resampled_upload_csv_name(filename: str, *, fallback: str) -> str:
     if stem.lower().endswith("_resampled"):
         return f"{stem}.csv"
     return f"{stem}_resampled.csv"
+
+def _upload_target_csv_name(filename: str, *, fallback: str) -> str:
+    """``{fallback_stem}_{original_stem}_resampled.csv`` (fallback alone without a name)."""
+    resampled = _resampled_upload_csv_name(filename, fallback=fallback)
+    if resampled == fallback:
+        return fallback
+    prefix = f"{Path(fallback).stem}_"
+    # A re-upload of a file Earnie wrote already carries the prefix.
+    return resampled if resampled.startswith(prefix) else f"{prefix}{resampled}"
+
 
 def single_csv_upload(
     label: str,
@@ -124,9 +135,11 @@ def save_profile_consumption_csv(
 ) -> str:
     """Speichert Verbrauchs-CSV unter uploads/ neben der aktiven Config; optional normalisiert.
 
-    Target name is ``{original_stem}_resampled.csv`` (basename only). If ``filename``
-    is empty/invalid, falls back to a stable ``{profile}_{role|consumer}.csv`` name.
-    Same original basename re-uploaded overwrites that resampled file.
+    Target name is ``{profile}_{role|consumer}_{original_stem}_resampled.csv``, so the
+    same upload name for another profile, consumer or role gets its own file. If
+    ``filename`` is empty/invalid, the stable ``{profile}_{role|consumer}.csv`` name.
+    The same original re-uploaded for the same target replaces that file, but only
+    once the new upload normalized without error.
     Returns a portable ``config/uploads/…`` path for storage in house profiles.
 
     ``min_hours``: ``0`` / omitted → soft import floor (``MIN_HOURS_IMPORT``);
@@ -142,13 +155,19 @@ def save_profile_consumption_csv(
     fallback = _stable_upload_csv_name(
         profile_id, consumer_id=consumer_id, role=role
     )
-    target = uploads_dir / _resampled_upload_csv_name(filename, fallback=fallback)
-    target.write_bytes(content)
-    portable = f"config/uploads/{target.name}"
-    if normalize:
-        hours = min_hours if min_hours > 0 else MIN_HOURS_IMPORT
-        normalize_profile_csv_file(portable, min_hours=hours)
-    return portable
+    target = uploads_dir / _upload_target_csv_name(filename, fallback=fallback)
+    # Normalize a temp copy; the stored (still referenced) file is replaced only
+    # when the new upload is valid.
+    staging = uploads_dir / f"{target.stem}.upload-tmp.csv"
+    staging.write_bytes(content)
+    try:
+        if normalize:
+            hours = min_hours if min_hours > 0 else MIN_HOURS_IMPORT
+            normalize_profile_csv_file(f"config/uploads/{staging.name}", min_hours=hours)
+        os.replace(staging, target)
+    finally:
+        staging.unlink(missing_ok=True)
+    return f"config/uploads/{target.name}"
 
 def save_energiemonitor_profile_csvs(
     profile_id: str,

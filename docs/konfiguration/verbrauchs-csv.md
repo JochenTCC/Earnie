@@ -26,9 +26,10 @@ timestamp;power_kw
 | Abtastung    | Beliebig. Beim Import rechnet Earnie auf Stundenwerte um: zuerst Zero-Order-Hold auf ein 1‑Minuten-Raster, dann Stundenmittel = ∫P·dt / 1 h. Bei Lücken gilt der letzte Wert bis zum nächsten Sample. |
 
 
-Beim Upload schreibt Earnie eine **normalisierte** Datei nach `earnie_env/config/uploads/` (im Container: `config/uploads/`). Der Dateiname leitet sich vom Original ab: `{Originalname}_resampled.csv` (z. B. `BEZUG-2025-22.7.2026_resampled.csv`).
+Beim Upload schreibt Earnie eine **normalisierte** Datei nach `earnie_env/config/uploads/` (im Container: `config/uploads/`). Der Dateiname setzt sich aus Hausprofil, Rolle bzw. Verbraucher und Originalname zusammen: `{Profil}_{Rolle oder Verbraucher}_{Originalname}_resampled.csv` (z. B. `mein_haus_verbrauch_BEZUG-2025-22.7.2026_resampled.csv`).
 
-- **Gleicher Originalname:** Ein erneuter Upload überschreibt die vorhandene resampled-Datei.
+- **Gleicher Originalname, gleiches Ziel:** Ein erneuter Upload überschreibt die vorhandene resampled-Datei, aber erst, wenn die neue Datei gültig ist. Ist sie ungültig, bleibt die bisherige Datei unverändert.
+- **Gleicher Originalname, anderes Profil, andere Rolle oder anderer Verbraucher:** Jedes Ziel bekommt eine eigene Datei.
 - **Anderer Originalname:** Earnie legt eine neue Datei an, und der Profil-Pfad zeigt auf diese neue Datei.
 
 ## Importmodus (Hausprofil)

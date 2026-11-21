@@ -419,7 +419,8 @@ def _update_scenarios_for_battery_save(
     if renamed:
         _ent()._rewrite_id_list_in_scenarios("battery_ids", old_id, entity_id)
         _rewrite_shadow_battery_overlay(old_id, entity_id)
-    # Scrub before components save: reinit rejects Powerstations in battery_ids.
+    # Reinit rejects Powerstations in battery_ids: runs inside the caller's
+    # ``deferred_reinit`` together with the components save.
     if is_powerstation:
         _scrub_battery_ids_from_scenarios(entity_id)
         if renamed:
@@ -491,9 +492,7 @@ def upsert_battery(
         in grid_tied_house_battery_ids([save_spec], data.get("inverters")),
     )
     is_powerstation = str(save_spec.get("type") or "") == "powerstation"
-    _update_scenarios_for_battery_save(
-        entity_id, old_id, is_powerstation=is_powerstation
-    )
+    renamed = bool(old_id and old_id != entity_id)
     prev_attached = _previous_attached_ids(batteries, {entity_id, old_id})
     batteries = [
         item
@@ -502,13 +501,22 @@ def upsert_battery(
     ]
     batteries.append(save_spec)
     data["batteries"] = batteries
-    _ent()._save_components_document(data)
-    if is_powerstation:
-        new_attached = list(save_spec.get("attached_consumer_ids") or [])
-        # Only push battery→consumer when the attached list itself changed;
-        # otherwise auto-persist of inherited fields would detach consumers.
-        if new_attached != prev_attached:
-            sync_consumers_from_powerstation_attached(entity_id, new_attached)
+    from ui import house_config_io as _io
+
+    # Components first (validated on save), then scenarios and consumers; one reinit
+    # at the end, so no reinit sees the new id in one file and the old in the other.
+    with _io.deferred_reinit():
+        _ent()._save_components_document(data)
+        _update_scenarios_for_battery_save(
+            entity_id, old_id, is_powerstation=is_powerstation
+        )
+        if is_powerstation:
+            new_attached = list(save_spec.get("attached_consumer_ids") or [])
+            # Push battery→consumer when the attached list changed or the id did
+            # (consumers carry the powerstation id); not otherwise, or auto-persist
+            # of inherited fields would detach consumers.
+            if new_attached != prev_attached or renamed:
+                sync_consumers_from_powerstation_attached(entity_id, new_attached)
     return entity_id
 
 
@@ -522,8 +530,6 @@ def delete_battery(entity_id: str) -> None:
     target = str(entity_id or "").strip()
     if not target:
         raise ValueError("Batterie-ID fehlt.")
-    # Scrub first so components save → reinit does not see a dangling id.
-    _scrub_battery_ids_from_scenarios(target)
     data = _ent()._load_components_document()
     batteries = list(data.get("batteries") or [])
     remaining = [item for item in batteries if str(item.get("id", "")).strip() != target]
@@ -552,4 +558,10 @@ def delete_battery(entity_id: str) -> None:
             )
     data["batteries"] = remaining
     data["inverters"] = drop_owned_inverters(inverters, battery_id=target)
-    _ent()._save_components_document(data)
+    from ui import house_config_io as _io
+
+    # Checks above run before anything is written; components first, then the
+    # scenarios, one reinit for both (none sees a dangling id).
+    with _io.deferred_reinit():
+        _ent()._save_components_document(data)
+        _scrub_battery_ids_from_scenarios(target)

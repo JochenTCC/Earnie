@@ -44,9 +44,10 @@ def _load_components_document() -> dict:
 
 def _save_components_document(data: dict) -> None:
     from house_config.components_store import save_components_document
+    from ui import house_config_io as _io
 
     save_components_document(resolve_components_json_path(), data)
-    config.reinit_config()
+    _io.reinit_after_write()
 
 def _pv_bindings_src(
     raw_spec: dict, existing: dict | None, *, old_id: str, entity_id: str
@@ -147,8 +148,6 @@ def upsert_pv_system(
     )
 
     save_spec = activate_pv_system_required(save_spec)
-    if old_id and old_id != entity_id:
-        _rewrite_id_list_in_scenarios("pv_system_ids", old_id, entity_id)
     data["pv_systems"] = _replace_entity_in_list(systems, save_spec, {entity_id, old_id})
     # Re-activate inverter required keys (sens_inv_power_pv) after PV attach/detach.
     invs = list(data.get("inverters") or [])
@@ -160,7 +159,13 @@ def upsert_pv_system(
             activate_inverter_required(inv, pv_systems=data.get("pv_systems") or [])
         )
     data["inverters"] = refreshed
-    _save_components_document(data)
+    from ui import house_config_io as _io
+
+    # Components first (validated on save), then the scenarios; one reinit for both.
+    with _io.deferred_reinit():
+        _save_components_document(data)
+        if old_id and old_id != entity_id:
+            _rewrite_id_list_in_scenarios("pv_system_ids", old_id, entity_id)
     return entity_id
 
 
@@ -349,7 +354,6 @@ def delete_pv_system(entity_id: str) -> None:
     if len(remaining) == len(systems):
         raise ValueError(f"Unbekanntes PV-Feld '{target}'.")
     data["pv_systems"] = remaining
-    _save_components_document(data)
 
     doc = _io.load_backtesting_scenarios_raw()
     changed = False
@@ -369,9 +373,11 @@ def delete_pv_system(entity_id: str) -> None:
         else:
             settings.pop("pv_system_ids", None)
         changed = True
-    if changed:
-        _io.save_backtesting_scenarios(doc)
-        config.reinit_config()
+    # Components first (validated on save), then the scenarios; one reinit for both.
+    with _io.deferred_reinit():
+        _save_components_document(data)
+        if changed:
+            _io.save_backtesting_scenarios(doc)
 
 
 

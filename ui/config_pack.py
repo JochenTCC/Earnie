@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import zipfile
 
 import streamlit as st
 
@@ -63,7 +64,7 @@ def _render_config_pack_import() -> None:
         return
     try:
         written = import_config_pack_bytes(uploaded.getvalue())
-    except (DataModelError, ValueError, OSError, KeyError) as exc:
+    except (DataModelError, ValueError, OSError, KeyError, zipfile.BadZipFile) as exc:
         st.error(str(exc))
         logger.warning("config pack import rejected: %s", exc)
         return
