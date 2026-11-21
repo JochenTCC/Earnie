@@ -67,13 +67,18 @@ def _select_profile(profiles: dict[str, dict], request: dict | None) -> str:
     ids = list(profiles)
     displays, id_by_display = label_select_choices(profiles, ids, new_option=None)
     display_by_id = {entity_id: display for display, entity_id in id_by_display.items()}
+    live_id = resolve_live_profile_id({"profiles": profiles})
+    if not live_id:
+        st.warning(
+            "Das Live-Szenario verweist auf ein Hausprofil, das es nicht gibt — "
+            "bitte im Szenarienkonfigurator korrigieren. Bis dahin zeigt die "
+            "Auswahl das erste Hausprofil."
+        )
     wanted = (request or {}).get("profile_id")
     if wanted in profiles:
         st.session_state[_PROFILE_SELECT_KEY] = display_by_id[wanted]
     elif st.session_state.get(_PROFILE_SELECT_KEY) not in displays:
-        st.session_state[_PROFILE_SELECT_KEY] = display_by_id[
-            resolve_live_profile_id({"profiles": profiles})
-        ]
+        st.session_state[_PROFILE_SELECT_KEY] = display_by_id[live_id or ids[0]]
     picked = st.selectbox(
         "Hausprofil",
         displays,

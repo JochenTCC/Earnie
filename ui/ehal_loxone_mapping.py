@@ -301,22 +301,28 @@ def resolve_field_select_default(existing: str, proposed: str) -> str:
 
 
 def resolve_live_profile_id(house_doc: dict) -> str:
-    """Prefer Live-Szenario house_profile_id; else first profile id."""
+    """House profile id of the Live-Szenario.
+
+    An empty ``house_profile_id`` means the first profile, the same default the
+    daemon uses (``house_config.scenario_resolution._prepare_live_scenario_settings``).
+    A ``house_profile_id`` that names no profile in ``house_doc`` returns ``""``:
+    the optimizer rejects such a scenario, so callers must report it instead of
+    working on another profile.
+    """
     refs = get_live_scenario_refs()
     profile_id = _nonempty(refs.get("house_profile_id"))
     profiles = house_doc.get("profiles") or {}
     if isinstance(profiles, dict):
-        if profile_id and profile_id in profiles:
-            return profile_id
-        return next(iter(profiles), "")
-    if isinstance(profiles, list):
-        for profile in profiles:
-            if isinstance(profile, dict) and _nonempty(profile.get("id")) == profile_id:
-                return profile_id
-        for profile in profiles:
-            if isinstance(profile, dict) and profile.get("id"):
-                return str(profile["id"])
-    return ""
+        ids = [str(key) for key in profiles if str(key or "").strip()]
+    elif isinstance(profiles, list):
+        ids = [
+            str(p["id"]) for p in profiles if isinstance(p, dict) and _nonempty(p.get("id"))
+        ]
+    else:
+        ids = []
+    if profile_id:
+        return profile_id if profile_id in ids else ""
+    return ids[0] if ids else ""
 
 
 def consumers_for_profile(house_doc: dict, profile_id: str) -> list[dict]:
@@ -631,6 +637,10 @@ def _render_field_selects(
             )
             if mapped:
                 ehal_map[field] = mapped
+            elif field in bindings and not str(bindings.get(field) or "").strip():
+                # Q8 activation key (empty Merker = addressed by exchange ID): keep it,
+                # the select has no option for it and would drop it on save.
+                ehal_map[field] = ""
     return ehal_map
 
 
