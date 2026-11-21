@@ -99,9 +99,12 @@ def _render_next_month_rate_entry(
     cols[1].markdown(f"**Monat**  \n{month}")
     cent = cols[2].number_input(
         "Cent/kWh",
-        min_value=0.01,
+        # Export may be 0 ct; import needs a price.
+        min_value=0.0 if side == "export" else 0.01,
         step=0.01,
         format="%.3f",
+        value=None,
+        placeholder="Wert eingeben",
         key=cent_key,
         help=f"Wird in tariffs.json für {tariff['id']} ergänzt.",
     )
@@ -109,6 +112,9 @@ def _render_next_month_rate_entry(
         "Speichern",
         key=scoped_widget_key(session_scope, f"next_month_save_{side}"),
     ):
+        if cent is None:
+            st.error("Bitte zuerst den Cent/kWh-Wert eintragen.")
+            return
         try:
             append_tariff_monthly_rate(
                 side=side,

@@ -479,3 +479,38 @@ def test_ordered_user_scenario_ids_dedupes_and_skips_blank():
         labels={"live": "Live", "b": "B", "a": "A"},
     )
     assert ordered == ["live", "b", "a"]
+
+
+def test_missing_refs_are_carried_and_dropped_on_request():
+    from ui.scenario_form_helpers import (
+        carry_missing_refs,
+        drop_missing_refs,
+        hidden_scenario_settings,
+        missing_scenario_refs,
+    )
+
+    stored = {
+        "import_tariff_id": "gone_tariff",
+        "battery_ids": ["bat_a", "gone_bat"],
+        "house_profile_id": "home",
+        "pv_kwp": 6.0,
+    }
+    missing = missing_scenario_refs(
+        stored,
+        profiles={"home": {"id": "home"}},
+        batteries=[{"id": "bat_a"}],
+        pv_systems=[],
+        import_tariffs=[{"id": "fixed"}],
+        export_tariffs=[],
+    )
+    assert missing == {"import_tariff_id": ["gone_tariff"], "battery_ids": ["gone_bat"]}
+    form = {"battery_ids": ["bat_a"], "house_profile_id": "home"}
+    carried = carry_missing_refs(form, missing)
+    assert carried["import_tariff_id"] == "gone_tariff"
+    assert carried["battery_ids"] == ["bat_a", "gone_bat"]
+    # A pick of another tariff replaces the missing one.
+    assert carry_missing_refs({"import_tariff_id": "fixed"}, missing)["import_tariff_id"] == "fixed"
+    dropped = drop_missing_refs(stored, missing)
+    assert "import_tariff_id" not in dropped
+    assert dropped["battery_ids"] == ["bat_a"]
+    assert hidden_scenario_settings(stored) == {"pv_kwp": 6.0}
