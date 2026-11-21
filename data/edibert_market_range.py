@@ -5,7 +5,7 @@ UTC month under ``runtime/edibert_market/market_archive/<zone>/``, HTTP 429 wait
 aWATTar fallback: without an answer and without a cache the run fails. ``price_source: csv`` reads an
 Energy-Charts CSV download (offline source, test fixtures).
 
-Both return the frame the SE works with: naive Vienna time index ``ts_price``, column
+Both return the frame the SE works with: naive planning-timezone index ``ts_price``, column
 ``price_cent_kwh``; the two quarter-hours of the repeated autumn hour are averaged as before.
 """
 from __future__ import annotations
@@ -17,11 +17,11 @@ from pathlib import Path
 import pandas as pd
 from edibert import api
 
+import config
 from runtime_store.persist_paths import runtime_path
 
 logger = logging.getLogger(__name__)
 
-PRICE_INDEX_TZ = "Europe/Vienna"
 CACHE_DIR_NAME = "edibert_market"
 
 
@@ -30,12 +30,17 @@ def energy_charts_price_column(zone: str) -> str:
     return f"Day Ahead Auktion ({zone})"
 
 
+def price_index_tz() -> str:
+    """Timezone of the naive ``ts_price`` index: the planning timezone of the config."""
+    return config.get_planning_timezone()
+
+
 def _local_frame(stamps: pd.Series, cents: pd.Series) -> pd.DataFrame:
-    """UTC stamps + cent/kWh → naive Vienna index, duplicates (autumn hour) averaged."""
+    """UTC stamps + cent/kWh → naive planning-timezone index, duplicates (autumn hour) averaged."""
     frame = pd.DataFrame(
         {
             "ts_price": pd.to_datetime(stamps, utc=True)
-            .dt.tz_convert(PRICE_INDEX_TZ)
+            .dt.tz_convert(price_index_tz())
             .dt.tz_localize(None)
             .to_numpy(),
             "price_cent_kwh": pd.to_numeric(cents, errors="coerce").to_numpy(),
@@ -47,8 +52,9 @@ def _local_frame(stamps: pd.Series, cents: pd.Series) -> pd.DataFrame:
 def _archive_prices(
     zone: str, start: pd.Timestamp, end: pd.Timestamp, timeout: float
 ) -> pd.DataFrame:
-    first = start.normalize().tz_localize(PRICE_INDEX_TZ).to_pydatetime()
-    last = (end.normalize() + pd.Timedelta(days=1)).tz_localize(PRICE_INDEX_TZ).to_pydatetime()
+    tz = price_index_tz()
+    first = start.normalize().tz_localize(tz).to_pydatetime()
+    last = (end.normalize() + pd.Timedelta(days=1)).tz_localize(tz).to_pydatetime()
     archive = api.MarketArchive(zone, Path(runtime_path(CACHE_DIR_NAME)), timeout=timeout)
     data = archive.prices(first, last)
     for note in data.notes:

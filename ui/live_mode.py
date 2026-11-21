@@ -222,7 +222,7 @@ def _restore_cached_opt_in_bundle() -> None:
 
 
 def _opt_in_planning_inputs() -> tuple[object, list] | None:
-    """Planungsfenster + Matrix; None wenn keine Börsenpreise verfügbar sind."""
+    """Planungsfenster + Matrix; None ohne Börsenpreise, PV-Prognose oder Verbrauchsprofile."""
     planning_window = profile_manager.compute_live_planning_window()
     market_data = fetch_live_day_ahead_prices(planning_end=planning_window.end)
     if not market_data:
@@ -232,7 +232,14 @@ def _opt_in_planning_inputs() -> tuple[object, list] | None:
         )
         st.session_state.pop(SESSION_LIVE_DISPLAY_BUNDLE, None)
         return None
-    matrix = profile_manager.build_live_planning_matrix(market_data, planning_window)
+    from data.pv_forecast import PvForecastUnavailableError
+
+    try:
+        matrix = profile_manager.build_live_planning_matrix(market_data, planning_window)
+    except (PvForecastUnavailableError, profile_manager.ConsumptionProfileUnavailableError) as exc:
+        st.error(f"🚨 Planung nicht möglich: {exc}")
+        st.session_state.pop(SESSION_LIVE_DISPLAY_BUNDLE, None)
+        return None
     return planning_window, matrix
 
 

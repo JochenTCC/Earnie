@@ -19,6 +19,27 @@ from runtime_store.planning_clock import planning_now
 
 logger = logging.getLogger(__name__)
 
+_REMEDY_GENERATE_CONS_DATA = (
+    "Abhilfe: im Szenario-Explorer „Verbrauchsdaten generieren (synthetisch)“ ausführen "
+    "oder gemessene Verbrauchsdaten abwarten; Earnie berechnet die Profile im nächsten "
+    "Zyklus neu."
+)
+
+
+class ConsumptionProfileUnavailableError(RuntimeError):
+    """A consumption profile the plan needs is missing, unreadable or incomplete (cycle aborts)."""
+
+
+class MissingConsumptionDataError(ValueError):
+    """cons_data.csv has no rows, or not every hour, for a day a logged-day run needs."""
+
+
+def _remedy_delete_profile(profile_path: str) -> str:
+    return (
+        f"Abhilfe: '{profile_path}' löschen; Earnie berechnet die Datei im nächsten Zyklus "
+        "aus cons_data.csv neu."
+    )
+
 
 def _cons_data_to_profile_dataframe(cons_df: pd.DataFrame) -> pd.DataFrame:
     """Wandelt cons_data in das interne Profil-Format (Total, BaseLoad, Verbraucher-Namen)."""
@@ -88,18 +109,27 @@ def _flex_profile_export_spec(df: pd.DataFrame) -> tuple[list[str], dict[str, st
     return label_cols, rename_to_csv
 
 
-def generate_consumption_profile() -> bool:
-    """Berechnet Verbrauchsprofile aus cons_data.csv."""
+def generate_consumption_profile() -> None:
+    """Berechnet Verbrauchsprofile aus cons_data.csv.
+
+    Raises :class:`ConsumptionProfileUnavailableError` when cons_data.csv is missing or
+    empty, or when the profiles cannot be computed or written.
+    """
+    print("[cache] Verarbeite Verbrauchsdaten und isoliere die Haus-Grundlast...")
     try:
-        print("[cache] Verarbeite Verbrauchsdaten und isoliere die Haus-Grundlast...")
         df = _load_profile_source_dataframe()
-        if df is None or df.empty:
-            path = cons_data_store.get_output_path()
-            print(
-                f"[WARN] Profil-Update abgebrochen: '{path}' fehlt oder ist leer. "
-                "Bitte scripts/generate_cons_data.py ausführen."
-            )
-            return False
+    except Exception as exc:
+        raise ConsumptionProfileUnavailableError(
+            f"Verbrauchsprofile nicht berechenbar: cons_data.csv nicht lesbar ({exc}). "
+            f"{_REMEDY_GENERATE_CONS_DATA}"
+        ) from exc
+    if df is None or df.empty:
+        path = cons_data_store.get_output_path()
+        raise ConsumptionProfileUnavailableError(
+            f"Verbrauchsprofile nicht berechenbar: '{path}' fehlt oder ist leer. "
+            f"{_REMEDY_GENERATE_CONS_DATA}"
+        )
+    try:
         df['Month'] = df.index.month
         df['Weekday'] = df.index.weekday
         df['Hour'] = df.index.hour
@@ -123,39 +153,38 @@ def generate_consumption_profile() -> bool:
             for csv_col in rename_to_csv.values():
                 flex_profile[csv_col] = flex_profile[csv_col].round(3)
             flex_profile.to_csv(flexible_consumer_profiles_file(), index=False, sep=";")
-
-        print(
-            "[OK] 'consumption_profiles.csv', 'total_consumption_profiles.csv' "
-            "und ggf. 'flexible_consumer_profiles.csv' erfolgreich neu berechnet!"
-        )
-        return True
-    except Exception as e:
-        print(f"[FEHLER] Fehler bei der Profilberechnung: {e}")
-        return False
+    except Exception as exc:
+        raise ConsumptionProfileUnavailableError(
+            f"Verbrauchsprofile nicht berechenbar: {exc}. {_REMEDY_GENERATE_CONS_DATA}"
+        ) from exc
+    print(
+        "[OK] 'consumption_profiles.csv', 'total_consumption_profiles.csv' "
+        "und ggf. 'flexible_consumer_profiles.csv' erfolgreich neu berechnet!"
+    )
 
 
 def _flex_profile_needs_regeneration() -> bool:
-    """True wenn flexible_consumer_profiles.csv fehlt oder keine Verbraucher-Spalten hat."""
-    flex_path = flexible_consumer_profiles_file()
-    if not config.get_flexible_consumers():
+    """True wenn flexible_consumer_profiles.csv fehlt, nicht lesbar ist oder einem
+    gemessenen flexiblen Verbraucher (cons_data-Spalte) seine Profilspalte fehlt."""
+    from data.cons_data_house_profile import expected_cons_data_consumer_ids
+    from settings.flexible_consumers import profile_column_id
+
+    profiled_ids = set(expected_cons_data_consumer_ids())
+    expected = {
+        profile_column_id(consumer)
+        for consumer in config.get_flexible_consumers()
+        if str(consumer["id"]) in profiled_ids
+    }
+    if not expected:
         return False
+    flex_path = flexible_consumer_profiles_file()
     if not os.path.exists(flex_path):
         return True
     try:
         header = pd.read_csv(flex_path, sep=";", nrows=0).columns.tolist()
     except Exception:
         return True
-    data_cols = {col for col in header if col not in {"Month", "Weekday", "Hour"}}
-    if not data_cols or data_cols == {"Consumption"}:
-        return True
-    from settings.flexible_consumers import profile_column_id
-
-    expected = {
-        profile_column_id(consumer)
-        for consumer in config.get_flexible_consumers()
-    }
-    expected.update(str(consumer["id"]) for consumer in config.get_flexible_consumers())
-    return not data_cols.intersection(expected)
+    return not expected.issubset(header)
 
 
 def _flex_profile_status_message() -> str:
@@ -187,11 +216,8 @@ def check_and_update_profile_if_new_month() -> None:
     elif not os.path.exists(total_consumption_profiles_file()):
         update_reason = "total_consumption_profiles.csv fehlt"
         should_update = True
-    elif not os.path.exists(flexible_consumer_profiles_file()) and config.get_flexible_consumers():
-        update_reason = "flexible_consumer_profiles.csv fehlt"
-        should_update = True
     elif _flex_profile_needs_regeneration():
-        update_reason = "flexible_consumer_profiles.csv unvollständig oder veraltet"
+        update_reason = "flexible_consumer_profiles.csv fehlt, unvollständig oder veraltet"
         should_update = True
     else:
         file_time = os.path.getmtime(profile_path)
@@ -213,30 +239,63 @@ def check_and_update_profile_if_new_month() -> None:
         logger.info("Profil-Check: %s — kein Update nötig.", status)
 
 
-def _load_hourly_profile(target_hours: List, profile_path: str, column: str = "Consumption") -> List[float]:
-    """Lädt stündliche Profilwerte (Month/Weekday/Hour) für die Zielstunden."""
-    global_hour_defaults = {h: 0.5 for h in range(24)}
-
+def _read_profile_csv(profile_path: str, columns: list[str]) -> pd.DataFrame:
+    """Profil-CSV mit Month/Weekday/Hour und ``columns``; sonst ConsumptionProfileUnavailableError."""
     if not os.path.exists(profile_path):
-        return [global_hour_defaults.get(dt.hour, 0.5) for dt in target_hours]
-
+        raise ConsumptionProfileUnavailableError(
+            f"Verbrauchsprofil '{profile_path}' fehlt. {_REMEDY_GENERATE_CONS_DATA}"
+        )
     try:
         df_profiles = pd.read_csv(profile_path, sep=';')
+    except Exception as exc:
+        raise ConsumptionProfileUnavailableError(
+            f"Verbrauchsprofil '{profile_path}' nicht lesbar ({exc}). "
+            f"{_remedy_delete_profile(profile_path)}"
+        ) from exc
+    missing = [col for col in ["Month", "Weekday", "Hour", *columns] if col not in df_profiles.columns]
+    if missing:
+        raise ConsumptionProfileUnavailableError(
+            f"Verbrauchsprofil '{profile_path}' ohne Spalte(n) {', '.join(missing)}. "
+            f"{_remedy_delete_profile(profile_path)}"
+        )
+    return df_profiles
+
+
+def _profile_values(
+    df_profiles: pd.DataFrame, column: str, target_hours: List, profile_path: str
+) -> List[float]:
+    """Werte je Zielstunde: exakter Month/Weekday/Hour-Eintrag, sonst Mittel der Stunde in der Datei."""
+    try:
         lookup = df_profiles.set_index(['Month', 'Weekday', 'Hour'])[column].to_dict()
-        hour_fallback = df_profiles.groupby('Hour')[column].mean().to_dict()
-        values = []
-        for dt in target_hours:
-            key = (dt.month, dt.weekday(), dt.hour)
-            if key in lookup:
-                values.append(float(lookup[key]))
-            elif dt.hour in hour_fallback:
-                values.append(float(hour_fallback[dt.hour]))
-            else:
-                values.append(global_hour_defaults.get(dt.hour, 0.5))
-        return values
-    except Exception as e:
-        print(f"[FEHLER] Fehler beim Verarbeiten von '{profile_path}': {e}. Nutze statische Defaults.")
-        return [global_hour_defaults[dt.hour] for dt in target_hours]
+        hour_mean = df_profiles.groupby('Hour')[column].mean().to_dict()
+    except Exception as exc:
+        raise ConsumptionProfileUnavailableError(
+            f"Verbrauchsprofil '{profile_path}' nicht auswertbar ({exc}). "
+            f"{_remedy_delete_profile(profile_path)}"
+        ) from exc
+    values = []
+    for dt in target_hours:
+        key = (dt.month, dt.weekday(), dt.hour)
+        if key in lookup:
+            values.append(float(lookup[key]))
+        elif dt.hour in hour_mean:
+            values.append(float(hour_mean[dt.hour]))
+        else:
+            raise ConsumptionProfileUnavailableError(
+                f"Verbrauchsprofil '{profile_path}' hat keine Werte für {dt.hour:02d} Uhr "
+                f"(Spalte {column}). {_REMEDY_GENERATE_CONS_DATA}"
+            )
+    return values
+
+
+def _load_hourly_profile(target_hours: List, profile_path: str, column: str = "Consumption") -> List[float]:
+    """Lädt stündliche Profilwerte (Month/Weekday/Hour) für die Zielstunden.
+
+    Raises :class:`ConsumptionProfileUnavailableError` when the file is missing, unreadable
+    or has no value for an hour of the day; no invented load.
+    """
+    df_profiles = _read_profile_csv(profile_path, [column])
+    return _profile_values(df_profiles, column, target_hours, profile_path)
 
 
 def _load_consumption_profile(target_hours: List) -> List[float]:
@@ -363,50 +422,39 @@ def _build_optimization_matrix(
 
 
 def _load_flexible_consumer_hourly_profiles(target_hours: List) -> dict[str, List[float]]:
-    """Lädt stündliche Profilwerte je flexiblem Verbraucher für die Zielstunden."""
+    """Lädt stündliche Profilwerte je flexiblem Verbraucher für die Zielstunden.
+
+    Consumers without a cons_data column (``expected_cons_data_consumer_ids``) get a zero
+    profile: they are not measured. For every other consumer the column must be in
+    flexible_consumer_profiles.csv, else :class:`ConsumptionProfileUnavailableError`.
+    """
     from settings.flexible_consumers import profile_column_id
 
+    from data.cons_data_house_profile import expected_cons_data_consumer_ids
+
     consumers = config.get_flexible_consumers()
-    profiles = {consumer["id"]: [] for consumer in consumers}
+    if not consumers:
+        return {}
+    profiled_ids = set(expected_cons_data_consumer_ids())
+    column_by_consumer = {
+        str(consumer["id"]): profile_column_id(consumer)
+        for consumer in consumers
+        if str(consumer["id"]) in profiled_ids
+    }
+    profiles: dict[str, List[float]] = {
+        consumer["id"]: [0.0] * len(target_hours)
+        for consumer in consumers
+        if str(consumer["id"]) not in column_by_consumer
+    }
+    if not column_by_consumer:
+        return profiles
     profile_path = flexible_consumer_profiles_file()
-
-    if not os.path.exists(profile_path):
-        return {cid: [0.0] * len(target_hours) for cid in profiles}
-
-    try:
-        df_profiles = pd.read_csv(profile_path, sep=';')
-        csv_columns = set(df_profiles.columns)
-        column_by_consumer = {
-            str(consumer["id"]): profile_column_id(consumer)
-            for consumer in consumers
-            if profile_column_id(consumer) in csv_columns
-        }
-        lookup = {
-            cid: df_profiles.set_index(['Month', 'Weekday', 'Hour'])[col].to_dict()
-            for cid, col in column_by_consumer.items()
-        }
-        hour_fallback = {
-            cid: df_profiles.groupby('Hour')[col].mean().to_dict()
-            for cid, col in column_by_consumer.items()
-        }
-        for dt in target_hours:
-            key = (dt.month, dt.weekday(), dt.hour)
-            for consumer in consumers:
-                cid = consumer["id"]
-                if cid not in lookup:
-                    profiles[cid].append(0.0)
-                    continue
-                if key in lookup[cid]:
-                    profiles[cid].append(float(lookup[cid][key]))
-                elif dt.hour in hour_fallback[cid]:
-                    profiles[cid].append(float(hour_fallback[cid][dt.hour]))
-                else:
-                    profiles[cid].append(0.0)
-    except Exception as e:
-        print(f"[FEHLER] Fehler beim Laden von '{profile_path}': {e}. Nutze Null-Profile.")
-        return {cid: [0.0] * len(target_hours) for cid in profiles}
-
-    return profiles
+    df_profiles = _read_profile_csv(profile_path, list(column_by_consumer.values()))
+    for consumer in consumers:
+        col = column_by_consumer.get(str(consumer["id"]))
+        if col is not None:
+            profiles[consumer["id"]] = _profile_values(df_profiles, col, target_hours, profile_path)
+    return {consumer["id"]: profiles[consumer["id"]] for consumer in consumers}
 
 
 def compute_live_planning_window(now: datetime | None = None):
@@ -493,25 +541,65 @@ def get_forecast_vectors(market_data) -> Tuple[List[float], List[float], List[di
 # ==============================================================================
 # NEU: EXTRAKTION DER GRUNDLAST UND TAGESSUMMEN FÜR DEN OPTIMIZER (SIMULATION)
 # ==============================================================================
-def get_historical_day_data(target_date) -> Tuple[List[float], dict, List[float]]:
+def _local_hours_of_day(day: date) -> list[int]:
+    """Clock hours that exist on ``day`` in the planning timezone (spring DST day: 23)."""
+    from datetime import time, timezone
+    from zoneinfo import ZoneInfo
+
+    tz = ZoneInfo(config.get_planning_timezone())
+    hours = []
+    for hour in range(24):
+        naive = datetime.combine(day, time(hour))
+        round_trip = naive.replace(tzinfo=tz).astimezone(timezone.utc).astimezone(tz)
+        if round_trip.replace(tzinfo=None) == naive:
+            hours.append(hour)
+    return hours
+
+
+def get_historical_day_data(
+    target_date, *, require_complete: bool = False
+) -> Tuple[List[float], dict, List[float]]:
     """
     Extrahiert für ein bestimmtes Datum die 24-stündige Grundlast, die Tages-Summen
     der steuerbaren Verbraucher sowie den geloggten Gesamtverbrauch (kW pro Stunde).
+
+    A day without rows in cons_data returns ``([], {}, [])``: no totals, the caller decides
+    (Live: configured ``daily_target_kwh``). Hours missing inside a day count as 0 kW with a
+    warning. ``require_complete=True`` (Szenario-Explorer / Backtesting, logged day) raises
+    :class:`MissingConsumptionDataError` for a day without rows or with missing hours.
     """
     if isinstance(target_date, str):
         target_date = pd.to_datetime(target_date).date()
     elif isinstance(target_date, datetime):
         target_date = target_date.date()
-        
-    df = _load_profile_source_dataframe()
-    if df is None or df.empty:
-        print(
-            f"[WARN] Keine historischen Daten in cons_data für das Datum {target_date}."
-        )
-        empty_totals = {c["id"]: 0.0 for c in config.get_flexible_consumers()}
-        return [0.5] * 24, empty_totals, [0.5] * 24
 
-    df_day = df[df.index.date == target_date]
+    df = _load_profile_source_dataframe()
+    df_day = df[df.index.date == target_date] if df is not None and not df.empty else None
+    expected_hours = _local_hours_of_day(target_date)
+    present_hours = set() if df_day is None else set(df_day.index.hour)
+    missing_hours = [hour for hour in expected_hours if hour not in present_hours]
+    if missing_hours and require_complete:
+        what = (
+            "keine Daten"
+            if len(missing_hours) == len(expected_hours)
+            else f"{len(missing_hours)} von {len(expected_hours)} Stunden fehlen "
+            f"({', '.join(f'{hour:02d}' for hour in missing_hours)} Uhr)"
+        )
+        raise MissingConsumptionDataError(
+            f"cons_data.csv: für den {target_date:%d.%m.%Y} {what}. Den Zeitraum auf Tage mit "
+            "vollständigen Verbrauchsdaten einschränken oder die Verbrauchsdaten neu erzeugen."
+        )
+    if df_day is None or df_day.empty:
+        logger.warning("cons_data.csv: keine Daten für %s.", target_date)
+        return [], {}, []
+    if missing_hours:
+        logger.warning(
+            "cons_data.csv: für %s fehlen %d Stunden (%s Uhr); sie zählen mit 0 kW.",
+            target_date,
+            len(missing_hours),
+            ", ".join(f"{hour:02d}" for hour in missing_hours),
+        )
+
     full_day_range = pd.date_range(
         start=f"{target_date} 00:00:00",
         end=f"{target_date} 23:00:00",
@@ -519,11 +607,15 @@ def get_historical_day_data(target_date) -> Tuple[List[float], dict, List[float]
     )
     df_day = df_day.reindex(full_day_range, fill_value=0.0)
 
+    from data.cons_data_house_profile import consumer_labels_for_ids
+
+    flexible = config.get_flexible_consumers()
+    labels = consumer_labels_for_ids([str(consumer["id"]) for consumer in flexible])
     historical_totals = {
-        consumer["id"]: round(float(df_day[consumer["name"]].sum()), 3)
-        if consumer["name"] in df_day.columns
+        consumer["id"]: round(float(df_day[labels[str(consumer["id"])]].sum()), 3)
+        if labels[str(consumer["id"])] in df_day.columns
         else 0.0
-        for consumer in config.get_flexible_consumers()
+        for consumer in flexible
     }
     actual_baseload = df_day['BaseLoad'].round(3).tolist()
     actual_total = df_day['Total'].round(3).tolist()

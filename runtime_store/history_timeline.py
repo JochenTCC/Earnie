@@ -13,6 +13,7 @@ from typing import Any
 import config
 from optimizer.schedule import QUARTER_HOUR_MINUTES, quarter_hour_slot_start
 from optimizer.simulation import calculate_step_cost_euro_from_row, flexible_consumer_power_kw
+from optimizer.slot_duration import quarter_hour_grid
 
 from . import optimization_history
 from .history_chart_rows import (
@@ -133,20 +134,17 @@ def quarter_hour_slots_between(
     window_start: datetime,
     window_end_exclusive: datetime,
 ) -> tuple[datetime, ...]:
-    """Viertelstunden-Slots in [window_start, window_end_exclusive)."""
+    """Viertelstunden-Slots in [window_start, window_end_exclusive), in Echtzeit gestuft (DST: 92 / 100)."""
     if window_start.tzinfo is None or window_end_exclusive.tzinfo is None:
         raise ValueError("window_start und window_end_exclusive müssen timezone-aware sein.")
     if window_end_exclusive <= window_start:
         return ()
-    step = timedelta(minutes=QUARTER_HOUR_MINUTES)
-    slot = _coerce_slot_start(window_start)
-    end_bound = _coerce_slot_start(window_end_exclusive)
-    if window_end_exclusive > end_bound:
-        end_bound += step
-    slots: list[datetime] = []
-    while slot < end_bound and slot < window_end_exclusive:
-        slots.append(slot)
-        slot += step
+    slots = quarter_hour_grid(
+        _coerce_slot_start(window_start),
+        window_end_exclusive,
+        step=timedelta(minutes=QUARTER_HOUR_MINUTES),
+        include_end=False,
+    )
     return tuple(slots)
 
 

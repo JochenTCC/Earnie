@@ -24,7 +24,7 @@ from optimizer.milp_horizon import (
     plant_battery_params,
     plant_soc_percent,
 )
-from optimizer.slot_duration import DEFAULT_DT_H, validate_dt_h
+from optimizer.slot_duration import DEFAULT_DT_H, quarter_hour_grid, validate_dt_h
 from runtime_store.power_interval_sampler import MIN_SAMPLE_COUNT_FOR_MEAN
 from runtime_store.savings_ledger_flex import FlexDayInputs, retime_flex_day
 
@@ -619,18 +619,13 @@ def _slot_row(inp: LedgerInput, slot: LedgerSlot, dt_h: float) -> dict[str, Any]
 
 
 def _grid_slot_starts(day_start: datetime, day_end: datetime, dt_h: float) -> list[datetime]:
-    """Slot starts in ``[day_start, day_end)`` on the quarter-hour grid."""
+    """Slot starts in ``[day_start, day_end)`` on the quarter-hour grid, stepped in real time."""
     step = timedelta(hours=dt_h)
     minutes = int(step.total_seconds() // 60)
     first = day_start.replace(minute=(day_start.minute // minutes) * minutes, second=0, microsecond=0)
     if first < day_start:
         first += step
-    starts = []
-    moment = first
-    while moment < day_end:
-        starts.append(moment)
-        moment += step
-    return starts
+    return quarter_hour_grid(first, day_end, step=step, include_end=False)
 
 
 def _slots_in_day(day_start: datetime, day_end: datetime, dt_h: float) -> int:

@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import time
 from datetime import datetime, timedelta
 from typing import Iterable
 
@@ -38,6 +39,30 @@ CSV_SEP = ";"
 SOURCE_LOXONE = "loxone"
 SOURCE_SYNTHETIC = "synthetic"
 SOURCE_MEASURED = "measured"
+
+
+_REPLACE_ATTEMPTS = 3
+_REPLACE_SLEEP_SEC = 0.2
+
+
+def _replace_atomically(tmp_path: str, path: str) -> None:
+    """``os.replace`` with short retries (Windows: a reader may hold the target open)."""
+    for attempt in range(_REPLACE_ATTEMPTS):
+        try:
+            os.replace(tmp_path, path)
+            return
+        except PermissionError:
+            if attempt + 1 == _REPLACE_ATTEMPTS:
+                os.remove(tmp_path)
+                raise
+            time.sleep(_REPLACE_SLEEP_SEC * (attempt + 1))
+
+
+def _write_json_atomic(path: str, payload: dict, **dump_kwargs) -> None:
+    tmp_path = f"{path}.tmp"
+    with open(tmp_path, "w", encoding="utf-8") as f:
+        json.dump(payload, f, **dump_kwargs)
+    _replace_atomically(tmp_path, path)
 
 
 def get_output_path() -> str:
@@ -155,7 +180,11 @@ def save_cons_data(df: pd.DataFrame, path: str | None = None, *, apply_retention
 
     export = df.reset_index()
     export["timestamp"] = export["timestamp"].dt.strftime("%Y-%m-%d %H:%M:%S")
-    export.to_csv(path, sep=CSV_SEP, index=False, decimal=".")
+    # Write next to the target and replace it: a crash mid-write must not cut the
+    # only copy of the measured history.
+    tmp_path = f"{path}.tmp"
+    export.to_csv(tmp_path, sep=CSV_SEP, index=False, decimal=".")
+    _replace_atomically(tmp_path, path)
 
     meta_path = path[: -len(".csv")] + METADATA_SUFFIX if path.endswith(".csv") else path + METADATA_SUFFIX
     from data.cons_data_house_profile import (
@@ -176,8 +205,7 @@ def save_cons_data(df: pd.DataFrame, path: str | None = None, *, apply_retention
         },
         schema_version=CONS_DATA_META_SCHEMA,
     )
-    with open(meta_path, "w", encoding="utf-8") as f:
-        json.dump(meta, f, indent=2, ensure_ascii=False)
+    _write_json_atomic(meta_path, meta, indent=2, ensure_ascii=False)
 
     return path
 
@@ -359,14 +387,26 @@ def _load_pending_state() -> dict:
             payload["samples"] = []
         return payload
     except (json.JSONDecodeError, OSError) as e:
-        logger.warning("cons_data pending state unreadable: %s", e)
+        # Keep the unreadable file: the next save would otherwise overwrite the samples.
+        kept = f"{PENDING_STATE_FILE}.unreadable-{datetime.now():%Y%m%d-%H%M%S}"
+        try:
+            os.replace(PENDING_STATE_FILE, kept)
+        except OSError as move_exc:
+            raise RuntimeError(
+                f"cons_data pending state {PENDING_STATE_FILE} unreadable ({e}) and could "
+                f"not be moved aside ({move_exc})."
+            ) from e
+        logger.error(
+            "cons_data pending state unreadable (%s) — kept as %s, starting a new buffer.",
+            e,
+            kept,
+        )
         return {"samples": [], "last_daily_flush": None}
 
 
 def _save_pending_state(state: dict) -> None:
     payload = stamp_payload(strip_metadata(state), schema_version=CONS_DATA_PENDING_SCHEMA)
-    with open(PENDING_STATE_FILE, "w", encoding="utf-8") as f:
-        json.dump(payload, f, indent=2)
+    _write_json_atomic(PENDING_STATE_FILE, payload, indent=2)
 
 
 def record_live_sample(

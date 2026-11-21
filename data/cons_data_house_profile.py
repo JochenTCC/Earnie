@@ -189,7 +189,34 @@ def expected_cons_data_consumer_ids() -> list[str]:
     return cons_data_consumer_ids(profile)
 
 
+# Column names of the profile frame (``data.profile_manager``) next to the consumer labels.
+_RESERVED_PROFILE_COLUMNS = frozenset({"Total", "BaseLoad", "Month", "Weekday", "Hour"})
+
+
 def consumer_labels_for_ids(consumer_ids: list[str]) -> dict[str, str]:
+    """Display label per consumer id; unique over all cons_data consumers.
+
+    The labels name the columns of the profile frame, so two consumers with the same
+    name (or a name equal to a frame column) get their id appended instead of sharing
+    one column.
+    """
+    all_ids = list(dict.fromkeys([*expected_cons_data_consumer_ids(), *consumer_ids]))
+    raw = _raw_consumer_labels(all_ids)
+    counts: dict[str, int] = {}
+    for label in raw.values():
+        counts[label] = counts.get(label, 0) + 1
+    unique = {
+        cid: (
+            f"{label} ({cid})"
+            if counts[label] > 1 or label in _RESERVED_PROFILE_COLUMNS
+            else label
+        )
+        for cid, label in raw.items()
+    }
+    return {cid: unique[cid] for cid in consumer_ids}
+
+
+def _raw_consumer_labels(consumer_ids: list[str]) -> dict[str, str]:
     labels = {cid: cid for cid in consumer_ids}
     config_by_runtime_id = {
         runtime_consumer_id(c): str(c.get("name") or c["id"])

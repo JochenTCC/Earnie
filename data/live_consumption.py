@@ -18,7 +18,6 @@ from settings.flexible_consumers import flex_kw_to_canonical
 
 logger = logging.getLogger(__name__)
 
-_UI_TIMEZONE = ZoneInfo("Europe/Vienna")
 _DEAD_TELEMETRY_EPS = 1e-6
 
 
@@ -71,8 +70,8 @@ def build_consumption_snapshot(
 
 
 def _ui_slot_datetime() -> datetime:
-    """Aktueller Zeitpunkt für Live-UI (Filter-Inferenz im nativen Fenster)."""
-    return datetime.now(tz=_UI_TIMEZONE)
+    """Aktueller Zeitpunkt für Live-UI (Filter-Inferenz im nativen Fenster), Planungszeitzone."""
+    return datetime.now(tz=ZoneInfo(config.get_planning_timezone()))
 
 
 def _filter_contexts_from_config_fallback() -> dict[str, dict]:

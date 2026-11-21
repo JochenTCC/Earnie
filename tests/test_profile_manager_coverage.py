@@ -13,6 +13,13 @@ from data import profile_manager as pm
 VIENNA = ZoneInfo("Europe/Vienna")
 
 
+@pytest.fixture
+def profiled_ev(monkeypatch):
+    monkeypatch.setattr(
+        "data.cons_data_house_profile.expected_cons_data_consumer_ids", lambda: ["ev", "pool"]
+    )
+
+
 def test_load_cons_data_profile_dataframe_empty():
     with patch.object(pm.cons_data_store, "load_cons_data", return_value=pd.DataFrame()):
         assert pm.load_cons_data_profile_dataframe() is None
@@ -32,10 +39,24 @@ def test_load_cons_data_pv_series_values():
     assert series.tolist() == [1.5, 2.0]
 
 
-def test_load_hourly_profile_missing_file_uses_defaults(tmp_path):
+def test_load_hourly_profile_missing_file_raises(tmp_path):
     hours = [datetime(2024, 6, 1, h) for h in (0, 12)]
-    values = pm._load_hourly_profile(hours, str(tmp_path / "missing.csv"))
-    assert values == [0.5, 0.5]
+    with pytest.raises(pm.ConsumptionProfileUnavailableError, match="fehlt.*Verbrauchsdaten generieren"):
+        pm._load_hourly_profile(hours, str(tmp_path / "missing.csv"))
+
+
+def test_load_hourly_profile_without_the_column_raises(tmp_path):
+    path = tmp_path / "profiles.csv"
+    path.write_text("Month;Weekday;Hour;Other\n6;5;10;1.0\n", encoding="utf-8")
+    with pytest.raises(pm.ConsumptionProfileUnavailableError, match="Consumption.*löschen"):
+        pm._load_hourly_profile([datetime(2024, 6, 1, 10)], str(path))
+
+
+def test_load_hourly_profile_without_the_hour_raises(tmp_path):
+    path = tmp_path / "profiles.csv"
+    path.write_text("Month;Weekday;Hour;Consumption\n6;5;10;1.0\n", encoding="utf-8")
+    with pytest.raises(pm.ConsumptionProfileUnavailableError, match="03 Uhr"):
+        pm._load_hourly_profile([datetime(2024, 6, 1, 3)], str(path))
 
 
 def test_load_hourly_profile_lookup_and_hour_fallback(tmp_path):
@@ -55,13 +76,13 @@ def test_load_hourly_profile_lookup_and_hour_fallback(tmp_path):
     assert values[1] == pytest.approx(0.75)
 
 
-def test_flex_profile_needs_regeneration_missing(tmp_path, monkeypatch):
+def test_flex_profile_needs_regeneration_missing(tmp_path, monkeypatch, profiled_ev):
     monkeypatch.setattr(pm, "flexible_consumer_profiles_file", lambda: str(tmp_path / "flex.csv"))
     with patch.object(pm.config, "get_flexible_consumers", return_value=[{"id": "ev"}]):
         assert pm._flex_profile_needs_regeneration() is True
 
 
-def test_flex_profile_needs_regeneration_false_when_column_present(tmp_path, monkeypatch):
+def test_flex_profile_needs_regeneration_false_when_column_present(tmp_path, monkeypatch, profiled_ev):
     path = tmp_path / "flex.csv"
     path.write_text("Month;Weekday;Hour;ev\n6;0;10;0.5\n", encoding="utf-8")
     monkeypatch.setattr(pm, "flexible_consumer_profiles_file", lambda: str(path))
@@ -172,13 +193,11 @@ def test_get_historical_date_picker_bounds_without_cons_data(monkeypatch):
     assert lo < hi
 
 
-def test_get_historical_day_data_empty_cons(monkeypatch):
+def test_get_historical_day_data_empty_cons_has_no_totals(monkeypatch):
     monkeypatch.setattr(pm, "_load_profile_source_dataframe", lambda: None)
     with patch.object(pm.config, "get_flexible_consumers", return_value=[{"id": "ev", "name": "EV"}]):
         base, totals, total = pm.get_historical_day_data("2024-06-01")
-    assert base == [0.5] * 24
-    assert totals == {"ev": 0.0}
-    assert total == [0.5] * 24
+    assert (base, totals, total) == ([], {}, [])
 
 
 def test_get_historical_day_data_from_frame(monkeypatch):
@@ -245,19 +264,29 @@ def test_cons_data_to_profile_dataframe_maps_columns(monkeypatch):
     assert list(frame["Smart"]) == [0.5, 0.7]
 
 
-def test_generate_consumption_profile_empty_returns_false(monkeypatch):
+def test_generate_consumption_profile_without_cons_data_raises(monkeypatch):
     monkeypatch.setattr(pm, "_load_profile_source_dataframe", lambda: None)
     monkeypatch.setattr(pm.cons_data_store, "get_output_path", lambda: "missing.csv")
-    assert pm.generate_consumption_profile() is False
+    with pytest.raises(pm.ConsumptionProfileUnavailableError, match="'missing.csv' fehlt"):
+        pm.generate_consumption_profile()
 
 
-def test_generate_consumption_profile_exception_returns_false(monkeypatch):
+def test_generate_consumption_profile_error_raises(monkeypatch):
     monkeypatch.setattr(
         pm,
         "_load_profile_source_dataframe",
         lambda: (_ for _ in ()).throw(RuntimeError("boom")),
     )
-    assert pm.generate_consumption_profile() is False
+    with pytest.raises(pm.ConsumptionProfileUnavailableError, match="boom"):
+        pm.generate_consumption_profile()
+
+
+def test_check_and_update_propagates_a_failed_regeneration(tmp_path, monkeypatch):
+    monkeypatch.setattr(pm, "consumption_profiles_file", lambda: str(tmp_path / "c.csv"))
+    monkeypatch.setattr(pm, "_load_profile_source_dataframe", lambda: None)
+    monkeypatch.setattr(pm.cons_data_store, "get_output_path", lambda: "cons_data.csv")
+    with pytest.raises(pm.ConsumptionProfileUnavailableError):
+        pm.check_and_update_profile_if_new_month()
 
 
 def test_generate_consumption_profile_writes_base_and_total(tmp_path, monkeypatch):
@@ -274,7 +303,7 @@ def test_generate_consumption_profile_writes_base_and_total(tmp_path, monkeypatc
     monkeypatch.setattr(pm, "total_consumption_profiles_file", lambda: str(total_path))
     monkeypatch.setattr(pm, "flexible_consumer_profiles_file", lambda: str(flex_path))
     monkeypatch.setattr(pm, "_flex_profile_export_spec", lambda _df: ([], {}))
-    assert pm.generate_consumption_profile() is True
+    pm.generate_consumption_profile()
     base = pd.read_csv(cons_path, sep=";")
     total = pd.read_csv(total_path, sep=";")
     assert "Consumption" in base.columns
@@ -283,7 +312,7 @@ def test_generate_consumption_profile_writes_base_and_total(tmp_path, monkeypatc
     assert not flex_path.exists()
 
 
-def test_flex_profile_needs_regeneration_consumption_only(tmp_path, monkeypatch):
+def test_flex_profile_needs_regeneration_consumption_only(tmp_path, monkeypatch, profiled_ev):
     path = tmp_path / "flex.csv"
     path.write_text("Month;Weekday;Hour;Consumption\n6;0;10;0.5\n", encoding="utf-8")
     monkeypatch.setattr(pm, "flexible_consumer_profiles_file", lambda: str(path))
@@ -373,7 +402,7 @@ def test_load_consumption_and_total_profiles(monkeypatch):
     assert pm._load_total_consumption_profile(hours) == [0.2, 0.3]
 
 
-def test_load_flexible_consumer_profiles_missing_file(tmp_path, monkeypatch):
+def test_load_flexible_consumer_profiles_missing_file_raises(tmp_path, monkeypatch, profiled_ev):
     monkeypatch.setattr(
         pm, "flexible_consumer_profiles_file", lambda: str(tmp_path / "missing.csv")
     )
@@ -382,21 +411,29 @@ def test_load_flexible_consumer_profiles_missing_file(tmp_path, monkeypatch):
         "get_flexible_consumers",
         return_value=[{"id": "ev"}, {"id": "pool"}],
     ):
-        profiles = pm._load_flexible_consumer_hourly_profiles(
-            [datetime(2024, 6, 1, 10)]
-        )
-    assert profiles == {"ev": [0.0], "pool": [0.0]}
+        with pytest.raises(pm.ConsumptionProfileUnavailableError, match="fehlt"):
+            pm._load_flexible_consumer_hourly_profiles([datetime(2024, 6, 1, 10)])
 
 
-def test_load_flexible_consumer_profiles_corrupt_csv(tmp_path, monkeypatch):
+def test_load_flexible_consumer_profiles_corrupt_csv_raises(tmp_path, monkeypatch, profiled_ev):
     path = tmp_path / "flex.csv"
     path.write_text("not;a;valid\nprofile\n", encoding="utf-8")
     monkeypatch.setattr(pm, "flexible_consumer_profiles_file", lambda: str(path))
     with patch.object(pm.config, "get_flexible_consumers", return_value=[{"id": "ev"}]):
-        profiles = pm._load_flexible_consumer_hourly_profiles(
-            [datetime(2024, 6, 1, 10), datetime(2024, 6, 1, 11)]
-        )
-    assert profiles == {"ev": [0.0, 0.0]}
+        with pytest.raises(pm.ConsumptionProfileUnavailableError, match="löschen"):
+            pm._load_flexible_consumer_hourly_profiles([datetime(2024, 6, 1, 10)])
+
+
+def test_unmeasured_flexible_consumer_gets_a_zero_profile_without_a_file(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "data.cons_data_house_profile.expected_cons_data_consumer_ids", lambda: []
+    )
+    monkeypatch.setattr(
+        pm, "flexible_consumer_profiles_file", lambda: str(tmp_path / "missing.csv")
+    )
+    with patch.object(pm.config, "get_flexible_consumers", return_value=[{"id": "heat"}]):
+        profiles = pm._load_flexible_consumer_hourly_profiles([datetime(2024, 6, 1, 10)])
+    assert profiles == {"heat": [0.0]}
 
 
 def test_build_live_planning_matrix_wires_helpers(monkeypatch):

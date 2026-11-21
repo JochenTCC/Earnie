@@ -74,7 +74,7 @@ def test_generate_consumption_profile_writes_canonical_flex_columns(tmp_path, mo
         lambda: ["ev"],
     )
 
-    assert pm.generate_consumption_profile() is True
+    pm.generate_consumption_profile()
     flex_df = pd.read_csv(flex_path, sep=";")
     assert "ev" in flex_df.columns
     assert "eauto" not in flex_df.columns
