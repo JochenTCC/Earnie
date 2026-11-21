@@ -21,8 +21,15 @@ from pathlib import Path
 
 from version import __version__, normalize_for_image_build
 
-DEFAULT_REGISTRY_IMAGE = "ghcr.io/jochentcc/earnie-energy"
-LEGACY_REGISTRY_IMAGE = "ghcr.io/jochentcc/ernie-energy"
+# GitHub organisation move (Step 1): every image is also published under the
+# organisation namespace. Installed systems keep pulling the personal namespace
+# until a later release switches the default image names.
+GHCR_NAMESPACE = "ghcr.io/jochentcc"
+ORG_GHCR_NAMESPACE = "ghcr.io/earnie-hems"
+DEFAULT_REGISTRY_IMAGE = f"{GHCR_NAMESPACE}/earnie-energy"
+LEGACY_REGISTRY_IMAGE = f"{GHCR_NAMESPACE}/ernie-energy"
+ORG_REGISTRY_IMAGE = f"{ORG_GHCR_NAMESPACE}/earnie-energy"
+REGISTRY_IMAGES = (DEFAULT_REGISTRY_IMAGE, LEGACY_REGISTRY_IMAGE, ORG_REGISTRY_IMAGE)
 DEFAULT_PLATFORM = "linux/amd64"
 MULTIARCH_PLATFORM = "linux/amd64,linux/arm64"
 TARGET_PLATFORMS = {
@@ -104,7 +111,8 @@ def stage_shadow_client(dest: Path) -> None:
 def default_tags(version: str | None = None) -> list[str]:
     """Default GHCR tags for *version* (defaults to ``version.__version__``).
 
-    Every release gets ``:next`` and ``:<version>`` (plus legacy aliases).
+    Every release gets ``:next`` and ``:<version>`` (plus the legacy alias and
+    the organisation namespace, see ``REGISTRY_IMAGES``).
     Official releases also get ``:latest``. Pre-releases omit ``:latest`` so
     it stays on the last official build; ``:next`` always points at the newest
     build (stable or pre-release).
@@ -112,7 +120,7 @@ def default_tags(version: str | None = None) -> list[str]:
     ver = __version__ if version is None else version
     include_latest = not is_prerelease_version(ver)
     tags: list[str] = []
-    for image in (DEFAULT_REGISTRY_IMAGE, LEGACY_REGISTRY_IMAGE):
+    for image in REGISTRY_IMAGES:
         if include_latest:
             tags.append(f"{image}:latest")
         tags.append(f"{image}:next")

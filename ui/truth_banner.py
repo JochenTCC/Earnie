@@ -13,6 +13,11 @@ from runtime_store.registry_entitlement import RegistryReport, registry_status
 from version import display_version
 
 OFFICIAL_REPO_URL = "https://github.com/JochenTCC/Earnie"
+# GitHub organisation move, Step 1: the repo moves to the organisation after the
+# 2.8 release; installed systems must accept both identities before the transfer.
+# OFFICIAL_REPO_URL stays the one displayed and linked until the move is done.
+ORG_REPO_URL = "https://github.com/Earnie-HEMS/Earnie"
+OFFICIAL_REPO_URLS = (OFFICIAL_REPO_URL, ORG_REPO_URL)
 REQUIRED_PHRASE_NONCOMMERCIAL = "nicht-kommerziell"
 REQUIRED_PHRASE_PRODUCT = "Earnie"
 BANNER_LABEL = "Banner der Wahrheit"
@@ -59,12 +64,11 @@ def resolve_build_origin() -> str | None:
 
 
 def is_unofficial_origin(origin: str | None) -> bool:
-    """True only when origin is present and clearly not the official repo."""
+    """True only when origin is present and clearly none of the official repos."""
     if not origin or not str(origin).strip():
         return False
-    official = _normalize_repo_identity(OFFICIAL_REPO_URL)
-    actual = _normalize_repo_identity(origin)
-    return actual != official
+    official = {_normalize_repo_identity(url) for url in OFFICIAL_REPO_URLS}
+    return _normalize_repo_identity(origin) not in official
 
 
 _BOUND_COLOR = "#008000"
