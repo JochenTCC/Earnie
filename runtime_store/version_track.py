@@ -56,7 +56,15 @@ class _SemVer:
             return False
         if other.pre is None:
             return True
-        return self.pre < other.pre
+        return _pre_release_key(self.pre) < _pre_release_key(other.pre)
+
+
+def _pre_release_key(pre: str) -> list[tuple[int, int, str]]:
+    """SemVer precedence of a pre-release: numeric identifiers as numbers, below text ones."""
+    return [
+        (0, int(part), "") if part.isdigit() else (1, 0, part)
+        for part in pre.split(".")
+    ]
 
 
 def last_run_version_path() -> str:

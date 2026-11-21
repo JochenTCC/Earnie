@@ -155,7 +155,12 @@ def _write_day_slots(closing: sl.LedgerState) -> None:
     fail loud on the missing day (``savings_ledger_store.closed_day_slots``).
     """
     try:
-        store.append_day_slots(sl.day_slots_record(closing))
+        record = sl.day_slots_record(closing)
+        if store.last_line_has_day(
+            store.savings_ledger_slots_file(), record["day_start"], record["chain_start"]
+        ):
+            return
+        store.append_day_slots(record)
     except Exception as exc:  # noqa: BLE001 — see above
         logger.warning(
             "savings ledger: slots of day %s not written (%r); rebuild with: "
@@ -230,7 +235,18 @@ def _on_cycle(
                 row = closed_day.row
                 # Append before taking the new state: if the write fails, the next
                 # slot closes the same day again instead of losing the row.
-                store.append_row(row)
+                # A daemon that stopped between this append and the state save closes the
+                # same day again after its restart: the row is then already there.
+                if store.last_line_has_day(
+                    store.savings_ledger_file(), row["day_start"], row["chain_start"]
+                ):
+                    logger.warning(
+                        "savings ledger: day %s is already in the ledger (stop before the "
+                        "state was saved); not appended again.",
+                        row["day_start"],
+                    )
+                else:
+                    store.append_row(row)
                 _write_day_slots(closed_day.closing)
                 logger.info(
                     "savings ledger: day %s closed, saving %.2f EUR (adjusted %.2f EUR, coverage %.2f).",

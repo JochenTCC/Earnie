@@ -37,8 +37,11 @@ def _save_state(path: str, data: dict[str, Any]) -> None:
     parent = os.path.dirname(path)
     if parent:
         os.makedirs(parent, exist_ok=True)
-    with open(path, "w", encoding="utf-8") as handle:
+    # Temp file + replace: a stop during the write must not leave a cut-off state file.
+    tmp = f"{path}.tmp"
+    with open(tmp, "w", encoding="utf-8") as handle:
         json.dump(payload, handle, indent=2)
+    os.replace(tmp, path)
 
 
 def _load_state(path: str) -> dict[str, Any]:
@@ -596,12 +599,19 @@ def finalize_closed_interval(
         closed_at=closed_at,
     )
     end = start + timedelta(minutes=QUARTER_HOUR_MINUTES)
+    # Also drop what lies before the closed slot: samples and anchors of slots no cycle
+    # closed (restart, skipped cycle) are never asked for again.
     kept: list[dict[str, Any]] = []
     for sample in samples:
         ts = _parse_ts(sample.get("ts"))
-        if ts is None or not (start <= ts < end):
+        if ts is None or ts >= end:
             kept.append(sample)
     state["samples"] = kept
+    state["energy_anchors"] = {
+        key: anchor
+        for key, anchor in (state.get("energy_anchors") or {}).items()
+        if (_parse_ts(key) or end) >= end
+    }
     _save_state(path, state)
     logger.info(
         "power_interval_sampler: closed %s samples=%d pv=%.3f kW src=%s",

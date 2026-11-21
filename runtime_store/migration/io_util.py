@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import json
 import os
-import shutil
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -64,30 +63,42 @@ def write_json_atomic(path: Path, doc: dict[str, Any]) -> None:
 
 
 def replace_pack_docs(config_dir: str | Path, docs: Docs) -> tuple[str, ...]:
-    """Atomically replace pack files present in ``docs``. Returns written names."""
+    """Replace the pack files present in ``docs``, each atomically. Returns written names.
+
+    When a write fails, the files already replaced get their previous bytes back (a file
+    the call created is removed) and the error is raised: the set is old or new, not mixed.
+    """
     root = Path(config_dir)
+    names = [name for name in docs if name in PACK_FILENAMES]
+    previous: dict[str, bytes | None] = {
+        name: ((root / name).read_bytes() if (root / name).is_file() else None) for name in names
+    }
     written: list[str] = []
-    with tempfile.TemporaryDirectory(prefix="earnie_mig_") as tmp:
-        tmp_root = Path(tmp)
-        for name, doc in docs.items():
-            if name not in PACK_FILENAMES:
-                continue
-            dest_tmp = tmp_root / name
-            dest_tmp.write_text(
-                json.dumps(doc, indent=4, ensure_ascii=False) + "\n",
-                encoding="utf-8",
-            )
-        for name in docs:
-            if name not in PACK_FILENAMES:
-                continue
-            src = tmp_root / name
-            if not src.is_file():
-                continue
-            dest = root / name
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(src, dest)
+    try:
+        for name in names:
+            write_json_atomic(root / name, docs[name])
             written.append(name)
+    except BaseException:
+        for name in written:
+            content = previous[name]
+            if content is None:
+                (root / name).unlink(missing_ok=True)
+            else:
+                _write_bytes_atomic(root / name, content)
+        raise
     return tuple(written)
+
+
+def _write_bytes_atomic(path: Path, content: bytes) -> None:
+    fd, tmp_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=str(path.parent))
+    try:
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(content)
+        os.replace(tmp_name, path)
+    except Exception:
+        if os.path.isfile(tmp_name):
+            os.unlink(tmp_name)
+        raise
 
 
 def stable_json_text(doc: dict[str, Any]) -> str:

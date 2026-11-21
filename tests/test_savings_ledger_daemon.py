@@ -294,6 +294,27 @@ def test_planning_shadow_soc_is_none_for_a_chain_without_battery_after_one_was_a
     assert "no shadow SoC for the plan" not in caplog.text
 
 
+def test_day_closed_again_after_a_stop_before_the_state_save_is_not_appended_twice(ledger, caplog):
+    state_path, rows_path = ledger
+    _cycle("2026-11-02T06:45:03", _closed("2026-11-02T06:30:00"))
+    _cycle("2026-11-02T07:00:02", _closed("2026-11-02T06:45:00"))
+    before_close = state_path.read_text(encoding="utf-8")
+    row = _cycle("2026-11-02T07:15:04", _closed("2026-11-02T07:00:00"))
+    assert row is not None
+
+    # the daemon stopped after the appends, before the state was saved
+    state_path.write_text(before_close, encoding="utf-8")
+    hook.reset()
+    with caplog.at_level(logging.WARNING):
+        again = _cycle("2026-11-02T07:15:30", _closed("2026-11-02T07:00:00"))
+
+    assert again == row
+    assert "already in the ledger" in caplog.text
+    rows = store.read_rows(str(rows_path))
+    assert rows == [row]
+    assert list(store.closed_day_slots(rows)) == [row["day_start"]]
+
+
 def test_out_of_band_cycle_only_updates_the_prices(ledger):
     _cycle("2026-11-02T10:00:01", _closed("2026-11-02T09:45:00"), price=30.0)
     # out-of-band run in the same slot: no closed interval, newer prices win

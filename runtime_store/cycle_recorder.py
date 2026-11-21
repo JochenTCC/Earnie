@@ -268,6 +268,8 @@ def _ensure_config_snapshot(config_hash: str) -> None:
     configs_dir().mkdir(parents=True, exist_ok=True)
     path = configs_dir() / f"{config_hash}.json"
     if path.is_file():
+        # Mark the snapshot as in use: ``prune_old_snapshots`` keeps it by its mtime.
+        os.utime(path)
         return
     snapshot: dict[str, Any] = {"schema": RECORDER_SCHEMA, "files": {}}
     for source_path, archive_name in iter_input_files():
@@ -306,6 +308,25 @@ def prune_old_segments(keep_days: int | None = None) -> list[Path]:
         except ValueError:
             continue
         if day < cutoff:
+            path.unlink(missing_ok=True)
+            removed.append(path)
+    if removed:
+        removed.extend(prune_old_snapshots(cutoff))
+    return removed
+
+
+def prune_old_snapshots(cutoff: date) -> list[Path]:
+    """Delete config snapshots last used before ``cutoff``. Returns removed paths.
+
+    Every cycle touches its snapshot (``_ensure_config_snapshot``), so a snapshot whose
+    mtime lies before the oldest kept segment day is referenced by no kept cycle.
+    """
+    root = configs_dir()
+    if not root.is_dir():
+        return []
+    removed: list[Path] = []
+    for path in root.glob("*.json"):
+        if date.fromtimestamp(path.stat().st_mtime) < cutoff:
             path.unlink(missing_ok=True)
             removed.append(path)
     return removed
