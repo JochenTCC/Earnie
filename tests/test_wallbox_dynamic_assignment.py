@@ -233,3 +233,43 @@ def test_an_ev_without_a_wallbox_has_no_charger() -> None:
     pool = pool_dynamic_ev_view(spec, ["wb_big"])
     with pytest.raises(ValueError, match="keine Wallbox zugeordnet"):
         charger_id_of_ev(pool)
+
+
+def _without_plug_signal(wallbox: dict) -> dict:
+    out = {**wallbox}
+    out["ehal_bindings"] = {
+        k: v for k, v in wallbox["ehal_bindings"].items() if not k.endswith("sens_evcs_connected")
+    }
+    return out
+
+
+def test_loader_view_needs_no_plug_signal() -> None:
+    # Scenario Explorer / backtesting assign by arrival (D9): a planned wallbox needs no binding.
+    no_plug = dict(WALLBOXES, wb_small=_without_plug_signal(WALLBOXES["wb_small"]))
+    spec = _ev()
+    resolve_dynamic_ev_view(spec, no_plug, label="car_a")
+    assert [w["id"] for w in spec[VIEW_DYNAMIC_KEY]] == ["wb_big", "wb_small"]
+
+
+def test_live_requires_the_plug_signal_on_every_dynamic_wallbox() -> None:
+    from house_config.wallboxes import require_plug_signals
+
+    require_plug_signals(WALLBOXES)
+    no_plug = dict(WALLBOXES, wb_small=_without_plug_signal(WALLBOXES["wb_small"]))
+    with pytest.raises(ValueError, match="'wb_small': Binding sens_evcs_connected fehlt"):
+        require_plug_signals(no_plug)
+
+
+def test_live_daemon_fails_loud_without_a_plug_signal(monkeypatch, tmp_path) -> None:
+    from integrations import ev_assignment_live
+
+    monkeypatch.setattr(store, "consume_picks", lambda: [])
+    monkeypatch.setattr(store, "set_live_assignments", lambda _a: None)
+    no_plug = {"wb_small": _without_plug_signal(WALLBOXES["wb_small"])}
+    monkeypatch.setattr(ev_assignment_live, "_dynamic_setup", lambda: ([_ev()], no_plug))
+    with pytest.raises(SystemExit) as exited:
+        ev_assignment_live.start()
+    assert exited.value.code == 1
+    with pytest.raises(ValueError, match="sens_evcs_connected fehlt"):
+        ev_assignment_live.tick()
+    ev_assignment_live.reset_for_tests()

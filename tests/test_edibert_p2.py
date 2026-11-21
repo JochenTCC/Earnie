@@ -64,6 +64,7 @@ def test_plan_lists_both_steps_and_all_questions(tmp_path: Path) -> None:
         "dm6.wallboxes",
         "dm6.debug_dump_flag_removal",
         "dm6.scenario_own_reference_removal",
+        "dm6.wallbox_charger_keys",
         "tf1.tariff_format",
         "tf1.grid_area_levies",
     )
@@ -96,6 +97,7 @@ def test_one_run_one_backup_matches_golden_and_is_idempotent(tmp_path: Path) -> 
         "dm6.wallboxes",
         "dm6.debug_dump_flag_removal",
         "dm6.scenario_own_reference_removal",
+        "dm6.wallbox_charger_keys",
         "tf1.tariff_format",
         "tf1.grid_area_levies",
     )

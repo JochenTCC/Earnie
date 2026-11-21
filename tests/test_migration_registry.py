@@ -117,7 +117,7 @@ def test_meta_every_step_covered_by_fixture_detect(tmp_path):
     for name in (
         *HAPPY_SNAPSHOTS, "v3_last", "v3_ha_sign", "v4_pre_ha_pull", "v4_pre_se_conf_defaults",
         "v4_pre_tariff_track", "v5_pre_scenario_feed_in", "v5_pre_heat_source",
-        "v5_pre_heating_systems", "v5_pre_grid_levies",
+        "v5_pre_heating_systems", "v5_pre_grid_levies", "v6_pre_wallbox_charger_keys",
     ):
         docs = load_pack_docs(_copy_snapshot(tmp_path / "meta", name))
         for step in STEPS:
@@ -162,6 +162,7 @@ def test_per_step_detect_apply_smoke(tmp_path):
         "dm6.debug_dump_flag_removal": "v5_pre_heat_source",
         "dm6.scenario_own_reference_removal": "v5_pre_heat_source",
         "dm6.consumer_bare_bindings": "v5_pre_heat_source",
+        "dm6.wallbox_charger_keys": "v6_pre_wallbox_charger_keys",
         "tf1.tariff_format": "v4_pre_tariff_track",
         "tf1.grid_area_levies": "v5_pre_grid_levies",
     }

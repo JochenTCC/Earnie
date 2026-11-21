@@ -54,6 +54,9 @@ from runtime_store.migration.steps.topology import STEP as TOPOLOGY
 from runtime_store.migration.steps.v3_to_v4 import STEP as V3_TO_V4
 from runtime_store.migration.steps.vat_deductible import STEP as VAT_DEDUCTIBLE
 from runtime_store.migration.steps.wallboxes import STEP as WALLBOXES
+from runtime_store.migration.steps.wallbox_charger_keys import (
+    STEP as WALLBOX_CHARGER_KEYS,
+)
 from runtime_store.migration.types import MigrationStep
 
 # Inventory order (Earnie-env-home chronology + code dependencies). Data model 5 comes after
@@ -93,6 +96,7 @@ STEPS: tuple[MigrationStep, ...] = (
     DEBUG_DUMP_FLAG_REMOVAL,
     SCENARIO_OWN_REFERENCE_REMOVAL,
     CONSUMER_BARE_BINDINGS,
+    WALLBOX_CHARGER_KEYS,
     TARIFF_FORMAT,
     GRID_AREA_LEVIES,
 )

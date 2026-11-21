@@ -366,6 +366,7 @@ def test_feed_in_migration_asks_per_flat_scenario(tmp_path):
         "dm6.wallboxes",
         "dm6.debug_dump_flag_removal",
         "dm6.scenario_own_reference_removal",
+        "dm6.wallbox_charger_keys",
         "tf1.grid_area_levies",
     )
     by_id = {q.id: q for q in plan.questions}
@@ -398,6 +399,7 @@ def test_feed_in_migration_writes_tariffs_and_drops_flat_keys(tmp_path):
         "dm6.wallboxes",
         "dm6.debug_dump_flag_removal",
         "dm6.scenario_own_reference_removal",
+        "dm6.wallbox_charger_keys",
         "tf1.grid_area_levies",
     )
     doc = json.loads((config_dir / "backtesting_scenarios.json").read_text(encoding="utf-8"))
