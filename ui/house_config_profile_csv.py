@@ -73,15 +73,48 @@ _PASSTHROUGH_CONSUMER_KEYS = (
 def _digital_csv_decision_key(session_scope: str, index: int, path: str) -> str:
     return _scoped_key(session_scope, f"hc_digital_csv_decision_{index}_{path}")
 
+def _raw_upload_of(path: str) -> str:
+    """The upload as sent next to the normalized ``path`` ('' when none is kept)."""
+    from pathlib import Path
+
+    from runtime_store.persist_paths import resolve_config_prefixed_path
+    from ui.house_config_csv_io import raw_upload_sidecar
+
+    raw = raw_upload_sidecar(path)
+    return raw if Path(resolve_config_prefixed_path(raw)).is_file() else ""
+
+
+def _drop_raw_upload(path: str) -> None:
+    """The 0/1 question is answered: the kept upload is no longer needed (asked once)."""
+    from pathlib import Path
+
+    from runtime_store.persist_paths import resolve_config_prefixed_path
+    from ui.house_config_csv_io import raw_upload_sidecar
+
+    Path(resolve_config_prefixed_path(raw_upload_sidecar(path))).unlink(missing_ok=True)
+
+
 def _ensure_consumer_csv_normalized(
     path: str,
     *,
     digital_scale_kw: float | None = None,
 ) -> None:
-    from house_config.consumption_csv import load_hourly_profile_csv, normalize_profile_csv_file
+    from house_config.consumption_csv import (
+        load_and_normalize_profile_csv,
+        load_hourly_profile_csv,
+        normalize_profile_csv_file,
+        write_canonical_hourly_csv,
+    )
 
     if digital_scale_kw is not None:
-        normalize_profile_csv_file(path, digital_scale_kw=digital_scale_kw)
+        raw = _raw_upload_of(path)
+        if raw:
+            # Scale the 0/1 samples as uploaded, then average to hours.
+            rows = load_and_normalize_profile_csv(raw, digital_scale_kw=digital_scale_kw)
+            write_canonical_hourly_csv(path, rows)
+        else:
+            normalize_profile_csv_file(path, digital_scale_kw=digital_scale_kw)
+        _drop_raw_upload(path)
         return
     try:
         load_hourly_profile_csv(path)
@@ -109,11 +142,14 @@ def _render_digital_csv_scale_prompt(
             st.warning(f"CSV noch nicht normalisierbar: {exc}")
         return
     try:
-        looks_digital = profile_csv_looks_digital(path)
+        # Detect on the upload as sent: hourly averaging of a 15-minute on/off log
+        # yields fractions that no longer look digital.
+        looks_digital = profile_csv_looks_digital(_raw_upload_of(path) or path)
     except (ValueError, OSError, FileNotFoundError) as exc:
         st.warning(f"CSV noch nicht normalisierbar: {exc}")
         return
     if not looks_digital:
+        _drop_raw_upload(path)
         try:
             _ensure_consumer_csv_normalized(path)
         except (ValueError, OSError, FileNotFoundError) as exc:
@@ -150,6 +186,7 @@ def _render_digital_csv_scale_prompt(
         ):
             try:
                 _ensure_consumer_csv_normalized(path)
+                _drop_raw_upload(path)
                 st.session_state[decision_key] = "no"
                 st.rerun()
             except (ValueError, OSError, FileNotFoundError) as exc:
@@ -233,6 +270,7 @@ def _store_uploaded_consumer_csv(
             upload.getvalue(),
             upload.name,
             consumer_id=consumer_slug or f"c{index}",
+            keep_raw=True,
         )
         decision_key = _digital_csv_decision_key(session_scope, index, saved)
         st.session_state.pop(decision_key, None)

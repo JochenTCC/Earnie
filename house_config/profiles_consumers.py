@@ -236,10 +236,12 @@ def _normalize_earnie_role(
         }
     power_source = str(rec_input.get("power_source", "manual")).strip().lower()
     power_name = _loxone_power_name_from_raw(raw)
-    if power_source == "loxone" and not power_name:
+    power_binding = appliance_settings.has_power_binding(raw)
+    if power_source == "loxone" and not (power_name or power_binding):
         raise ValueError(
             f"profiles '{profile_id}' consumers[{index}] '{consumer_id}': "
-            "earnie_role=manual mit power_source=loxone erfordert loxone_inputs.power_name."
+            "earnie_role=manual mit power_source=loxone erfordert loxone_inputs.power_name "
+            "oder ein sens_power_act-Binding (EHAL-Com)."
         )
     if power_source == "loxone":
         _set_generic_loxone_inputs(spec, power_name)
@@ -250,6 +252,7 @@ def _normalize_earnie_role(
         consumer_id=consumer_id,
         nominal_power_kw=spec["nominal_power_kw"],
         loxone_power_name=power_name if power_source == "loxone" else "",
+        power_binding=power_binding,
     )
 
 

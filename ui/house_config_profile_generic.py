@@ -123,7 +123,19 @@ def _render_manual_power_source(
     session_scope: str,
 ) -> str:
     """Leistungsquelle without Merker text fields (bindings only via EHAL-Com)."""
+    from settings.appliances import has_power_binding
+
     default_source = _preserved_appliance_power_source(consumer)
+    # "loxone" saves only with a marker or a sens_power_act binding to read from.
+    if not (
+        _loxone_inputs_from_consumer(consumer).get("power_name")
+        or has_power_binding(consumer)
+    ):
+        st.caption(
+            "Leistungsquelle: Aus Profil (Nennleistung). Für „Smarthome-Binding“ zuerst "
+            "unter **Daemon Control → EHAL-Com** das Feld `sens_power_act` binden."
+        )
+        return "manual"
     power_source = labeled_selectbox(
         "Leistungsquelle",
         options=["manual", "loxone"],
@@ -149,7 +161,9 @@ def _render_manual_appliance_defaults(
 ) -> dict:
     """Standard power for manual appliances (runtime = schedule.duration_h)."""
     rec = consumer.get("appliance_recommendation") or {}
-    default_power = float(rec.get("default_power_kw", nominal) or nominal)
+    stored_power = rec.get("default_power_kw")
+    # 0 kW is valid for power_source=manual; only a missing value falls back.
+    default_power = float(nominal if stored_power is None else stored_power)
     return {
         "default_power_kw": float(
             labeled_number_input(

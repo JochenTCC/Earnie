@@ -87,6 +87,8 @@ _PASSTHROUGH_CONSUMER_KEYS = (
     "profile_csv",
     "use_profile_csv",
     "ehal_bindings",
+    # pool_filter MILP field without a form widget (house_config.profiles_consumers).
+    "signal_type",
     ID_LOCKED_KEY,
     ID_PROVISIONAL_LABEL_KEY,
 )

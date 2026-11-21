@@ -7,7 +7,7 @@ from pathlib import Path
 import streamlit as st
 
 from house_config.id_slug import slug_id
-from runtime_store.persist_paths import resolve_uploads_dir
+from runtime_store.persist_paths import resolve_config_prefixed_path, resolve_uploads_dir
 
 def _stable_upload_csv_name(
     profile_id: str,
@@ -132,8 +132,13 @@ def save_profile_consumption_csv(
     normalize: bool = True,
     min_hours: int = 0,
     role: str = "",
+    keep_raw: bool = False,
 ) -> str:
     """Speichert Verbrauchs-CSV unter uploads/ neben der aktiven Config; optional normalisiert.
+
+    ``keep_raw``: also keep the upload as sent (``raw_upload_sidecar``), for
+    decisions that need the original sampling (digital 0/1 detection: hourly
+    averaging of a 15-minute on/off log no longer looks digital).
 
     Target name is ``{profile}_{role|consumer}_{original_stem}_resampled.csv``, so the
     same upload name for another profile, consumer or role gets its own file. If
@@ -167,7 +172,18 @@ def save_profile_consumption_csv(
         os.replace(staging, target)
     finally:
         staging.unlink(missing_ok=True)
-    return f"config/uploads/{target.name}"
+    portable = f"config/uploads/{target.name}"
+    raw = Path(resolve_config_prefixed_path(raw_upload_sidecar(portable)))
+    if keep_raw:
+        raw.write_bytes(content)
+    else:
+        raw.unlink(missing_ok=True)
+    return portable
+
+
+def raw_upload_sidecar(portable: str) -> str:
+    """Portable path of the upload as sent, kept next to its normalized ``portable``."""
+    return f"{portable}.raw"
 
 def save_energiemonitor_profile_csvs(
     profile_id: str,
