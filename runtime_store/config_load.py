@@ -87,8 +87,9 @@ def load_config_or_exit() -> ModuleType:
     prepare_config_path()
     from runtime_store.migration.gate import abort_if_migration_pending
 
-    abort_if_migration_pending()
     try:
+        # The gate reads the pack files too: invalid JSON there is a config error, no traceback.
+        abort_if_migration_pending()
         import config as config_module
 
         return config_module

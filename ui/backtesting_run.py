@@ -31,6 +31,7 @@ from simulation.backtesting_progress import (
     ordered_backtesting_result_ids,
 )
 from simulation.engine import HISTORICAL_REFERENCE_ID
+from simulation.run_exit_codes import EXIT_ABORTED
 from runtime_store.env_vars import is_rule_reference_enabled
 from simulation.reference_selection import (
     DEFAULT_REFERENCES,
@@ -345,7 +346,12 @@ def _render_last_run_result() -> None:
         with st.status("Szenario-Explorer abgebrochen", state="error", expanded=True):
             st.info(_CANCELLED_INFO)
         return
-    with st.status("Szenario-Explorer fehlgeschlagen", state="error", expanded=True):
+    title = (
+        "Szenario-Explorer nicht gestartet"
+        if result["exit_code"] == EXIT_ABORTED
+        else "Szenario-Explorer fehlgeschlagen"
+    )
+    with st.status(title, state="error", expanded=True):
         output = result["output"]
         hint = _format_backtesting_run_error(output)
         if hint:

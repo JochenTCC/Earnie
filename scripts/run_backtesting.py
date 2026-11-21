@@ -16,8 +16,16 @@ from pathlib import Path
 import pandas as pd
 
 from runtime_store.config_load import load_config_or_exit
+from simulation.run_exit_codes import aborted_exit
 
-config = load_config_or_exit()
+try:
+    config = load_config_or_exit()
+except SystemExit as _config_abort:
+    # As a process: a config that does not load or a pending migration is an abort (exit 2).
+    # Imported (UI, other scripts): unchanged.
+    if __name__ == "__main__":
+        raise aborted_exit(_config_abort) from None
+    raise
 import logger_config
 from data import profile_manager
 from simulation.backtesting_log import save_backtesting_log
@@ -1523,6 +1531,10 @@ def main(argv: list[str] | None = None):
 if __name__ == "__main__":
     try:
         main()
+    except SystemExit as abort:
+        # Every deliberate stop of the run (stale cons_data, bad arguments, tariff checks …)
+        # exits EXIT_ABORTED; a crash keeps Python's exit code 1.
+        raise aborted_exit(abort) from None
     except BacktestingCancelled as cancelled:
         # No log is written; the previous run's results stay as they were.
         print(f"\nSzenario-Explorer abgebrochen ({cancelled}). Kein Log geschrieben.", flush=True)
