@@ -429,16 +429,24 @@ def metrics(pairs: list[tuple[float, float]]) -> dict[str, float]:
 
 
 def daily_day_ahead(
-    runs: list[tuple[datetime, dict[str, float]]], day: date, tz: ZoneInfo
+    runs: list[tuple[datetime, dict[str, float]]],
+    day: date,
+    tz: ZoneInfo,
+    lat: float,
+    lon: float,
 ) -> float | None:
-    """Daily kWh of ``day`` from the latest run fetched before local midnight."""
+    """Daily kWh of ``day`` from the latest run fetched before local midnight.
+
+    The run must cover every daylight hour of the day (see :func:`_is_daylight_hour`); hours
+    it leaves out at night count as 0 (forecast.solar sends no keys before sunrise).
+    """
     midnight = datetime.combine(day, datetime.min.time(), tzinfo=tz)
     candidates = [(t, plant) for t, plant in runs if t < midnight]
     if not candidates:
         return None
     _, plant = candidates[-1]
     keys = _day_slot_keys(day, tz)
-    if not all(k in plant for k in keys if _is_daylight_hour(k, tz)):
+    if not all(k in plant for k in keys if _is_daylight_hour(k, lat, lon)):
         return None
     return sum(plant.get(k, 0.0) for k in keys)
 
@@ -453,8 +461,19 @@ def _day_slot_keys(day: date, tz: ZoneInfo) -> list[str]:
     return keys
 
 
-def _is_daylight_hour(key: str, tz: ZoneInfo) -> bool:
-    return 6 <= _parse_slot_key(key).astimezone(tz).hour < 19
+def _is_daylight_hour(key: str, lat: float, lon: float) -> bool:
+    """The sun is above the horizon for the whole hour (at its start and its end).
+
+    Site position instead of a fixed 06–19 window: in November forecast.solar has no key
+    for 06:00, and the Earnie mapping (watts at the slot start) none for the sunrise hour.
+    Hours with sunrise or sunset inside may be missing in a run and then count as 0.
+    """
+    from data.solar_horizon import sun_position
+
+    start = _parse_slot_key(key)
+    return all(
+        sun_position(lat, lon, moment)[0] > 0.0 for moment in (start, start + timedelta(hours=1))
+    )
 
 
 def _fmt(value: float, digits: int = 2) -> str:
@@ -462,7 +481,7 @@ def _fmt(value: float, digits: int = 2) -> str:
 
 
 def cmd_evaluate(args: argparse.Namespace) -> int:
-    _, _, tz_name, systems = _planning_systems()
+    lat, lon, tz_name, systems = _planning_systems()
     tz = ZoneInfo(tz_name)
     out_dir = _out_dir(args.out_dir)
     forecasts_path = os.path.join(out_dir, "forecasts.jsonl")
@@ -497,14 +516,17 @@ def cmd_evaluate(args: argparse.Namespace) -> int:
         print()
 
     days = sorted({_parse_slot_key(k).astimezone(tz).date() for k in actual})
-    complete_days = [d for d in days if all(k in actual for k in _day_slot_keys(d, tz) if _is_daylight_hour(k, tz))]
+    complete_days = [
+        d for d in days
+        if all(k in actual for k in _day_slot_keys(d, tz) if _is_daylight_hour(k, lat, lon))
+    ]
     print(f"== Tagesenergie Day-ahead (letzter Abruf vor Mitternacht), {len(complete_days)} Tage ==")
     rows = []
     for day in complete_days:
         measured = sum(actual.get(k, 0.0) for k in _day_slot_keys(day, tz))
         row = {"day": day, "actual": measured}
         for source in sources:
-            row[source] = daily_day_ahead(runs[source], day, tz)
+            row[source] = daily_day_ahead(runs[source], day, tz, lat, lon)
         rows.append(row)
     usable = [r for r in rows if all(r[s] is not None for s in sources)]
     if not usable:

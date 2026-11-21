@@ -8,6 +8,8 @@ import pytest
 
 from scripts import pv_forecast_compare as pfc
 
+# Dornbirn-like site.
+LAT, LON = 47.4, 9.7
 VIENNA = ZoneInfo("Europe/Vienna")
 
 
@@ -100,7 +102,33 @@ def test_daily_day_ahead_uses_last_run_before_local_midnight():
         (datetime(2026, 10, 29, 12, tzinfo=timezone.utc), early),
         (datetime(2026, 10, 29, 23, 30, tzinfo=timezone.utc), late),  # 00:30 local on the day itself
     ]
-    assert pfc.daily_day_ahead(runs, day, VIENNA) == pytest.approx(24.0)
+    assert pfc.daily_day_ahead(runs, day, VIENNA, LAT, LON) == pytest.approx(24.0)
+
+
+def test_daily_day_ahead_counts_night_hours_a_run_leaves_out_as_zero():
+    # forecast.solar in November: keys only from the sunrise hour to the sunset hour.
+    day = date(2026, 11, 20)
+    keys = pfc._day_slot_keys(day, VIENNA)
+    daylight = [k for k in keys if pfc._is_daylight_hour(k, LAT, LON)]
+    assert 7 <= len(daylight) <= 9
+    run = (datetime(2026, 11, 19, 22, tzinfo=timezone.utc), {k: 1.0 for k in daylight})
+    assert pfc.daily_day_ahead([run], day, VIENNA, LAT, LON) == pytest.approx(len(daylight))
+
+
+def test_daily_day_ahead_rejects_a_run_without_a_daylight_hour():
+    day = date(2026, 11, 20)
+    keys = pfc._day_slot_keys(day, VIENNA)
+    daylight = [k for k in keys if pfc._is_daylight_hour(k, LAT, LON)]
+    run = (datetime(2026, 11, 19, 22, tzinfo=timezone.utc), {k: 1.0 for k in daylight[1:]})
+    assert pfc.daily_day_ahead([run], day, VIENNA, LAT, LON) is None
+
+
+def test_daylight_follows_the_sun_not_a_fixed_window():
+    # 20 Nov: 06:00 local (05 UTC) is before sunrise, the sunrise hour 07:00 (06 UTC) is not
+    # daylight for the whole hour; 12:00 local is.
+    assert not pfc._is_daylight_hour("2026-11-20T05:00Z", LAT, LON)
+    assert not pfc._is_daylight_hour("2026-11-20T06:00Z", LAT, LON)
+    assert pfc._is_daylight_hour("2026-11-20T11:00Z", LAT, LON)
 
 
 def test_solcast_sites_parsing():
