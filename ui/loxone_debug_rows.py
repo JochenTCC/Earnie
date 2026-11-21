@@ -133,6 +133,11 @@ def _live_field_to_push_ehal_id(field: str) -> str:
     return name
 
 
+# "Zuletzt gelesen" for a push field with no inbox row: never received. Falling
+# back to the page's read time made such signals look freshly read.
+_NEVER_PUSHED = "—"
+
+
 def _inbox_last_read_local(ehal_id: str) -> str:
     """Local ``HH:MM:SS`` from the push inbox ``last_ts``, or empty."""
     eid = str(ehal_id or "").strip()
@@ -176,7 +181,7 @@ def _try_push_live_row(
             return None
         if value is None:
             return None
-        last = _inbox_last_read_local(ehal_id) or last_ts or read_at
+        last = _inbox_last_read_local(ehal_id) or last_ts or _NEVER_PUSHED
         return _enrich_read_row(
             {
                 "EHAL-Feld": field,
@@ -196,7 +201,7 @@ def _try_push_live_row(
         return None
     if value is None:
         return None
-    last = _inbox_last_read_local(ehal_id) or read_at
+    last = _inbox_last_read_local(ehal_id) or _NEVER_PUSHED
     value_space = "ehal" if backend == "ha" else "hub"
     return _enrich_read_row(
         {
@@ -261,7 +266,8 @@ def _read_row_from_check(
     ehal_id = _live_field_to_push_ehal_id(field)
     last = read_at
     if item.state:
-        last = _inbox_last_read_local(ehal_id) or read_at
+        # Push-inbox result: the time is when the hub last pushed, not this read.
+        last = _inbox_last_read_local(ehal_id) or _NEVER_PUSHED
     status = "Kein Mapping" if not mapping else read_check_status_label(item)
     return _enrich_read_row(
         {

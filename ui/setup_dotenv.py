@@ -21,9 +21,20 @@ from runtime_store.persist_paths import resolve_dotenv_path
 from ui.flash import flash
 from version import display_version
 
+# {form_key: ip} queued by the Smarthome-Backend scan ("Dieses Backend verwenden");
+# applied by render_loxone_credentials_form before its IP widget is created.
+LOXONE_IP_PENDING_KEY = "sb_loxone_ip_pending"
 
-def _save_loxone_credentials(ip: str, user: str, password: str) -> str | None:
-    """Speichert .env und lädt Config neu. Liefert Fehlermeldung oder None."""
+
+def _save_loxone_credentials(
+    ip: str, user: str, password: str, *, select_loxone_backend: bool = False
+) -> str | None:
+    """Speichert .env und lädt Config neu. Liefert Fehlermeldung oder None.
+
+    ``select_loxone_backend``: also set ``ehal.backend=loxone`` — only once the
+    credentials are valid and written, so picking Loxone under "Backend ändern"
+    does not switch away from HA/OpenEMS before anything is saved.
+    """
     validation_error = validate_loxone_credentials(ip, user, password)
     if validation_error:
         return validation_error
@@ -38,6 +49,17 @@ def _save_loxone_credentials(ip: str, user: str, password: str) -> str | None:
         )
 
     load_app_dotenv(override=True)
+    if select_loxone_backend:
+        from runtime_store.ehal_setup import BACKEND_LOXONE
+        from ui.ehal_connection import persist_ehal_backend
+
+        try:
+            persist_ehal_backend(BACKEND_LOXONE)
+        except (OSError, ValueError) as exc:
+            return (
+                f"Zugangsdaten in `{path}` gespeichert, aber der Wechsel auf "
+                f"Loxone ist fehlgeschlagen: {exc}"
+            )
     config.reinit_config(require_loxone_credentials=True)
     flash("success", f"Zugangsdaten gespeichert in `{path}`.")
     return None
@@ -76,13 +98,23 @@ def _render_loxone_dotenv_conflict_hint() -> None:
             st.rerun()
 
 
-def render_loxone_credentials_form(*, form_key: str = "loxone_setup_form") -> None:
-    """Formular für Miniserver-IP, Benutzer und Passwort."""
+def render_loxone_credentials_form(
+    *, form_key: str = "loxone_setup_form", select_loxone_backend: bool = False
+) -> None:
+    """Formular für Miniserver-IP, Benutzer und Passwort.
+
+    ``select_loxone_backend``: on a successful save also switch ``ehal.backend``
+    to Loxone (Smarthome-Backend credentials step).
+    """
     dotenv_path = resolve_dotenv_path()
     env_ip, env_user, env_pass = read_loxone_credentials()
     ip_key = f"{form_key}_ip"
     discovered = str(st.session_state.get("sb_discovered_loxone_host") or "").strip()
-    if ip_key not in st.session_state:
+    pending = st.session_state.get(LOXONE_IP_PENDING_KEY)
+    if isinstance(pending, dict) and form_key in pending:
+        # Set before the widget exists in this run (Streamlit widget-key rule).
+        st.session_state[ip_key] = pending.pop(form_key)
+    elif ip_key not in st.session_state:
         st.session_state[ip_key] = discovered or env_ip
     st.caption(f"Zieldatei: `{dotenv_path}`")
     _render_loxone_dotenv_conflict_hint()
@@ -111,7 +143,9 @@ def render_loxone_credentials_form(*, form_key: str = "loxone_setup_form") -> No
     if not submitted:
         return
 
-    error = _save_loxone_credentials(ip, user, password)
+    error = _save_loxone_credentials(
+        ip, user, password, select_loxone_backend=select_loxone_backend
+    )
     if error:
         st.error(error)
         return

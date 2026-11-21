@@ -29,14 +29,17 @@ from runtime_store.ehal_setup import (
 from runtime_store.install_context import install_context_target_kinds
 from runtime_store.loxone_callback_status import format_loxone_callback_caption
 from ui.ehal_connection import (
-    persist_ehal_backend,
     render_anbindung_section,
     render_ha_connection_form,
     render_openems_connection_form,
 )
 from ui.flash import flash
 from ui.help_hint import render_page_title_with_help
-from ui.setup_dotenv import render_loxone_credentials_form, render_loxone_verify_results
+from ui.setup_dotenv import (
+    LOXONE_IP_PENDING_KEY,
+    render_loxone_credentials_form,
+    render_loxone_verify_results,
+)
 from ui.setup_readiness import is_sb_configured
 
 _SB_HELP = (
@@ -175,7 +178,7 @@ def _render_configured_summary(*, allow_change: bool = True) -> None:
     if not allow_change:
         return
     with st.expander("Backend ändern", expanded=False):
-        _render_discovery_flow()
+        _render_discovery_flow(auto_scan=False)
     _render_backend_import_section(backend)
 
 
@@ -201,9 +204,13 @@ def _apply_discovered_loxone_host(hit: DiscoveredBackend) -> str:
         st.session_state.pop(_SESSION_DISCOVERED_LOXONE_HOST, None)
         return ""
     st.session_state[_SESSION_DISCOVERED_LOXONE_HOST] = host
-    # Force both first-run and Zugangsdaten expander IP widgets (Streamlit keys).
-    for form_key in ("sb_loxone_form", "sb_anbindung_loxone_form", "loxone_setup_form"):
-        st.session_state[f"{form_key}_ip"] = host
+    # The Zugangsdaten expander may already have created its IP widget in this
+    # run; writing that key now would raise StreamlitWidgetAlreadyInstantiatedError.
+    # Queue the value; render_loxone_credentials_form applies it before the widget.
+    st.session_state[LOXONE_IP_PENDING_KEY] = {
+        form_key: host
+        for form_key in ("sb_loxone_form", "sb_anbindung_loxone_form", "loxone_setup_form")
+    }
     return host
 
 
@@ -259,10 +266,9 @@ def _render_manual_selection() -> None:
 def _render_credentials_step(backend: str) -> None:
     st.markdown(f"**Zugangsdaten: {backend_label(backend)}**")
     if backend == BACKEND_LOXONE:
-        # render_loxone_credentials_form alone doesn't set ehal.backend (loxone is
-        # only the implicit default) — make a switch away from HA/OpenEMS explicit.
-        persist_ehal_backend(BACKEND_LOXONE)
-        render_loxone_credentials_form(form_key="sb_loxone_form")
+        # ehal.backend switches to Loxone only on a successful save, so picking
+        # Loxone and then "Andere Auswahl" leaves an HA/OpenEMS setup untouched.
+        render_loxone_credentials_form(form_key="sb_loxone_form", select_loxone_backend=True)
         render_loxone_verify_results(button_key="sb_loxone_verify_button")
         _render_miniserver_callback_caption()
     elif backend == BACKEND_HA:
@@ -272,6 +278,7 @@ def _render_credentials_step(backend: str) -> None:
     if st.button("Andere Auswahl", key="sb_credentials_back"):
         st.session_state.pop(_SESSION_CHOSEN_BACKEND, None)
         st.session_state.pop(_SESSION_DISCOVERED_LOXONE_HOST, None)
+        st.session_state.pop(LOXONE_IP_PENDING_KEY, None)
         st.rerun()
 
 
@@ -286,13 +293,26 @@ def _render_bridge_ha_shortcut() -> None:
     render_ha_connection_form(form_key="sb_ha_bridge_form")
 
 
-def _render_discovery_flow() -> None:
+def _render_discovery_flow(*, auto_scan: bool = True) -> None:
+    """Scan + pick a backend.
+
+    ``auto_scan=False`` (configured page, inside the collapsed "Backend ändern"):
+    Streamlit renders expander bodies even when collapsed, so the network scan
+    waits for an explicit button instead of running on every first page visit.
+    """
     chosen = st.session_state.get(_SESSION_CHOSEN_BACKEND)
     if chosen:
         _render_credentials_step(chosen)
         return
 
     if _SESSION_RESULTS not in st.session_state:
+        if not auto_scan:
+            if st.button("Im Netzwerk nach Backends suchen", key="sb_start_scan_button"):
+                with st.spinner("Suche nach Loxone / Home Assistant im Netzwerk…"):
+                    st.session_state[_SESSION_RESULTS] = _run_scan(active=False)
+                st.rerun()
+            _render_manual_selection()
+            return
         with st.spinner("Suche nach Loxone / Home Assistant im Netzwerk…"):
             st.session_state[_SESSION_RESULTS] = _run_scan(active=False)
 

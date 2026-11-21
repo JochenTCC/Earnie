@@ -457,17 +457,21 @@ def _plan_checkbox_key(appliance_id: str, index: int) -> str:
     return f"{_PLAN_CHECKBOX_PREFIX}{appliance_id}_{index}"
 
 
-def _init_plan_checkbox_state(
+def _sync_plan_checkbox_state(
     appliance_id: str,
     rec: ApplianceRecommendation,
     active: dict | None,
 ) -> None:
+    """Tick exactly the option that matches the stored schedule, on every run.
+
+    The options shift every 30 min while the page stays open; seeding only
+    missing keys left the tick on the old index (another start time), and
+    unticking it then removed nothing. The stored schedule is the truth.
+    """
     for index, option in enumerate(rec.options):
-        key = _plan_checkbox_key(appliance_id, index)
-        if key not in st.session_state:
-            st.session_state[key] = bool(
-                active and _schedule_matches_option(active, option.start_datetime)
-            )
+        st.session_state[_plan_checkbox_key(appliance_id, index)] = bool(
+            active and _schedule_matches_option(active, option.start_datetime)
+        )
 
 
 def _on_plan_checkbox_change(
@@ -512,7 +516,7 @@ def _render_recommendation_table(
     runtime_h: float,
 ) -> None:
     active = appliance_schedules.active_schedule_for(appliance_id)
-    _init_plan_checkbox_state(appliance_id, rec, active)
+    _sync_plan_checkbox_state(appliance_id, rec, active)
     if active:
         st.caption(
             f"Aktiver Optimierungsplan bis **{active['expires_at'][:16].replace('T', ' ')}** "

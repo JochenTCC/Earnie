@@ -34,7 +34,7 @@ Ist ein Backend verbunden, zeigt die Seite von oben nach unten:
 
 - Erfolgsmeldung mit dem aktiven Backend (EHAL-Com und Optimierer-Dienst sind freigeschaltet).
 - **Zugangsdaten** (zuklappbar): Zugangsdaten erneut eingeben oder prüfen. Bei einem Loxone-Auth-Fehler öffnet sich der Bereich automatisch.
-- **Backend ändern:** Discovery starten oder das Backend wechseln.
+- **Backend ändern:** Die Netzwerksuche startet hier erst mit **Im Netzwerk nach Backends suchen**; die manuelle Auswahl steht sofort bereit. Das aktive Backend bleibt, bis die Zugangsdaten des neuen Backends gespeichert sind. Bei Loxone wechselt `ehal.backend` also erst mit **Speichern**; **Andere Auswahl** lässt die bisherige Anbindung unverändert.
 - **Loxone-Import:** nur bei Loxone.
 
 Während der Ersteinrichtung erscheinen die Zugangsdaten als eigener Schritt (noch ohne Erfolgsmeldung). Nach dem Speichern verschwindet dieser offene Anbindung-Abschnitt.
