@@ -169,6 +169,78 @@ def test_pay_to_export_shrinks_pv_bar_and_hides_export() -> None:
     assert slot.is_visually_balanced
 
 
+@pytest.mark.parametrize(
+    "load_kw,grid_kw",
+    [(1.0, -4.0), (4.0, -1.0)],
+)
+def test_pay_to_export_with_reported_export_keeps_pv_bar(load_kw: float, grid_kw: float) -> None:
+    """Export the row reports is drawn as Einspeisung, not subtracted from PV (twice)."""
+    row = {
+        "PV-Prognose (kW)": 5.0,
+        "Verbrauch-Prognose (kW)": load_kw,
+        "SwimSpa (kW)": 0.0,
+        "Geplante Batterie-Aktion (kW)": 0.0,
+        "Netzbezug (kW)": grid_kw,
+        "k_push_act": -1.0,
+    }
+    slot = build_flow_balance_segments(row, flex_consumers=_flex_pairs())
+    pv = next(segment for segment in slot.up if segment.kind == KIND_PV)
+    export = next(segment for segment in slot.down if segment.kind == KIND_EXPORT_PV)
+    assert pv.kw == pytest.approx(5.0)
+    assert export.kw == pytest.approx(-grid_kw)
+    assert slot.is_visually_balanced
+
+
+def test_pay_to_export_skipped_charge_is_curtailed_once() -> None:
+    """Full battery, planned charge 3 kW, no export: PV shrinks by the surplus, once."""
+    row = {
+        "PV-Prognose (kW)": 5.0,
+        "Verbrauch-Prognose (kW)": 2.0,
+        "SwimSpa (kW)": 0.0,
+        "Geplante Batterie-Aktion (kW)": 3.0,
+        "Netzbezug (kW)": 0.0,
+        "k_push_act": -1.0,
+        "Simulierter SoC (%)": 100.0,
+    }
+    slot = build_flow_balance_segments(row, flex_consumers=_flex_pairs())
+    pv = next(segment for segment in slot.up if segment.kind == KIND_PV)
+    assert pv.kw == pytest.approx(2.0)
+    assert KIND_EXPORT_PV not in {segment.kind for segment in slot.down}
+    assert slot.is_visually_balanced
+
+
+def test_pay_to_export_nan_k_push_act_falls_through_to_feed_in_column() -> None:
+    row = {
+        "PV-Prognose (kW)": 5.0,
+        "Verbrauch-Prognose (kW)": 1.0,
+        "SwimSpa (kW)": 0.0,
+        "Geplante Batterie-Aktion (kW)": 0.0,
+        "Netzbezug (kW)": 0.0,
+        "k_push_act": float("nan"),
+        "Einspeisevergütung (Cent/kWh)": -0.5,
+    }
+    slot = build_flow_balance_segments(row, flex_consumers=_flex_pairs())
+    pv = next(segment for segment in slot.up if segment.kind == KIND_PV)
+    assert pv.kw == pytest.approx(1.0)
+    assert KIND_EXPORT_PV not in {segment.kind for segment in slot.down}
+
+
+def test_discharge_beyond_load_is_not_drawn_as_consumption() -> None:
+    """Inconsistent row (discharge 3 kW, load 1 kW, no export): load bars stay at 1 kW."""
+    from ui.flow_balance_allocate import allocate_slot_flows
+
+    flows = allocate_slot_flows(
+        pv=0.0,
+        load_kw=1.0,
+        battery_charge=0.0,
+        battery_discharge=3.0,
+        grid_import=0.0,
+        grid_export=0.0,
+    )
+    assert flows.discharge_to_load == pytest.approx(1.0)
+    assert flows.load_kw == pytest.approx(1.0)
+
+
 def test_rows_without_soc_keep_planned_charge() -> None:
     row = {
         "PV-Prognose (kW)": 10.0,

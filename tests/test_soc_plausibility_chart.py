@@ -186,6 +186,34 @@ def test_ghost_bars_skipped_below_one_kwh_equivalent(monkeypatch):
     assert ghost == []
 
 
+def test_ghost_bars_on_quarter_hour_slots_use_power_threshold():
+    """2 kW on 15-min slots is 0.5 kWh per slot; the outline is still drawn."""
+    ev = {
+        "id": "eauto",
+        "name": "E-Auto",
+        "type": "ev",
+        "chart_color_index": 0,
+        "nominal_power_kw": 3.5,
+    }
+    matched = _slot_df(flex_kw=2.0)
+    start = matched["slot_datetime"].iloc[0]
+    matched["slot_datetime"] = [
+        start + timedelta(minutes=15 * index) for index in range(len(matched))
+    ]
+    axis = ChartSlotAxis.from_dataframe(matched)
+    fig = go.Figure()
+    add_matched_flex_ghost_traces(
+        fig,
+        matched,
+        axis,
+        flex_consumers=[(ev, "E-Auto (kW)")],
+        history_slot_count=1,
+    )
+    ghost = [trace for trace in fig.data if trace.name == "Original-Schedule"]
+    assert ghost
+    assert abs(ghost[0].y[0]) == pytest.approx(2.0)
+
+
 def test_ghost_bars_skipped_without_matched_df():
     fig = go.Figure()
     axis = ChartSlotAxis.from_dataframe(_slot_df())

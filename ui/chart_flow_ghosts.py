@@ -15,7 +15,7 @@ from ui.chart_flow_segments import FLOW_BALANCE_BAR_WIDTH_FRACTION, _safe_float
 
 _GHOST_LINE_WIDTH = 2.5
 
-_GHOST_MIN_KWH = 1.0
+_GHOST_MIN_KW = 1.0
 
 
 def add_matched_flex_ghost_traces(
@@ -30,9 +30,9 @@ def add_matched_flex_ghost_traces(
     Umrandete (nicht gefüllte) Flex-Balken für Original-Schedule (BL-Ziel-Lastzeiten).
 
     Stackt nur die Matched-Baseline-Flex-Leistung (kW) ab ``history_slot_count``
-    nach unten — unabhängig vom optimierten Stack. Segmente mit
-    Energie-Äquivalent unter ``_GHOST_MIN_KWH`` (Roh-kW × Slotdauer) werden
-    weggelassen. Balkenhöhe ist auf ``nominal_power_kw`` begrenzt, wenn gesetzt.
+    nach unten — unabhängig vom optimierten Stack. Segmente mit Roh-Leistung
+    unter ``_GHOST_MIN_KW`` werden weggelassen (unabhängig von der Slotdauer).
+    Balkenhöhe ist auf ``nominal_power_kw`` begrenzt, wenn gesetzt.
     """
     if matched_baseline_df is None or matched_baseline_df.empty:
         return
@@ -75,13 +75,10 @@ def _collect_ghost_buckets(
         x_val = list(_battery_bar_times(axis, slice(index, index + 1)))[0]
         time_label = str(row.get("Uhrzeit", ""))
         bar_width_ms = axis.bar_width_ms(FLOW_BALANCE_BAR_WIDTH_FRACTION, index)
-        slot_hours = axis.slot_duration(index).total_seconds() / 3600.0
         cumulative = 0.0
         for consumer, column in pairs:
             raw_kw = _safe_float(row.get(column))
-            if raw_kw <= 1e-9:
-                continue
-            if raw_kw * slot_hours < _GHOST_MIN_KWH:
+            if raw_kw < _GHOST_MIN_KW:
                 continue
             nominal = _safe_float(consumer.get("nominal_power_kw"))
             # Matched-baseline energy can concentrate into few slots above nominal

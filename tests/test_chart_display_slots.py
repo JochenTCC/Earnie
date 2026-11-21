@@ -9,7 +9,9 @@ import pandas as pd
 from runtime_store.history_timeline import SLOT_MISSING, SLOT_PRESENT
 from ui.chart_context import (
     align_hourly_increments_to_display_slots,
+    align_hourly_values_to_chart_slots,
     align_rows_to_display_slots,
+    matrix_indices_for_chart,
 )
 from ui.charts import _mask_missing_log_slots
 
@@ -61,6 +63,24 @@ def test_align_hourly_increments_splits_hour_evenly():
         [4.0, 8.0], matrix, chart, slots
     )
     assert increments == [1.0, 1.0, 1.0, 1.0, 8.0]
+
+
+def test_align_increments_keep_the_slot_that_contains_sunrise():
+    """chart.start is the exact sunrise; the quarter-hour holding it is on the axis."""
+    from data.planning_window import compute_ui_chart_window
+
+    chart = compute_ui_chart_window(_dt(14, 30), 47.404, 9.743, TZ, segment_index=0)
+    slots = chart.slot_datetimes
+    assert slots[0] < chart.start
+    matrix = [{"slot_datetime": slot} for slot in slots]
+    increments = align_hourly_increments_to_display_slots(
+        [1.0] * len(slots), matrix, chart, slots
+    )
+    assert increments == [1.0] * len(slots)
+    assert matrix_indices_for_chart(matrix, chart) == list(range(len(slots)))
+    assert align_hourly_values_to_chart_slots(
+        [2.0] * len(slots), matrix, chart
+    ) == [2.0] * len(slots)
 
 
 def test_mask_missing_log_slots_sets_nan():

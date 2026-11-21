@@ -1,6 +1,7 @@
 """Plotly-Charts für Optimierungsdarstellung (sunrise→sunrise Live, 24h Historie)."""
 from __future__ import annotations
 
+import logging
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
@@ -43,6 +44,9 @@ from ui.chart_legend_mobile import (
 )
 from ui.help_hint import render_title_with_help
 from ui.s2_viewport import is_phone_request
+
+logger = logging.getLogger(__name__)
+
 
 def add_power_traces(
     fig: go.Figure,
@@ -163,6 +167,8 @@ def _add_soc_price_layer(
     try:
         chart_soc_entities = load_chart_soc_entities()
     except Exception:  # noqa: BLE001
+        # Chart 1 stays usable without the per-battery SoC lines, but say why.
+        logger.exception("Chart 1: SoC-Entitäten nicht ladbar, Linien je Batterie fehlen.")
         chart_soc_entities = []
     add_optimized_soc_traces(
         fig, plot_df, axis, extrap_start=extrap_start, extrap_end=extrap_end,
