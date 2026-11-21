@@ -152,6 +152,27 @@ def _load_disk_cache(url: str, now_time: datetime) -> Optional[dict]:
     return watts
 
 
+def _fresh_memory_cache(url: str, now_time: datetime) -> Optional[dict]:
+    """In-memory forecast.solar answer for *url*, dropped once older than ``DISK_CACHE_MAX_AGE``.
+
+    After API errors the cache is reused; without an age limit a forecast from days ago
+    would keep covering only its own days, and the slots after it would get 0 kW.
+    """
+    cached = _CACHED_HOURLY_WATTS_BY_URL.get(url)
+    fetched_at = _LAST_API_CALL_BY_URL.get(url)
+    if cached is None or fetched_at is None:
+        return cached
+    age = _as_naive_local(now_time) - _as_naive_local(fetched_at)
+    if age <= DISK_CACHE_MAX_AGE:
+        return cached
+    print(
+        f"[info] forecast.solar-Cache im Speicher zu alt "
+        f"({age.total_seconds() / 3600:.1f} h) — wird nicht genutzt."
+    )
+    del _CACHED_HOURLY_WATTS_BY_URL[url]
+    return None
+
+
 def _set_fetch_source(source: str) -> None:
     global _LAST_FETCH_SOURCE
     _LAST_FETCH_SOURCE = source
@@ -297,7 +318,7 @@ def _check_and_fetch_api_data(url: str, kwp: float) -> Optional[dict]:
     from runtime_store.shadow.hooks import replay_ext_payload
     from runtime_store.shadow.transport import ext_get
 
-    cached = _CACHED_HOURLY_WATTS_BY_URL.get(url)
+    cached = _fresh_memory_cache(url, now_time)
     # Prod only: Shadow reads the Prod feed and must not seed Prod's API guard.
     if cached is None and not is_shadow_mode() and url not in _DISK_CACHE_CHECKED_URLS:
         _DISK_CACHE_CHECKED_URLS.add(url)
@@ -452,6 +473,43 @@ def _map_hourly_data_to_vector(hourly_watts: dict, target_hours: list) -> tuple[
     return pv_vector, False
 
 
+def _uncovered_daylight_days(
+    hourly_watts: dict,
+    target_hours: list,
+    *,
+    lat: float,
+    lon: float,
+) -> list:
+    """Days with daylight slots in *target_hours* that the forecast.solar data has no point on.
+
+    Such slots would map to 0 kW like the night; the system then takes Open-Meteo instead.
+    """
+    from data.planning_window import official_sun_times
+
+    tz_name = config.get_planning_timezone()
+    covered = {stamp.date() for stamp, _ in _forecast_solar_curve(hourly_watts)}
+    uncovered = []
+    for day in sorted({dt.date() for dt in target_hours}):
+        if day in covered:
+            continue
+        sunrise, sunset = official_sun_times(day, lat, lon, tz_name)
+        sunrise, sunset = sunrise.replace(tzinfo=None), sunset.replace(tzinfo=None)
+        if any(
+            dt.date() == day and sunrise < _as_planning_naive(dt, tz_name) < sunset
+            for dt in target_hours
+        ):
+            uncovered.append(day)
+    return uncovered
+
+
+def _as_planning_naive(value: datetime, tz_name: str) -> datetime:
+    if value.tzinfo is None:
+        return value
+    from zoneinfo import ZoneInfo
+
+    return value.astimezone(ZoneInfo(tz_name)).replace(tzinfo=None)
+
+
 def _open_meteo_pv_vector(
     *,
     lat: float,
@@ -518,13 +576,25 @@ def _forecast_one_system(
     )
     hourly_watts = _check_and_fetch_api_data(url, kwp)
     if hourly_watts:
-        pv_vector, success = _map_hourly_data_to_vector(hourly_watts, target_hours)
+        uncovered = _uncovered_daylight_days(hourly_watts, target_hours, lat=lat, lon=lon)
+        pv_vector, success = (
+            _map_hourly_data_to_vector(hourly_watts, target_hours)
+            if not uncovered
+            else ([], False)
+        )
         if success:
             return pv_vector, SOURCE_FORECAST_SOLAR
-        reason = (
-            f"Daten ohne passende Zeitstempel für {len(target_hours)} Zielstunden "
-            f"(Quelle {_LAST_FETCH_SOURCE})"
-        )
+        if uncovered:
+            reason = (
+                "Daten decken die Tage mit Tageslicht nicht ab "
+                f"({', '.join(day.isoformat() for day in uncovered)} fehlen, "
+                f"Quelle {_LAST_FETCH_SOURCE})"
+            )
+        else:
+            reason = (
+                f"Daten ohne passende Zeitstempel für {len(target_hours)} Zielstunden "
+                f"(Quelle {_LAST_FETCH_SOURCE})"
+            )
     else:
         reason = f"keine Daten (Quelle {_LAST_FETCH_SOURCE})"
 

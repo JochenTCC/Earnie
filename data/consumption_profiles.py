@@ -1,8 +1,9 @@
 """Synthetische Verbrauchsprofile aus Hausprofilen für Backtesting."""
 from __future__ import annotations
 
+import calendar
 import os
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from functools import lru_cache
 from typing import TYPE_CHECKING
 
@@ -55,11 +56,21 @@ def _consumer_id(consumer: dict, fallback_index: int) -> str:
 
 
 def _modeled_hour_index(slot_dt: datetime) -> int:
+    """Hour of the modeled reference year for the slot's calendar day and hour.
+
+    By calendar date, not hours modulo 8760: a leap reference year would otherwise shift
+    every slot of the following year by one day. 29 Feb maps to 28 Feb when the
+    reference year has none; the last day of a leap reference year (beyond 8760 h)
+    maps to the day before.
+    """
     naive = slot_dt.replace(tzinfo=None) if slot_dt.tzinfo else slot_dt
-    return (
-        int((naive - modeled_profile_ref_start()).total_seconds() // 3600)
-        % MODELED_PROFILE_HOURS_PER_YEAR
-    )
+    ref_year = modeled_profile_ref_start().year
+    day = naive.day
+    if naive.month == 2 and day == 29 and not calendar.isleap(ref_year):
+        day = 28
+    day_index = (date(ref_year, naive.month, day) - date(ref_year, 1, 1)).days
+    day_index = min(day_index, MODELED_PROFILE_HOURS_PER_YEAR // 24 - 1)
+    return day_index * 24 + naive.hour
 
 
 def _parse_profile_timestamp(ts_raw: str) -> datetime:

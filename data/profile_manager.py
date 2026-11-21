@@ -519,11 +519,15 @@ def get_historical_day_data(target_date) -> Tuple[List[float], dict, List[float]
     )
     df_day = df_day.reindex(full_day_range, fill_value=0.0)
 
+    from data.cons_data_house_profile import consumer_labels_for_ids
+
+    flexible = config.get_flexible_consumers()
+    labels = consumer_labels_for_ids([str(consumer["id"]) for consumer in flexible])
     historical_totals = {
-        consumer["id"]: round(float(df_day[consumer["name"]].sum()), 3)
-        if consumer["name"] in df_day.columns
+        consumer["id"]: round(float(df_day[labels[str(consumer["id"])]].sum()), 3)
+        if labels[str(consumer["id"])] in df_day.columns
         else 0.0
-        for consumer in config.get_flexible_consumers()
+        for consumer in flexible
     }
     actual_baseload = df_day['BaseLoad'].round(3).tolist()
     actual_total = df_day['Total'].round(3).tolist()

@@ -181,6 +181,16 @@ def _parse_open_meteo_hourly(
     return out
 
 
+def _planning_wall_clock(moment: datetime) -> datetime:
+    """Naive wall clock of the planning timezone; the hourly series are keyed that way.
+
+    Live slots are timezone-aware; an aware ``start`` never matches a naive key.
+    """
+    if moment.tzinfo is None:
+        return moment
+    return moment.astimezone(ZoneInfo(config.get_planning_timezone())).replace(tzinfo=None)
+
+
 def _is_skipped_local_hour(moment: datetime) -> bool:
     """True for a wall-clock time that does not exist (spring clock change gap)."""
     tz = ZoneInfo(config.get_planning_timezone())
@@ -252,7 +262,9 @@ def get_hourly_outdoor_forecast_c(
         raise ValueError("horizon muss mindestens 1 sein")
     lat = float(latitude if latitude is not None else config.get("LATITUDE", cast=float))
     lon = float(longitude if longitude is not None else config.get("LONGITUDE", cast=float))
-    start_dt = (start or planning_now()).replace(minute=0, second=0, microsecond=0)
+    start_dt = _planning_wall_clock(start or planning_now()).replace(
+        minute=0, second=0, microsecond=0
+    )
     forecast_days = _required_forecast_days(start_dt, horizon)
 
     cache_key = (round(lat, 4), round(lon, 4), forecast_days)
@@ -301,7 +313,9 @@ def get_hourly_tilted_irradiance_forecast_wm2(
     lon = float(longitude)
     tilt = int(round(float(tilt_deg)))
     azimuth = int(round(float(azimuth_deg)))
-    start_dt = (start or planning_now()).replace(minute=0, second=0, microsecond=0)
+    start_dt = _planning_wall_clock(start or planning_now()).replace(
+        minute=0, second=0, microsecond=0
+    )
     forecast_days = _required_forecast_days(start_dt, horizon)
 
     cache_key = (
