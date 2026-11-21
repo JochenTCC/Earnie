@@ -407,6 +407,7 @@ def _compare_at(args: argparse.Namespace, cases: list[Any]) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    from scripts.suite_queue import queued_slot
     from tests.regression.baseline import (
         DirtyWorktreeError,
         baseline_for_update,
@@ -447,7 +448,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.backfill_baseline:
         return _backfill_baselines(cases)
     if args.compare_at:
-        return _compare_at(args, cases)
+        with queued_slot(f"run_regression --compare-at {args.compare_at} [{ROOT.name}]"):
+            return _compare_at(args, cases)
 
     new_baseline: dict[str, Any] | None = None
     if args.update_golden:
@@ -468,17 +470,19 @@ def main(argv: list[str] | None = None) -> int:
         for case in cases
     ]
     raw_results: list[dict[str, Any]] = []
-    if workers == 1 or len(payloads) == 1:
-        for payload in payloads:
-            raw_results.append(_run_one_case_payload(payload))
-    else:
-        with ProcessPoolExecutor(max_workers=workers) as pool:
-            futures = {
-                pool.submit(_run_one_case_payload, payload): payload
-                for payload in payloads
-            }
-            for fut in as_completed(futures):
-                raw_results.append(fut.result())
+    # Machine-wide test queue: wait for other sessions' pytest / regression runs.
+    with queued_slot(f"run_regression {len(payloads)} case(s) [{ROOT.name}]"):
+        if workers == 1 or len(payloads) == 1:
+            for payload in payloads:
+                raw_results.append(_run_one_case_payload(payload))
+        else:
+            with ProcessPoolExecutor(max_workers=workers) as pool:
+                futures = {
+                    pool.submit(_run_one_case_payload, payload): payload
+                    for payload in payloads
+                }
+                for fut in as_completed(futures):
+                    raw_results.append(fut.result())
 
     # Stable order by case id
     raw_results.sort(key=lambda r: r["case_id"])

@@ -23,6 +23,12 @@ from tests.regression.baseline import GIT_LOCATION_ENV
 for _key in GIT_LOCATION_ENV:
     os.environ.pop(_key, None)
 
+# A test session is already a run (queued by scripts.run_pytest, or started
+# directly). Code under test that would enter the machine-wide test queue
+# (scripts.run_regression, scripts.run_pytest) must not queue a second time —
+# it would wait behind its own outer run. tests/test_suite_queue.py unsets it.
+os.environ["EARNIE_TEST_QUEUE_HELD"] = "1"
+
 
 # Streamlit AppTest defaults to a 3 s script timeout. Under the full xdist run
 # (``-n auto``, all cores busy, MILP tests in parallel) a cold script run regularly

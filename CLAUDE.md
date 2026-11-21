@@ -12,10 +12,15 @@ Project rules live in `.cursor/rules/*.mdc` and `.cursor/skills/*/SKILL.md` (wri
   ```
 
   The wrapper adds `-n auto` (pytest-xdist) unless `-n` is given — full suite ≈ 2.5 min in parallel vs. > 10 min sequential. Use it for small subsets too (`... -m scripts.run_pytest tests/test_ha_adapter.py -q`). Sequential (`-n 0`) only for debugging, `--dead-fixtures`, mutmut.
+- **Machine-wide test queue:** `run_pytest` (directory targets / full suite) and `run_regression` wait for other sessions' runs (`scripts/suite_queue.py`, status: `python -m scripts.suite_queue status`). ≤ 3 explicit files / node ids run in the fast lane without queueing. Start the full suite with Bash `run_in_background: true` (queue wait + run can exceed the 10 min foreground limit); never bypass the queue (`--no-queue`, `EARNIE_TEST_QUEUE=off`).
 - UTF-8 env is required on Windows (cp1252 console crashes on `→`, umlauts). See `.cursor/skills/windows-unicode-console/`.
 - Test health / quality gate: `.cursor/rules/test-health.mdc`, `.cursor/skills/quality-gate/`.
 - Backtesting / SE runs: always `--workers N` with the largest useful N (`.cursor/rules/backtesting-max-workers.mdc`).
 - Red golden-master regression case (`scripts.run_regression`, pre-push hook): triage with `.cursor/skills/regression-triage/SKILL.md` (report verdict → `--compare-at <baseline-sha>` → bisect → bug / intended / test data) before any `--update-golden`.
+
+## Parallel sessions / worktrees
+
+Classify each session (`review`, `fix`, `hotfix`, `feat`, `port`, `spike`, triage); those classes work in their own worktree `..\earnie-wt\<class>-<slug>` — never switch branches in the main checkout. Docs/backlog-only work, Q&A and session conclusion stay in the main checkout. In a worktree run tests with the main checkout's `.venv` python from the worktree root. Rule `.cursor/rules/parallel-sessions.mdc`, workflow `docs/workflow/parallel-sessions.md`.
 
 ## Shell
 
