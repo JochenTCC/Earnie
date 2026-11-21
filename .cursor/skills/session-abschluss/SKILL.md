@@ -32,6 +32,7 @@ Run in parallel:
 - `git log -5 --oneline` (commit style)
 - Chat history for this session: what was completed, what remains open?
 - **Private earnie-env (if present):** `git status` / `git diff` in the sibling private site-pack repo (default `..\Earnie-env-home`, see `docs/einrichtung/private-env.md` / `scripts/link_private_env.ps1`). Do not invent a second path; if the junction exists, follow its target.
+- **Worktree session (`parallel-sessions.mdc`):** if this session worked in `..\earnie-wt\<class>-<slug>`, gather status/diff **there** (that branch is what gets committed), plus `git worktree list` in the main checkout. Do not commit the main checkout's unrelated changes from a worktree session — they belong to the user or another session.
 - **Private regression repo (if present):** `git status -sb` in `Earnie-regression-private` (parent of `$EARNIE_REGRESSION_PRIVATE_DIR`, default sibling `..\Earnie-regression-private`, see `docs/workflow/regression-suite.md` §4). Needed for §2b and the publish-guide warning.
 
 ### 2. Classify changes
@@ -123,6 +124,8 @@ git push
 ```
 
 On failure (upstream, auth): state the cause, do not blindly retry.
+
+**Worktree session:** push the worktree's branch (`git push -u origin <class>/<slug>`), then ask how to integrate: PR to `main` (default) or merge in the main checkout (only if the user confirms the main checkout is free). After the merge — or if the branch is abandoned — remove the worktree (`git worktree remove ..\earnie-wt\<class>-<slug>`, `git branch -d <class>/<slug>`). `review` worktrees have nothing to push: just remove them. See `docs/workflow/parallel-sessions.md` §2.
 
 ### 6. Phase 1 report + publish decision guide
 
