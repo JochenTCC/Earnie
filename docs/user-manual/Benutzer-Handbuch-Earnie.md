@@ -324,6 +324,12 @@ Die erzeugten Verbrauchsverläufe lassen sich im Explorer prüfen (Plausibilitä
 
 Ändern sich Parameter, aus denen der Verbrauch berechnet wird (Hausprofil, PV), müssen die Verbrauchsdaten **neu erzeugt** werden. Bis dahin bleibt der Start der Rechnung gesperrt.
 
+**Lücken in den Verbrauchsdaten:** Szenario-Explorer und Backtesting rechnen nur mit lückenlosen Stundenwerten aus `cons_data.csv` (Verbrauch und PV). Fehlt eine Stunde oder ein ganzer Tag, den ein Rechenfenster braucht, bricht die Rechnung ab. Die Meldung nennt je Tag die fehlenden Uhrzeiten oder „keine Daten“. Abhilfe: den Zeitraum auf Tage mit vollständigen Daten einschränken oder die Verbrauchsdaten neu erzeugen. Zu beachten:
+
+- Ein Rechenfenster kann über den Zeitraum hinausreichen: Mit Ladeplan eines E-Autos beginnt es am Vortag zur Abfahrtszeit, im Sonnenaufgangs-Modus reicht es vom Vortag bis zum Folgetag. Diese Tage müssen ebenfalls Daten haben.
+- Am Tag der Umstellung auf Sommerzeit fehlt die Stunde 02:00 regulär; der Tag gilt mit 23 Stunden als vollständig.
+- Mit **Verbrauchsdaten auf letzten Kalendermonat spiegeln** spiegelt Earnie einen Tag vor und einen Tag nach dem Zeitraum mit. Fehlen dafür Quellstunden, bricht schon das Spiegeln mit einer Liste der Lücken ab.
+
 #### Szenario-Explorer ausführen
 
 1. Die Auswahl der Szenarien prüfen und ggf. im Szenarienkonfigurator anpassen.
