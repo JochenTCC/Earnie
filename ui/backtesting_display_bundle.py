@@ -432,6 +432,19 @@ def _snapshot_missing_multi_ess_soc(snapshot: dict) -> bool:
     return not bool(discover_ess_soc_series(pd.DataFrame(rows[:1])))
 
 
+def _require_log_matches_config(meta: dict) -> None:
+    """An on-demand window simulates with the current configuration and is saved into the
+    log, so it needs a log that still matches that configuration."""
+    from ui.backtesting import log_stale_reason
+
+    if log_stale_reason(meta) is not None:
+        raise ValueError(
+            "Für dieses Fenster liegt im Log kein gespeicherter Plan vor, und die aktuelle "
+            "Konfiguration passt nicht mehr zum Lauf. Bitte den Szenario-Explorer neu "
+            "berechnen, um das Fenster anzuzeigen."
+        )
+
+
 def _on_demand_window_snapshot(
     log_dir: str,
     window_anchor: str,
@@ -449,15 +462,22 @@ def _on_demand_window_snapshot(
         simulate_window_snapshot,
     )
 
-    cache_key = cache_key_for_window(window_anchor, scenario_id, log_horizon)
+    # created_at: a new run in the same session must not show the window of the old one.
+    cache_key = (
+        *cache_key_for_window(window_anchor, scenario_id, log_horizon),
+        str(meta.get("created_at") or ""),
+    )
     if replace_stale:
         cache_key = (*cache_key, "multi_ess_soc_v1")
     snapshot_cache = _on_demand_snapshot_cache()
     snapshot = snapshot_cache.get(cache_key)
     if snapshot is not None:
         return snapshot
+    _require_log_matches_config(meta)
     anchor_dt = pd.Timestamp(window_anchor).to_pydatetime()
-    initial_soc = initial_soc_for_anchor(anchor_dt, scenario_id, hourly_df)
+    initial_soc = initial_soc_for_anchor(
+        anchor_dt, scenario_id, hourly_df, horizon_mode=log_horizon
+    )
     with st.spinner("Fenster wird berechnet…"):
         snapshot = simulate_window_snapshot(
             anchor_dt,
@@ -499,6 +519,7 @@ def resolve_backtesting_display_bundle(
         str(view_mode),
         int(segment_index),
         str(log_horizon),
+        str(meta.get("created_at") or ""),
         "multi_ess_soc_v1",
         "standard_rules_v1",
     )

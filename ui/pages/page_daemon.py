@@ -150,15 +150,22 @@ def _render_silent_mode_toggle() -> None:
             "Silent-Modus: keine Sollwert-Schreibzugriffe. "
             "Loud-Modus: Schreiben nur, solange der Optimierer-Dienst läuft."
         )
-    silent = st.toggle(
+    # The file leads: only a click writes (callback), so a second tab with an old widget
+    # value cannot switch the mode back on its next rerun.
+    st.session_state["daemon_silent_mode"] = current
+    st.toggle(
         "Silent-Modus",
-        value=current,
         disabled=shadow,
         key="daemon_silent_mode",
+        on_change=_save_silent_mode,
         help="Persistiert in runtime/local_settings.json (silent_mode).",
     )
-    if shadow or silent == current:
+
+
+def _save_silent_mode() -> None:
+    if is_shadow_mode():
         return
+    silent = bool(st.session_state["daemon_silent_mode"])
     write_silent_mode_to_local_settings(resolve_local_settings_json_path(), silent)
     reload_runtime_config()
     if silent:
@@ -168,7 +175,6 @@ def _render_silent_mode_toggle() -> None:
             "warning",
             "Loud-Modus: Die Anlage erhält Sollwerte, sobald der Optimierer-Dienst läuft.",
         )
-    st.rerun()
 
 
 def _scroll_to_log_top() -> None:

@@ -426,18 +426,18 @@ def _assemble_balanced_slot(
     down_primary = sum(segment.kw for segment in down_segments)
     offset_kw = up_external - down_primary - powers["battery_charge"]
     surplus_export_pv = 0.0
-    surplus_curtail_pv = float(powers.get("curtail_pv") or 0.0)
-    if powers["grid_export"] < 1e-9 and offset_kw > 1e-9:
-        if forbid_export:
-            surplus_curtail_pv += offset_kw
-        else:
-            surplus_export_pv = offset_kw
+    surplus_curtail_pv = 0.0
+    if forbid_export:
+        # ``offset_kw`` already holds the whole surplus (skipped charge included).
+        # What the row reports as export stays Einspeisung; only the rest is curtailed.
+        surplus_curtail_pv = max(offset_kw - powers["grid_export"], 0.0)
+    elif powers["grid_export"] < 1e-9 and offset_kw > 1e-9:
+        surplus_export_pv = offset_kw
 
     # Pay-to-export: shrink the PV up-bar (curtailed kW never enters the house
     # balance) instead of drawing Einspeisung / Abregelung down-bars.
     effective_pv = nameplate_pv
-    display_curtail_pv = 0.0
-    if forbid_export and surplus_curtail_pv > 1e-9:
+    if surplus_curtail_pv > 1e-9:
         effective_pv = max(0.0, nameplate_pv - surplus_curtail_pv)
         up_segments = [
             (
@@ -458,8 +458,6 @@ def _assemble_balanced_slot(
         ]
         if effective_pv <= 1e-9:
             up_segments = [seg for seg in up_segments if seg.kind != KIND_PV]
-    elif surplus_curtail_pv > 1e-9:
-        display_curtail_pv = surplus_curtail_pv
 
     flows = allocate_slot_flows(
         pv=effective_pv,
@@ -472,7 +470,6 @@ def _assemble_balanced_slot(
     balance_up, balance_down = _segments_from_allocation(
         flows,
         surplus_export_pv=surplus_export_pv,
-        surplus_curtail_pv=display_curtail_pv,
     )
     up_segments.extend(balance_up)
     down_segments.extend(balance_down)
@@ -493,9 +490,12 @@ def _row_pay_to_export(row: Mapping[str, Any]) -> bool:
         if key not in row:
             continue
         try:
-            return float(row[key]) < 0.0
+            price = float(row[key])
         except (TypeError, ValueError):
             continue
+        if math.isnan(price):
+            continue
+        return price < 0.0
     return False
 
 
@@ -537,13 +537,11 @@ def build_flow_balance_segments(
     )
     forbid_export = _row_pay_to_export(row)
     grid_import = max(grid, 0.0) + discharge_skipped
-    # Pay-to-export: skipped charge / clipped netz must not become "Einspeisung".
-    if forbid_export:
-        grid_export = 0.0
-        curtail_pv = charge_skipped + max(-grid, 0.0)
-    else:
-        grid_export = max(-grid, 0.0) + charge_skipped
-        curtail_pv = 0.0
+    # Pay-to-export: skipped charge must not become "Einspeisung" (it is curtailed);
+    # export the row itself reports is real and stays Einspeisung.
+    grid_export = max(-grid, 0.0)
+    if not forbid_export:
+        grid_export += charge_skipped
     battery_charge = max(battery, 0.0)
     battery_discharge = max(-battery, 0.0)
     flex_pairs = list(flex_consumers) if flex_consumers is not None else _default_flex_pairs(row)
@@ -555,7 +553,6 @@ def build_flow_balance_segments(
             "grid_export": grid_export,
             "battery_charge": battery_charge,
             "battery_discharge": battery_discharge,
-            "curtail_pv": curtail_pv,
         },
         _primary_up_segments(pv, grid_import),
         _primary_down_segments(row, baseload, flex_pairs),

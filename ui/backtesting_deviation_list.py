@@ -10,6 +10,8 @@ import streamlit as st
 import config
 
 from simulation.backtesting_log import extract_critical_cases, summarize_critical_cases
+from simulation.backtesting_snapshots import normalize_window_anchor_key
+from simulation.reference_costs import is_scenario_reference_id
 from simulation.engine import (
     HISTORICAL_REFERENCE_ID,
     HistoricalDataCache,
@@ -23,6 +25,7 @@ from ui.backtesting_deviation_calendar import (
     default_calendar_date,
     deviation_marker_for_case,
     render_deviation_calendar,
+    stored_window_anchors,
 )
 from ui.backtesting_diag_single_window import render_diag_single_window_panel
 from ui.backtesting_display_bundle import (
@@ -270,7 +273,8 @@ def _optimized_scenario_ids(meta: dict) -> list[str]:
     return [
         str(scenario_id)
         for scenario_id in meta.get("scenario_ids", [])
-        if scenario_id != ref_id
+        # References (ref:/l1:/l2:) are not optimized and have no window plans.
+        if scenario_id != ref_id and not is_scenario_reference_id(str(scenario_id))
     ]
 
 
@@ -318,6 +322,26 @@ def _run_anchors_from_hourly(
     return anchors
 
 
+def _run_anchors_from_stored(
+    stored: dict[date, str],
+    hourly_df: pd.DataFrame | None,
+) -> list[datetime]:
+    """The run's saved anchors whose 24 h before the anchor hold booked rows."""
+    if hourly_df is None or hourly_df.empty or "ts" not in hourly_df.columns:
+        return []
+    part = hourly_df
+    if "scenario_id" in hourly_df.columns:
+        part = hourly_df[hourly_df["scenario_id"] != HISTORICAL_REFERENCE_ID]
+    stamps = pd.DatetimeIndex(pd.to_datetime(part["ts"]).unique()).sort_values()
+    anchors: list[datetime] = []
+    for key in sorted(set(stored.values())):
+        anchor = pd.Timestamp(key)
+        position = stamps.searchsorted(anchor - pd.Timedelta(hours=24))
+        if position < len(stamps) and stamps[position] < anchor:
+            anchors.append(anchor.to_pydatetime())
+    return anchors
+
+
 def _run_anchors_via_cons_data(meta: dict) -> list[datetime]:
     bounds = nav_bounds_from_period(meta.get("period") or {})
     if bounds is None:
@@ -337,6 +361,12 @@ def _run_anchors_for_meta(
         anchors = cached.get("anchors")
         if isinstance(anchors, list):
             return anchors
+
+    stored = stored_window_anchors(meta)
+    if stored is not None:
+        anchors = _run_anchors_from_stored(stored, hourly_df)
+        st.session_state[_SESSION_RUN_ANCHORS_KEY] = {"key": cache_key, "anchors": anchors}
+        return anchors
 
     if hourly_df is not None:
         from_hourly = _run_anchors_from_hourly(meta, hourly_df)
@@ -489,14 +519,24 @@ def _render_detail_mode_radio() -> str:
     )
 
 
-def _render_deviation_summary_caption(cases: list[dict]) -> None:
+def _render_deviation_summary_caption(cases: list[dict], index: dict) -> None:
     if not cases:
         st.caption("Keine auffälligen Abweichungen — alle in-run Tage sind dennoch wählbar.")
         return
     summary = summarize_critical_cases(cases)
-    st.caption(
-        f"{summary['total']} Abweichungen in {summary['distinct_windows']} Fenstern"
-    )
+    text = f"{summary['total']} Abweichungen in {summary['distinct_windows']} Fenstern"
+    in_calendar = {cell.anchor_iso for cell in index.values() if cell.in_run}
+    outside = [
+        case
+        for case in cases
+        if normalize_window_anchor_key(str(case.get("window_anchor"))) not in in_calendar
+    ]
+    if outside:
+        text += (
+            f"; {len(outside)} davon in Fenstern, die der Kalender nicht zeigt "
+            "(Fenster über den Rand des Zeitraums hinaus)"
+        )
+    st.caption(text)
 
 
 def _scenario_options_for_cell(
@@ -555,7 +595,12 @@ def render_deviation_list(
 
     cases = deviation_cases_for_display(meta)
     index = build_deviation_calendar_index(meta, cases, run_anchors=run_anchors)
-    _render_deviation_summary_caption(cases)
+    _render_deviation_summary_caption(cases, index)
+    if stored_window_anchors(meta) is None:
+        st.caption(
+            "Älterer Lauf ohne gespeicherte Fensteranker: Die Kalendertage folgen dem "
+            "aktuellen Ladeplan. Nach einer Änderung von „fertig bis“ bitte neu berechnen."
+        )
 
     selection = _resolve_deviation_selection(index, meta, labels_map)
     if selection is None:

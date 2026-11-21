@@ -10,6 +10,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, TextIO
 
+import pandas as pd
+
 from runtime_store.env_vars import is_rule_reference_enabled
 from runtime_store.persist_paths import resolve_backtesting_log_dir
 from simulation.backtesting_progress import (
@@ -108,8 +110,12 @@ def auto_backtesting_workers(parallel_task_count: int) -> int:
     return min(parallel_task_count, available)
 
 
-def suggest_test_month() -> int | None:
-    """Monat für Testlauf: März im SE-Fenster, sonst erster Monat im Fenster."""
+def suggest_test_month() -> pd.Period | None:
+    """Monat für Testlauf: März im SE-Fenster, sonst erster Monat im Fenster.
+
+    With its year: the window can span two calendar years, and the CLI would put a bare
+    month number into the year of the cons_data end.
+    """
     from data.data_loader import resolve_simulation_window
 
     try:
@@ -118,13 +124,10 @@ def suggest_test_month() -> int | None:
         return None
     cursor = start.to_period("M")
     end_period = end.to_period("M")
-    first_month: int | None = None
+    first_month = cursor if cursor <= end_period else None
     while cursor <= end_period:
-        month = int(cursor.month)
-        if first_month is None:
-            first_month = month
-        if month == 3:
-            return 3
+        if cursor.month == 3:
+            return cursor
         cursor += 1
     return first_month
 
@@ -196,8 +199,8 @@ def _drain_subprocess_stdout(pipe: TextIO | None, chunks: list[str]) -> None:
 def build_backtesting_command(
     *,
     output_dir: str,
-    start_month: int | None = None,
-    end_month: int | None = None,
+    start_month: int | str | None = None,
+    end_month: int | str | None = None,
     progress_file: str | None = None,
     horizon_mode: str = DEFAULT_HORIZON_MODE,
     workers: int = 1,
@@ -246,8 +249,8 @@ class BacktestingRun:
 def start_backtesting_subprocess(
     *,
     output_dir: str | None = None,
-    start_month: int | None = None,
-    end_month: int | None = None,
+    start_month: int | str | None = None,
+    end_month: int | str | None = None,
     progress_file: str | None = None,
     horizon_mode: str = DEFAULT_HORIZON_MODE,
     workers: int = 1,
@@ -328,8 +331,8 @@ def poll_backtesting_progress(
 def run_backtesting_subprocess(
     *,
     output_dir: str | None = None,
-    start_month: int | None = None,
-    end_month: int | None = None,
+    start_month: int | str | None = None,
+    end_month: int | str | None = None,
     progress_file: str | None = None,
     horizon_mode: str = DEFAULT_HORIZON_MODE,
     workers: int = 1,

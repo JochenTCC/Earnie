@@ -131,15 +131,19 @@ def _zip_file_name(zip_path: str) -> str:
     return zip_path.split("/")[-1].split("\\")[-1]
 
 
-def _render_config_only_download(attachments: list[Any], config_pack: bytes) -> None:
+def _render_config_only_download(attachments: list[Any]) -> None:
+    from runtime_store.config_pack import build_config_pack_bytes
+
     st.markdown("**Nur Konfiguration**")
     st.caption(
-        "Konfigurations-ZIP plus Anhänge, ohne Historie und Logs. Hilft nur bei "
-        "Fragen, die **nicht** den Live-Betrieb betreffen (Einrichtung, Hausprofil, "
-        "Szenarien, Backtesting)."
+        "Konfigurations-ZIP plus Anhänge, ohne Historie, Logs, hochgeladene CSV-Dateien "
+        "und Passwörter. Hilft nur bei Fragen, die **nicht** den Live-Betrieb betreffen "
+        "(Einrichtung, Hausprofil, Szenarien, Backtesting)."
     )
     try:
-        payload = build_config_only_bundle_bytes(attachments, config_pack=config_pack)
+        payload = build_config_only_bundle_bytes(
+            attachments, config_pack=build_config_pack_bytes(for_support=True)
+        )
     except (OSError, ValueError, zipfile.BadZipFile) as exc:
         st.error(f"ZIP-Erstellung fehlgeschlagen: {exc}")
         logger.exception("Support-Paket (nur Konfiguration) fehlgeschlagen")
@@ -235,5 +239,5 @@ def render_support_package_controls(config_pack: bytes | None) -> None:
     )
     attachment_list = list(attachments or [])
     if config_pack is not None:
-        _render_config_only_download(attachment_list, config_pack)
+        _render_config_only_download(attachment_list)
     _render_full_package(attachment_list)

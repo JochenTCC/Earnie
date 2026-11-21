@@ -25,10 +25,13 @@ if "_fake_run_seeded" not in st.session_state:
         "run": _FakeRun(cfg["cancel_requested"]),
         "ctx": {"workers": 1, "preferred_progress_ids": [], "labels_for_order": {}, "eta_tracker": None},
         "status_label": "Szenario-Explorer läuft…",
-        "start_month": None,
-        "end_month": None,
+        "calendar_month": None,
     }
-br.poll_backtesting_progress = lambda run, on_progress=None: None
+if cfg.get("running"):
+    # The run is still going: stop the script where the page would wait for it.
+    br.poll_backtesting_progress = lambda run, on_progress=None: st.stop()
+else:
+    br.poll_backtesting_progress = lambda run, on_progress=None: None
 br.finish_backtesting_run = lambda run: (cfg["exit_code"], "Traceback: boom")
 
 page_backtesting.render()

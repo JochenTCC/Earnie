@@ -322,6 +322,19 @@ def _append_breakdown_links(
     _append_return_flows(links, data, system_idx)
 
 
+def _breakdown_with_drawn_baseload(breakdown: dict, consumers: list[dict]) -> dict:
+    """Copy of ``breakdown`` whose ``baseload_kw`` is house minus the drawn consumers.
+
+    The snapshot's ``baseload_kw`` subtracts every metered ``flex_kw`` entry. A metered
+    consumer without a Sankey node (e.g. a known consumer hidden by the absence mode)
+    stays in the house load, so it is part of *Grundlast* here instead of vanishing.
+    """
+    flex_kw = breakdown.get("flex_kw") or {}
+    drawn_kw = sum(_flex_kw_for_consumer(flex_kw, consumer) for consumer in consumers)
+    baseload = round(max(0.0, float(breakdown["house_kw"]) - drawn_kw), 3)
+    return {**breakdown, "baseload_kw": baseload}
+
+
 def _breakdown_sankey_data(
     data: dict,
     breakdown: dict,
@@ -329,6 +342,7 @@ def _breakdown_sankey_data(
     head: _SankeyHead,
 ) -> tuple[list[str], _SankeyLinks, list[str]]:
     consumers = _sankey_breakdown_consumers()
+    breakdown = _breakdown_with_drawn_baseload(breakdown, consumers)
     links = _SankeyLinks()
     labels, node_colors = _breakdown_node_labels_colors(
         breakdown, consumers, main_state, head

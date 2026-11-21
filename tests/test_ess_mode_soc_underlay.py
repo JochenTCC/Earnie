@@ -333,3 +333,61 @@ def test_underlay_follows_controlled_battery_column_not_aggregate():
     assert _y_at(under, t_1815) == pytest.approx(91.1, abs=0.05)
     assert _y_at(soc, t_1815) == pytest.approx(91.1, abs=0.05)
     assert _y_at(under, t_1815) == pytest.approx(_y_at(soc, t_1815), abs=0.05)
+
+
+def _qh_ramp_df() -> pd.DataFrame:
+    slots = [datetime(2026, 7, 6, 18, minute, tzinfo=_TZ) for minute in (0, 15, 30, 45)]
+    slots.append(datetime(2026, 7, 6, 19, 0, tzinfo=_TZ))
+    return pd.DataFrame({
+        "slot_datetime": slots,
+        "Uhrzeit": [slot.strftime("%d.%m. %H:%M") for slot in slots],
+        "Geplante Batterie-Aktion (kW)": [0.0, 0.0, 2.0, 2.0, 2.0],
+        "Simulierter SoC (%)": [50.0, 50.0, 50.0, 55.0, 60.0],
+    })
+
+
+def test_ramp_between_half_and_three_quarter_keeps_the_next_quarter():
+    """Jetzt 18:35: the 18:45 MILP slot counts as a later slot of the hour."""
+    from ui.chart_soc_ramps import _current_hour_soc_ramp, _has_milp_slots_between
+
+    df = _qh_ramp_df()
+    axis = ChartSlotAxis.from_dataframe(df)
+    now = datetime(2026, 7, 6, 18, 35, tzinfo=_TZ)
+    quarter_end = datetime(2026, 7, 6, 18, 45, tzinfo=_TZ)
+    hour_end = datetime(2026, 7, 6, 19, 0, tzinfo=_TZ)
+    assert _has_milp_slots_between(axis, quarter_end, hour_end, 0, len(df), 2)
+    ramp = _current_hour_soc_ramp(
+        axis, df["Simulierter SoC (%)"], df, now, 0, len(df), 2,
+        battery_params=_BATTERY,
+    )
+    assert ramp is not None
+    _t_start, _y_start, t_end, y_end = ramp
+    assert t_end == quarter_end
+    assert y_end == pytest.approx(55.0)
+
+
+def test_resolve_battery_params_without_params_uses_plant_of_configured_list(monkeypatch):
+    from ui import chart_soc_ramps
+
+    first = {**_BATTERY, "id": "a", "label": "A"}
+    second = {**_BATTERY, "id": "b", "label": "B", "battery_capacity_kwh": 5.0}
+    monkeypatch.setattr(chart_soc_ramps.config, "get_battery_params_list", lambda: [first, second])
+    monkeypatch.setattr(
+        "optimizer.sim_horizon_chart_soc.house_balance_batteries", lambda batteries: batteries
+    )
+    params = chart_soc_ramps._resolve_battery_params(None)
+    assert params["battery_capacity_kwh"] == pytest.approx(15.0)
+
+
+def test_underlay_and_line_width_accept_battery_list():
+    """Backtesting snapshots pass a multi-ESS list; must not call ``.get`` on it."""
+    from ui.chart_soc import _legacy_soc_line_width
+    from ui.chart_soc_underlay import _resolve_underlay_soc_column
+
+    params = [{**_BATTERY, "id": "15_kwh_speicher", "label": "15 kWh Speicher"}]
+    controlled_col = "Simulierter SoC 15 kWh Speicher (%)"
+    df = _chart_df(["IDLE", "IDLE"], [50.0, 51.0])
+    df[controlled_col] = [40.0, 41.0]
+    df["Simulierter SoC Ecoflow (%)"] = [70.0, 71.0]
+    assert _resolve_underlay_soc_column(df, battery_params=params) == controlled_col
+    assert _legacy_soc_line_width([], params) > 0

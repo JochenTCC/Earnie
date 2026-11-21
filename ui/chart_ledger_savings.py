@@ -12,7 +12,7 @@ Reads only: the daemon owns the ledger files (``savings_ledger_store.peek_state`
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Sequence
 
 import config
@@ -57,6 +57,18 @@ def _no_ledger(slot_count: int, history_slot_count: int, hint: str) -> dict[str,
     }
 
 
+def _utc_key(stamp: datetime) -> datetime:
+    """Lookup key of a slot start: the UTC instant.
+
+    Ledger slot starts carry fixed offsets, display slots ``ZoneInfo`` times. Python
+    never treats an aware time in a DST fold or gap as equal to one in another zone,
+    so a lookup by the raw value misses the slots around the clock change.
+    """
+    if stamp.tzinfo is None:
+        raise ValueError(f"savings ledger: slot start without timezone: {stamp!r}")
+    return stamp.astimezone(timezone.utc)
+
+
 def _slot_series(
     slot_starts: Sequence[datetime],
     history_slot_count: int,
@@ -72,15 +84,15 @@ def _slot_series(
     booked: dict[datetime, dict[str, Any]] = {}
     for day in closed_slots.values():
         for slot in day:
-            booked[datetime.fromisoformat(slot["slot_start"])] = slot
+            booked[_utc_key(datetime.fromisoformat(slot["slot_start"]))] = slot
     for slot in state.slots:
-        booked[datetime.fromisoformat(slot["slot_start"])] = slot
+        booked[_utc_key(datetime.fromisoformat(slot["slot_start"]))] = slot
     count = len(slot_starts)
     with_eur = [0.0] * count
     without_eur = [0.0] * count
     states = [SLOT_PLAN] * count
     for index in range(min(history_slot_count, count)):
-        start = slot_starts[index]
+        start = _utc_key(slot_starts[index])
         record = booked.get(start)
         if record is not None:
             if record["counted"]:
@@ -103,13 +115,13 @@ def _slot_shadow_soc(
 ) -> list[float | None]:
     """Shadow SoC at the end of each display slot left of *Jetzt*; the open day only (Chart 1)."""
     by_start = {
-        datetime.fromisoformat(slot["slot_start"]): float(slot["shadow_soc_end"])
+        _utc_key(datetime.fromisoformat(slot["slot_start"])): float(slot["shadow_soc_end"])
         for slot in state.slots
         if slot["shadow_soc_end"] is not None  # no house battery: no shadow SoC
     }
     values: list[float | None] = [None] * len(slot_starts)
     for index in range(min(history_slot_count, len(slot_starts))):
-        values[index] = by_start.get(slot_starts[index])
+        values[index] = by_start.get(_utc_key(slot_starts[index]))
     return values
 
 

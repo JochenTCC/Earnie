@@ -523,3 +523,19 @@ def test_sb_configured_with_ha_backend_without_url_or_token(tmp_path, monkeypatc
     )
 
     assert setup_readiness.is_sb_configured() is True
+
+
+def test_live_profile_items_flag_a_deleted_profile():
+    """A live scenario pointing to a deleted profile is not ready (UI review 4d)."""
+    profiles_doc = {"profiles": [{"id": "other", "netznutzung": {"area_id": "x"}}]}
+    items = setup_readiness._missing_live_profile_items(  # noqa: SLF001
+        {"house_profile_id": "gone"}, profiles_doc
+    )
+    assert items == ["Hausprofil zuordnen (Echtzeit-Umgebung)"]
+
+
+def test_broken_json_is_an_error_not_an_empty_setup(tmp_path):
+    broken = tmp_path / "house_profiles.json"
+    broken.write_text("{ not json", encoding="utf-8")
+    with pytest.raises(ValueError, match="kein gültiges JSON"):
+        setup_readiness._read_json_document(str(broken))  # noqa: SLF001

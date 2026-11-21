@@ -56,10 +56,35 @@ def test_initial_soc_from_hourly_df():
     assert soc == 62.5
 
 
-def test_initial_soc_fallback_without_match():
+def test_initial_soc_without_series_fails_loud():
     anchor = window_anchor_for_date(LOW_EAUTO_DAY)
-    soc = initial_soc_for_anchor(anchor, "missing", pd.DataFrame())
-    assert soc == 50.0
+    with pytest.raises(ValueError, match="SoC"):
+        initial_soc_for_anchor(anchor, "missing", pd.DataFrame())
+
+
+def test_initial_soc_before_the_first_booked_slot_is_the_run_start_soc():
+    from simulation.backtesting_single_window import RUN_START_SOC
+
+    anchor = window_anchor_for_date(LOW_EAUTO_DAY)
+    slots = window_slot_datetimes(anchor)
+    hourly_df = pd.DataFrame(
+        {"ts": [slots[4]], "scenario_id": ["fixture_5kwh_fixed"], "sim_soc": [62.5]}
+    )
+    assert initial_soc_for_anchor(anchor, "fixture_5kwh_fixed", hourly_df) == RUN_START_SOC
+
+
+def test_initial_soc_missing_inside_the_series_fails_loud():
+    anchor = window_anchor_for_date(LOW_EAUTO_DAY)
+    slots = window_slot_datetimes(anchor)
+    hourly_df = pd.DataFrame(
+        {
+            "ts": [slots[0] - pd.Timedelta(hours=1), slots[1]],
+            "scenario_id": ["fixture_5kwh_fixed"] * 2,
+            "sim_soc": [40.0, 62.5],
+        }
+    )
+    with pytest.raises(ValueError, match="ohne SoC"):
+        initial_soc_for_anchor(anchor, "fixture_5kwh_fixed", hourly_df)
 
 
 def test_simulate_window_snapshot_on_fixture(

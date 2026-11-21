@@ -67,11 +67,16 @@ def _set_s2_segment_index(segment: int) -> None:
 
 
 def _prepare_date_picker_state(display_cycle: int, sa0_date: date) -> None:
-    """Picker-Wert nur vor Widget-Instanziierung setzen (Streamlit-Regel)."""
-    if st.session_state.get(SESSION_S2_DATE_PICKER_CYCLE) == display_cycle:
+    """Picker-Wert nur vor Widget-Instanziierung setzen (Streamlit-Regel).
+
+    Keyed by cycle *and* SA₀ day: at sunrise cycle 0 gets a new day, and a picker still on
+    the old day would read as a user pick and move the chart out of the live window.
+    """
+    marker = (display_cycle, sa0_date)
+    if st.session_state.get(SESSION_S2_DATE_PICKER_CYCLE) == marker:
         return
     st.session_state[SESSION_S2_DATE_PICKER] = sa0_date
-    st.session_state[SESSION_S2_DATE_PICKER_CYCLE] = display_cycle
+    st.session_state[SESSION_S2_DATE_PICKER_CYCLE] = marker
 
 
 def _apply_s2_nav_state(cycle_offset: int, segment_index: int) -> None:

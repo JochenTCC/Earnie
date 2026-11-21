@@ -79,3 +79,31 @@ def test_csv_probe_key_includes_path_and_series():
     )
     assert k1 != k2
     assert k1 != k3
+
+
+def test_series_fingerprint_sees_values_between_the_sample_points():
+    """Invert switches or a corrected import change values off the first/middle/last points."""
+    base = [(f"2024-01-01T{h:02d}:00:00", 1.0) for h in range(10)]
+    changed = list(base)
+    changed[2] = (changed[2][0], -1.0)
+    assert fingerprint_ist_series(base) != fingerprint_ist_series(changed)
+    assert fingerprint_ist_series(base) == fingerprint_ist_series(list(base))
+
+
+def test_profile_csv_lookup_rereads_a_rewritten_file(tmp_path):
+    """Imports overwrite fixed paths; the CSV cache must follow the file, not the path."""
+    import os
+    from datetime import datetime
+
+    from data.consumption_profiles import csv_kw_at_datetime
+    from house_config.consumption_csv import write_canonical_hourly_csv
+
+    path = tmp_path / "pv.csv"
+    write_canonical_hourly_csv(str(path), [("2024-01-01 10:00:00", 1.0)])
+    assert csv_kw_at_datetime(str(path), datetime(2024, 1, 1, 10)) == 1.0
+    write_canonical_hourly_csv(
+        str(path), [("2024-01-01 10:00:00", 2.5), ("2024-01-01 11:00:00", 0.0)]
+    )
+    stat = os.stat(path)
+    os.utime(path, ns=(stat.st_atime_ns, stat.st_mtime_ns + 1_000_000_000))
+    assert csv_kw_at_datetime(str(path), datetime(2024, 1, 1, 10)) == 2.5

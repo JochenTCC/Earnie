@@ -311,3 +311,27 @@ def _sample_rows_for_snapshot(count: int = 24, start: datetime | None = None):
             }
         )
     return chart_rows, matrix
+
+
+
+def test_battery_params_from_snapshot_keeps_a_stored_capacity_of_zero():
+    from ui.backtesting_display_bundle import _battery_params_from_snapshot
+
+    params = {
+        "battery_capacity_kwh": 0.0,
+        "min_soc": 0.0,
+        "max_soc": 100.0,
+        "max_power_kw": 0.0,
+        "efficiency": 1.0,
+    }
+    resolved = _battery_params_from_snapshot({"battery_params": params, "scenario_id": "x"})
+    assert resolved["battery_capacity_kwh"] == 0.0
+
+
+def test_on_demand_window_is_refused_for_a_stale_log():
+    import pytest
+
+    from ui.backtesting_display_bundle import _require_log_matches_config
+
+    with pytest.raises(ValueError, match="neu"):
+        _require_log_matches_config({"period": {}})

@@ -46,9 +46,25 @@ def test_cancelled_run_of_the_session_shows_the_cancel_notice():
     at = _active_run(130, cancel_requested=True)
     assert not at.exception
     assert any("abgebrochen" in info.value for info in at.info)
-    cancel = [b for b in at.button if b.key == "backtesting_cancel_btn"]
-    assert cancel and cancel[0].disabled
+    # The page reruns once the run has ended: no run left, so no cancel button either.
+    assert not [b for b in at.button if b.key == "backtesting_cancel_btn"]
     assert "_backtesting_active_run" not in at.session_state
+
+
+def test_result_of_a_failed_run_survives_the_next_rerun():
+    at = _active_run(1, cancel_requested=False)
+    at.run()
+    assert not at.exception
+    assert any("Exit-Code 1" in err.value for err in at.error)
+
+
+def test_generate_button_is_locked_while_a_run_of_the_session_is_going():
+    at = AppTest.from_file(str(_ACTIVE_RUN_SCRIPT), default_timeout=30)
+    at.session_state["_fake_run_cfg"] = {"exit_code": 0, "cancel_requested": False, "running": True}
+    at.run()
+    assert not at.exception
+    generate = [b for b in at.button if b.key == "backtesting_cons_data_generate_btn"]
+    assert generate and generate[0].disabled
 
 
 def test_failed_run_is_not_reported_as_cancelled():
