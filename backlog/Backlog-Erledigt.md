@@ -2,6 +2,12 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### PV forecast comparison lines in Chart 1 (2026-11-21)
+
+- [x] **PV forecast comparison lines in Chart 1** `[dev]` *(decided 2026-11-21, maintainer; run choice: option a)*: the PV forecasts of the comparison logger (`scripts/pv_forecast_compare.py fetch`, see **PV forecast comparison run** in [Bugfixes](Backlog-Bugfixes.md)) as dotted step lines in Chart 1 on the NAS production install, to look at them daily over the winter; the evaluation follows about March to May 2027. `runtime_store/pv_forecast_compare_view.py` reads `forecasts.jsonl` (only lines fetched in the chart window minus 4 days are JSON-parsed; cached per file state), each hour takes the **latest run fetched before the hour starts**, summed over the PV systems (a missing system leaves the hour empty); `ui/chart_pv_compare.py` draws one line per source with the toggle "Test-Prognosen PV einblenden". Enabled only by `EARNIE_PV_FORECAST_COMPARE_DIR`; without it nothing is read. The horizon comparison needs no extra logger source: with the manual horizon on, Earnie's own PV forecast is forecast.solar **with** horizon (SUSI P3a-2), the logger's `forecast_solar` is **without**.
+  - **Note — state (2026-11-21):** built and tested (`tests/test_pv_forecast_compare_view.py`); checked in the local UI with the NAS logger file (six sources drawn, toggle off removes them, first read 0.02 s for 7.4 MB).
+  - [x] **NAS:** logger directory mounted read-only into `earnie-productive` (`/app/pv_forecast_compare`), `EARNIE_PV_FORECAST_COMPARE_DIR` set, image `2.8.0-dev.30` *(done 2026-11-21)*.
+
 ### Bugfix — HA add-on read `.env` from the data volume (2026-11-21)
 
 - [x] **Bugfix — HA add-on read `.env` from the data volume, not from `/config`** *(found 2026-11-18 in tester support; fixed 2026-11-18 on `main`, not on `release/2.7`, maintainer)*: `run.sh` sets `EARNIE_CONFIG_PATH=/config` and `EARNIE_ENV_PATH=/data/earnie_env`. `config.json` has the add-on exception (`persist_paths_base._effective_config_path_env`), `persist_paths.resolve_dotenv_path` had none: because `EARNIE_ENV_PATH` is set it always took `/data/earnie_env/config/.env`. The config migration in `run.sh` copied the old `.env` to `/config`, bootstrap then created a template `.env` on the data volume, and credentials entered since then landed there; `/config/.env` (named in `DOCS.md` and `docs/einrichtung/homeassistant-addon.md`) was never read.
