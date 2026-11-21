@@ -58,6 +58,11 @@ def render_optimization_chart1(
     *,
     chart_key: str = "live_power_soc_chart",
 ) -> None:
+    from ui.chart_pv_compare import pv_compare_series_for_chart
+
+    pv_compare_series = pv_compare_series_for_chart(
+        bundle.display_df, toggle_key=f"{chart_key}_pv_compare"
+    )
     with chart_flex_consumers_context(
         list(bundle.flex_consumers) if bundle.flex_consumers else None
     ), chart_baseline_label_context(bundle.baseline_label):
@@ -80,6 +85,7 @@ def render_optimization_chart1(
             battery_params=bundle.battery_params,
             show_baseline_soc=bundle.show_baseline_soc,
             slot_shadow_soc=bundle.slot_shadow_soc,
+            pv_compare_series=pv_compare_series,
         )
     if bundle.baseline_soc_hint:
         st.caption(bundle.baseline_soc_hint)

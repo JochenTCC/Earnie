@@ -271,6 +271,8 @@ Eine Einstellung ist nicht nötig; die Datei bleibt lokal. Voraussetzung ist ein
 
 **Rohdaten für einen Zählervergleich:** Mit `EARNIE_POWER_SAMPLE_LOG_DAYS=<Tage>` in `.env` schreibt Earnie jede Leistungsprobe (alle 30 s) in `runtime/power_samples/JJJJ-MM-TT.jsonl`: Netzleistung, Bezugs- und Einspeisezähler zum selben Zeitpunkt, wann jeder dieser Werte als Push angekommen ist, und die geschätzte Uhrabweichung. Ältere Tage löscht Earnie selbst. Gedacht ist das für einen Vergleich mit dem Viertelstunden-Export aus dem Portal des Netzbetreibers. Leer oder `0` schaltet es aus.
 
+**Test-Prognosen PV in Chart 1:** Läuft der PV-Prognose-Vergleich (`scripts/pv_forecast_compare.py fetch`, stündlich), kann Chart 1 dessen Prognosen als gepunktete Linien neben der eigenen PV-Prognose zeigen. Dazu `EARNIE_PV_FORECAST_COMPARE_DIR` auf das Ausgabeverzeichnis des Vergleichs setzen (das Verzeichnis mit `forecasts.jsonl`; im Container nur lesend einhängen). Über dem Chart erscheint dann der Schalter **Test-Prognosen PV einblenden**. Je Stunde zeigt jede Quelle den letzten Lauf vor Beginn der Stunde, summiert über alle PV-Felder; fehlt ein PV-Feld in einer Stunde, bleibt die Stunde leer. Earnie plant weiter nur mit seiner eigenen PV-Prognose. Ohne die Variable ändert sich nichts. Ist die Datei nicht lesbar, steht eine Warnung über dem Chart.
+
 <a id="cycle-recorder-regression-r-rec"></a>
 
 ### Cycle-Recorder

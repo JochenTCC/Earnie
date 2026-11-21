@@ -1,7 +1,7 @@
 """Plotly-Charts für Optimierungsdarstellung (sunrise→sunrise Live, 24h Historie)."""
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -110,6 +110,7 @@ class _Chart1Options:
     chart_now: datetime | None
     battery_params: dict | None
     slot_shadow_soc: Sequence[float | None] | None = None
+    pv_compare_series: Mapping[str, Sequence[float | None]] | None = None
 
 
 def _add_power_layer(
@@ -137,6 +138,10 @@ def _add_power_layer(
         show_soc_plausibility=options.show_soc_plausibility,
         history_slot_count=options.history_slot_count,
     )
+    if options.pv_compare_series:
+        from ui.chart_pv_compare import add_pv_compare_traces
+
+        add_pv_compare_traces(fig, axis, options.pv_compare_series)
 
 
 def _add_soc_price_layer(
@@ -247,6 +252,7 @@ def build_power_soc_chart_figure(
     chart_now: datetime | None = None,
     battery_params: dict | None = None,
     slot_shadow_soc: Sequence[float | None] | None = None,
+    pv_compare_series: Mapping[str, Sequence[float | None]] | None = None,
 ) -> go.Figure:
     """Baut Chart 1 (Leistung, SoC, Preis) ohne Streamlit-Rendering."""
     options = _Chart1Options(
@@ -261,6 +267,7 @@ def build_power_soc_chart_figure(
         chart_now=chart_now,
         battery_params=battery_params,
         slot_shadow_soc=slot_shadow_soc,
+        pv_compare_series=pv_compare_series,
     )
     plot_df = _mask_missing_log_slots(df, slot_qualities)
     axis = ChartSlotAxis.from_dataframe(plot_df)
@@ -305,6 +312,7 @@ def render_power_soc_chart(
     optimization_matrix: list[dict] | None = None,
     battery_params: dict | None = None,
     slot_shadow_soc: Sequence[float | None] | None = None,
+    pv_compare_series: Mapping[str, Sequence[float | None]] | None = None,
 ) -> None:
     """Leistungen (PV, Verbrauch, Batterie, Flex) und SoC-Verläufe."""
     if chart_header_label and chart_header_help:
@@ -331,6 +339,7 @@ def render_power_soc_chart(
         chart_now=chart_now,
         battery_params=battery_params,
         slot_shadow_soc=slot_shadow_soc,
+        pv_compare_series=pv_compare_series,
     )
     plotly_kwargs: dict = {"width": "stretch"}
     if chart_key:
