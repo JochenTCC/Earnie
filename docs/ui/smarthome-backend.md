@@ -34,7 +34,7 @@ Ist ein Backend verbunden, zeigt die Seite von oben nach unten:
 
 - Erfolgsmeldung mit dem aktiven Backend (EHAL-Com und Optimierer-Dienst sind freigeschaltet).
 - **Zugangsdaten** (zuklappbar): Zugangsdaten erneut eingeben oder prüfen. Bei einem Loxone-Auth-Fehler öffnet sich der Bereich automatisch.
-- **Backend ändern:** Discovery starten oder das Backend wechseln.
+- **Backend ändern:** Die Netzwerksuche startet hier erst mit **Im Netzwerk nach Backends suchen**; die manuelle Auswahl steht sofort bereit. Das aktive Backend bleibt, bis die Zugangsdaten des neuen Backends gespeichert sind. Bei Loxone wechselt `ehal.backend` also erst mit **Speichern**; **Andere Auswahl** lässt die bisherige Anbindung unverändert.
 - **Loxone-Import:** nur bei Loxone.
 
 Während der Ersteinrichtung erscheinen die Zugangsdaten als eigener Schritt (noch ohne Erfolgsmeldung). Nach dem Speichern verschwindet dieser offene Anbindung-Abschnitt.
@@ -56,7 +56,7 @@ Das Speichern der Zugangsdaten setzt `ehal.backend` und schaltet **EHAL-Com** so
 
 ## Loxone-Import
 
-Der Import von Loxone ins Hausprofil läuft von dieser Seite aus, sobald Loxone verbunden ist. Danach die Verbraucherliste im Hauskonfigurator und das Signal-Mapping auf EHAL-Com prüfen.
+Der Import von Loxone ins Hausprofil läuft von dieser Seite aus, sobald Loxone verbunden ist. Danach die Verbraucherliste im Hauskonfigurator und die Signalliste auf EHAL-Com prüfen.
 
 Gibt es noch kein Hausprofil, legt der Import das Profil `live` an. Dafür ist vorher die Auswahl **Netzbereich (Netznutzung) für das neue Hausprofil** Pflicht; ohne Auswahl bleibt der Import-Knopf gesperrt. Einen eigenen Arbeitspreis danach im Hauskonfigurator unter Standort eintragen ([Preise](../konfiguration/preise.md#eigener-arbeitspreis-benutzer-netzbereich)).
 

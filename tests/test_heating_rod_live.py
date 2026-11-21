@@ -188,23 +188,6 @@ def test_signal_catalog_offers_the_rod_as_optional_and_activation_writes_its_map
     assert "ehal_bindings" not in consumer
 
 
-def test_mapping_page_lists_the_rod_and_saves_into_its_map():
-    from ui.ehal_loxone_mapping import build_entity_rows
-    from ui.ehal_loxone_mapping_persist import apply_entity_bindings
-
-    house, components = _raw_house()
-    rows = build_entity_rows(house, "home", components_doc=components)
-    row = next(item for item in rows if item["id"] == _ROD_ID)
-    assert _ENABLE in row["fields"]
-
-    out = apply_entity_bindings(
-        house, profile_id="home", entity_id=_ROD_ID, bindings={_ENABLE: "Rod_En"}
-    )
-    consumer = out["profiles"]["home"]["consumers"][0]
-    assert consumer[ROD_BINDINGS_KEY] == {_ENABLE: "Rod_En"}
-    assert "ehal_bindings" not in consumer
-
-
 # --- gate -------------------------------------------------------------------------------
 
 

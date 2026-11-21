@@ -503,9 +503,9 @@ Values in the telemetry URL path must already be in **canonical EHAL units** (§
 
 - Onboarding helper **inside** the Loxone-EHAL path — not a live I/O replacement.
 - Structure scan (`integrations/loxone_structure.py`): supports **compare-all** (LoxAPP3 + candidate presence against LoxAPP3, source id `http_probe`, + optional **MCP 17.1**) for lab/compare; MCP helpers remain in `integrations/` for later re-integration.
-- **EHAL-Com UI:** mapping names come from the LoxAPP3-presence variant (`sources=(http_probe,)`). MCP URL input, Ollama button, Quellenvergleich, and source picker are not in the shipping UI.
+- **EHAL-Com UI:** there is no per-signal Merker mapping UI; bindings come from the Loxone-Import (Smarthome-Backend) and the Signalliste. MCP URL input, Ollama button, Quellenvergleich, and source picker are not in the shipping UI.
 - **Greenfield presence probe:** `integrations/loxone_greenfield_import.probe_marker_names` classifies known `greenfield_device_map.json` names against LoxAPP3 control names (no Merker HTTP). EFM meters still need LoxAPP3.
-- Contract UI on EHAL-Com: **Signalliste** for all backends (qualified IDs, Pflicht/optional/aktiviert, match status; Loxone VO/VI export; HA YAML package). Activation keys live on `plant` / `consumers[].ehal_bindings` / `batteries[].ehal_bindings` / `inverters[].ehal_bindings` (`components.json` for ESS and inverters). The older HITL helpers `ui/ehal_loxone_mapping.py` / `ui/ehal_ha_mapping.py` are not mounted on the page.
+- Contract UI on EHAL-Com: **Signalliste** for all backends (qualified IDs, Pflicht/optional/aktiviert, match status; Loxone VO/VI export; HA YAML package). Activation keys live on `plant` / `consumers[].ehal_bindings` / `batteries[].ehal_bindings` / `inverters[].ehal_bindings` (`components.json` for ESS and inverters). The older HITL mapping UIs (`ui/ehal_loxone_mapping*.py`, `ui/ehal_ha_mapping.py`) have been removed.
 - Optional LLM (code retained, **not** exposed in UI): local **Ollama** HTTP (`/api/chat`, JSON). Not bundled in Earnie image / LoxBerry ZIP.
 - EFM interpretation C (meter tree → Hausprofil consumers + optional flex power): research note `[efm-auto-sync.md](../dev/done/efm-auto-sync.md)`; library `integrations/loxone_efm_meters.py` via greenfield `merge_efm` (Smarthome-Backend Loxone-Import).
 

@@ -20,7 +20,7 @@ from optimizer.charging_context import (
 from optimizer.eauto_milp import _preset_must_charge_now
 from optimizer.milp import milp_horizon_schedule
 from settings import ehal_marker_resolve as resolve
-from ui.ehal_loxone_mapping import EV_FIELDS
+from ehal.qualified_ids import EV_KINDS
 
 _REPO = Path(__file__).resolve().parents[1]
 
@@ -241,7 +241,7 @@ class TestChargingContextEnrichment:
 
 class TestMappingCatalog:
     def test_ev_fields_and_greenfield(self):
-        assert "get_evcs_soc_min_immediate" in EV_FIELDS
+        assert "get_evcs_soc_min_immediate" in EV_KINDS
         greenfield = json.loads(
             (_REPO / "share" / "loxone" / "greenfield_device_map.json").read_text(
                 encoding="utf-8"

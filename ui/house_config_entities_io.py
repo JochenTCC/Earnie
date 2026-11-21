@@ -476,6 +476,32 @@ def get_live_scenario_refs() -> dict:
         "house_profile_id": str(settings.get("house_profile_id", "") or "").strip(),
     }
 
+
+def resolve_live_profile_id(house_doc: dict) -> str:
+    """House profile id of the Live-Szenario.
+
+    An empty ``house_profile_id`` means the first profile, the same default the
+    daemon uses (``house_config.scenario_resolution._prepare_live_scenario_settings``).
+    A ``house_profile_id`` that names no profile in ``house_doc`` returns ``""``:
+    the optimizer rejects such a scenario, so callers must report it instead of
+    working on another profile.
+    """
+    profile_id = str(get_live_scenario_refs().get("house_profile_id") or "").strip()
+    profiles = house_doc.get("profiles") or {}
+    if isinstance(profiles, dict):
+        ids = [str(key) for key in profiles if str(key or "").strip()]
+    elif isinstance(profiles, list):
+        ids = [
+            str(p["id"])
+            for p in profiles
+            if isinstance(p, dict) and str(p.get("id") or "").strip()
+        ]
+    else:
+        ids = []
+    if profile_id:
+        return profile_id if profile_id in ids else ""
+    return ids[0] if ids else ""
+
 def save_live_scenario_refs(
     *,
     battery_ids: list[str] | None = None,

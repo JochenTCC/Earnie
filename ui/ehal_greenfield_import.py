@@ -1,6 +1,8 @@
 """Smarthome-Backend: Loxone → Hausprofil import (2.4.n / 2.4.o)."""
 from __future__ import annotations
 
+import hashlib
+import time
 from typing import Any
 
 import streamlit as st
@@ -42,7 +44,7 @@ _IMPORT_HINT = (
 )
 _IMPORT_SAVED_FLASH = (
     "Loxone-Import gespeichert. Entities/Bindings sind gesetzt — "
-    "Signal-Mapping auf **EHAL-Com** prüfen, angelegte Verbraucher "
+    "**Signalliste** auf **EHAL-Com** prüfen, angelegte Verbraucher "
     "im **Hauskonfigurator** prüfen und Parameter dort ergänzen."
 )
 
@@ -79,8 +81,12 @@ def _show_onboarding_prompt() -> bool:
     return True
 
 
+_FAILED_ACCESS_TTL_S = 30.0
+
+
 def _access_fingerprint(host: str, user: str, password: str) -> str:
-    return f"{host}|{user}|{len(password)}"
+    digest = hashlib.sha256(password.encode("utf-8")).hexdigest()[:16]
+    return f"{host}|{user}|{digest}"
 
 
 def resolve_loxone_import_access(
@@ -100,6 +106,26 @@ def resolve_loxone_import_access(
     return False, _CREDENTIALS_HINT
 
 
+def _cached_access(
+    cached: object, fp: str, now: float
+) -> tuple[bool, str | None] | None:
+    """Session cache hit: success until the credentials change, failure for a short TTL.
+
+    A failed probe must not stick for the whole session, otherwise the button stays
+    disabled after the Miniserver is back online.
+    """
+    if not (isinstance(cached, tuple) and len(cached) == 3 and cached[0] == fp):
+        return None
+    enabled, checked_at = cached[1], cached[2]
+    if not isinstance(enabled, bool) or not isinstance(checked_at, (int, float)):
+        return None
+    if enabled:
+        return True, None
+    if now - checked_at < _FAILED_ACCESS_TTL_S:
+        return False, _CREDENTIALS_HINT
+    return None
+
+
 def _loxone_import_access() -> tuple[bool, str | None]:
     """Cached Miniserver access check for the Import button."""
     host = str(config.get("LOXONE_IP") or "").strip()
@@ -107,27 +133,22 @@ def _loxone_import_access() -> tuple[bool, str | None]:
     password = str(config.get("LOXONE_PASS") or "")
     credentials_ok = loxone_env_configured()
     fp = _access_fingerprint(host, user, password)
-    cached = st.session_state.get(_SESSION_ACCESS)
-    if (
-        isinstance(cached, tuple)
-        and len(cached) == 3
-        and cached[0] == fp
-        and isinstance(cached[1], bool)
-    ):
-        enabled = bool(cached[1])
-        return enabled, None if enabled else _CREDENTIALS_HINT
+    now = time.monotonic()
+    hit = _cached_access(st.session_state.get(_SESSION_ACCESS), fp, now)
+    if hit is not None:
+        return hit
     enabled, hint = resolve_loxone_import_access(
         host=host,
         user=user,
         password=password,
         credentials_ok=credentials_ok,
     )
-    st.session_state[_SESSION_ACCESS] = (fp, enabled, hint)
+    st.session_state[_SESSION_ACCESS] = (fp, enabled, now)
     return enabled, hint
 
 
 def render_greenfield_import_section() -> None:
-    """Loxone-Import control on Hauskonfigurator (above Verbraucher)."""
+    """Loxone-Import control on Smarthome-Backend (after a successful connection)."""
     show_onboarding = _show_onboarding_prompt()
     wizard = wizard_active()
     access_ok, access_hint = _loxone_import_access()

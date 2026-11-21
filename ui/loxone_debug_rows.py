@@ -24,6 +24,7 @@ from integrations.ehal_debug_mapping import (  # noqa: F401  (build_loxone_setpo
 )
 from integrations.loxone_connectivity import LoxoneCheck, loxone_env_configured
 from runtime_store import run_state
+from runtime_store.ehal_push_inbox import STATE_ZERO_ASSUMED_NEVER
 from runtime_store.main_daemon import status as daemon_status
 from ui.ehal_unit_display import live_read_pair
 from ui.sankey_produktiv import has_produktiv_run
@@ -132,6 +133,11 @@ def _live_field_to_push_ehal_id(field: str) -> str:
     return name
 
 
+# "Zuletzt gelesen" for a push field with no inbox row: never received. Falling
+# back to the page's read time made such signals look freshly read.
+_NEVER_PUSHED = "—"
+
+
 def _inbox_last_read_local(ehal_id: str) -> str:
     """Local ``HH:MM:SS`` from the push inbox ``last_ts``, or empty."""
     eid = str(ehal_id or "").strip()
@@ -175,7 +181,7 @@ def _try_push_live_row(
             return None
         if value is None:
             return None
-        last = _inbox_last_read_local(ehal_id) or last_ts or read_at
+        last = _inbox_last_read_local(ehal_id) or last_ts or _NEVER_PUSHED
         return _enrich_read_row(
             {
                 "EHAL-Feld": field,
@@ -195,7 +201,7 @@ def _try_push_live_row(
         return None
     if value is None:
         return None
-    last = _inbox_last_read_local(ehal_id) or read_at
+    last = _inbox_last_read_local(ehal_id) or _NEVER_PUSHED
     value_space = "ehal" if backend == "ha" else "hub"
     return _enrich_read_row(
         {
@@ -249,6 +255,10 @@ def _read_row_from_check(
     field: str, item: LoxoneCheck, *, mapping: str, read_at: str
 ) -> dict[str, str]:
     wert = parse_check_wert(item.detail, passed=item.passed)
+    if not wert and item.state == STATE_ZERO_ASSUMED_NEVER:
+        # Soft warning, but the optimizer computes with this assumed 0: show it
+        # ("Wert=0; 0 angenommen (nie gesendet) — …").
+        wert = parse_check_wert(str(item.detail or "").split(";", 1)[0], passed=True)
     if wert and field.endswith("get_evcs_ready_by_time"):
         from integrations.ehal_live import format_ready_by_display
 
@@ -256,7 +266,8 @@ def _read_row_from_check(
     ehal_id = _live_field_to_push_ehal_id(field)
     last = read_at
     if item.state:
-        last = _inbox_last_read_local(ehal_id) or read_at
+        # Push-inbox result: the time is when the hub last pushed, not this read.
+        last = _inbox_last_read_local(ehal_id) or _NEVER_PUSHED
     status = "Kein Mapping" if not mapping else read_check_status_label(item)
     return _enrich_read_row(
         {

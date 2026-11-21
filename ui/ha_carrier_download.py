@@ -31,9 +31,18 @@ def render_ha_carrier_yaml_download() -> None:
         "Sollwert-Automationen. ENTITY_*-Platzhalter in Home Assistant ersetzen — "
         "Earnie speichert keine entity_ids."
     )
-    _render_fail_safe_values(*_load_docs())
-    # After the form: a save above belongs in the package below.
-    house, components = _load_docs()
+    try:
+        _render_fail_safe_values(*_load_docs())
+        # After the form: a save above belongs in the package below.
+        house, components = _load_docs()
+    except (ValueError, OSError) as exc:
+        # Fail loud: a package built without components.json would silently lack
+        # every battery / inverter / wallbox signal.
+        st.error(
+            "YAML-Paket nicht verfügbar: Konfiguration nicht lesbar — "
+            f"{exc} Bitte die Datei im Konfigurationsverzeichnis prüfen."
+        )
+        return
     host = st.text_input(
         "Earnie-Host (für HA erreichbar)",
         value=_default_host(),
@@ -140,12 +149,9 @@ def _load_docs() -> tuple[dict, dict]:
     from ui.house_config_io import _load_components_document, load_house_profiles
 
     house = load_house_profiles()
-    try:
-        components = _load_components_document()
-    except Exception:  # noqa: BLE001
-        components = {"batteries": [], "pv_systems": []}
+    components = _load_components_document()
     if not isinstance(components, dict):
-        components = {"batteries": [], "pv_systems": []}
+        raise ValueError("components.json ist kein JSON-Objekt.")
     return house if isinstance(house, dict) else {}, components
 
 

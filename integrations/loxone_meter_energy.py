@@ -231,8 +231,9 @@ def load_live_profile_consumers() -> list[dict[str, Any]]:
 
         from house_config.profiles_store import load_house_profiles_document
         from runtime_store.persist_paths import resolve_house_profiles_json_path
-        from ui.ehal_loxone_mapping import resolve_live_profile_id
-    except ImportError:
+        from ui.house_config_entities_io import resolve_live_profile_id
+    except ImportError as exc:
+        logger.warning("Zählerenergie: Live-Hausprofil nicht ladbar (%s) — keine Verbraucher.", exc)
         return []
     path = resolve_house_profiles_json_path()
     if not path or not os.path.isfile(path):
@@ -245,7 +246,14 @@ def load_live_profile_consumers() -> list[dict[str, Any]]:
         return []
     profile_id = resolve_live_profile_id(doc)
     profiles = doc.get("profiles")
-    if not profile_id or not isinstance(profiles, dict):
+    if not profile_id:
+        if profiles:
+            logger.warning(
+                "Zählerenergie: house_profile_id des Live-Szenarios gibt es in "
+                "house_profiles.json nicht — keine Verbraucher-Zähler gelesen."
+            )
+        return []
+    if not isinstance(profiles, dict):
         return []
     profile = profiles.get(profile_id)
     if not isinstance(profile, dict):

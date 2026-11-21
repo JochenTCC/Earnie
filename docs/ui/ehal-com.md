@@ -302,7 +302,7 @@ EHAL-Com has no status bar of its own. Write mode and service state live on **Op
 - **Silent-Modus** toggle (section *Schreibzugriffe*): when on, the optimizer does not write setpoints to the hub.
 - **Status**, **PID**, **Lock**, and **Letzter Optimierungslauf**: state of the optimizer service (`main.py`) and the age of its last run.
 
-Setpoints reach the hub only in **Loud mode while the service is running**. Loud mode with a stopped service writes nothing. EHAL-Com shows the outcome of the last run: **Live-Schreiben** reports `Silent-Modus beim letzten Lauf …` when that run was silent. On Loxone, a caption at the top shows when the Miniserver last called Earnie (`Letzter Aufruf vom Miniserver`).
+Setpoints reach the hub only in **Loud mode while the service is running**. Loud mode with a stopped service writes nothing. EHAL-Com shows the outcome of the last run: **Live-Schreiben** reports `Silent-Modus beim letzten Lauf …` when that run was silent. If a Loud run stored no write records, it shows a warning instead and lists the planned setpoints, not the written ones. On Loxone, a caption at the top shows when the Miniserver last called Earnie (`Letzter Aufruf vom Miniserver`).
 
 ### Live Read
 
@@ -315,7 +315,7 @@ Only `sens_*` and `get_*` (measurements / inputs). The table lists **all** expec
 | `Wert (EHAL)`          | Value in EHAL units (Loxone: after role-registry conversion; HA push: already canonical on the wire). `—` when no conversion path exists. |
 | `Status`               | `OK`, `Warnung`, error states, or `Kein Mapping`. For push backends also push-state strings (`0 angenommen (verstummt)`, `0 (gehalten)`, `Zuletzt bekannt (gehalten)`, …). |
 | `Detail`               | Error text (empty when OK); optional empty rows may show a fallback hint. |
-| `Zuletzt gelesen` (last read) | Timestamp of the query; for push rows the inbox `last_ts` (local clock) is preferred when available. |
+| `Zuletzt gelesen` (last read) | Pull rows: timestamp of the query. Push rows: the inbox `last_ts` (local clock), i.e. when the hub last pushed; `—` when the signal was never received. |
 
 **Units:** from role `loxone` / `openems` blocks in `share/ehal/roles/*.json` (HA: EHAL wire units; conversion happens in the carrier YAML Jinja) — not hard-coded in the UI. Every value cell shows its unit as a suffix when known.
 

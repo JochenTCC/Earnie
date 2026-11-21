@@ -245,6 +245,12 @@ def _opt_in_consumption_snapshot(main_state: dict | None):
     return live_consumption.fetch_live_consumption_snapshot(main_state)
 
 
+def _opt_in_initial_soc(main_state: dict | None, current_soc: float) -> float:
+    """SOC of the last main run; the live SOC when the run stored none (missing or null)."""
+    stored = (main_state or {}).get("soc_percent")
+    return float(stored) if stored is not None else float(current_soc)
+
+
 def _store_opt_in_session_state(
     cache_key: str,
     *,
@@ -286,7 +292,7 @@ def _run_opt_in_live_simulation(
     if snapshot and live_consumption.reject_live_matrix_snapshot_reason(snapshot) is None:
         matrix = live_consumption.apply_live_snapshot_to_matrix(matrix, snapshot, hour_index=0)
 
-    sim_soc = float(main_state.get("soc_percent", current_soc)) if main_state else current_soc
+    sim_soc = _opt_in_initial_soc(main_state, current_soc)
     targets = consumer_targets.resolve_consumer_daily_targets(matrix=matrix)
     savings_info = optimizer.calculate_optimization_savings(
         matrix,
@@ -389,6 +395,15 @@ def _live_optimization_prepare_fragment(current_soc: float) -> None:
     _render_main_down_notice(snapshot, persisted_fresh=False)
     if st.session_state.get(SESSION_OPT_IN_SIMULATION):
         _run_opt_in_live_simulation(current_soc, main_state, current_slot, reason)
+        return
+    # The opt-in flag is popped after the run; keep showing its result on later
+    # fragment ticks for the same slot instead of dropping the charts again.
+    if _opt_in_cache_valid(_opt_in_cache_key(current_slot, main_state)):
+        _restore_cached_opt_in_bundle()
+        st.caption(
+            "Angezeigt: einmalige UI-Simulation für diesen Viertelstunden-Slot "
+            "(kein main.py-Lauf)."
+        )
         return
 
     if snapshot:

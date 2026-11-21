@@ -352,7 +352,14 @@ def _render_ehal_writes(
         _render_write_table(build_ehal_write_rows([]))
         return
     if silent_run or ehal_writes is None:
-        st.info("Silent-Modus beim letzten Lauf — keine EHAL-Schreibvorgänge.")
+        if silent_run:
+            st.info("Silent-Modus beim letzten Lauf — keine EHAL-Schreibvorgänge.")
+        else:
+            st.warning(
+                "Der letzte Lauf war nicht im Silent-Modus, hat aber keine "
+                "EHAL-Schreibdaten (`ehal_writes`) gespeichert. Unten stehen die "
+                "geplanten Sollwerte, nicht die geschriebenen — Optimierer-Log prüfen."
+            )
         _render_write_table(
             build_intended_write_rows(loxone_sent, completed_at)
             if loxone_sent

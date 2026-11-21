@@ -123,6 +123,18 @@ def _render_openems_form_inputs(
     return values, bool(submitted)
 
 
+def openems_form_error(values: dict[str, str]) -> str | None:
+    """Missing required OpenEMS input; an empty field is never replaced by a default."""
+    if not values["base_url"]:
+        return "Base-URL ist erforderlich."
+    if not values["username"] or not values["password"]:
+        return (
+            "Benutzername und Passwort sind erforderlich "
+            "(OpenEMS-Edge-Standard: Benutzer `x`, Passwort `admin`)."
+        )
+    return None
+
+
 def _persist_openems_connection(data: dict, values: dict[str, str]) -> None:
     payload = dict(data)
     block = _ehal_block(payload)
@@ -130,8 +142,8 @@ def _persist_openems_connection(data: dict, values: dict[str, str]) -> None:
     block["adapter_id"] = values["adapter_id"]
     block["openems"] = {
         "base_url": values["base_url"],
-        "username": values["username"] or "x",
-        "password": values["password"] or "admin",
+        "username": values["username"],
+        "password": values["password"],
         "ess_component": values["ess_component"],
     }
     payload["ehal"] = block
@@ -150,8 +162,9 @@ def render_openems_connection_form(*, form_key: str = "ehal_openems_form") -> No
 
     if not submitted:
         return
-    if not values["base_url"]:
-        st.error("Base-URL ist erforderlich.")
+    error = openems_form_error(values)
+    if error:
+        st.error(error)
         return
     _persist_openems_connection(data, values)
     flash("success", "OpenEMS-Zugang gespeichert (`ehal.backend=openems`).")

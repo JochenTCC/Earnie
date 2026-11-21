@@ -109,6 +109,68 @@ def test_shows_configured_summary_when_hub_credentials_present(monkeypatch):
     assert not any(sh.value == "Anbindung" for sh in at.subheader)
 
 
+def _loxone_configured(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "ui.pages.page_smarthome_backend._render_backend_import_section",
+        lambda backend: None,
+    )
+    monkeypatch.setenv("LOXONE_IP", "192.168.178.20")
+    monkeypatch.setenv("LOXONE_USER", "earnie")
+    monkeypatch.setenv("LOXONE_PASS", "secret")
+
+
+def test_configured_page_scans_only_on_request(monkeypatch, _mock_scan_no_network):
+    """The collapsed "Backend ändern" body renders too: no scan until asked."""
+    _loxone_configured(monkeypatch)
+    at = AppTest.from_file(str(_SCRIPT), default_timeout=_TIMEOUT).run()
+    assert not at.exception
+    _mock_scan_no_network.assert_not_called()
+    at.button(key="sb_start_scan_button").click().run()
+    assert not at.exception
+    _mock_scan_no_network.assert_called()
+
+
+def test_use_discovered_loxone_while_loxone_is_active(monkeypatch):
+    """The Zugangsdaten expander already owns its IP widget in that run."""
+    _loxone_configured(monkeypatch)
+    hit = DiscoveredBackend(
+        kind="loxone", host="192.168.178.30", method="ssdp", port=80, name="Miniserver"
+    )
+    monkeypatch.setattr(
+        "ui.pages.page_smarthome_backend.scan_for_backends",
+        MagicMock(return_value=[hit]),
+    )
+    at = AppTest.from_file(str(_SCRIPT), default_timeout=_TIMEOUT).run()
+    at.button(key="sb_start_scan_button").click().run()
+    at.button(key="sb_use_single_hit").click().run()
+    assert not at.exception
+    assert at.text_input(key="sb_loxone_form_ip").value == "192.168.178.30"
+    assert at.text_input(key="sb_anbindung_loxone_form_ip").value == "192.168.178.30"
+
+
+def test_loxone_backend_is_switched_on_save_not_on_render(monkeypatch, tmp_path):
+    persisted = MagicMock()
+    monkeypatch.setattr("ui.ehal_connection.persist_ehal_backend", persisted)
+    monkeypatch.setattr(
+        "ui.setup_dotenv.write_loxone_dotenv", lambda *a: tmp_path / ".env"
+    )
+    monkeypatch.setattr("ui.setup_dotenv.load_app_dotenv", lambda **k: None)
+    monkeypatch.setattr("ui.setup_dotenv.config.reinit_config", lambda **k: None)
+    at = AppTest.from_file(str(_SCRIPT), default_timeout=_TIMEOUT).run()
+    at.selectbox(key="sb_manual_backend_select").select_index(0).run()
+    at.button(key="sb_manual_backend_confirm").click().run()
+    assert not at.exception
+    assert at.text_input(key="sb_loxone_form_ip") is not None
+    persisted.assert_not_called()
+
+    at.text_input(key="sb_loxone_form_ip").set_value("192.168.178.40")
+    at.text_input(key="sb_loxone_form_user").set_value("earnie")
+    at.text_input(key="sb_loxone_form_password").set_value("secret-1")
+    at.button(key="sb_loxone_form_submit").click().run()
+    assert not at.exception
+    persisted.assert_called_once_with("loxone")
+
+
 def test_shadow_configured_skips_discovery_scan(monkeypatch, _mock_scan_no_network):
     """Shadow §6.3: no integration_scanner from collapsed Backend ändern expander."""
     monkeypatch.setenv("EARNIE_SHADOW", "1")
