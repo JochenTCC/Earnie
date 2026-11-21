@@ -12,8 +12,9 @@ Per flex consumer, the first that applies:
 - a consumer without power setpoint (on/off): ``sens_consumer_active`` × nominal power.
 
 Units: the HA carrier pushes a field with an EHAL quantity in its canonical unit
-(``ehal_base_unit``: ``sens_evcs_active_power`` in W), converted here to kW. ``sens_power_act``
-has no EHAL unit: it is pushed as the entity's number and taken as kW, like on Loxone.
+(``ehal_base_unit``: ``sens_evcs_active_power`` and ``sens_power_act`` in W, converted from the
+entity's W / kW / MW), converted here to kW. A carrier package generated before
+``sens_power_act`` had a unit pushes the entity's number as it is: generate it again.
 
 A value counts only when it was measured: inbox state ``OK`` or an explicitly pushed 0
 (``0 (gehalten)``), and for the digital run state also the held edge (``Digital (gehalten)``).

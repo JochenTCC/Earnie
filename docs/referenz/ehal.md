@@ -83,7 +83,7 @@ EHAL base units (adapters normalize hub-native units into these):
 
 | Quantity / domain                                                                                                                                  | Unit   | Sign / range                                                                          |
 | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | ------------------------------------------------------------------------------------- |
-| Active power telemetry (`sens_grid_power_active`, `sens_pv_production_active`, `sens_evcs_active_power`, `sens_ess_power`, `sens_inv_power_ac`, `sens_inv_power_pv`, `sens_power_consumers`) | **W**  | See below                                                                             |
+| Active power telemetry (`sens_grid_power_active`, `sens_pv_production_active`, `sens_evcs_active_power`, `sens_ess_power`, `sens_inv_power_ac`, `sens_inv_power_pv`, `sens_power_consumers`, consumer `sens_power_act`, `sens_ev_charge_power`) | **W**  | See below                                                                             |
 | ESS charge/discharge **limits**, `set_grid_export_power_limit` / `get_grid_export_power_limit`, `get_ess_max_charge_power` / `get_ess_max_discharge_power`, `get_inv_max_ac_power` / `get_inv_max_pv_power`, `set_inv_ac_power_limit` | **W**  | Non-negative **magnitudes** (true caps); direction is in the field name, not the sign |
 | `set_ess_active_power`                                                                                                                             | **W**  | Signed; `+` = discharge, `−` = charge (omit on Automatik)                             |
 | Energy counters / capacity (`sens_pv_energy`, `sens_grid_energy_import` / `_export`, `sens_ess_energy_charge` / `_discharge`, `sens_energy_total`, `sens_evcs_bat_capacity`) | **kWh** | Cumulative or capacity ≥ `0`; HA may convert Wh → kWh at the boundary                 |
@@ -380,7 +380,7 @@ Fields map to known OpenEMS Edge channels (semantic reference). Channel architec
 
 | EHAL field                      | OpenEMS (prototype)                                                                                                                         |
 | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `sens_grid_power_active`        | `_sum/GridActivePower` (normalize: `+` = import)                                                                                            |
+| `sens_grid_power_active`        | `_sum/GridActivePower` (OpenEMS: `+` = buy-from-grid, `−` = sell-to-grid; same sign as EHAL, role `openems` block `sign: 1`)                |
 | `sens_pv_production_active`     | `_sum/ProductionActivePower`                                                                                                                |
 | `ess.{id}.sens_ess_soc`         | `ess0/Soc` / `_sum/EssSoc` (primary; not on plant telemetry doc)                                                                              |
 | `sens_ess_power`                | ESS ActivePower (OpenEMS sign; already EHAL-aligned)                                                                                        |
@@ -475,7 +475,7 @@ Adapter: `integrations/ha_adapter.py` (push inbox + `status.json` only). Carrier
 
 ### Units on the HA telemetry wire
 
-Values in the telemetry URL path must already be in **canonical EHAL units** (§ Units table): active power **W**, energy **kWh**, SoC/fills **%**, EVCS current **A**, etc. Earnie does not receive HA `unit_of_measurement` on push — the **HA carrier** (generated Jinja) converts native entity units before calling `/ehal/telemetry/…` (W/kW/MW → W, Wh/kWh/MWh → kWh, %, A; unknown unit → no push + HA log). Setpoints in `status.json` use the same EHAL numeric units as Loxone (e.g. ESS limits in **W**).
+Values in the telemetry URL path must already be in **canonical EHAL units** (§ Units table): active power **W**, energy **kWh**, SoC/fills **%**, EVCS current **A**, etc. Earnie does not receive HA `unit_of_measurement` on push — the **HA carrier** (generated Jinja) converts native entity units before calling `/ehal/telemetry/…` (W/kW/MW → W, Wh/kWh/MWh → kWh, %, A; unknown unit → no push + HA log). This covers the consumer power `sens_power_act` and the counters `sens_energy_total` / `sens_ess_energy_charge` / `_discharge` too; a package generated before they had a unit pushes the entity's number as it is and must be generated again. Setpoints in `status.json` use the same EHAL numeric units as Loxone (e.g. ESS limits in **W**).
 
 ### Config and binding UI
 

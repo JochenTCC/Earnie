@@ -153,7 +153,12 @@ def _cmd_attrs(
         on_cmd, off_cmd = f"{base}1{query}", f"{base}0{query}"
         comment = f"{sig.ehal_id} 0/1; parallel to {sig.old_name}"
     else:
-        on_cmd, off_cmd = f"{base}{value_placeholder(sig.ehal_id)}{query}", ""
+        # The Off command pushes an explicit 0: without it nothing arrives at value 0, and
+        # only a power is then read as 0 (a limit, a SoC or a temperature becomes a read
+        # error). The heartbeat keeps no Off command: a 0 there is not a link signal.
+        is_heartbeat = sig.ehal_id == heartbeat_signal().ehal_id
+        on_cmd = f"{base}{value_placeholder(sig.ehal_id)}{query}"
+        off_cmd = "" if is_heartbeat else f"{base}0{query}"
         comment = f"{sig.ehal_id}; parallel to {sig.old_name}"
     attrs = {
         "Title": sig.title,

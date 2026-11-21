@@ -172,6 +172,17 @@ def test_fetch_heat_feedback_reads_mapped_kinds_in_ehal_units():
     }
 
 
+def test_fetch_heat_feedback_on_ha_takes_the_pushed_ehal_value(monkeypatch):
+    """The HA carrier pushes ``sens_heat_power`` in W: the Loxone kW block must not apply."""
+    from integrations import ehal_live
+    from integrations.loxone_client import fetch_heat_feedback
+
+    monkeypatch.setattr(ehal_live, "is_ehal_network_backend", lambda: True)
+    consumer = _consumer({"sens_heat_power": "Qth"})
+    with _hub({"Qth": 6500.0}):
+        assert fetch_heat_feedback(consumer) == {"sens_heat_power": 6500.0}
+
+
 def test_observability_records_band_source_and_feedback():
     consumer = _consumer(
         {

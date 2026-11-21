@@ -427,12 +427,13 @@ def is_stale(
 
 
 # --- Derived value state ---------------------------------------------------------------
-# A Loxone output reports "On" (value != 0) and "Off" (value == 0) separately. An analog
-# output has no Off command, so nothing is sent at 0; a digital output sends its Off
-# command once on the edge, not repeated. So a silent analog signal means 0 *if the link
-# is alive*; the link is judged from repeating non-zero signals (the heartbeat, or any
-# fresh analog value). A drop to 0 of an analog signal is therefore noticed only after the
-# stale limit (3 x repeat, default 30 s at 10 s repeat).
+# A Loxone output reports "On" (value != 0) and "Off" (value == 0) separately. The Off
+# command is sent once on the edge, not repeated; an analog output from a template made
+# before the Off command was added sends nothing at 0. So a silent *power* means 0 if the
+# link is alive; the link is judged from repeating non-zero signals (the heartbeat, or any
+# fresh analog value). Without the Off command a drop to 0 is noticed only after the stale
+# limit (3 x repeat, default 30 s at 10 s repeat). Other kinds (SoC, limits, temperatures)
+# are never assumed 0: they need the explicit 0 from the Off command.
 
 STATE_OK = "OK"
 STATE_ZERO_HELD = "0 (gehalten)"
@@ -475,10 +476,18 @@ def derive_state(
     repeat_s: float | None = None,
     now: datetime | None = None,
 ) -> tuple[str, float | None]:
-    """(state label, derived value) for one expected signal; ``row`` is ``None`` if never received."""
-    energy = _is_energy_kind(field_kind(ehal_id))
+    """(state label, derived value) for one expected signal; ``row`` is ``None`` if never received.
+
+    Display counterpart of ``resolve_push_read`` with the same zero rule: only a power (and a
+    never-received digital signal) is taken as 0 when silent. Every other kind (SoC, limit,
+    temperature, energy) has no value then, as the optimizer read path sees it once its
+    last-known hold has run out.
+    """
+    kind = field_kind(ehal_id)
+    digital = is_digital_id(ehal_id)
+    power = _is_power_kind(kind) and not _is_energy_kind(kind)
     if row is None:
-        if energy:
+        if not (power or digital):
             return (STATE_UNKNOWN, None)
         return (STATE_ZERO_ASSUMED_NEVER, 0.0) if link else (STATE_UNKNOWN, None)
     if not row.get("parse_ok", True) or row.get("value") is None:
@@ -489,9 +498,9 @@ def derive_state(
         return (STATE_ZERO_HELD, 0.0) if link else (STATE_ZERO_HELD_NO_LINK, 0.0)
     if not is_stale(row, repeat_s=repeat_s, now=now):
         return (STATE_OK, value)
-    if is_digital_id(ehal_id):
+    if digital:
         return (STATE_DIGITAL_HELD, value)  # edge-complete (On and Off commands)
-    if energy:
+    if not power:
         return (STATE_READ_ERROR, None)
     return (STATE_ZERO_ASSUMED_SILENT, 0.0) if link else (STATE_UNKNOWN, None)
 

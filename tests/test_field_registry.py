@@ -101,11 +101,12 @@ def test_loxone_write_roundtrip_active() -> None:
     assert apply_loxone_read(hub, spec) == pytest.approx(-1500.0)
 
 
-def test_openems_grid_sign_flip() -> None:
+def test_openems_grid_keeps_the_sign() -> None:
+    # OpenEMS: − = sell-to-grid, EHAL: − = export. Same convention, no flip.
     spec = openems_spec("sens_grid_power_active")
     assert spec is not None
-    assert apply_openems_read(-77, spec) == pytest.approx(77.0)
-    assert apply_openems_read(50, spec) == pytest.approx(-50.0)
+    assert apply_openems_read(-77, spec) == pytest.approx(-77.0)
+    assert apply_openems_read(50, spec) == pytest.approx(50.0)
 
 
 def test_openems_limit_write_polarity() -> None:

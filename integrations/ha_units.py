@@ -67,10 +67,16 @@ FIELD_QUANTITY: dict[str, str] = {
     "sens_ev_charge_power": "power",
     "sens_power_consumers": "power",
     "flex.sens_power_act": "power",
+    # Consumer power (``consumer|heatpump|pool.<id>.sens_power_act``): the kind as
+    # ``field_kind`` returns it. A run state belongs to ``sens_consumer_active``.
+    "sens_power_act": "power",
     "sens_heat_power": "power",
     "sens_pv_energy": "energy",
     "sens_grid_energy_import": "energy",
     "sens_grid_energy_export": "energy",
+    "sens_energy_total": "energy",
+    "sens_ess_energy_charge": "energy",
+    "sens_ess_energy_discharge": "energy",
     "sens_evcs_bat_capacity": "energy",
     "sens_ess_soc": "percent",
     "sens_evcs_soc_act": "percent",

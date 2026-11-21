@@ -204,7 +204,25 @@ def _read_consumer_meter_kw(consumer: dict) -> float | None:
     raw = fetch_loxone_generic_value(io_name)
     if raw is None:
         return None
-    return round(max(0.0, float(raw)), 3)
+    kind = (
+        "sens_evcs_active_power"
+        if io_name == marker_sens_evcs_active_power(consumer)
+        else "sens_power_act"
+    )
+    return _hub_power_kw(raw, kind)
+
+
+def _hub_power_kw(raw: float, kind: str) -> float | None:
+    """Hub power reading → kW (≥ 0); unit and lower bound come from the role file."""
+    from ehal.field_registry import apply_loxone_read, loxone_spec
+
+    spec = loxone_spec(kind)
+    if spec is None:
+        raise KeyError(f"no loxone conversion for {kind}")
+    watts = apply_loxone_read(raw, spec)
+    if watts is None:
+        return None
+    return round(watts / 1000.0, 3)
 
 
 def resolve_consumer_live_power_kw(
