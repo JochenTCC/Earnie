@@ -22,6 +22,11 @@ def is_phone_user_agent(user_agent: str) -> bool:
     return bool(_PHONE_UA_RE.search(user_agent or ""))
 
 
+def is_phone_request() -> bool:
+    """True when the current Streamlit request comes from a phone (User-Agent)."""
+    return is_phone_user_agent(_request_user_agent())
+
+
 def _request_user_agent() -> str:
     try:
         headers = getattr(st.context, "headers", None)
@@ -60,7 +65,7 @@ def resolve_s2_span() -> ChartSpan:
     session_val = st.session_state.get(SESSION_S2_SPAN_OVERRIDE)
     if session_val in ("segment", "full"):
         return session_val
-    if is_phone_user_agent(_request_user_agent()):
+    if is_phone_request():
         return "segment"
     return "full"
 

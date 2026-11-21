@@ -118,17 +118,33 @@ def test_env_switch_off_by_default(monkeypatch):
     assert view.compare_dir_from_env() is None
 
 
-def test_chart_draws_one_dotted_step_line_per_source():
-    starts = [datetime(2026, 11, 21, 10, 0, tzinfo=VIENNA) + timedelta(minutes=15 * i) for i in range(4)]
+def test_chart_draws_one_dotted_line_per_source_from_hour_centre_to_hour_centre():
+    # 10:30 to 12:30 in quarter hours: half of hour 10, all of 11, half of hour 12.
+    start = datetime(2026, 11, 21, 10, 30, tzinfo=VIENNA)
+    starts = [start + timedelta(minutes=15 * i) for i in range(8)]
     axis = ChartSlotAxis.from_dataframe(pd.DataFrame({"slot_datetime": starts}))
     fig = go.Figure()
-    add_pv_compare_traces(fig, axis, {"solcast": [1.0, 1.0, None, 1.0], "forecast_solar": [2.0] * 4})
+    solcast = [1.0, 1.0, None, None, None, None, 3.0, 3.0]
+    add_pv_compare_traces(fig, axis, {"solcast": solcast, "forecast_solar": [2.0] * 8})
     names = [trace.name for trace in fig.data]
     assert names == ["forecast.solar (Stundenenergie)", "Solcast"]
     trace = fig.data[1]
-    assert trace.line.shape == "hv" and trace.line.dash == "dot"
-    # One extra point closes the last slot.
-    assert len(trace.x) == 5 and list(trace.y) == [1.0, 1.0, None, 1.0, 1.0]
+    assert trace.line.shape is None and trace.line.dash == "dot"
+    assert trace.connectgaps is False
+    # One point per hour, in the middle of the hour's shown slots.
+    assert list(trace.x) == [
+        datetime(2026, 11, 21, 10, 45, tzinfo=VIENNA),
+        datetime(2026, 11, 21, 11, 30, tzinfo=VIENNA),
+        datetime(2026, 11, 21, 12, 15, tzinfo=VIENNA),
+    ]
+    assert list(trace.y) == [1.0, None, 3.0]
+
+
+def test_chart_rejects_different_values_within_one_hour():
+    starts = [datetime(2026, 11, 21, 10, 0, tzinfo=VIENNA) + timedelta(minutes=15 * i) for i in range(4)]
+    axis = ChartSlotAxis.from_dataframe(pd.DataFrame({"slot_datetime": starts}))
+    with pytest.raises(ValueError, match="derselben Stunde"):
+        add_pv_compare_traces(go.Figure(), axis, {"solcast": [1.0, 1.0, None, 1.0]})
 
 
 def test_chart_rejects_series_of_the_wrong_length():
