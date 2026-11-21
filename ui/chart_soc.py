@@ -359,6 +359,8 @@ def _legacy_soc_line_width(
         return soc_line_width_for_capacity_kwh(
             float(entity.get("battery_capacity_kwh") or 0.0)
         )
+    if isinstance(battery_params, list):
+        battery_params = _resolve_battery_params(battery_params) if battery_params else None
     if battery_params:
         capacity = battery_params.get("battery_capacity_kwh")
         if capacity is None:

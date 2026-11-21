@@ -441,6 +441,8 @@ def test_build_chart_display_past_cycle_is_history_only(history_files):
     display = build_chart_display_context(chart_context, [])
     assert display.history_only is True
     assert all(q != SLOT_MILP for q in display.slot_qualities)
+    # Same axis as the chart window: no extra hour after the closing sunrise.
+    assert display.slot_datetimes == chart_context.chart_window.slot_datetimes
 
 
 def test_build_chart_history_sanitizes_implausible_soc_spike(history_files):

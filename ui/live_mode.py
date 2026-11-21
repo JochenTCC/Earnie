@@ -65,9 +65,17 @@ def _snapshot_cache_key(
     span: str,
 ) -> str:
     completed = snapshot_completed_at(snapshot) or ""
+    # main.py writes the display snapshot before it books the ledger slot; without the
+    # ledger's last booked slot in the key, Chart 2 lags one slot until the next run.
+    ledger_state = savings_ledger_store.peek_state().state
+    ledger_last = (
+        ledger_state.last_slot_start.isoformat()
+        if ledger_state is not None and ledger_state.last_slot_start is not None
+        else ""
+    )
     return (
         f"{current_slot}|{completed}|{simulation_settings_fingerprint()}"
-        f"|s2:{cycle_offset}:{segment_index}:{span}"
+        f"|s2:{cycle_offset}:{segment_index}:{span}|ledger:{ledger_last}"
     )
 
 

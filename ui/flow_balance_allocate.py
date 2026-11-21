@@ -72,7 +72,9 @@ def allocate_slot_flows(
 
     if export_from_battery > discharge_rem + 1e-6:
         export_from_battery = max(discharge_rem, 0.0)
-    discharge_to_load = discharge - export_from_battery
+    # Discharge that neither the load nor the export accounts for (inconsistent
+    # row) is not drawn: the load bars never exceed the load.
+    discharge_to_load = min(discharge - export_from_battery, load_rem)
 
     return FlowAllocation(
         pv_to_load=pv_to_load,

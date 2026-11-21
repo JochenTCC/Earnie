@@ -92,6 +92,23 @@ def test_slots_carry_with_and_without_and_the_open_day_waits_after_the_last_book
     assert ledger["slot_with_eur"][2] == 0.0 and ledger["slot_without_eur"][2] == 0.0
 
 
+def test_slots_in_the_autumn_dst_fold_find_their_ledger_records():
+    """Ledger keys carry fixed offsets; the display slots in the repeated hour must match."""
+    first = datetime(2026, 10, 25, 2, 0, tzinfo=_TZ, fold=0)
+    second = datetime(2026, 10, 25, 2, 0, tzinfo=_TZ, fold=1)
+    assert first.isoformat().endswith("+02:00") and second.isoformat().endswith("+01:00")
+    state = _state(
+        _booked(first, with_eur=0.10, without_eur=0.30),
+        _booked(second, with_eur=0.20, without_eur=0.40),
+    )
+
+    ledger = _build(state, [first, second], history=2)
+
+    assert ledger["slot_states"] == [SLOT_COUNTED, SLOT_COUNTED]
+    assert ledger["slot_with_eur"] == pytest.approx([0.10, 0.20])
+    assert ledger["slot_shadow_soc"] == [20.0, 20.0]
+
+
 def test_a_gap_before_the_last_booked_slot_has_no_data():
     slots = [_slot(8) + _QUARTER * index for index in range(3)]
     state = _state(

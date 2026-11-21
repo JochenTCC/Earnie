@@ -8,6 +8,7 @@ from typing import Any, Mapping, Sequence
 import config
 from optimizer.schedule import QUARTER_HOUR_MINUTES, quarter_hour_slot_start
 from runtime_store import optimization_history
+from runtime_store.history_chart_rows import _chart_snapshot
 from runtime_store.history_timeline import (
     _chart_battery_kw_from_snapshot,
     _consumer_kw_from_entry,
@@ -238,6 +239,29 @@ def _measured_flex_kw(
     return None
 
 
+def _unlisted_flex_kw(
+    entry: dict[str, Any],
+    consumers: Sequence[Mapping[str, Any]],
+    *,
+    ist_snapshot: dict[str, Any] | None = None,
+) -> float:
+    """Metered kW the snapshot took out of ``baseload_kw`` for consumers this page does not list.
+
+    ``baseload_kw`` is house minus every ``flex_kw`` entry, including metered known
+    house loads that are neither optimizer flex nor manual appliances. Without a
+    consumer of their own they belong back in the baseload, or the house load shrinks.
+    """
+    snapshot = ist_snapshot if ist_snapshot else _chart_snapshot(entry)
+    if snapshot.get("baseload_kw") is None:
+        return 0.0  # forecast baseload: nothing was subtracted
+    listed = {str(consumer["id"]) for consumer in consumers}
+    return sum(
+        max(float(kw or 0.0), 0.0)
+        for cid, kw in (snapshot.get("flex_kw") or {}).items()
+        if str(cid) not in listed
+    )
+
+
 def _load_by_id_from_entry(
     entry: dict[str, Any],
     consumers: Sequence[Mapping[str, Any]],
@@ -248,7 +272,9 @@ def _load_by_id_from_entry(
 ) -> dict[str, float]:
     """Baseload + measured flex + manuals (measured or schedule peel from baseload)."""
     _, baseload, _ = _power_kw_from_entry(entry, ist_snapshot=ist_snapshot)
-    baseload_kw = max(float(baseload), 0.0)
+    baseload_kw = max(float(baseload), 0.0) + _unlisted_flex_kw(
+        entry, consumers, ist_snapshot=ist_snapshot
+    )
     loads: dict[str, float] = {}
     for consumer in consumers:
         cid = str(consumer["id"])
@@ -279,8 +305,11 @@ def _grid_import_export_kw(
     load_kw: float,
     pv_kw: float,
     *,
+    battery_charge_kw: float,
+    battery_discharge_kw: float,
     ist_snapshot: dict[str, Any] | None = None,
 ) -> tuple[float, float]:
+    """Measured grid, else the balance load − PV + charge − discharge."""
     snapshot = (
         ist_snapshot
         if ist_snapshot is not None
@@ -290,7 +319,7 @@ def _grid_import_export_kw(
     if grid_raw is not None:
         grid = float(grid_raw)
         return max(grid, 0.0), max(-grid, 0.0)
-    net = load_kw - pv_kw
+    net = load_kw - pv_kw + battery_charge_kw - battery_discharge_kw
     return max(net, 0.0), max(-net, 0.0)
 
 
@@ -324,8 +353,9 @@ def slot_from_replay_entry(
     from runtime_store.slot_ist_powers import resolve_ist_snapshot
 
     flex = list(consumers) if consumers is not None else cost_analysis_consumers()
-    ist_snap, _source = resolve_ist_snapshot(slot_start, entry, closed_by_interval)
-    snapshot = ist_snap or (entry.get("consumption_snapshot") or {})
+    # An empty Ist snapshot is deliberate (e.g. dead all-zero telemetry); falling back
+    # to the raw log snapshot here would revive those zeros as a 0 kWh slot.
+    snapshot, _source = resolve_ist_snapshot(slot_start, entry, closed_by_interval)
     pv_kw, _, _ = _power_kw_from_entry(entry, ist_snapshot=snapshot)
     if snapshot.get("pv_kw") is not None:
         pv_kw = float(snapshot["pv_kw"])
@@ -341,7 +371,12 @@ def slot_from_replay_entry(
         entry, ist_snapshot=snapshot
     )
     grid_import, grid_export = _grid_import_export_kw(
-        entry, load_kw, pv_kw, ist_snapshot=snapshot
+        entry,
+        load_kw,
+        pv_kw,
+        battery_charge_kw=charge_kw,
+        battery_discharge_kw=discharge_kw,
+        ist_snapshot=snapshot,
     )
     price = _import_price_cent_from_entry(
         entry, slot_start=slot_start

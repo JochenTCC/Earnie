@@ -185,10 +185,10 @@ def test_hv_line_endpoint_time_matches_last_slot():
 
 
 def test_soc_intra_hour_ramp_replaces_flat_milp_tail():
-    """Keine horizontale SoC-Treppe zwischen Jetzt und Stundenende."""
+    """Keine horizontale SoC-Treppe zwischen Jetzt und Stundenende (letztes Viertel)."""
     import plotly.graph_objects as go
 
-    now = datetime(2026, 6, 15, 14, 37, tzinfo=_TZ)
+    now = datetime(2026, 6, 15, 14, 52, tzinfo=_TZ)
     hour_end = datetime(2026, 6, 15, 15, 0, tzinfo=_TZ)
     slots = [
         datetime(2026, 6, 15, 14, 0, tzinfo=_TZ),
@@ -223,7 +223,7 @@ def test_soc_intra_hour_ramp_replaces_flat_milp_tail():
         for x, y in zip(milp_trace.x, milp_trace.y)
     }
 
-    assert datetime(2026, 6, 15, 14, 45, tzinfo=_TZ) not in xs
+    assert not any(now < x < hour_end for x in xs)
     assert now in xs
     assert hour_end in xs
     assert ys[hour_end] == tail_y
@@ -231,10 +231,14 @@ def test_soc_intra_hour_ramp_replaces_flat_milp_tail():
 
 
 def test_soc_intra_hour_ramp_before_now_replaces_flat_milp_head():
-    """Keine horizontale SoC-Treppe zwischen erstem MILP-Viertel und Jetzt."""
+    """Keine horizontale SoC-Treppe zwischen erstem MILP-Viertel und Jetzt (letztes Viertel).
+
+    In früheren Vierteln der Stunde folgt die Kurve der MILP-Linie
+    (``test_ramp_between_half_and_three_quarter_keeps_the_next_quarter``).
+    """
     import plotly.graph_objects as go
 
-    now = datetime(2026, 6, 15, 14, 37, tzinfo=_TZ)
+    now = datetime(2026, 6, 15, 14, 52, tzinfo=_TZ)
     hour_end = datetime(2026, 6, 15, 15, 0, tzinfo=_TZ)
     slots = [
         datetime(2026, 6, 15, 14, 0, tzinfo=_TZ),
@@ -246,16 +250,16 @@ def test_soc_intra_hour_ramp_before_now_replaces_flat_milp_head():
     df = pd.DataFrame({
         "slot_datetime": slots,
         "Uhrzeit": [slot.strftime("%d.%m. %H:%M") for slot in slots],
-        "Simulierter SoC (%)": [40.0, 41.0, 60.0, 60.0, 60.0],
-        "Geplante Batterie-Aktion (kW)": [0.0, 2.0, 0.0, 0.0, 0.0],
+        "Simulierter SoC (%)": [40.0, 41.0, 42.0, 60.0, 60.0],
+        "Geplante Batterie-Aktion (kW)": [0.0, 0.0, 2.0, 0.0, 0.0],
         "Preis extrapoliert": [False] * 5,
     })
     axis = ChartSlotAxis.from_dataframe(df)
-    history_slot_count = 2
+    history_slot_count = 3
     y_at_now = _soc_from_history_extrapolation(
         axis, df["Simulierter SoC (%)"], df, now, history_slot_count,
     )
-    assert y_at_now > 41.0
+    assert y_at_now > 42.0
     assert y_at_now < 60.0
 
     fig = go.Figure()
@@ -267,7 +271,7 @@ def test_soc_intra_hour_ramp_before_now_replaces_flat_milp_head():
         pd.Timestamp(x).to_pydatetime().replace(tzinfo=_TZ): float(y)
         for x, y in zip(milp_trace.x, milp_trace.y)
     }
-    first_milp = datetime(2026, 6, 15, 14, 30, tzinfo=_TZ)
+    first_milp = datetime(2026, 6, 15, 14, 45, tzinfo=_TZ)
     assert ys[first_milp] < 60.0
     assert ys[now] == pytest.approx(y_at_now)
     assert ys[now] < 60.0

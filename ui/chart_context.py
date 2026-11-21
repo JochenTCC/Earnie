@@ -204,16 +204,28 @@ def _row_slot(row: dict) -> datetime | None:
     return parse_chart_row_slot_datetime(row) or parse_row_slot_datetime(row)
 
 
+def _first_chart_slot(chart: UiChartWindow) -> datetime:
+    """Start of the first chart slot.
+
+    ``chart.start`` is the exact sunrise (e.g. 04:53:58); the slot that contains it
+    starts earlier (04:45) and belongs to the window.
+    """
+    if chart.slot_datetimes:
+        return chart.slot_datetimes[0]
+    return chart.start
+
+
 def matrix_indices_for_chart(
     matrix: list[dict],
     chart: UiChartWindow,
 ) -> list[int]:
     indices: list[int] = []
+    first_slot = _first_chart_slot(chart)
     for index, row in enumerate(matrix):
         slot = _row_slot(row)
         if slot is None:
             continue
-        if chart.start <= slot <= chart.end:
+        if first_slot <= slot <= chart.end:
             indices.append(index)
     return indices
 
@@ -378,9 +390,16 @@ def _milp_only_context(
     )
 
 
+def _history_only_end_exclusive(chart: UiChartWindow) -> datetime:
+    if chart.slot_datetimes:
+        return chart.slot_datetimes[-1] + timedelta(minutes=15)
+    return chart.end
+
+
 def _history_only_context(chart: UiChartWindow) -> ChartDisplayContext:
     """Vergangener SA-Zyklus: ausschließlich Produktiv-Log."""
-    history = build_chart_history(chart.start, chart.end + timedelta(hours=1))
+    # Same slots as the chart window: up to and including the slot that holds chart.end.
+    history = build_chart_history(chart.start, _history_only_end_exclusive(chart))
     return ChartDisplayContext(
         rows=history.rows,
         slot_datetimes=history.slot_starts,
@@ -519,9 +538,10 @@ def align_hourly_increments_to_display_slots(
     display axis are dropped, so Σ result = Σ of the rows that lie on the axis.
     """
     rows: list[tuple[datetime, float]] = []
+    first_slot = _first_chart_slot(chart)
     for index, row in enumerate(matrix):
         slot = _row_slot(row)
-        if slot is None or not (chart.start <= slot <= chart.end):
+        if slot is None or not (first_slot <= slot <= chart.end):
             continue
         if index < len(hourly_values):
             rows.append((slot, float(hourly_values[index])))
@@ -649,9 +669,10 @@ def align_hourly_values_to_chart_slots(
 ) -> list:
     """Stundenwerte auf chart.slot_datetimes abbilden (fehlende Slots mit fill)."""
     by_slot: dict[datetime, object] = {}
+    first_slot = _first_chart_slot(chart)
     for index, row in enumerate(matrix):
         slot = _row_slot(row)
-        if slot is None or not (chart.start <= slot <= chart.end):
+        if slot is None or not (first_slot <= slot <= chart.end):
             continue
         if index < len(values):
             by_slot[slot] = values[index]

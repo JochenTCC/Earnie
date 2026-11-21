@@ -171,9 +171,11 @@ def _hourly_price_hv_xy(
             points_y.extend([price, price])
             continue
         if x_left != points_x[-1]:
-            points_x.append(x_left)
-            points_y.append(points_y[-1])
-        if price != points_y[-1]:
+            # Gap (slot without price, e.g. missing log slot): break the line
+            # instead of carrying the previous price across it.
+            points_x.extend([x_left, x_left])
+            points_y.extend([float("nan"), price])
+        elif price != points_y[-1]:
             points_x.append(x_left)
             points_y.append(price)
         points_x.append(x_right)

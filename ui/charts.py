@@ -1,6 +1,7 @@
 """Plotly-Charts für Optimierungsdarstellung (sunrise→sunrise Live, 24h Historie)."""
 from __future__ import annotations
 
+import logging
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
@@ -43,6 +44,9 @@ from ui.chart_legend_mobile import (
 )
 from ui.help_hint import render_title_with_help
 from ui.s2_viewport import is_phone_request
+
+logger = logging.getLogger(__name__)
+
 
 def add_power_traces(
     fig: go.Figure,
@@ -163,6 +167,8 @@ def _add_soc_price_layer(
     try:
         chart_soc_entities = load_chart_soc_entities()
     except Exception:  # noqa: BLE001
+        # Chart 1 stays usable without the per-battery SoC lines, but say why.
+        logger.exception("Chart 1: SoC-Entitäten nicht ladbar, Linien je Batterie fehlen.")
         chart_soc_entities = []
     add_optimized_soc_traces(
         fig, plot_df, axis, extrap_start=extrap_start, extrap_end=extrap_end,
@@ -203,12 +209,36 @@ def _add_soc_price_layer(
     )
 
 
+_SOC_AXIS_DEFAULT_RANGE = (-5.0, 105.0)
+
+_SOC_AXIS_PRICE_PADDING = 2.0
+
+
+def _soc_price_axis_range(df: pd.DataFrame) -> tuple[float, float]:
+    """SoC/price axis: 0–100 % with margin, widened when a price lies outside.
+
+    Negative feed-in or import prices (and prices above 105 ct) would otherwise be
+    clipped at the fixed range.
+    """
+    low, high = _SOC_AXIS_DEFAULT_RANGE
+    for column in ("Strompreis (Cent/kWh)", "Einspeisevergütung (Cent/kWh)"):
+        if column not in df.columns:
+            continue
+        prices = pd.to_numeric(df[column], errors="coerce").dropna()
+        if prices.empty:
+            continue
+        low = min(low, float(prices.min()) - _SOC_AXIS_PRICE_PADDING)
+        high = max(high, float(prices.max()) + _SOC_AXIS_PRICE_PADDING)
+    return low, high
+
+
 def _power_soc_layout(
     axis: ChartSlotAxis,
     *,
     chart_window: UiChartWindow | None,
     chart_title: str | None,
     chart_header_label: str | None,
+    soc_axis_range: tuple[float, float] = _SOC_AXIS_DEFAULT_RANGE,
 ) -> dict:
     default_title = (
         _sunrise_chart_title(chart_window)
@@ -228,7 +258,7 @@ def _power_soc_layout(
             side="right",
             overlaying="y",
             showgrid=False,
-            range=[-5, 105],
+            range=list(soc_axis_range),
         ),
         **_collapsible_chart_layout(top_margin=top_margin),
     )
@@ -287,6 +317,7 @@ def build_power_soc_chart_figure(
             chart_window=chart_window,
             chart_title=chart_title,
             chart_header_label=chart_header_label,
+            soc_axis_range=_soc_price_axis_range(plot_df),
         )
     )
     return fig

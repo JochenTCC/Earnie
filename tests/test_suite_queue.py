@@ -113,13 +113,21 @@ _HOLDER = textwrap.dedent(
     with queued_slot("holder"):
         marker.write_text("in", encoding="utf-8")
         time.sleep(float(sys.argv[2]))
+        # Still inside the slot: written before the release in queued_slot's finally.
+        Path(str(marker) + ".leaving").write_text("leaving", encoding="utf-8")
     """
 )
 
 
 def test_lock_excludes_second_process(qdir: Path, tmp_path: Path) -> None:
-    """A second run must not start while another process holds the slot."""
+    """A second run must not start while another process holds the slot.
+
+    The check is the holder's "leaving" marker, written inside the slot right before
+    the release. Whether the holder process has already exited is no criterion: the
+    slot is released before interpreter shutdown, which takes longer under load.
+    """
     marker = tmp_path / "holder.marker"
+    leaving = Path(str(marker) + ".leaving")
     env = {**os.environ, tq.QUEUE_DIR_ENV: str(qdir)}
     env.pop(tq.HELD_ENV, None)
     holder = subprocess.Popen(
@@ -134,7 +142,7 @@ def test_lock_excludes_second_process(qdir: Path, tmp_path: Path) -> None:
         started = time.time()
         with tq.queued_slot("second", out=io.StringIO(), poll_seconds=0.05):
             entered = time.time()
-            assert holder.poll() is not None, "slot granted while holder still ran"
+            assert leaving.exists(), "slot granted while holder still held it"
         assert entered - started > 0.5
     finally:
         holder.kill()

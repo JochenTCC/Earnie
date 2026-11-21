@@ -69,6 +69,53 @@ def test_hourly_price_hv_steps_at_qh_boundaries_when_prices_vary():
     assert _dt(7, 0) in change_times
 
 
+def test_hourly_price_hv_breaks_at_slot_without_price():
+    """A slot without price (missing log slot) is a gap, not the previous price."""
+    import math
+
+    slots = [_dt(6, 0), _dt(6, 15), _dt(6, 30), _dt(6, 45)]
+    df = pd.DataFrame({
+        "slot_datetime": slots,
+        "Strompreis (Cent/kWh)": [16.0, float("nan"), 20.0, 20.0],
+    })
+    axis = ChartSlotAxis.from_dataframe(df)
+    line_x, line_y = _hourly_price_hv_xy(axis, df)
+    by_time = list(zip(line_x, line_y))
+    # No point inside the missing slot carries 16 ct.
+    assert not any(
+        _dt(6, 15) < x < _dt(6, 30) for x, _ in by_time
+    )
+    assert any(x == _dt(6, 30) and math.isnan(y) for x, y in by_time)
+    assert any(x == _dt(6, 30) and y == 20.0 for x, y in by_time)
+
+
+def test_hourly_price_hv_has_no_gap_on_contiguous_mixed_slots():
+    slots = _mixed_slots()
+    df = pd.DataFrame({
+        "slot_datetime": slots,
+        "Strompreis (Cent/kWh)": [16.0, 16.5, 16.2, 16.8, 17.0, 18.0, 19.0],
+    })
+    axis = ChartSlotAxis.from_dataframe(df)
+    _line_x, line_y = _hourly_price_hv_xy(axis, df)
+    assert not line_y.isna().any()
+
+
+def test_soc_price_axis_range_widens_for_negative_prices():
+    from ui.charts import _soc_price_axis_range
+
+    df = pd.DataFrame({
+        "Strompreis (Cent/kWh)": [-12.0, 30.0],
+        "Einspeisevergütung (Cent/kWh)": [-3.0, 8.0],
+    })
+    low, high = _soc_price_axis_range(df)
+    assert low == -14.0
+    assert high == 105.0
+    assert _soc_price_axis_range(pd.DataFrame({"Strompreis (Cent/kWh)": [20.0]})) == (
+        -5.0,
+        105.0,
+    )
+
+
 def test_bar_widths_follow_slot_duration():
     slots = _mixed_slots()
     axis = ChartSlotAxis.from_dataframe(pd.DataFrame({"slot_datetime": slots}))
