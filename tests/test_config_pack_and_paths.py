@@ -297,6 +297,43 @@ def test_config_pack_rejects_v1_manifest(monkeypatch, tmp_path: Path) -> None:
         import_config_pack_bytes(buf.getvalue())
 
 
+@pytest.mark.parametrize(
+    "member",
+    [
+        "uploads/../../escaped.txt",
+        "uploads/sub/../../../escaped.txt",
+        "uploads/..\\..\\escaped.txt",
+        "uploads//escaped.txt",
+        "uploads/C:/escaped.txt",
+    ],
+)
+def test_config_pack_rejects_upload_member_that_leaves_uploads(
+    monkeypatch, tmp_path: Path, member: str
+) -> None:
+    """An ``uploads/`` member with ``..`` or an absolute part is refused before any write."""
+    import io
+
+    from runtime_store.data_model import CURRENT_DATA_MODEL
+
+    monkeypatch.chdir(tmp_path)
+    _clear_sidecar_path_overrides(monkeypatch)
+    cfg = tmp_path / "earnie_env" / "config"
+    cfg.mkdir(parents=True)
+    monkeypatch.setenv("EARNIE_CONFIG_PATH", str(cfg))
+    before = '{"untouched": true}'
+    (cfg / "config.json").write_text(before, encoding="utf-8")
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr(MANIFEST_NAME, json.dumps({DATA_MODEL_KEY: CURRENT_DATA_MODEL, "files": []}))
+        zf.writestr(member, "evil")
+
+    with pytest.raises(ValueError, match="unter uploads/ ist nicht erlaubt"):
+        import_config_pack_bytes(buf.getvalue())
+
+    assert not list(tmp_path.rglob("escaped.txt"))
+    assert (cfg / "config.json").read_text(encoding="utf-8") == before
+
+
 def test_config_pack_rejects_v2_member_with_v4_manifest(
     monkeypatch, tmp_path: Path
 ) -> None:
