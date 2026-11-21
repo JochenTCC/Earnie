@@ -182,10 +182,22 @@ def _profile_geo_and_csv_fields(raw: dict) -> dict:
     battery_profile_csv = str(raw.get("battery_profile_csv", "") or "").strip()
     grid_profile_csv = str(raw.get("grid_profile_csv", "") or "").strip()
     historical_csv_source = str(raw.get("historical_csv_source", "") or "").strip().lower()
-    if historical_csv_source not in ("separate", "energiemonitor", "balance"):
+    profile_label = str(raw.get("id", "") or "").strip() or "?"
+    if not historical_csv_source:
         historical_csv_source = "separate"
+    elif historical_csv_source not in ("separate", "energiemonitor", "balance"):
+        raise ValueError(
+            f"profiles '{profile_label}': historical_csv_source "
+            f"{raw.get('historical_csv_source')!r} ist unbekannt "
+            "(erlaubt: separate, energiemonitor, balance)."
+        )
     land_raw = str(raw.get("land", "") or "").strip().upper()
-    land = land_raw if land_raw in {"AT", "DE", "CH"} else "AT"
+    if land_raw and land_raw not in {"AT", "DE", "CH"}:
+        raise ValueError(
+            f"profiles '{profile_label}': land {raw.get('land')!r} ist unbekannt "
+            "(erlaubt: AT, DE, CH)."
+        )
+    land = land_raw or "AT"
     latitude = _float_field_or_default(raw, "latitude", profile_default("latitude"))
     longitude = _float_field_or_default(raw, "longitude", profile_default("longitude"))
     if "netznutzung_arbeitspreis_cent_kwh" in raw:

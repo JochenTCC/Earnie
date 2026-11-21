@@ -158,12 +158,10 @@ def load_components_document(path: str) -> dict:
         WALLBOXES_KEY: wallboxes,
     }
     if shadow:
-        try:
-            from runtime_store.shadow.hooks import apply_overlay_to_components
+        # No fallback to the plain document: a broken overlay must not pass as "no overlay".
+        from runtime_store.shadow.hooks import apply_overlay_to_components
 
-            out = apply_overlay_to_components(out)
-        except Exception:
-            pass
+        out = apply_overlay_to_components(out)
     _components_doc_cache[abs_path] = (*stamp, out)
     return out
 

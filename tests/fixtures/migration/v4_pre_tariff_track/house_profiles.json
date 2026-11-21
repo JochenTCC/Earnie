@@ -9,7 +9,7 @@
             "pv_profile_csv": "fixture/data.csv",
             "battery_profile_csv": "fixture/data.csv",
             "grid_profile_csv": "fixture/data.csv",
-            "historical_csv_source": "fixture/separate",
+            "historical_csv_source": "separate",
             "baseload_distribution": "equal",
             "consumers": [
                 {
@@ -317,7 +317,7 @@
             "pv_profile_csv": "fixture/data.csv",
             "battery_profile_csv": "fixture/data.csv",
             "grid_profile_csv": "fixture/data.csv",
-            "historical_csv_source": "fixture/separate",
+            "historical_csv_source": "separate",
             "baseload_distribution": "equal",
             "consumers": [
                 {
@@ -625,7 +625,7 @@
             "pv_profile_csv": "fixture/data.csv",
             "battery_profile_csv": "fixture/data.csv",
             "grid_profile_csv": "fixture/data.csv",
-            "historical_csv_source": "fixture/separate",
+            "historical_csv_source": "separate",
             "baseload_distribution": "equal",
             "consumers": [
                 {

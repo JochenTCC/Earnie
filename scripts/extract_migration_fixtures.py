@@ -53,7 +53,6 @@ _BINDING_VALUE_KEYS = frozenset(
 )
 _PATHISH_KEYS = frozenset(
     {
-        "historical_csv_source",
         "pv_profile_csv",
         "total_profile_csv",
         "grid_profile_csv",

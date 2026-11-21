@@ -495,8 +495,9 @@ def test_loxone_names_unknown_backend_surfaces_error(tmp_path):
     doc = json.loads(path.read_text(encoding="utf-8"))
     doc["ehal"] = {"backend": "homeassistant", "adapter_id": "earnie-hems"}
     path.write_text(json.dumps(doc, indent=2), encoding="utf-8")
-    with pytest.raises(ValueError, match="ehal.backend"):
-        plan_migration(config_dir)
+    plan = plan_migration(config_dir)
+    assert plan.can_run is False
+    assert any("ehal.backend" in blocker.message_de for blocker in plan.blockers)
 
 
 def test_loxone_names_unknown_answer_blocks(tmp_path):

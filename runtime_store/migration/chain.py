@@ -34,13 +34,13 @@ def apply_chain(
     questions: list[Question] = []
 
     for step in steps:
-        if not step_is_pending(step, start, current):
-            continue
-        questions.extend(step_questions(step, current))
-        before = copy.deepcopy(current)
         try:
+            if not step_is_pending(step, start, current):
+                continue
+            questions.extend(step_questions(step, current))
+            before = copy.deepcopy(current)
             result: StepResult = step.apply(current, answers)
-        except Exception as exc:  # noqa: BLE001 — map unexpected apply errors
+        except Exception as exc:  # noqa: BLE001 — map unexpected step errors to a blocker
             blockers.append(
                 Blocker(step_id=step.id, message_de=str(exc) or type(exc).__name__)
             )

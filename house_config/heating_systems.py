@@ -199,9 +199,21 @@ def load_heating_systems_for_house(house_profiles_path: str) -> dict[str, dict[s
 
 
 def components_path_for_house(house_profiles_path: str) -> str:
-    return os.path.join(
-        os.path.dirname(os.path.abspath(house_profiles_path)), "components.json"
+    """``components.json`` that belongs to this house file.
+
+    For the active house profile it is the active components file (the editors write there,
+    also behind ``EARNIE_COMPONENTS_PATH``); any other house file has it in its own folder.
+    """
+    from runtime_store.persist_paths import (
+        resolve_components_json_path,
+        resolve_house_profiles_json_path,
     )
+
+    house_path = os.path.abspath(house_profiles_path)
+    active_house = os.path.abspath(resolve_house_profiles_json_path())
+    if os.path.normcase(house_path) == os.path.normcase(active_house):
+        return resolve_components_json_path()
+    return os.path.join(os.path.dirname(house_path), "components.json")
 
 
 def resolve_heating_system(

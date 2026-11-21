@@ -236,9 +236,11 @@ def apply(docs: Docs, answers: Answers) -> StepResult:
         str(w.get("id")): w for w in existing if isinstance(w, dict)
     }
     new_ids: list[str] = []
+    converted = False
     for profile, consumer in _iter_evs(out.get(HOUSE_FILE)):
         if not _ev_pending(consumer):
             continue
+        converted = True
         # The EV carried this activation since dm4.required_signal_activation; an EV
         # without it gets it on its wallbox, so that step stays done.
         candidate = activate_wallbox_required(_wallbox_from_ev(consumer))
@@ -260,7 +262,9 @@ def apply(docs: Docs, answers: Answers) -> StepResult:
     blocker = _move_openems_component(
         out.get(CONFIG_FILE),
         list(components.get(WALLBOXES_KEY) or []),
-        from_old_model=_needs_stamp(docs),
+        # An EV in the old shape marks the old model too: coming from data model 4,
+        # dm5.netznutzung_split has already stamped the files in this chain.
+        from_old_model=_needs_stamp(docs) or converted,
     )
     if blocker is not None:
         return _blocked(docs, blocker)
