@@ -62,6 +62,15 @@ class TestParseMonth:
         ts = _parse_month("6")
         assert ts == pd.Timestamp(2026, 6, 1)
 
+    def test_parses_month_with_year(self, monkeypatch):
+        from datetime import date
+
+        monkeypatch.setattr(
+            "data.profile_manager.get_cons_data_date_bounds",
+            lambda: (date(2025, 3, 1), date(2026, 2, 28)),
+        )
+        assert _parse_month("2025-03") == pd.Timestamp(2025, 3, 1)
+
     def test_rejects_invalid_month(self):
         import argparse
 

@@ -8,7 +8,7 @@ from shlex import join as shlex_join
 import pandas as pd
 import streamlit as st
 
-from ui.number_format import format_decimal
+from ui.number_format import format_decimal, format_general
 from ui.backtesting_runner import _subprocess_env, project_root, python_executable
 
 
@@ -98,8 +98,12 @@ def render_diag_single_window_panel(
             "Diagnose ausführen",
             key=f"diag_single_window_{window_anchor}_{scenario_id}",
         ):
-            with st.spinner("diag_single_window läuft…"):
-                exit_code, output = run_diag_single_window(argv)
+            try:
+                with st.spinner("diag_single_window läuft…"):
+                    exit_code, output = run_diag_single_window(argv)
+            except subprocess.TimeoutExpired as exc:
+                st.error(f"Diagnose nach {format_general(exc.timeout)} s abgebrochen (Zeitlimit).")
+                return
             if exit_code == 0:
                 st.success("Diagnose abgeschlossen.")
             else:

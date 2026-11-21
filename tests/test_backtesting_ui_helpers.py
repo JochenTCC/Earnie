@@ -275,7 +275,7 @@ def test_suggest_test_month_from_se_window(monkeypatch):
             pd.Timestamp("2026-05-31"),
         ),
     )
-    assert suggest_test_month() == 3
+    assert suggest_test_month() == pd.Period("2026-03")
 
 
 def test_suggest_test_month_prefers_march_over_january(monkeypatch):
@@ -288,7 +288,21 @@ def test_suggest_test_month_prefers_march_over_january(monkeypatch):
             pd.Timestamp("2026-12-31"),
         ),
     )
-    assert suggest_test_month() == 3
+    assert suggest_test_month() == pd.Period("2026-03")
+
+
+def test_suggest_test_month_keeps_the_year_of_the_window(monkeypatch):
+    """cons_data ends in February 2026: March lies in 2025, not in the year of the end."""
+    import pandas as pd
+
+    monkeypatch.setattr(
+        "data.data_loader.resolve_simulation_window",
+        lambda range_mode="last_12_months": (
+            pd.Timestamp("2025-03-01"),
+            pd.Timestamp("2026-02-28"),
+        ),
+    )
+    assert suggest_test_month() == pd.Period("2025-03")
 
 
 def test_suggest_test_month_none_without_window(monkeypatch):
@@ -312,7 +326,7 @@ def test_suggest_test_month_fallback_when_no_march(monkeypatch):
             pd.Timestamp("2026-02-28"),
         ),
     )
-    assert suggest_test_month() == 4
+    assert suggest_test_month() == pd.Period("2025-04")
 
 
 def test_write_and_read_progress_file(tmp_path):

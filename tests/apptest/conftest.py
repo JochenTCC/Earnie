@@ -17,7 +17,6 @@ from pathlib import Path
 import pytest
 
 from runtime_store import optimization_history
-from simulation import backtesting_log
 from tests.conftest import _reinit_config_offline
 from tests.fixtures.open_meteo_mock import install_open_meteo_climate_mock
 
@@ -44,7 +43,6 @@ def _isolated_backtesting_config(tmp_path, monkeypatch):
     run_state.json) in die Seiten gerendert und die Tests von lokalem
     Produktiv-Zustand statt der Fixtures abhängig machen.
 
-    simulation.backtesting_log._DEFAULT_LOG_DIR und
     runtime_store.optimization_history.RUNTIME_DIR/HISTORY_FILE werden je
     einmal beim ersten Modul-Import ausgewertet (nicht bei jedem Aufruf) —
     sobald irgendein anderer Test vor diesem hier zuerst importiert (in der
@@ -82,7 +80,6 @@ def _isolated_backtesting_config(tmp_path, monkeypatch):
         monkeypatch.setenv(_name, "")  # merkt den Ausgangszustand für den Teardown
         monkeypatch.delenv(_name)
 
-    monkeypatch.setattr(backtesting_log, "_DEFAULT_LOG_DIR", str(runtime_dir))
     monkeypatch.setattr(optimization_history, "RUNTIME_DIR", str(runtime_dir))
     monkeypatch.setattr(
         optimization_history,
