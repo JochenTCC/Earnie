@@ -1,0 +1,15 @@
+{
+    "tariff_format": 1,
+    "rule_sets": {},
+    "areas": [
+        {
+            "id": "user_profile_a",
+            "label": "Eigener Arbeitspreis – House A",
+            "land": "AT",
+            "base_cent_kwh": {
+                "unmetered_power": 5.353,
+                "metered_power": 5.353
+            }
+        }
+    ]
+}

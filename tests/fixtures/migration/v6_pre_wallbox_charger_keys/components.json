@@ -1,0 +1,212 @@
+{
+    "batteries": [
+        {
+            "id": "virtual_gs",
+            "label": "1.0 kWh Virtuell (Geschirrspüler)",
+            "type": "powerstation",
+            "battery_capacity_kwh": 1.0,
+            "battery_max_charge_power_kw": 5.0,
+            "battery_max_discharge_power_kw": 0.0,
+            "battery_efficiency": 0.9690721649484536,
+            "battery_min_soc": 5.0,
+            "battery_max_soc": 100.0,
+            "threshold_power": 0.03,
+            "limits_from_live": false,
+            "control": "limits_only",
+            "backing": "virtual",
+            "role": "single_use",
+            "attached_consumer_ids": [
+                "geschirrspueler"
+            ],
+            "attached_consumer_id": "geschirrspueler",
+            "battery_wear": {
+                "enabled": false
+            },
+            "ehal_bindings": {
+                "ess.virtual_gs.sens_ess_soc": "",
+                "ess.virtual_gs.set_ess_charge_power_limit": "",
+                "ess.virtual_gs.set_ess_discharge_power_limit": ""
+            }
+        },
+        {
+            "id": "ecoflow_delta_3",
+            "label": "Ecoflow Powerstation Delta 3",
+            "type": "powerstation",
+            "battery_capacity_kwh": 1.024,
+            "battery_max_charge_power_kw": 1.5,
+            "battery_max_discharge_power_kw": 2.2,
+            "battery_efficiency": 0.9278350515463918,
+            "battery_min_soc": 10.0,
+            "battery_max_soc": 100.0,
+            "threshold_power": 0.03,
+            "limits_from_live": true,
+            "control": "full",
+            "backing": "physical",
+            "role": "standby_backup",
+            "attached_consumer_ids": [
+                "verbraucher"
+            ],
+            "attached_consumer_id": "verbraucher",
+            "standby_power_kw": 0.02,
+            "ehal_bindings": {
+                "ess.ecoflow_delta_3.get_ess_soc_max": "alias_38",
+                "ess.ecoflow_delta_3.get_ess_soc_min": "alias_39",
+                "ess.ecoflow_delta_3.sens_ess_power": "alias_40",
+                "ess.ecoflow_delta_3.sens_ess_soc": "alias_41",
+                "ess.ecoflow_delta_3.set_ess_charge_power_limit": "alias_42",
+                "ess.ecoflow_delta_3.set_ess_discharge_power_limit": "alias_43",
+                "ess.ecoflow_delta_3.set_ess_mode": "alias_44",
+                "ess.ecoflow_delta_3.set_ess_active_power": "alias_45",
+                "ess.ecoflow_delta_3.set_ess_source_select": "alias_37"
+            },
+            "battery_wear": {
+                "enabled": false
+            },
+            "inverter_id": "wr_ecoflow_delta_3"
+        },
+        {
+            "id": "virtual_washing",
+            "label": "1.5 kWh Virtuell (Waschen)",
+            "type": "powerstation",
+            "battery_capacity_kwh": 0.1,
+            "battery_max_charge_power_kw": 5.0,
+            "battery_max_discharge_power_kw": 0.0,
+            "battery_efficiency": 0.9690721649484536,
+            "battery_min_soc": 5.0,
+            "battery_max_soc": 100.0,
+            "threshold_power": 0.03,
+            "limits_from_live": false,
+            "control": "limits_only",
+            "backing": "virtual",
+            "role": "single_use",
+            "attached_consumer_ids": [
+                "trockner",
+                "waschmaschine"
+            ],
+            "attached_consumer_id": "trockner",
+            "battery_wear": {
+                "enabled": false
+            },
+            "ehal_bindings": {
+                "ess.virtual_washing.sens_ess_soc": "",
+                "ess.virtual_washing.set_ess_charge_power_limit": "",
+                "ess.virtual_washing.set_ess_discharge_power_limit": ""
+            }
+        },
+        {
+            "id": "15_kwh_speicher",
+            "label": "15 kWh Speicher",
+            "type": "house",
+            "battery_capacity_kwh": 15.0,
+            "battery_max_charge_power_kw": 5.0,
+            "battery_max_discharge_power_kw": 5.0,
+            "battery_efficiency": 0.9690721649484536,
+            "battery_min_soc": 5.0,
+            "battery_max_soc": 100.0,
+            "threshold_power": 0.03,
+            "limits_from_live": true,
+            "control": "full",
+            "standby_power_kw": 0.026,
+            "ehal_bindings": {
+                "ess.15_kwh_speicher.get_ess_max_charge_power": "alias_46",
+                "ess.15_kwh_speicher.get_ess_max_discharge_power": "alias_47",
+                "ess.15_kwh_speicher.get_ess_soc_max": "alias_48",
+                "ess.15_kwh_speicher.get_ess_soc_min": "alias_49",
+                "ess.15_kwh_speicher.sens_ess_power": "alias_50",
+                "ess.15_kwh_speicher.sens_ess_soc": "alias_51",
+                "ess.15_kwh_speicher.set_ess_active_power": "alias_52",
+                "ess.15_kwh_speicher.set_ess_charge_power_limit": "alias_53",
+                "ess.15_kwh_speicher.set_ess_discharge_power_limit": "alias_54",
+                "ess.15_kwh_speicher.set_ess_mode": "alias_55"
+            },
+            "battery_wear": {
+                "enabled": false
+            },
+            "inverter_id": "wr_main",
+            "regulates_on": "grid"
+        }
+    ],
+    "pv_systems": [
+        {
+            "id": "dach_nord",
+            "label": "Dach Nord",
+            "kwp": 6.8,
+            "pv_tilt": 18.0,
+            "pv_azimuth": -154.0,
+            "inverter_id": "wr_main",
+            "ehal_bindings": {}
+        },
+        {
+            "id": "dach_sued",
+            "label": "Dach Süd",
+            "kwp": 5.7,
+            "pv_tilt": 18.0,
+            "pv_azimuth": 26.0,
+            "inverter_id": "wr_main",
+            "ehal_bindings": {}
+        }
+    ],
+    "earnie_data_model": 6,
+    "inverters": [
+        {
+            "id": "wr_main",
+            "label": "Haupt-Wechselrichter",
+            "type": "hybrid",
+            "ac_connection": "grid_tied",
+            "control": "full",
+            "ehal_bindings": {
+                "inv.wr_main.sens_inv_power_pv": "",
+                "inv.wr_main.set_inv_ac_power_limit": ""
+            },
+            "efficiency": 0.97
+        },
+        {
+            "id": "wr_ecoflow_delta_3",
+            "label": "Powerstation-WR Ecoflow Powerstation Delta 3",
+            "type": "hybrid",
+            "ac_connection": "island",
+            "control": "full",
+            "owned_by": "ecoflow_delta_3",
+            "ehal_bindings": {
+                "inv.wr_ecoflow_delta_3.set_inv_ac_power_limit": ""
+            },
+            "efficiency": 0.97
+        }
+    ],
+    "heating_systems": [
+        {
+            "id": "heating_profile_a",
+            "label": "Heizsystem House A",
+            "heat_source": {
+                "type": "heat_pump",
+                "heat_pump_type": "erde"
+            },
+            "heating_power_kw": 8.17,
+            "min_on_quarterhours": 1,
+            "heat_storage": {
+                "volume_liters": 887.0,
+                "heat_loss_kw_per_k": 0.01,
+                "setpoint_c": 47.0,
+                "tolerance_c": 5.0
+            }
+        }
+    ],
+    "wallboxes": [
+        {
+            "id": "e_auto",
+            "label": "Wallbox smart",
+            "voltage_v": 220.0,
+            "phases": 1,
+            "min_current_a": 6.363636363636363,
+            "max_current_a": 15.909090909090908,
+            "ehal_bindings": {
+                "sens_evcs_active_power": "alias_5",
+                "set_evcs_max_current": "alias_6",
+                "set_evcs_mode": "alias_7",
+                "sens_evcs_connected": "alias_8",
+                "get_evcs_nominal_current": "alias_10",
+                "evcs.e_auto.set_evcs_max_current": ""
+            }
+        }
+    ]
+}

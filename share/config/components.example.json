@@ -105,10 +105,9 @@
             "min_current_a": 6.0,
             "max_current_a": 16.0,
             "ehal_bindings": {
-                "sens_evcs_active_power": "",
-                "set_evcs_max_current": "",
-                "set_evcs_mode": "",
-                "evcs.ev.set_evcs_max_current": ""
+                "evcs.ev.sens_evcs_active_power": "",
+                "evcs.ev.set_evcs_max_current": "",
+                "evcs.ev.set_evcs_mode": ""
             }
         }
     ]

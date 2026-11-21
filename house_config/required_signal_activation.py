@@ -100,9 +100,24 @@ def activate_wallbox_required(wallbox: dict[str, Any]) -> dict[str, Any]:
     if not wid:
         return out
     out["ehal_bindings"] = activate_required_keys(
-        out.get("ehal_bindings"), wallbox_required_keys(wid)
+        out.get("ehal_bindings"), _wallbox_missing_required(out.get("ehal_bindings"), wid)
     )
     return out
+
+
+def _wallbox_missing_required(bindings: Any, wallbox_id: str) -> tuple[str, ...]:
+    """Required charger keys of the wallbox whose kind it holds under no spelling.
+
+    A charger kind counts as present under the bare ``<kind>`` or another ``evcs.*`` Kennung
+    too, so activation never adds a second key for it; ``dm6.wallbox_charger_keys`` rekeys
+    those to ``evcs.<Wallbox>.<kind>``.
+    """
+    from ehal.qualified_ids import field_kind
+
+    held = {field_kind(str(k)) for k in bindings} if isinstance(bindings, dict) else set()
+    return tuple(
+        k for k in wallbox_required_keys(wallbox_id) if field_kind(k) not in held
+    )
 
 
 def activate_consumer_required(consumer: dict[str, Any]) -> dict[str, Any]:
@@ -236,9 +251,7 @@ def pack_missing_required(
     if isinstance(components, dict):
         for wallbox in components.get("wallboxes") or []:
             wid = str(wallbox.get("id") or "").strip() if isinstance(wallbox, dict) else ""
-            if wid and missing_required_keys(
-                wallbox.get("ehal_bindings"), wallbox_required_keys(wid)
-            ):
+            if wid and _wallbox_missing_required(wallbox.get("ehal_bindings"), wid):
                 return True
         pv_systems = list(components.get("pv_systems") or [])
         grid_tied = grid_tied_house_battery_ids(

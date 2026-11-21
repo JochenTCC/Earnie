@@ -143,12 +143,11 @@
             "min_current_a": 6.363636363636363,
             "max_current_a": 15.909090909090908,
             "ehal_bindings": {
-                "sens_evcs_active_power": "alias_13",
-                "set_evcs_max_current": "alias_14",
-                "set_evcs_mode": "alias_15",
-                "sens_evcs_connected": "alias_16",
-                "get_evcs_nominal_current": "alias_18",
-                "evcs.e_auto.set_evcs_max_current": ""
+                "evcs.e_auto.set_evcs_max_current": "alias_14",
+                "evcs.e_auto.sens_evcs_active_power": "alias_13",
+                "evcs.e_auto.set_evcs_mode": "alias_15",
+                "evcs.e_auto.sens_evcs_connected": "alias_16",
+                "evcs.e_auto.get_evcs_nominal_current": "alias_18"
             }
         }
     ]
