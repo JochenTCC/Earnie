@@ -156,14 +156,15 @@ def run_migration(
             manual_todos=(),
             written_files=(),
         )
-    _require_answers(plan.questions, answers)
-
     docs = load_pack_docs(root)
     level = plan_level_blockers(docs)
     if level:
         raise MigrationError(level[0].message_de)
 
     chain = apply_chain(docs, answers, registry, stop_on_blocker=True)
+    # The questions of the run with the answers: an earlier answer can settle a later
+    # question of the dry run (plan.questions), which must then not be required.
+    _require_answers(chain.questions, answers)
     if chain.blockers:
         raise MigrationError(chain.blockers[0].message_de)
 

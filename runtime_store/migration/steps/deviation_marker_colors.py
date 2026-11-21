@@ -3,6 +3,10 @@
 Detect-based (no data-model bump). Also moves
 ``battery_forced_charge_target_missed`` to category warning when that rule
 is already present.
+
+Only the values shipped before the change are replaced (hint yellow, warning
+orange, the rule in category hint). An own colour or category stays, and the
+step does not come back for it.
 """
 from __future__ import annotations
 
@@ -22,6 +26,10 @@ HINT_COLOR = "#27ae60"
 WARNING_COLOR = "#f1c40f"
 RULE_ID = "battery_forced_charge_target_missed"
 RULE_CATEGORY = "warning"
+# Shipped before this step (deviation_rules.example.json up to 2.7.0-beta.2).
+OLD_HINT_COLOR = "#f1c40f"
+OLD_WARNING_COLOR = "#e67e22"
+OLD_RULE_CATEGORY = "hint"
 
 
 def _doc(docs: Docs) -> dict[str, Any] | None:
@@ -60,19 +68,19 @@ def detect(docs: Docs) -> bool:
     if version is None or version < 4:
         return False
     hint = _category_block(doc, "hint")
-    if hint is not None and hint.get("color") != HINT_COLOR:
+    if hint is not None and hint.get("color") == OLD_HINT_COLOR:
         return True
     warning = _category_block(doc, "warning")
-    if warning is not None and warning.get("color") != WARNING_COLOR:
+    if warning is not None and warning.get("color") == OLD_WARNING_COLOR:
         return True
     rule = _target_rule(doc)
-    return rule is not None and rule.get("category") != RULE_CATEGORY
+    return rule is not None and rule.get("category") == OLD_RULE_CATEGORY
 
 
-def _set_color(doc: dict[str, Any], name: str, color: str) -> None:
+def _replace_color(doc: dict[str, Any], name: str, old: str, new: str) -> None:
     block = _category_block(doc, name)
-    if block is not None:
-        block["color"] = color
+    if block is not None and block.get("color") == old:
+        block["color"] = new
 
 
 def apply(docs: Docs, answers: Answers) -> StepResult:
@@ -83,10 +91,11 @@ def apply(docs: Docs, answers: Answers) -> StepResult:
     doc = _doc(out)
     if doc is None:
         return StepResult(docs=out, changed_files=())
-    _set_color(doc, "hint", HINT_COLOR)
-    _set_color(doc, "warning", WARNING_COLOR)
+    # Warning first: the old hint colour is the new warning colour.
+    _replace_color(doc, "warning", OLD_WARNING_COLOR, WARNING_COLOR)
+    _replace_color(doc, "hint", OLD_HINT_COLOR, HINT_COLOR)
     rule = _target_rule(doc)
-    if rule is not None:
+    if rule is not None and rule.get("category") == OLD_RULE_CATEGORY:
         rule["category"] = RULE_CATEGORY
     return StepResult(docs=out, changed_files=("deviation_rules.json",))
 

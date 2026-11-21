@@ -210,3 +210,74 @@ def test_shadow_overlay_error_on_components_is_raised(tmp_path, monkeypatch):
             components_store.load_components_document(str(path))
     finally:
         components_store.clear_components_doc_cache()
+
+
+def _marker_docs(*, hint: str, warning: str, category: str) -> dict:
+    return {
+        "deviation_rules.json": {
+            "earnie_data_model": CURRENT_DATA_MODEL,
+            "categories": {"hint": {"color": hint}, "warning": {"color": warning}},
+            "rules": [{"id": "battery_forced_charge_target_missed", "category": category}],
+        }
+    }
+
+
+def test_marker_colour_step_leaves_own_values_alone():
+    from runtime_store.migration.steps import deviation_marker_colors as step
+
+    own = _marker_docs(hint="#123456", warning="#ff8800", category="error")
+    assert step.detect(own) is False
+
+
+def test_marker_colour_step_replaces_only_the_old_shipped_values():
+    from runtime_store.migration.steps import deviation_marker_colors as step
+
+    docs = _marker_docs(hint="#123456", warning=step.OLD_WARNING_COLOR, category="error")
+    assert step.detect(docs) is True
+    doc = step.apply(docs, {}).docs["deviation_rules.json"]
+    assert doc["categories"]["hint"]["color"] == "#123456"
+    assert doc["categories"]["warning"]["color"] == step.WARNING_COLOR
+    assert doc["rules"][0]["category"] == "error"
+
+
+def test_run_requires_only_the_questions_left_open_by_the_answers(tmp_path):
+    """dm4 area answered: the dm5 grid-area question of the dry run no longer applies."""
+    import shutil
+
+    from runtime_store.migration.runner import run_migration
+
+    repo = Path(__file__).resolve().parents[1]
+    config_dir = tmp_path / "cfg"
+    shutil.copytree(repo / "tests/fixtures/migration/v4_pre_inverter_gridfee", config_dir)
+    shutil.copy(repo / "share/config/grid_fees.json", config_dir / "grid_fees.json")
+    house_path = config_dir / "house_profiles.json"
+    house = json.loads(house_path.read_text(encoding="utf-8"))
+    for profile in house["profiles"]:
+        profile["netznutzung_arbeitspreis_cent_kwh"] = 0
+        profile.pop("netznutzung", None)
+    _write(house_path, house)
+
+    plan = plan_migration(config_dir)
+    dm5 = [q.id for q in plan.questions if q.id.startswith("dm5.netznutzung_split")]
+    assert dm5, "the dry run without answers asks for the grid area"
+    answers = {
+        q.id: (q.default if q.default is not None else q.choices[0])
+        for q in plan.questions
+        if q.required and q.id not in dm5
+    }
+    answers["dm4.grid_fee_profile.area_id"] = "AT-NOE"
+    run_migration(config_dir, answers)
+    stored = json.loads(house_path.read_text(encoding="utf-8"))
+    assert [p["netznutzung"]["area_id"] for p in stored["profiles"]] == ["AT-NOE"]
+
+
+def test_shadow_write_guard_covers_the_house_profile_outside_the_config_dir(sidecar_env):
+    from house_config.profiles_store import _refuse_shadow_config_write
+    from runtime_store.shadow.errors import ConfigReadOnlyError
+
+    cfg, side = sidecar_env
+    with pytest.raises(ConfigReadOnlyError):
+        _refuse_shadow_config_write(str(side / "house_profiles.json"))
+    with pytest.raises(ConfigReadOnlyError):
+        _refuse_shadow_config_write(str(cfg / "house_profiles.json"))
+    _refuse_shadow_config_write(str(side / "other_export.json"))
