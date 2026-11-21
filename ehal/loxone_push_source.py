@@ -155,14 +155,16 @@ def build_ehal_index(
 _index_cache: dict[str, BindingSource] | None = None
 _ehal_index_cache: dict[str, BindingSource] | None = None
 _index_mtime_key: tuple[float, float] | None = None
+_failed_mtime_key: tuple[float, float] | None = None
 
 
 def clear_source_caches() -> None:
     """Reset lazy caches (tests / after config reload)."""
-    global _index_cache, _ehal_index_cache, _index_mtime_key
+    global _index_cache, _ehal_index_cache, _index_mtime_key, _failed_mtime_key
     _index_cache = None
     _ehal_index_cache = None
     _index_mtime_key = None
+    _failed_mtime_key = None
 
 
 def _file_mtime(path: str) -> float:
@@ -198,7 +200,7 @@ def _load_house_components() -> tuple[dict, dict]:
 
 
 def _ensure_indexes() -> None:
-    global _index_cache, _ehal_index_cache, _index_mtime_key
+    global _index_cache, _ehal_index_cache, _index_mtime_key, _failed_mtime_key
     mtime_key = _house_components_mtime_key()
     if (
         _index_cache is not None
@@ -208,14 +210,28 @@ def _ensure_indexes() -> None:
         return
     try:
         house, components = _load_house_components()
-        _index_cache = build_address_index(house, components)
-        _ehal_index_cache = build_ehal_index(house, components)
-        _index_mtime_key = mtime_key
+        address_index = build_address_index(house, components)
+        ehal_index = build_ehal_index(house, components)
     except Exception:  # noqa: BLE001 — read path must keep working
-        logger.exception("push source: failed to build binding indexes")
-        _index_cache = {}
-        _ehal_index_cache = {}
-        _index_mtime_key = mtime_key
+        # The last good index stays (bindings of unchanged entities are still right). An
+        # empty one is never kept as the answer for this file state: the next read tries
+        # again. Logged once per file state.
+        if _failed_mtime_key != mtime_key:
+            logger.exception(
+                "push source: binding index not built (%s); pushed signals of changed "
+                "bindings stay unresolved until the configuration loads again",
+                "last good index kept" if _index_cache is not None else "no index yet",
+            )
+            _failed_mtime_key = mtime_key
+        if _index_cache is None or _ehal_index_cache is None:
+            _index_cache = {}
+            _ehal_index_cache = {}
+            _index_mtime_key = None
+        return
+    _index_cache = address_index
+    _ehal_index_cache = ehal_index
+    _index_mtime_key = mtime_key
+    _failed_mtime_key = None
 
 
 def get_address_index() -> dict[str, BindingSource]:

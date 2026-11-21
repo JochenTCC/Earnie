@@ -223,7 +223,7 @@ Miniserver-Bezeichnungen müssen eindeutig sein. Die `id` im Hausprofil (Kleinbu
 - Titel: `Earnie_Verbraucher_Waschmaschine_Leistung`
 - VO-Befehl bei Ein: `/ehal/telemetry/flex.waschmaschine.sens_power_act/<v>`
 - VI-Check (Freigabe): `"consumer.waschmaschine.set_enable":\v` (der Titel bleibt `Earnie_Verbraucher_Waschmaschine_Freigabe`)
-- EHAL-Com-Binding: `consumer.{hk_id}.sens_power_act` → Titel (bei `zaehler_<slug>`: Kennung ohne `zaehler_`)
+- EHAL-Com-Binding: `consumer.{hk_id}.sens_power_act` → Titel (bei `zaehler_<slug>`: Kennung ohne `zaehler_`). Zwei Verbraucher eines Hausprofils dürfen deshalb nicht `zaehler_<slug>` und `<slug>` heißen: Sie hätten dieselbe Kennung, und Earnie lehnt das Hausprofil beim Laden mit einer Meldung ab, die beide ids nennt.
 
 `<Slug>` **im Merker:** kurzer, stabiler Token (z. B. `Waschmaschine`). `{hk_id}`: derselbe Verbraucher wie im Hausprofil.
 

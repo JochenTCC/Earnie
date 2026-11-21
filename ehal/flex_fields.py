@@ -157,16 +157,18 @@ def canonicalize_consumer_bindings(
     """Rewrite flex stubs / ``flex.*`` to typed namespaces; leave other keys.
 
     Empty string values are kept as Loxone activation flags (2.7.q Q8).
-    First-writer wins when two keys canonicalize to the same field.
+    When two keys canonicalize to the same field, the first hub address wins; an empty
+    activation flag never replaces an address.
     """
     if not isinstance(bindings, dict):
         return {}
     out: dict[str, str] = {}
     for key, value in bindings.items():
         field = canonicalize_consumer_field(str(key), consumer_id, consumer_type)
-        if not field or field in out:
+        address = str(value or "").strip()
+        if not field or (field in out and (out[field] or not address)):
             continue
-        out[field] = str(value or "").strip()
+        out[field] = address
     return out
 
 

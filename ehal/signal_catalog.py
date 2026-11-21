@@ -14,7 +14,7 @@ from ehal.push_signals import (
     title_from_qualified_id,
     vi_title_from_qualified_id,
 )
-from ehal.qualified_ids import field_kind, is_digital_id
+from ehal.qualified_ids import EVCS_KINDS, field_kind, is_digital_id
 from ehal.required_signals import (
     ComponentKind,
     binding_key_for_kind,
@@ -358,7 +358,11 @@ def iter_catalog_entries(house: dict, components: dict) -> list[CatalogEntry]:
                 )
             )
             bindings = _bindings_of(consumer)
-            for kind in _consumer_kinds(consumer, ctype):
+            kinds = _consumer_kinds(consumer, ctype)
+            if ctype == "ev" and _ev_charger_is_wallbox(consumer):
+                # The charger side is the wallbox's (``evcs.<Wallbox>.*``), listed below.
+                kinds = tuple(k for k in kinds if k not in EVCS_KINDS)
+            for kind in kinds:
                 _add(
                     _entry(
                         component_kind="consumer",
@@ -371,7 +375,83 @@ def iter_catalog_entries(house: dict, components: dict) -> list[CatalogEntry]:
                 )
         _add_rod_entries(profile, components, _add)
 
+    _add_wallbox_entries(house, components, _add)
     return out
+
+
+def _ev_charger_is_wallbox(consumer: dict[str, Any]) -> bool:
+    """True for an EV with a wallbox assignment (dm6): it has no charger signals of its own."""
+    from house_config.wallboxes import WALLBOX_ASSIGNMENT_KEY
+
+    return isinstance(consumer.get(WALLBOX_ASSIGNMENT_KEY), dict)
+
+
+def _wallbox_kinds() -> tuple[str, ...]:
+    """Charger kinds of a wallbox: role order first, then the rest of ``EVCS_KINDS``."""
+    role = [k for k in _role_kinds("evcs") if k in EVCS_KINDS]
+    return tuple(dict.fromkeys(role + sorted(EVCS_KINDS)))
+
+
+def _wallbox_use(house: dict) -> tuple[set[str], set[str]]:
+    """(wallboxes an EV of an active profile uses, those of them open to dynamic EVs)."""
+    from house_config.wallboxes import (
+        assigned_wallbox_id,
+        dynamic_wallbox_ids,
+        iter_house_evs,
+    )
+
+    used: set[str] = set()
+    dynamic: set[str] = set()
+    profiles = house.get("profiles") or {}
+    for profile in profiles.values() if isinstance(profiles, dict) else profiles:
+        if not isinstance(profile, dict):
+            continue
+        for consumer in profile.get("consumers") or []:
+            if isinstance(consumer, dict) and str(consumer.get("type") or "") == "ev":
+                fixed = assigned_wallbox_id(consumer)
+                if fixed:
+                    used.add(fixed)
+    for _pid, ev in iter_house_evs(house):
+        dynamic.update(i for i in dynamic_wallbox_ids(ev) if i)
+    return used | dynamic, dynamic
+
+
+def _add_wallbox_entries(house: dict, components: dict, add) -> None:
+    """Charger signals ``evcs.<Wallbox>.*`` of every wallbox an EV uses.
+
+    Same IDs as the inbox index and the write path (``push_signals``): the Kennung is the
+    wallbox, not the EV. The stecker signal is required where a dynamic EV may plug in.
+    """
+    from ehal.qualified_ids import qualified_charger_id
+    from ehal.required_signals import required_kinds_for_consumer
+
+    used, dynamic = _wallbox_use(house)
+    for wallbox in components.get("wallboxes") or []:
+        if not isinstance(wallbox, dict):
+            continue
+        wid = str(wallbox.get("id") or "").strip()
+        if not wid or wid not in used:
+            continue
+        required = set(required_kinds_for_consumer("ev"))
+        if wid in dynamic:
+            required.add("sens_evcs_connected")
+        active = {field_kind(str(key)) for key in _bindings_of(wallbox)}
+        for kind in _wallbox_kinds():
+            key = qualified_charger_id(wid, kind)
+            add(
+                CatalogEntry(
+                    component_kind="wallbox",
+                    entity_id=wid,
+                    consumer_type="ev",
+                    binding_key=key,
+                    ehal_id=key,
+                    group=_group_for("consumer", wid),
+                    direction="read" if _is_read(kind) else "write",
+                    digital=is_digital_id(key),
+                    is_required=kind in required,
+                    is_activated=kind in active,
+                )
+            )
 
 
 def _add_rod_entries(profile: dict, components: dict, add) -> None:
@@ -485,6 +565,7 @@ def set_binding_activation(
         "battery": "batteries",
         "inverter": "inverters",
         "pv_system": "pv_systems",
+        "wallbox": "wallboxes",
     }.get(component_kind)
     if not list_key:
         raise ValueError(f"unsupported component_kind {component_kind!r}")
@@ -498,7 +579,15 @@ def set_binding_activation(
             continue
         row = dict(item)
         bindings = dict(row.get("ehal_bindings") or {})
-        if activated:
+        if component_kind == "wallbox":
+            # A wallbox stores a kind bare or qualified: one kind, one key.
+            same_kind = [k for k in bindings if field_kind(str(k)) == field_kind(key)]
+            if activated and not same_kind:
+                bindings[key] = ""
+            elif not activated:
+                for peer in same_kind:
+                    bindings.pop(peer)
+        elif activated:
             bindings.setdefault(key, "")
         else:
             bindings.pop(key, None)
@@ -515,7 +604,8 @@ def catalog_to_signals(
     activated_only: bool,
 ) -> tuple[list, list]:
     """Build (read, write) ``Signal`` lists for VO/VI export from catalog."""
-    from ehal.push_signals import Signal
+    from ehal.push_signals import Signal, is_valid_write_ehal_id
+    from runtime_store.loxone_push_parse import is_valid_ehal_id
 
     reads: list[Signal] = []
     writes: list[Signal] = []
@@ -523,6 +613,15 @@ def catalog_to_signals(
     for entry in entries:
         if activated_only and not entry.is_activated:
             continue
+        accepted = is_valid_ehal_id if entry.direction == "read" else is_valid_write_ehal_id
+        if not accepted(entry.ehal_id):
+            # Same check as the inbox and the write path: a template with this ID would
+            # be wired in the hub and never arrive.
+            raise ValueError(
+                f"Kennung '{entry.entity_id}' ergibt die EHAL-ID '{entry.ehal_id}', die "
+                "Earnie nicht annimmt: erlaubt sind a–z, 0–9 und _ (höchstens 64 Zeichen). "
+                "Bitte die Kennung im Hauskonfigurator ändern."
+            )
         title_fn = (
             title_from_qualified_id
             if entry.direction == "read"
