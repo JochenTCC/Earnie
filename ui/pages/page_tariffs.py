@@ -62,7 +62,7 @@ def request_tariff_page(profile_id: str, open_tariff: tuple[str, str] | None = N
 
 
 def _select_profile(profiles: dict[str, dict], request: dict | None) -> str:
-    from ui.ehal_loxone_mapping import resolve_live_profile_id
+    from ui.house_config_entities_io import resolve_live_profile_id
 
     ids = list(profiles)
     displays, id_by_display = label_select_choices(profiles, ids, new_option=None)

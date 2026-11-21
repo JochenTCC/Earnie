@@ -151,11 +151,11 @@ Das Loxone-Template `VI_Earnie_*` enthält einen **Virtual HTTP Input**, der all
 - **Lesen je Batterie:** nur SoC ist als Per-Batterie-Pfad vorhanden (`ehal_live.read_ess_soc_by_id`); alles andere müsste ergänzt werden
 - **Schreiben je Batterie:** nur Powerstation-Funktionen in `optimizer/powerstation_live.py` (Ladelimit, optional Entladelimit, Quellenwahl); Einheit W→kW ist dort fest für die zwei Limit-Typen codiert
 - Status/Trace: `loxone_status_json.py` (flache Schlüssel, Überschreib-Effekt), `loxone_writes.build_sent_loxone_snapshot` (kennt keine Powerstations)
-- Mapping/UI und Namen: `integrations/loxone_ehal_mapping.py`, `ui/ehal_loxone_mapping.py`, `share/loxone/greenfield_device_map.json`, `share/loxone/recipes/ess.json`, VO-Templates
+- Mapping/UI und Namen: `integrations/loxone_ehal_mapping.py`, `share/loxone/greenfield_device_map.json`, `share/loxone/recipes/ess.json`, VO-Templates
 - HA: `integrations/ha_adapter.py`, `ha_units.py`, `house_config/ha_ehal_bindings.py` (`aggregate_ha_entities`)
 - Doku: `loxone-signals.md`, `ehal-com.md`, `ehal.md`
 
-Zum Vergleich ein Anlagen-Feld (Commit `32bb5b8f`, 2.7.j): rund 15 Dateien, ohne zentrale Registry. **Fallstrick:** `PLANT_FIELDS` ist doppelt definiert — `ui/ehal_loxone_mapping.py:56` (vollständig) und `ui/ehal_loxone_mapping_ui.py:52` (nur `set_ess_*`); die zweite speist die Namensvorschläge der HTTP-Probe, `set_grid_export_power_limit` bekommt dort nie einen Vorschlag.
+Zum Vergleich ein Anlagen-Feld (Commit `32bb5b8f`, 2.7.j): rund 15 Dateien, ohne zentrale Registry. (Der frühere Fallstrick mit doppeltem `PLANT_FIELDS` in `ui/ehal_loxone_mapping*.py` ist mit dem Löschen der Mapping-UI am 2026-11-21 entfallen.)
 
 ## 8. Nicht geprüft
 

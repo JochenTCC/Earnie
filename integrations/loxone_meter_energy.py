@@ -231,7 +231,7 @@ def load_live_profile_consumers() -> list[dict[str, Any]]:
 
         from house_config.profiles_store import load_house_profiles_document
         from runtime_store.persist_paths import resolve_house_profiles_json_path
-        from ui.ehal_loxone_mapping import resolve_live_profile_id
+        from ui.house_config_entities_io import resolve_live_profile_id
     except ImportError as exc:
         logger.warning("Zählerenergie: Live-Hausprofil nicht ladbar (%s) — keine Verbraucher.", exc)
         return []
