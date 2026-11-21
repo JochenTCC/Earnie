@@ -26,14 +26,33 @@ EARNIE_TRACK_FILES: frozenset[str] = frozenset(
 GRID_FEES_FILE = "grid_fees.json"
 
 
-def load_pack_docs(config_dir: str | Path) -> Docs:
-    """Load pack JSON files that exist under ``config_dir``."""
-    from settings.json_io import read_json_dict
+def _same_dir(left: str | Path, right: str | Path) -> bool:
+    return os.path.normcase(os.path.abspath(str(left))) == os.path.normcase(
+        os.path.abspath(str(right))
+    )
+
+
+def pack_file_paths(config_dir: str | Path) -> dict[str, Path]:
+    """Where each pack file of ``config_dir`` lives.
+
+    For the active config directory these are the paths the loaders use (the resolvers of
+    ``PACK_JSON_FILES``), so a sidecar behind ``EARNIE_*_PATH`` is migrated too. Any other
+    directory (pack import, recorder replay, ``--config-dir``) holds its files itself.
+    """
+    from runtime_store.persist_paths import config_dir as active_config_dir
 
     root = Path(config_dir)
+    if not _same_dir(root, active_config_dir()):
+        return {name: root / name for name in PACK_FILENAMES}
+    return {name: Path(resolver()) for name, resolver in PACK_JSON_FILES}
+
+
+def load_pack_docs(config_dir: str | Path) -> Docs:
+    """Load the pack JSON files of ``config_dir`` that exist (see ``pack_file_paths``)."""
+    from settings.json_io import read_json_dict
+
     docs: Docs = {}
-    for name in PACK_FILENAMES:
-        path = root / name
+    for name, path in pack_file_paths(config_dir).items():
         if not path.is_file():
             continue
         raw = read_json_dict(str(path))
@@ -68,23 +87,23 @@ def replace_pack_docs(config_dir: str | Path, docs: Docs) -> tuple[str, ...]:
     When a write fails, the files already replaced get their previous bytes back (a file
     the call created is removed) and the error is raised: the set is old or new, not mixed.
     """
-    root = Path(config_dir)
+    paths = pack_file_paths(config_dir)
     names = [name for name in docs if name in PACK_FILENAMES]
     previous: dict[str, bytes | None] = {
-        name: ((root / name).read_bytes() if (root / name).is_file() else None) for name in names
+        name: (paths[name].read_bytes() if paths[name].is_file() else None) for name in names
     }
     written: list[str] = []
     try:
         for name in names:
-            write_json_atomic(root / name, docs[name])
+            write_json_atomic(paths[name], docs[name])
             written.append(name)
     except BaseException:
         for name in written:
             content = previous[name]
             if content is None:
-                (root / name).unlink(missing_ok=True)
+                paths[name].unlink(missing_ok=True)
             else:
-                _write_bytes_atomic(root / name, content)
+                _write_bytes_atomic(paths[name], content)
         raise
     return tuple(written)
 

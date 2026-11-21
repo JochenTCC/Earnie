@@ -104,11 +104,17 @@ def _pending_and_questions(
     pending: list[str] = []
     questions: list[Question] = []
     for step in registry:
-        if not step_is_pending(step, start, current):
-            continue
-        pending.append(step.id)
-        questions.extend(step_questions(step, current))
-        result = step.apply(current, {})
+        # A step that raises is listed as pending; ``apply_chain`` turns the error into its blocker.
+        try:
+            if not step_is_pending(step, start, current):
+                continue
+            pending.append(step.id)
+            questions.extend(step_questions(step, current))
+            result = step.apply(current, {})
+        except Exception:  # noqa: BLE001
+            if step.id not in pending:
+                pending.append(step.id)
+            break
         if result.blockers:
             break
         current = result.docs

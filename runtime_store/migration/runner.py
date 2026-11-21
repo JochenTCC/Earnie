@@ -11,6 +11,7 @@ from runtime_store.migration.chain import apply_chain
 from runtime_store.migration.io_util import (
     TARIFF_TRACK_FILES,
     load_pack_docs,
+    pack_file_paths,
     replace_pack_docs,
     write_json_atomic,
 )
@@ -125,9 +126,10 @@ def migrate_config_dir_unattended(
         docs, label=label, steps=steps, validate_unchanged=False
     )
     written: list[str] = []
+    paths = pack_file_paths(root)
     for name, doc in migrated.items():
         if docs.get(name) != doc:
-            write_json_atomic(root / name, doc)
+            write_json_atomic(paths.get(name, root / name), doc)
             written.append(name)
     return tuple(written)
 
