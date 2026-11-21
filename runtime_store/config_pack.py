@@ -127,7 +127,28 @@ def import_config_pack_bytes(payload: bytes) -> list[str]:
         upload_members = [
             n for n in names if n.startswith("uploads/") and not n.endswith("/")
         ]
+        for member in upload_members:
+            _require_plain_upload_member(member)
         return _write_pack_to_config_dir(archive, json_payloads, upload_members)
+
+
+def _require_plain_upload_member(member: str) -> None:
+    """Reject an ``uploads/`` member whose name would leave the uploads folder.
+
+    The member name becomes a path below the staging dir and then below the live
+    uploads dir. ``..``, empty or drive parts and backslashes (a separator on
+    Windows) are refused before anything is written.
+    """
+    parts = member.split("/")
+    if (
+        "\\" in member
+        or ":" in member
+        or any(part in ("", ".", "..") for part in parts)
+    ):
+        raise ValueError(
+            f"Ungültiges Config-Paket: Dateiname '{member}' unter uploads/ ist nicht erlaubt "
+            "(kein '..', kein absoluter Pfad, kein Backslash)."
+        )
 
 
 def _read_pack_documents(

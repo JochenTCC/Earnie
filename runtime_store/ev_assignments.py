@@ -140,8 +140,14 @@ def _read_picks(path: str) -> list[dict[str, Any]]:
 def consume_picks() -> list[dict[str, Any]]:
     """Pick requests written since the last call; the file is removed."""
     path = _path(PICKS_FILENAME)
+    # The Monitor page writes from another process, where ``_lock`` does not hold: take the
+    # file away first, then read it, so a pick written in between stays for the next call.
+    taken = f"{path}.consumed"
     with _lock:
-        picks = _read_picks(path)
-        if os.path.isfile(path):
-            os.remove(path)
+        try:
+            os.replace(path, taken)
+        except FileNotFoundError:
+            return []
+        picks = _read_picks(taken)
+        os.remove(taken)
     return picks

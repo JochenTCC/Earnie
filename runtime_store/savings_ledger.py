@@ -280,6 +280,9 @@ CHAIN_FIRST_RUN = "first_run"
 CHAIN_STATE_UNREADABLE = "state_unreadable"
 CHAIN_SAVINGS_V_CHANGED = "savings_v_changed"
 CHAIN_BACKFILL = "backfill"
+# A house battery was added to or removed from the configuration: the shadow plant changes
+# (with or without shadow battery), so the chain cannot continue.
+CHAIN_BATTERY_CHANGED = "battery_changed"
 
 DayBounds = Callable[[datetime], tuple[datetime, datetime]]
 # v2: consumers, profiles and windows of the day a state holds open (I/O lives with the caller,

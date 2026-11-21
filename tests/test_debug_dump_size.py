@@ -117,6 +117,27 @@ def test_config_pack_rejects_unknown_format(tmp_path):
         expand_packed_configs(tmp_path)
 
 
+def test_config_pack_rejects_snapshot_name_that_leaves_configs(tmp_path):
+    """A dump is foreign input: a snapshot name with path parts must not become a file path."""
+    import hashlib
+
+    recorder = tmp_path / "dump" / "recorder"
+    recorder.mkdir(parents=True)
+    raw = "{}"
+    pack = {
+        "format": 1,
+        "lines": [],
+        "snapshots": {"../../escaped": {"sha256": hashlib.sha256(raw.encode()).hexdigest(), "raw": raw}},
+    }
+    (recorder / PACK_FILENAME).write_text(json.dumps(pack), encoding="utf-8")
+
+    with pytest.raises(ConfigPackError, match="plain file stem"):
+        expand_packed_configs(recorder)
+
+    assert not (tmp_path / "escaped.json").exists()
+    assert (recorder / PACK_FILENAME).is_file()
+
+
 def test_expand_without_pack_is_noop(tmp_path):
     assert expand_packed_configs(tmp_path) == 0
     assert expand_recorder_dump(tmp_path) == {"configs": 0, "segments": 0}

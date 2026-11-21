@@ -22,6 +22,7 @@ import gzip
 import hashlib
 import json
 import lzma
+import re
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -34,6 +35,9 @@ SEGMENT_XZ_SUFFIX = ".jsonl.xz"
 # Preset 3: 0.93 MB for 49 MB of cycles in 0.4 s; preset 6 gives 0.80 MB in 2.2 s
 # (measured 2026-11-19 on the maintainer dump). The dump is built on small NAS CPUs.
 SEGMENT_XZ_PRESET = 3
+
+# Snapshot names are config hashes (hex); letters, digits, ``_`` and ``-`` cover test names too.
+_SNAPSHOT_NAME_RE = re.compile(r"[A-Za-z0-9_-]+")
 
 
 class ConfigPackError(ValueError):
@@ -164,6 +168,10 @@ def expand_packed_configs(recorder_root: Path | str) -> int:
     snapshots = pack.get("snapshots")
     if not isinstance(lines, list) or not isinstance(snapshots, dict):
         raise ConfigPackError(f"invalid config pack shape: {pack_path}")
+    for name in snapshots:
+        # The name becomes ``configs/<name>.json``; a dump is foreign input.
+        if not _SNAPSHOT_NAME_RE.fullmatch(str(name)):
+            raise ConfigPackError(f"snapshot name {name!r} in {pack_path} is not a plain file stem")
     rebuilt = {name: _rebuild_snapshot_bytes(name, entry, lines) for name, entry in snapshots.items()}
     configs = root / "configs"
     configs.mkdir(parents=True, exist_ok=True)

@@ -63,9 +63,11 @@ def load_state(path: str | None = None, *, now: datetime | None = None) -> Loade
     """Read the ledger state.
 
     Missing file → new chain (``first_run``). A file of another ``savings_v`` → new
-    chain (``savings_v_changed``). An unreadable or malformed file is moved aside
+    chain (``savings_v_changed``). A file with broken content is moved aside
     to ``<path>.broken-<timestamp>`` with a warning and a new chain starts
     (``state_unreadable``); the first row of that chain carries the reason.
+    An ``OSError`` while reading (e.g. a network mount that is briefly away) is
+    raised: the file may be intact, so the caller tries again on the next cycle.
     """
     path = path or savings_ledger_state_file()
     if not os.path.isfile(path):
@@ -83,8 +85,8 @@ def load_state(path: str | None = None, *, now: datetime | None = None) -> Loade
             )
             return LoadedState(None, CHAIN_SAVINGS_V_CHANGED)
         return LoadedState(LedgerState.from_dict(raw), None)
-    except (OSError, ValueError, KeyError, TypeError) as exc:
-        stamp = (now or datetime.now()).strftime("%Y%m%d-%H%M%S")
+    except (ValueError, KeyError, TypeError) as exc:
+        stamp =(now or datetime.now()).strftime("%Y%m%d-%H%M%S")
         broken = f"{path}.broken-{stamp}"
         logger.warning(
             "savings ledger: state unreadable (%s) — moved to %s, new chain starts.",
@@ -144,6 +146,34 @@ def append_row(row: dict[str, Any], path: str | None = None) -> None:
         os.makedirs(parent, exist_ok=True)
     with open(path, "a", encoding="utf-8", newline="\n") as handle:
         handle.write(json.dumps(row, ensure_ascii=False, sort_keys=False) + "\n")
+
+
+def last_line_has_day(path: str, day_start: str, chain_start: str) -> bool:
+    """True when the last line of the JSONL file ``path`` is the record of that day and chain.
+
+    The daemon asks before it appends a closed day: after a stop between the append and
+    the state save, the restarted daemon closes the same day again. A last line that is
+    not JSON (torn write) counts as another day, with a warning; readers fail loud on it.
+    """
+    if not os.path.isfile(path):
+        return False
+    last = ""
+    with open(path, encoding="utf-8") as handle:
+        for line in handle:
+            if line.strip():
+                last = line
+    if not last:
+        return False
+    try:
+        record = json.loads(last)
+    except json.JSONDecodeError as exc:
+        logger.warning("savings ledger: last line of %s is not JSON (%s).", path, exc)
+        return False
+    return (
+        isinstance(record, dict)
+        and record.get("day_start") == day_start
+        and record.get("chain_start") == chain_start
+    )
 
 
 def read_rows(path: str | None = None) -> list[dict[str, Any]]:

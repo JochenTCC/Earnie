@@ -239,6 +239,82 @@ def test_without_house_battery_the_ledger_runs_without_shadow_battery(ledger, mo
     assert rows_path.exists()
 
 
+def test_battery_added_to_a_chain_without_battery_starts_a_new_chain(ledger, monkeypatch, caplog):
+    """A chain without shadow battery cannot continue once the house has a battery (it never closed a day again)."""
+    _state_path, rows_path = ledger
+    monkeypatch.setattr("config.get_battery_params_list", lambda: [])
+    _cycle("2026-11-02T10:00:01", _closed("2026-11-02T09:45:00"))
+    _cycle("2026-11-02T10:15:01", _closed("2026-11-02T10:00:00"))
+    assert store.load_state().state.shadow_soc is None
+
+    monkeypatch.setattr("config.get_battery_params_list", lambda: [dict(BATTERY)])
+    with caplog.at_level(logging.WARNING):
+        _cycle("2026-11-02T10:30:01", _closed("2026-11-02T10:15:00", soc0=60.0, soc1=60.0))
+        _cycle("2026-11-02T10:45:01", _closed("2026-11-02T10:30:00", soc0=60.0, soc1=60.0))
+
+    assert "house battery added" in caplog.text
+    assert "cycle not booked" not in caplog.text
+    state = store.load_state().state
+    assert state.chain_start == datetime(2026, 11, 2, 10, 15, tzinfo=TZ)
+    assert state.chain_start_reason == sl.CHAIN_BATTERY_CHANGED
+    assert state.shadow_soc is not None and state.shadow_soc_day_start == 60.0
+    assert [s["counted"] for s in state.slots] == [True, True]
+
+    # the day of the new chain closes, with its reason in the first row
+    row = _cycle("2026-11-03T07:15:01", _closed("2026-11-03T07:00:00", soc0=60.0, soc1=60.0))
+    assert row["chain_start_reason"] == sl.CHAIN_BATTERY_CHANGED
+    assert row["errors"] == 0
+    assert store.read_rows(str(rows_path)) == [row]
+
+
+def test_battery_removed_from_a_chain_with_battery_starts_a_new_chain(ledger, monkeypatch, caplog):
+    _cycle("2026-11-02T10:00:01", _closed("2026-11-02T09:45:00"))
+    _cycle("2026-11-02T10:15:01", _closed("2026-11-02T10:00:00"))
+    assert store.load_state().state.shadow_soc is not None
+
+    monkeypatch.setattr("config.get_battery_params_list", lambda: [])
+    with caplog.at_level(logging.WARNING):
+        _cycle("2026-11-02T10:30:01", _closed("2026-11-02T10:15:00"))
+
+    assert "house battery removed" in caplog.text
+    assert "cycle not booked" not in caplog.text
+    state = store.load_state().state
+    assert state.chain_start_reason == sl.CHAIN_BATTERY_CHANGED
+    assert state.shadow_soc is None and state.shadow_soc_day_start is None
+    assert hook.planning_shadow_soc(None) is None
+
+
+def test_planning_shadow_soc_is_none_for_a_chain_without_battery_after_one_was_added(ledger, monkeypatch, caplog):
+    monkeypatch.setattr("config.get_battery_params_list", lambda: [])
+    _cycle("2026-11-02T10:00:01", _closed("2026-11-02T09:45:00"))
+
+    monkeypatch.setattr("config.get_battery_params_list", lambda: [dict(BATTERY)])
+    with caplog.at_level(logging.WARNING):
+        assert hook.planning_shadow_soc(_closed("2026-11-02T10:00:00")) is None
+    assert "no shadow SoC for the plan" not in caplog.text
+
+
+def test_day_closed_again_after_a_stop_before_the_state_save_is_not_appended_twice(ledger, caplog):
+    state_path, rows_path = ledger
+    _cycle("2026-11-02T06:45:03", _closed("2026-11-02T06:30:00"))
+    _cycle("2026-11-02T07:00:02", _closed("2026-11-02T06:45:00"))
+    before_close = state_path.read_text(encoding="utf-8")
+    row = _cycle("2026-11-02T07:15:04", _closed("2026-11-02T07:00:00"))
+    assert row is not None
+
+    # the daemon stopped after the appends, before the state was saved
+    state_path.write_text(before_close, encoding="utf-8")
+    hook.reset()
+    with caplog.at_level(logging.WARNING):
+        again = _cycle("2026-11-02T07:15:30", _closed("2026-11-02T07:00:00"))
+
+    assert again == row
+    assert "already in the ledger" in caplog.text
+    rows = store.read_rows(str(rows_path))
+    assert rows == [row]
+    assert list(store.closed_day_slots(rows)) == [row["day_start"]]
+
+
 def test_out_of_band_cycle_only_updates_the_prices(ledger):
     _cycle("2026-11-02T10:00:01", _closed("2026-11-02T09:45:00"), price=30.0)
     # out-of-band run in the same slot: no closed interval, newer prices win
