@@ -42,6 +42,7 @@ from ui.chart_legend_mobile import (
     render_collapsible_legend_from_figure,
 )
 from ui.help_hint import render_title_with_help
+from ui.s2_viewport import is_phone_request
 
 def add_power_traces(
     fig: go.Figure,
@@ -291,6 +292,11 @@ def build_power_soc_chart_figure(
     return fig
 
 
+# Chart 1 on desktop and tablet: twice Plotly's default height (450 px). Phones keep the
+# default, the chart would otherwise be taller than the screen.
+CHART1_DESKTOP_HEIGHT_PX = 900
+
+
 def render_power_soc_chart(
     df: pd.DataFrame,
     baseline_df: pd.DataFrame | None = None,
@@ -341,6 +347,8 @@ def render_power_soc_chart(
         slot_shadow_soc=slot_shadow_soc,
         pv_compare_series=pv_compare_series,
     )
+    if not is_phone_request():
+        fig.update_layout(height=CHART1_DESKTOP_HEIGHT_PX)
     plotly_kwargs: dict = {"width": "stretch"}
     if chart_key:
         plotly_kwargs["key"] = chart_key
