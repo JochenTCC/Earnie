@@ -278,3 +278,61 @@ def test_default_visible_month_prefers_single_month_period(monkeypatch):
     index = build_deviation_calendar_index(meta, [], run_anchors=run_anchors)
     monkeypatch.setattr(cal.st, "session_state", {}, raising=False)
     assert cal._default_visible_month(index, 2025, date(2025, 1, 5), meta["period"]) == 3
+
+
+
+def test_index_follows_the_anchors_the_run_saved():
+    """A later charging plan must not move a day to another window (stored mapping wins)."""
+    day = date(2025, 8, 1)
+    run_anchor = datetime(2025, 8, 1, 5, 0)
+    assert run_anchor != anchor_for_calendar_date(day)
+    meta = _sample_meta()
+    meta["period"]["window_anchors"] = {day.isoformat(): run_anchor.isoformat()}
+    case = {
+        "kind": "strict_slow",
+        "scenario_id": "live",
+        "window_anchor": normalize_window_anchor_key(run_anchor),
+    }
+    index = build_deviation_calendar_index(meta, [case], run_anchors=[run_anchor])
+    cell = index[day]
+    assert cell.in_run is True
+    assert cell.severity == SEVERITY_RED
+    assert cell.anchor_iso == normalize_window_anchor_key(run_anchor)
+    assert index[date(2025, 8, 2)].in_run is False
+
+
+def test_stored_anchor_after_the_period_end_is_in_the_run():
+    """Sunrise books up to SA(end+1): that day opens its window too."""
+    end_plus_one = date(2025, 4, 1)
+    run_anchor = datetime(2025, 4, 1, 7, 0)
+    meta = _sample_meta(start="2025-03-01", end="2025-03-31")
+    meta["period"]["window_anchors"] = {end_plus_one.isoformat(): run_anchor.isoformat()}
+    index = build_deviation_calendar_index(meta, [], run_anchors=[run_anchor])
+    assert index[end_plus_one].in_run is True
+
+
+def test_run_anchors_from_stored_need_booked_rows():
+    import pandas as pd
+
+    from ui.backtesting_deviation_list import _run_anchors_from_stored
+
+    booked = datetime(2025, 3, 15, 7, 0)
+    empty = datetime(2025, 3, 20, 7, 0)
+    stored = {
+        date(2025, 3, 15): normalize_window_anchor_key(booked),
+        date(2025, 3, 20): normalize_window_anchor_key(empty),
+    }
+    hourly = pd.DataFrame(
+        {"ts": [datetime(2025, 3, 15, 1, 0)], "scenario_id": ["live"]}
+    )
+    assert _run_anchors_from_stored(stored, hourly) == [booked]
+
+
+def test_reference_series_are_not_offered_as_scenarios():
+    from ui.backtesting_deviation_list import _optimized_scenario_ids
+
+    meta = {
+        "reference_id": HISTORICAL_REFERENCE_ID,
+        "scenario_ids": [HISTORICAL_REFERENCE_ID, "live", "ref:live", "l1:live", "l2:live"],
+    }
+    assert _optimized_scenario_ids(meta) == ["live"]

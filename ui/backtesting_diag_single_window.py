@@ -79,7 +79,11 @@ def render_diag_single_window_panel(
     from simulation.backtesting_single_window import initial_soc_for_anchor
 
     anchor_dt = pd.Timestamp(window_anchor).to_pydatetime()
-    initial_soc = initial_soc_for_anchor(anchor_dt, scenario_id, hourly_df)
+    try:
+        initial_soc = initial_soc_for_anchor(anchor_dt, scenario_id, hourly_df)
+    except ValueError as exc:
+        st.error(f"Fenster-Diagnose nicht verfügbar: {exc}")
+        return
     argv = build_diag_single_window_argv(
         window_anchor,
         scenario_id,

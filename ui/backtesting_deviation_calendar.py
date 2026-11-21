@@ -81,6 +81,21 @@ def anchor_for_calendar_date(cell_date: date) -> datetime:
     return window_anchor_for_date(cell_date)
 
 
+def stored_window_anchors(meta: dict) -> dict[date, str] | None:
+    """Calendar date → anchor key as the run saved it; ``None`` for older logs.
+
+    The current charging plan can differ from the run's (``ready_by_hour``), so the run's
+    own mapping decides which window a calendar day opens.
+    """
+    raw = (meta.get("period") or {}).get("window_anchors")
+    if not isinstance(raw, dict):
+        return None
+    return {
+        date.fromisoformat(str(day)): normalize_window_anchor_key(str(anchor))
+        for day, anchor in raw.items()
+    }
+
+
 def case_severity(case: dict) -> str:
     kind = str(case.get("kind", ""))
     if kind in _RED_KINDS:
@@ -175,10 +190,15 @@ def build_deviation_calendar_index(
     *,
     run_anchors: list[datetime],
 ) -> dict[date, CalendarCellState]:
-    """Baut Zellzustände für die 12 Kalendermonate im SE-Zeitraum."""
+    """Baut Zellzustände für die 12 Kalendermonate im SE-Zeitraum.
+
+    With the run's saved anchors, a day outside the period can be in the run too (the
+    sunrise chain books up to SA(end+1)); older logs map days with the current plan.
+    """
     period = meta.get("period") or {}
     month_years = _month_years_in_period(period)
     period_bounds = _period_date_bounds(period)
+    stored = stored_window_anchors(meta)
     run_anchor_keys = {
         normalize_window_anchor_key(anchor) for anchor in run_anchors
     }
@@ -196,14 +216,17 @@ def build_deviation_calendar_index(
         days_in_month = calendar.monthrange(year, month)[1]
         for day in range(1, days_in_month + 1):
             cell_date = date(year, month, day)
-            anchor = anchor_for_calendar_date(cell_date)
-            anchor_key = normalize_window_anchor_key(anchor)
-            in_period = (
-                period_bounds is not None
-                and period_bounds[0] <= cell_date <= period_bounds[1]
-            )
-            in_run = in_period and anchor_key in run_anchor_keys
-            day_cases = cases_by_anchor.get(anchor_key, [])
+            if stored is not None:
+                anchor_key = stored.get(cell_date)
+                in_run = anchor_key is not None and anchor_key in run_anchor_keys
+            else:
+                anchor_key = normalize_window_anchor_key(anchor_for_calendar_date(cell_date))
+                in_period = (
+                    period_bounds is not None
+                    and period_bounds[0] <= cell_date <= period_bounds[1]
+                )
+                in_run = in_period and anchor_key in run_anchor_keys
+            day_cases = cases_by_anchor.get(anchor_key, []) if anchor_key else []
             cases_by_scenario: dict[str, dict] = {}
             for scenario_id in {str(c.get("scenario_id", "?")) for c in day_cases}:
                 scenario_cases = [
@@ -430,7 +453,8 @@ def render_deviation_calendar(
     if clicked_date is not None:
         st.session_state[_SESSION_DATE_KEY] = clicked_date
         st.session_state[_SESSION_MONTH_KEY] = clicked_date.month
-        return clicked_date
+        # The grid above was drawn with the old selection: draw it again with the new one.
+        st.rerun()
     return selected_date
 
 
