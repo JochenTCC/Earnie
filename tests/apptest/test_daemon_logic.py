@@ -133,6 +133,24 @@ def test_d4_silent_toggle_writes_file_and_switches_runtime_state(
     assert at.toggle(key="daemon_silent_mode").value is target
 
 
+def test_d4_stale_tab_does_not_switch_silent_back(fake_daemon, local_settings: Path) -> None:
+    """Another tab switched the file; a rerun here must show and keep the file's value."""
+    at = _run()
+    current = at.toggle(key="daemon_silent_mode").value
+    doc = json.loads(local_settings.read_text(encoding="utf-8")) if local_settings.exists() else {}
+    doc["silent_mode"] = not current
+    local_settings.write_text(json.dumps(doc), encoding="utf-8")
+    from ui.runtime_config import reload_runtime_config
+
+    reload_runtime_config()
+
+    at.run(timeout=_TIMEOUT_S)
+
+    assert_clean(at)
+    assert json.loads(local_settings.read_text(encoding="utf-8"))["silent_mode"] is (not current)
+    assert at.toggle(key="daemon_silent_mode").value is (not current)
+
+
 # --- D5: Shadow-Modus -------------------------------------------------------------------
 
 

@@ -14,6 +14,7 @@ from runtime_store.persist_paths import (
 
 
 def _read_json_document(path: str) -> dict:
+    """A missing file is empty; a broken one is an error (it must not read as "not set up")."""
     target = Path(path)
     if not target.is_file():
         return {}
@@ -22,10 +23,12 @@ def _read_json_document(path: str) -> dict:
             payload = json.loads(target.read_text(encoding=encoding))
         except UnicodeDecodeError:
             continue
-        except json.JSONDecodeError:
-            return {}
-        return payload if isinstance(payload, dict) else {}
-    return {}
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"Datei '{path}' ist kein gültiges JSON: {exc}") from exc
+        if not isinstance(payload, dict):
+            raise ValueError(f"Datei '{path}' enthält kein JSON-Objekt.")
+        return payload
+    raise ValueError(f"Datei '{path}' ist weder UTF-8 noch cp1252 lesbar.")
 
 
 def _consumer_has_live_wiring(consumer: dict) -> bool:
@@ -41,6 +44,7 @@ def _consumer_has_live_wiring(consumer: dict) -> bool:
         if thermal["loxone"]:
             return True
     bindings = consumer.get("ehal_bindings")
+    # Keys are activation keys: a field with an empty address is activated too (Binding P5).
     if isinstance(bindings, dict) and any(str(k).strip() for k in bindings):
         return True
     return False
@@ -218,7 +222,9 @@ def _missing_live_profile_items(live_settings: dict, profiles_doc: dict) -> list
         if not isinstance(netznutzung, dict) or not netznutzung.get("area_id"):
             # Data model 5: the grid area is required (catalog area or own price).
             return ["Netzbereich (Netznutzung) im Hausprofil wählen"]
-    return []
+        return []
+    # The live scenario points to a profile that no longer exists.
+    return ["Hausprofil zuordnen (Echtzeit-Umgebung)"]
 
 
 def missing_runtime_scenario_items_for(

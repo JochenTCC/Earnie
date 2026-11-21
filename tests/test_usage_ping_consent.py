@@ -189,3 +189,19 @@ def test_cloud_demo_settings_show_note_without_toggle(
 
     consent.render_usage_ping_settings()
     assert captions == ["In der Online-Demo sendet Earnie keine Nutzungsstatistik."]
+
+
+def test_explorer_prompt_cancel_holds_for_the_session(
+    runtime_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """After Abbrechen the dialog does not come back on the next reruns (UI review 4d)."""
+    from ui import usage_ping_consent as consent
+
+    session: dict[str, Any] = {consent._SESSION_DIALOG_CHOICE: "cancel"}  # noqa: SLF001
+    monkeypatch.setattr(consent.st, "session_state", session)
+    opened: list[int] = []
+    monkeypatch.setattr(consent, "_consent_dialog", lambda: opened.append(1))
+
+    consent.maybe_prompt_consent_on_explorer()
+    consent.maybe_prompt_consent_on_explorer()
+    assert opened == []

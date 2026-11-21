@@ -52,8 +52,14 @@ def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
 
-def build_config_pack_bytes() -> bytes:
-    """Build a zip archive of the config JSON sidecars plus uploads/."""
+def build_config_pack_bytes(*, for_support: bool = False) -> bytes:
+    """Build a zip archive of the config JSON sidecars plus uploads/.
+
+    ``for_support``: the pack goes to the support: secrets are removed
+    (``secret_redaction``) and uploads/ (consumption and PV CSVs) stay out.
+    """
+    from runtime_store.secret_redaction import redact_secrets
+
     buffer = io.BytesIO()
     file_list: list[str] = []
     with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
@@ -65,13 +71,15 @@ def build_config_pack_bytes() -> bytes:
             # Tariff-track file: never stamp earnie_data_model (ConfigMigration).
             if arcname not in TARIFF_TRACK_FILES:
                 stamp_data_model(doc)
+            if for_support:
+                doc = redact_secrets(doc)
             archive.writestr(
                 arcname,
                 json.dumps(doc, indent=4, ensure_ascii=False) + "\n",
             )
             file_list.append(arcname)
         uploads = Path(resolve_uploads_dir())
-        if uploads.is_dir():
+        if uploads.is_dir() and not for_support:
             for file_path in sorted(uploads.rglob("*")):
                 if not file_path.is_file():
                     continue

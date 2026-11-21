@@ -23,7 +23,8 @@ def load_app_dotenv(*, override: bool = False) -> str | None:
     if not os.path.isfile(path):
         return None
     try:
-        load_dotenv(path, override=override)
+        # No ${VAR} expansion: a password containing "${" must arrive as written.
+        load_dotenv(path, override=override, interpolate=False)
     except OSError as exc:
         logging.getLogger(__name__).warning(
             "Could not load .env from %s: %s", path, exc
