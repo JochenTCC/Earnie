@@ -60,6 +60,7 @@ alwaysApply: true
 * **SE rule-based reference (`RuleRef`, 2.8):** P0 (method decisions), P1 (L1 vendor-mode battery chain), P2 (L2 rule builder), P3 (ladder in the SE, L2 headline), P4 (UI ladder + docs), P5 (study export + sensitivity)
 * **Support upload (`SupportUpload`, 2.+1):** P1 (smaller debug dump), P2 (upload with codes + contract), P3 (UI send + client encryption), P4 (fetch into intake + retention check), P5 (one-click registration + upload without code)
 * **Predictive heat control (`HeatControl`, 2.+1):** P1 (feedback signals), P2 (operating state), P3 (store target), P4 (two leaky stores), P5 (COP by temperature), P6 (building as a store), P7 (scheduled demand study), P8 (ready-by temperature)
+* **Parameter relevance (`ParamRelevance`, 2.+1):** P0 (inventory), P1 (sensitivity run + ranking), P2 (parameter metadata in the schema), P3 (self-identification candidates), P4 (tiered UI + wizards)
 
 ## 5. Commit & Chat Syntax
 
