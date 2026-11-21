@@ -70,6 +70,9 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
     - **Open (maintainer), after the first push:** the new packages `earnie-energy`, `earnie-addon-amd64`, `earnie-addon-aarch64` under `earnie-hems` may be created private — set them public (needed before Step 4 switches defaults); optionally link them to the repo.
     - [ ] Checked on a dev build: tag a dev version, release job green incl. the copy steps, `qemu_smoke` digest check green, `docker pull ghcr.io/earnie-hems/earnie-energy:<dev-version>` works.
 
+- [ ] **Regression cases for 2.8 features** `[qual]` *(added 2026-11-21, maintainer: before the 2.8 beta release)*: the suite has 12 cases, and most new 2.8 planner paths are covered by unit tests only. Add golden-master cases (`scripts.run_regression`, spec [`docs/workflow/regression-suite.md`](../docs/workflow/regression-suite.md)) for the 2.8 features that change the plan. **Done:** every new 2.8 feature that changes the plan has at least one green regression case — import cap / max-power tariff, savings ledger P9/P10, heating rod beside a fuel heat source, manual horizon to forecast.solar (SUSI P3a-2), heating power and house thermal from data model 5 — and the suite is green before the beta.
+  - **Tracker:** add the regression cases before the 2.8 beta release.
+
 ### Version 2.8.1
 
 - **Note (2026-11-18, maintainer):** **Edibert share consent — release gate** and **Grid catalog upkeep** moved here from Version 2.8; 2.8 ships without opening the tariff sharing and with the 2026 levy set. Wherever the items below say "2.8 release", read the 2.8.1 release.

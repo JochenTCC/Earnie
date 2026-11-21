@@ -25,18 +25,23 @@ GOLDENS = FIXTURES / "goldens"
 
 
 def _point_config(monkeypatch, config_dir: Path) -> None:
+    from runtime_store.persist_paths import clear_sidecar_path_cache
+
     config_dir.mkdir(parents=True, exist_ok=True)
     monkeypatch.setenv("EARNIE_CONFIG_PATH", str(config_dir / "config.json"))
     monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(config_dir.parent / "runtime"))
-    for suffix in (
-        "COMPONENTS_PATH",
-        "TARIFFS_PATH",
-        "HOUSE_PROFILES_PATH",
-        "BACKTESTING_SCENARIOS_PATH",
-        "DEVIATION_RULES_PATH",
-        "GRID_FEES_PATH",
+    # Pin every sidecar into the snapshot dir: one the snapshot lacks would
+    # otherwise fall back to earnie_env/config, i.e. the developer's own site.
+    for suffix, filename in (
+        ("COMPONENTS_PATH", "components.json"),
+        ("TARIFFS_PATH", "tariffs.json"),
+        ("HOUSE_PROFILES_PATH", "house_profiles.json"),
+        ("BACKTESTING_SCENARIOS_PATH", "backtesting_scenarios.json"),
+        ("DEVIATION_RULES_PATH", "deviation_rules.json"),
+        ("GRID_FEES_PATH", "grid_fees.json"),
     ):
-        monkeypatch.delenv(f"EARNIE_{suffix}", raising=False)
+        monkeypatch.setenv(f"EARNIE_{suffix}", str(config_dir / filename))
+    clear_sidecar_path_cache()
 
 
 def _copy_snapshot(tmp_path: Path, name: str, *, from_goldens: bool = False) -> Path:

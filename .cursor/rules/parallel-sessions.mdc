@@ -1,0 +1,39 @@
+---
+description: Parallel agent sessions — own git worktree per session class (review, fix, feat, …) and the machine-wide test queue
+alwaysApply: true
+---
+
+# Parallel Sessions: Worktrees + Test Queue
+
+Canonical workflow: `docs/workflow/parallel-sessions.md`.
+
+## Classify the session first
+
+At the start of a task (and when its scope turns into code changes), decide the class:
+
+| Class | Trigger | Where |
+|-------|---------|-------|
+| `review` | Review a branch / PR / commit range | `..\earnie-wt\review-<slug>`, `--detach` on the reviewed ref, read-only |
+| `fix` | Bugfix | `..\earnie-wt\fix-<slug>`, branch `fix/<slug>` |
+| `hotfix` | Patch for a tagged build | `..\earnie-wt\hotfix-<slug>`, branch from the tag (`branching-hotfix-playbook.mdc`) |
+| `feat` | Feature / refactoring with code changes | `..\earnie-wt\feat-<slug>`, branch `feat/<slug>` |
+| `port` | Cherry-picks onto `release/x.y` | `..\earnie-wt\port-<slug>`, branch `port/<slug>` |
+| `spike` | Throw-away experiment | `..\earnie-wt\spike-<slug>`, branch `spike/<slug>` |
+| `bisect` / `compare` | Regression triage | existing worktrees of skill `regression-triage` |
+| — | Docs / backlog only, Q&A without edits, release-notes drafts, session conclusion | main checkout |
+
+- If the session already runs inside a matching worktree: just use it.
+- If code changes are needed and the session is in the main checkout: create the worktree (commands in the workflow doc), tell the user the path and branch in one line, then work there. **Ask first** only if the main checkout has uncommitted changes that belong to this task (they would have to move along).
+- Never `git checkout`/`switch` branches in the main checkout for these classes — other sessions and the user work there.
+- Paths: next to the repo, short, never under a drive root or `.claude/worktrees/`.
+
+## Tests
+
+- Always via `scripts.run_pytest` / `scripts.run_regression` — they queue machine-wide (`scripts/suite_queue.py`); never plain `python -m pytest`, never `EARNIE_TEST_QUEUE=off` / `--no-queue` to jump the queue.
+- In a worktree: main checkout's interpreter, started from the **worktree root**: `<earnie-root>\.venv\Scripts\python.exe -m scripts.run_pytest tests -q --tb=short`.
+- Full suite in Claude Code: Bash tool with `run_in_background: true` (queue wait + run can exceed the 10 min foreground limit). Targeted files/node ids (≤ 3) use the fast lane and do not queue.
+- Waiting output `[test-queue] waiting …` is normal — do not kill and restart the run. `python -m scripts.suite_queue status` shows the queue.
+
+## Finish
+
+Commit + push the branch from the worktree; integration (PR / merge) per `branching-hotfix-playbook.mdc` and session conclusion. Remove the worktree after merge/abandon (`git worktree remove`, `git branch -d`). Shared `.venv`: dependency changes affect all sessions — coordinate with the user before installing.

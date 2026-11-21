@@ -56,13 +56,17 @@ if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
   exit 1
 fi
 
-if [ -x ".venv/Scripts/python.exe" ]; then
-  PYTHON=".venv/Scripts/python.exe"
-elif [ -x ".venv/bin/python" ]; then
-  PYTHON=".venv/bin/python"
-else
-  PYTHON="python"
-fi
+# Linked worktrees (docs/workflow/parallel-sessions.md) have no own .venv:
+# fall back to the main checkout's venv (parent of the shared .git dir).
+MAIN_ROOT="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"
+PYTHON="python"
+for CAND in ".venv/Scripts/python.exe" ".venv/bin/python" \
+            "$MAIN_ROOT/.venv/Scripts/python.exe" "$MAIN_ROOT/.venv/bin/python"; do
+  if [ -x "$CAND" ]; then
+    PYTHON="$CAND"
+    break
+  fi
+done
 
 if ! command -v "$PYTHON" >/dev/null 2>&1 && ! [ -x "$PYTHON" ]; then
   echo "pre-push: Python nicht gefunden (erwartet .venv oder python im PATH)." >&2
