@@ -347,18 +347,10 @@ def _render_consumer_form_body(
     }
     if c_type != "ev":
         item["nominal_power_kw"] = nominal
-    # „Haus Wärme“: the absent-mode setback is a house setting („Gebäude / Wärmebedarf“).
+    # „Haus Wärme“: the absent-mode setback is a house setting (group „Heizung“).
     if c_type != "thermal_annual":
-        item["absent_mode_enabled"] = labeled_checkbox(
-            "Inaktiv wenn abwesend",
-            value=bool(consumer.get("absent_mode_enabled", False)),
-            key=_scoped_key(session_scope, f"hc_absent_opt_in_{index}"),
-            help=(
-                "Bei wirksamem Abwesenheitsmodus (Live): Verbraucher ohne "
-                "Live-Optimierung. Die Heizungs-Absenkung steht im Abschnitt "
-                "„Gebäude / Wärmebedarf“."
-            ),
-        )
+        # Rendered in „Betrieb“ at the end of the form; the slot keeps the key order.
+        item["absent_mode_enabled"] = None
     provisional = str(consumer.get(ID_PROVISIONAL_LABEL_KEY) or "").strip()
     has_id = bool(str(consumer.get("id") or "").strip())
     if provisional and (not has_id or not is_id_locked(consumer)):
@@ -390,8 +382,19 @@ def _render_consumer_form_body(
             nominal_power_kw=_form_power_kw(item),
         )
     )
-    # Last field of every consumer form (all types except „Haus Wärme“).
     if c_type != "thermal_annual":
+        st.markdown("**Betrieb**")
+        item["absent_mode_enabled"] = labeled_checkbox(
+            "Inaktiv wenn abwesend",
+            value=bool(consumer.get("absent_mode_enabled", False)),
+            key=_scoped_key(session_scope, f"hc_absent_opt_in_{index}"),
+            help=(
+                "Bei wirksamem Abwesenheitsmodus (Live): Verbraucher ohne "
+                "Live-Optimierung. Die Heizungs-Absenkung steht in der Gruppe "
+                "„Heizung“ (Regelung)."
+            ),
+        )
+        # Last field of every consumer form (all types except „Haus Wärme“).
         item[INTERNAL_GAIN_FACTOR_KEY] = _render_internal_gain_factor(
             consumer, c_type, index, session_scope=session_scope
         )

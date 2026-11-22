@@ -167,17 +167,28 @@ def _historical_csv_state(keys: dict[str, str]) -> dict:
     }
 
 
-def _render_historical_csv_intro() -> None:
-    st.subheader("Historische Jahres-Leistungsprofile [kW]")
-    st.caption(
-        "Optional — für Ist-vs-Modell, Bilanz-Import und realistischere "
-        "Explorer-Rechnungen. Ohne CSV gilt nur das modellierte Hausprofil."
-    )
+# Group key on the Hausprofil tab (the other groups: ``house_config_profile_form.GROUP_KEYS``).
+_HISTORY_GROUP_KEY = "house_profile_group_history"
+
+
+def _history_status(keys: dict[str, str]) -> str:
+    state = _historical_csv_state(keys)
+    return "Lastprofil vorhanden" if state["verbrauch"] else "keine Daten"
 
 
 def _render_csv_import_expander(preview_id: str, keys: dict[str, str]) -> None:
-    """Import-mode radio, per-mode upload widgets and the QC block."""
-    with st.expander("Historische Jahres-Leistungsprofile [kW] (CSV)", expanded=True):
+    """Group „Historische Messdaten (CSV)“: import mode, upload widgets and the QC block."""
+    from ui.form_layout import form_group
+
+    with form_group(
+        "Historische Messdaten (CSV)",
+        key=_HISTORY_GROUP_KEY,
+        status=_history_status(keys),
+    ):
+        st.caption(
+            "Optional — für Ist-vs-Modell, Bilanz-Import und realistischere "
+            "Explorer-Rechnungen. Ohne CSV gilt nur das modellierte Hausprofil."
+        )
         st.caption(
             "Lastprofil [kW] (für Ist in Gesamt-Lastverhalten) und optional "
             "PV-Erzeugungsprofil [kW]. "
@@ -266,7 +277,6 @@ def render_historical_csv_section(
     init_historical_csv_session(session_scope, existing)
     keys = session_keys(session_scope)
 
-    _render_historical_csv_intro()
     _render_csv_import_expander(preview_id, keys)
 
     state = _historical_csv_state(keys)

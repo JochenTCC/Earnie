@@ -1,4 +1,4 @@
-"""House-profile section „Gebäude / Wärmebedarf“ with the switch „Heizung betrachten“.
+"""House-profile group „Heizung“ (building, control, gains) with the switch „Heizung betrachten“.
 
 The building's thermal properties belong to the house (``house_config.house_thermal``). Off
 (default for a new house): the section's fields and the „Haus Wärme“ consumer are hidden and
@@ -39,6 +39,7 @@ from ui.house_config_profile_session import _scoped_key
 
 # Run-local copy of the section's values for the consumer forms rendered after it.
 _STATE_KEY = "house_heating_state"
+_HEAT_LOSS_KEY = "house_heat_loss_kw_per_k"
 _WINDOW_LABELS = {"s": "Süd", "e": "Ost", "w": "West", "n": "Nord"}
 _MASS_LABELS = {
     "leicht": "Leicht (50 Wh/m²K)",
@@ -52,7 +53,7 @@ def house_heating_state(session_scope: str) -> dict:
     state = st.session_state.get(_scoped_key(session_scope, _STATE_KEY))
     if not isinstance(state, dict):
         raise RuntimeError(
-            "Hausprofil: Abschnitt „Gebäude / Wärmebedarf“ muss vor den Verbrauchern rendern."
+            "Hausprofil: Gruppe „Heizung“ muss vor den Verbrauchern rendern."
         )
     return state
 
@@ -239,6 +240,23 @@ def _render_baseload_gain(value: float, *, session_scope: str) -> float:
     )
 
 
+def _render_heat_loss_override(stored: dict, out: dict, *, session_scope: str) -> None:
+    """Expert override of H; fills the slot ``_render_comfort_fields`` left (or drops it)."""
+    h_value = float(stored.get(_HEAT_LOSS_KEY) or 0.0)
+    h_input = labeled_number_input(
+        "Haus-Verlustkoeffizient H (kW/K, 0 = auto aus HWB)",
+        min_value=0.0,
+        value=h_value,
+        step=0.01,
+        format="%.3f",
+        key=_scoped_key(session_scope, "house_thermal_h"),
+    )
+    if float(h_input) > 0.0:
+        out[_HEAT_LOSS_KEY] = float(h_input)
+    else:
+        out.pop(_HEAT_LOSS_KEY, None)
+
+
 def _render_comfort_fields(stored: dict, out: dict, *, session_scope: str) -> None:
     out["target_temp_c"] = float(
         labeled_number_input(
@@ -266,17 +284,9 @@ def _render_comfort_fields(stored: dict, out: dict, *, session_scope: str) -> No
             key=_scoped_key(session_scope, "house_thermal_heating_limit"),
         )
     )
-    h_value = float(stored.get("house_heat_loss_kw_per_k") or 0.0)
-    h_input = labeled_number_input(
-        "Haus-Verlustkoeffizient H (kW/K, 0 = auto aus HWB)",
-        min_value=0.0,
-        value=h_value,
-        step=0.01,
-        format="%.3f",
-        key=_scoped_key(session_scope, "house_thermal_h"),
-    )
-    if float(h_input) > 0.0:
-        out["house_heat_loss_kw_per_k"] = float(h_input)
+    # Rendered last (group „Experte“, ``_render_heat_loss_override``); the slot keeps the
+    # key order of the saved block.
+    out[_HEAT_LOSS_KEY] = None
     out["absent_mode_enabled"] = bool(
         labeled_checkbox(
             "Absenken wenn abwesend",
@@ -311,7 +321,6 @@ def render_house_heating_section(
     ``baseload_internal_gain_factor`` and the internal-gain inputs of the „Haus Wärme“
     preview (SUSI P2; other consumers as stored, they are auto-saved on every change).
     """
-    st.subheader("Gebäude / Wärmebedarf")
     enabled = bool(
         labeled_checkbox(
             "Heizung betrachten",
@@ -346,10 +355,15 @@ def render_house_heating_section(
             stored[SOLAR_GAINS_KEY] = default_solar_gains_for_new_house(
                 float(stored["living_area_m2"])
             )
+        st.markdown("**Gebäude**")
         thermal = _render_building_fields(stored, session_scope=session_scope)
+        st.markdown("**Regelung**")
         _render_comfort_fields(stored, thermal, session_scope=session_scope)
+        st.markdown("**Wärmegewinne**")
         _render_solar_gain_fields(stored, thermal, session_scope=session_scope)
         baseload_gain = _render_baseload_gain(baseload_gain, session_scope=session_scope)
+        with st.expander("Experte", key=_scoped_key(session_scope, "house_heating_expert")):
+            _render_heat_loss_override(stored, thermal, session_scope=session_scope)
         state = {
             HEATING_ENABLED_KEY: True,
             PERSONS_KEY: int(persons),

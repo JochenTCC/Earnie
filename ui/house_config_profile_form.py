@@ -41,6 +41,7 @@ from ui.house_config_io import (
 from ui.auto_persist import auto_persist
 from ui.form_layout import (
     WIDE_LABEL_RATIOS,
+    form_group,
     labeled_checkbox,
     labeled_number_input,
     labeled_selectbox,
@@ -240,7 +241,6 @@ def _preview_consumers(consumers: list[dict], heating: dict) -> list[dict]:
 def _edit_and_sync_consumers(
     session_scope: str, location: dict, heating: dict
 ) -> tuple[list, list]:
-    st.subheader("Verbraucher")
     st.caption(
         "Optional — ohne Verbraucher gilt der gesamte Jahresverbrauch als Grundlast. "
         "„Haus Wärme“ ist nicht erforderlich."
@@ -397,11 +397,35 @@ def _render_household_reference(
             )
 
 
-def _render_profile_identity(ctx: dict) -> tuple[str, str, float, dict, dict, bool]:
-    session_scope = ctx["session_scope"]
+# Groups of the Hausprofil tab (docs/dev/house-profile-layout.md, stage 1). The keys give
+# each group a stable identity, so a changing status in the title keeps it open or closed.
+GROUP_KEYS = {
+    "consumption": "house_profile_group_consumption",
+    "location": "house_profile_group_location",
+    "grid": "house_profile_group_grid",
+    "sun": "house_profile_group_sun",
+    "heating": "house_profile_group_heating",
+    "cooling": "house_profile_group_cooling",
+    "consumers": "house_profile_group_consumers",
+    "absence": "house_profile_group_absence",
+}
+# „Historische Messdaten (CSV)“: ``ui.house_config_historical_csv._HISTORY_GROUP_KEY``.
+
+
+def _session_value(session_scope: str, name: str, default=None):
+    """Value of a scoped form widget as of this run (before the widget renders)."""
+    return st.session_state.get(_scoped_key(session_scope, name), default)
+
+
+def _on_off(enabled: bool) -> str:
+    return "an" if enabled else "aus"
+
+
+def _render_profile_label(ctx: dict) -> tuple[str, str]:
+    """Bezeichnung above the groups; returns the label and the id a save would use."""
     label = labeled_text_input(
         "Bezeichnung",
-        key=_scoped_key(session_scope, "house_profile_label"),
+        key=_scoped_key(ctx["session_scope"], "house_profile_label"),
     )
     preview_id = _resolve_profile_id(
         is_new=ctx["is_new"],
@@ -409,34 +433,164 @@ def _render_profile_identity(ctx: dict) -> tuple[str, str, float, dict, dict, bo
         label=label,
         profile_ids=set(ctx["profile_ids"]),
     )
-    annual_kwh = labeled_number_input(
-        "Jahresverbrauch (kWh/a)",
-        min_value=0.0,
-        step=100.0,
-        key=_scoped_key(session_scope, "house_annual_kwh"),
-    )
-    household = _render_household_size(ctx["existing"], session_scope=session_scope)
-    absent_mode = labeled_checkbox(
-        "Abwesend / Urlaub",
-        key=_scoped_key(session_scope, "house_absent_mode"),
-        help=(
-            "Earnie-seitiger Abwesenheitsmodus (Live). "
-            "Wirkt zusammen mit dem Smarthome-Signal sens_absent_mode (ODER)."
-        ),
-    )
-    _render_absent_mode_status(profile_absent=bool(absent_mode))
-    location = _render_location_fields(session_scope=session_scope)
-    from ui.house_config_profile_horizon import render_horizon_section
+    return label, preview_id
 
-    location.update(
-        render_horizon_section(
-            ctx["existing"],
-            session_scope=session_scope,
-            latitude=location["latitude"],
-            longitude=location["longitude"],
+
+def _consumption_status(session_scope: str) -> str:
+    annual = _session_value(session_scope, "house_annual_kwh")
+    persons = _session_value(session_scope, "house_persons")
+    parts = []
+    if annual is not None:
+        parts.append(f"{float(annual):.0f} kWh/a")
+    if persons is not None:
+        parts.append(f"{int(persons)} Person" if int(persons) == 1 else f"{int(persons)} Personen")
+    return " · ".join(parts)
+
+
+def _render_consumption_group(ctx: dict) -> tuple[float, dict]:
+    """Group „Verbrauch & Haushalt“: Jahresverbrauch and Personen (+ reference slot)."""
+    session_scope = ctx["session_scope"]
+    with form_group(
+        "Verbrauch & Haushalt",
+        key=GROUP_KEYS["consumption"],
+        expanded=True,
+        required=True,
+        status=_consumption_status(session_scope),
+    ):
+        annual_kwh = labeled_number_input(
+            "Jahresverbrauch (kWh/a)",
+            min_value=0.0,
+            step=100.0,
+            key=_scoped_key(session_scope, "house_annual_kwh"),
         )
+        household = _render_household_size(ctx["existing"], session_scope=session_scope)
+    return float(annual_kwh), household
+
+
+def _render_location_group(session_scope: str) -> dict:
+    with form_group("Standort", key=GROUP_KEYS["location"], expanded=True, required=True):
+        return _render_location_core(session_scope=session_scope)
+
+
+def _render_grid_group(session_scope: str, location: dict) -> None:
+    """Group „Netzanschluss & Netzentgelt“: Netzbereich, then the plant-wide settings."""
+    from ui.house_config_plant import (
+        render_plant_export_limit,
+        render_plant_grid_meter_assertions,
     )
-    return label, preview_id, float(annual_kwh), household, location, bool(absent_mode)
+
+    with form_group(
+        "Netzanschluss & Netzentgelt", key=GROUP_KEYS["grid"], expanded=True, required=True
+    ):
+        location["netznutzung"] = _render_nne_arbeitspreis(
+            session_scope=session_scope, land=location["land"], region=location["region"]
+        )
+        with st.container(border=True):
+            st.markdown("**Anlagenweit – gilt für alle Profile**")
+            render_plant_export_limit()
+            render_plant_grid_meter_assertions()
+
+
+def _render_sun_group(ctx: dict, location: dict) -> None:
+    """Group „Sonne & Horizont“: horizon and the PV suggestion values.
+
+    Rendered before the consumers: their collector and preview read these fields.
+    """
+    from data.solar_horizon import HORIZON_SOURCE_KEY, SOURCE_MANUAL
+    from ui.house_config_profile_horizon import horizon_enabled_key, render_horizon_section
+
+    session_scope = ctx["session_scope"]
+    horizon_on = st.session_state.get(
+        horizon_enabled_key(session_scope),
+        ctx["existing"].get(HORIZON_SOURCE_KEY) == SOURCE_MANUAL,
+    )
+    with form_group(
+        "Sonne & Horizont",
+        key=GROUP_KEYS["sun"],
+        status=f"Horizont {_on_off(bool(horizon_on))}",
+    ):
+        location.update(
+            render_horizon_section(
+                ctx["existing"],
+                session_scope=session_scope,
+                latitude=location["latitude"],
+                longitude=location["longitude"],
+            )
+        )
+        st.markdown("**Vorschlagswerte für neue PV-Felder und den Solarkollektor**")
+        location["default_pv_tilt"], location["default_pv_azimuth"] = _render_pv_default_row(
+            session_scope=session_scope
+        )
+
+
+def _render_heating_group(ctx: dict, *, persons: int, annual_kwh: float) -> dict:
+    from house_config.house_thermal import HEATING_ENABLED_KEY
+    from house_config.profile_schema_defaults import profile_default
+    from ui.house_config_profile_house_thermal import render_house_heating_section
+
+    session_scope = ctx["session_scope"]
+    enabled = _session_value(
+        session_scope,
+        "house_heating_enabled",
+        ctx["existing"].get(HEATING_ENABLED_KEY, profile_default(HEATING_ENABLED_KEY)),
+    )
+    with form_group("Heizung", key=GROUP_KEYS["heating"], status=_on_off(bool(enabled))):
+        return render_house_heating_section(
+            session_scope=session_scope,
+            existing=ctx["existing"],
+            persons=persons,
+            annual_kwh=annual_kwh,
+        )
+
+
+def _render_cooling_group(ctx: dict, heating: dict) -> dict:
+    from house_config.house_cooling import COOLING_ENABLED_KEY
+    from ui.house_config_profile_cooling import render_house_cooling_section
+
+    session_scope = ctx["session_scope"]
+    enabled = _session_value(
+        session_scope,
+        "house_cooling_enabled",
+        ctx["existing"].get(COOLING_ENABLED_KEY, False),
+    )
+    with form_group("Kühlung", key=GROUP_KEYS["cooling"], status=_on_off(bool(enabled))):
+        cooling = render_house_cooling_section(
+            session_scope=session_scope, existing=ctx["existing"], heating=heating
+        )
+    heating[COOLING_ENABLED_KEY] = cooling[COOLING_ENABLED_KEY]
+    return cooling
+
+
+def _consumers_status(heating: dict) -> str:
+    shown = [
+        c
+        for c in st.session_state.get(_SESSION_CONSUMERS_KEY, [])
+        if not _hidden_heating_consumer(c, heating)
+    ]
+    return "keine" if not shown else f"{len(shown)}"
+
+
+def _render_absence_group(session_scope: str) -> bool:
+    absent_now = bool(_session_value(session_scope, "house_absent_mode", False))
+    with form_group(
+        "Abwesenheit",
+        key=GROUP_KEYS["absence"],
+        status="Abwesend / Urlaub aktiv" if absent_now else "",
+    ):
+        absent_mode = labeled_checkbox(
+            "Abwesend / Urlaub",
+            key=_scoped_key(session_scope, "house_absent_mode"),
+            help=(
+                "Earnie-seitiger Abwesenheitsmodus (Live). "
+                "Wirkt zusammen mit dem Smarthome-Signal sens_absent_mode (ODER)."
+            ),
+        )
+        _render_absent_mode_status(profile_absent=bool(absent_mode))
+        st.caption(
+            "Die Heizungs-Absenkung steht in der Gruppe „Heizung“ (Regelung), "
+            "„Inaktiv wenn abwesend“ beim jeweiligen Verbraucher."
+        )
+    return bool(absent_mode)
 
 
 def _render_absent_mode_status(*, profile_absent: bool) -> None:
@@ -471,64 +625,53 @@ def _render_absent_mode_status(*, profile_absent: bool) -> None:
         )
 
 
-def render_house_profile_tab() -> None:
-    from ui.house_config_plant import (
-        render_plant_export_limit,
-        render_plant_grid_meter_assertions,
-    )
+def _render_consumers_group(
+    ctx: dict, location: dict, heating: dict, cooling: dict, annual_kwh: float
+) -> tuple[list, list, dict, float]:
+    """Group „Verbraucher“: consumer forms, then the balance (Grundlast) right below them.
 
-    ctx = _render_profile_selector()
-    render_plant_export_limit()
-    render_plant_grid_meter_assertions()
-    label, preview_id, annual_kwh, household, location, absent_mode = _render_profile_identity(
-        ctx
-    )
-    from ui.house_config_profile_house_thermal import render_house_heating_section
-
-    heating = render_house_heating_section(
-        session_scope=ctx["session_scope"],
-        existing=ctx["existing"],
-        persons=household["persons"],
-        annual_kwh=annual_kwh,
-    )
-    from house_config.house_cooling import COOLING_ENABLED_KEY
+    Returns ``resolved``, ``resolved_for_preview``, the baseload ``preview`` and the
+    cooling kWh.
+    """
     from ui.house_config_profile_cooling import (
         cooling_preview_kwh,
         cooling_profile_fields,
         render_cooling_metric,
-        render_house_cooling_section,
         with_cooling,
     )
     from ui.house_config_profile_house_thermal import thermal_preview_fields
 
-    cooling = render_house_cooling_section(
-        session_scope=ctx["session_scope"], existing=ctx["existing"], heating=heating
-    )
-    heating[COOLING_ENABLED_KEY] = cooling[COOLING_ENABLED_KEY]
-    resolved, resolved_for_preview = _edit_and_sync_consumers(
-        ctx["session_scope"], location, heating
-    )
-    resolved = with_cooling(resolved, cooling)
-    resolved_for_preview = with_cooling(resolved_for_preview, cooling)
-    session_consumers = list(st.session_state.get(_SESSION_CONSUMERS_KEY, []))
-    try:
-        cooling_kwh = cooling_preview_kwh(
-            with_cooling(session_consumers, cooling),
-            heating=heating,
-            cooling=cooling,
-            preview_carrier=lambda c: {**c, **thermal_preview_fields(heating)},
+    session_scope = ctx["session_scope"]
+    with form_group(
+        "Verbraucher",
+        key=GROUP_KEYS["consumers"],
+        expanded=True,
+        status=_consumers_status(heating),
+    ):
+        resolved, resolved_for_preview = _edit_and_sync_consumers(
+            session_scope, location, heating
         )
-    except (ValueError, RuntimeError, OSError) as exc:
-        st.error(f"Klimaanlage nicht berechenbar: {exc}")
-        st.stop()
-    render_cooling_metric(cooling_kwh)
-    preview = _render_baseload_preview(
-        annual_kwh,
-        resolved_for_preview,
-        ctx["existing"],
-        ctx["session_scope"],
-        cooling_kwh=cooling_kwh,
-    )
+        resolved = with_cooling(resolved, cooling)
+        resolved_for_preview = with_cooling(resolved_for_preview, cooling)
+        session_consumers = list(st.session_state.get(_SESSION_CONSUMERS_KEY, []))
+        try:
+            cooling_kwh = cooling_preview_kwh(
+                with_cooling(session_consumers, cooling),
+                heating=heating,
+                cooling=cooling,
+                preview_carrier=lambda c: {**c, **thermal_preview_fields(heating)},
+            )
+        except (ValueError, RuntimeError, OSError) as exc:
+            st.error(f"Klimaanlage nicht berechenbar: {exc}")
+            st.stop()
+        render_cooling_metric(cooling_kwh)
+        preview = _render_baseload_preview(
+            annual_kwh,
+            resolved_for_preview,
+            ctx["existing"],
+            session_scope,
+            cooling_kwh=cooling_kwh,
+        )
     # The charts (Gesamt-Lastverhalten) model the cooling from these keys; the preview
     # Grundlast above already has it taken out.
     preview["cooling_profile"] = cooling_profile_fields(
@@ -537,6 +680,30 @@ def render_house_profile_tab() -> None:
         cooling=cooling,
         preview_carrier=lambda c: {**c, **thermal_preview_fields(heating)},
     )
+    return resolved, resolved_for_preview, preview, cooling_kwh
+
+
+def render_house_profile_tab() -> None:
+    """Hausprofil tab: header, then the groups in data-flow order (layout doc, stage 1).
+
+    Order constraints: the horizon (Sonne & Horizont) and the heating state feed the
+    consumer forms, so both render before „Verbraucher“.
+    """
+    ctx = _render_profile_selector()
+    session_scope = ctx["session_scope"]
+    label, preview_id = _render_profile_label(ctx)
+    annual_kwh, household = _render_consumption_group(ctx)
+    location = _render_location_group(session_scope)
+    _render_grid_group(session_scope, location)
+    _render_sun_group(ctx, location)
+    heating = _render_heating_group(
+        ctx, persons=household["persons"], annual_kwh=annual_kwh
+    )
+    cooling = _render_cooling_group(ctx, heating)
+    resolved, resolved_for_preview, preview, cooling_kwh = _render_consumers_group(
+        ctx, location, heating, cooling, annual_kwh
+    )
+    absent_mode = _render_absence_group(session_scope)
     _render_household_reference(
         household, annual_kwh, resolved_for_preview, heating, cooling_kwh=cooling_kwh
     )
@@ -631,7 +798,9 @@ from ui.house_config_profile_thermal import (  # noqa: E402
     _consumer_expander_title,
     _inject_profile_geo,
     _live_consumer_for_annual,
-    _render_location_fields,
+    _render_location_core,
+    _render_nne_arbeitspreis,
+    _render_pv_default_row,
     _render_thermal_annual_fields,
     _render_thermal_rc_fields,
     _render_thermal_solar_fields,

@@ -439,7 +439,7 @@ def _render_thermal_annual_fields(
 ) -> dict:
     """„Haus Wärme“: collector, heating system and consumption estimate.
 
-    The building fields come from the house section „Gebäude / Wärmebedarf“; the returned
+    The building fields come from the house group „Heizung“; the returned
     item holds only the consumer's own fields.
     """
     from ui.house_config_profile_house_thermal import (
@@ -449,8 +449,8 @@ def _render_thermal_annual_fields(
 
     thermal = consumer.get("thermal") or consumer
     st.caption(
-        "Gebäudedaten (Wohnfläche, HWB, Solltemperatur, …) stehen oben im Abschnitt "
-        "„Gebäude / Wärmebedarf“."
+        "Gebäudedaten (Wohnfläche, HWB, Solltemperatur, …) stehen oben in der Gruppe "
+        "„Heizung“."
     )
     item = _render_thermal_solar_fields(
         thermal,

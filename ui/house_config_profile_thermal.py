@@ -333,8 +333,8 @@ def _render_nne_arbeitspreis(*, session_scope: str, land: str, region: str) -> d
     return config
 
 
-def _render_location_fields(*, session_scope: str) -> dict:
-    st.subheader("Standort")
+def _render_location_core(*, session_scope: str) -> dict:
+    """Group „Standort“: coordinates, Land, time zone and Region."""
     land_key = _seed_land_widget_key(session_scope)
     latitude, longitude, land = _render_geo_row(
         session_scope=session_scope, land_key=land_key
@@ -344,21 +344,12 @@ def _render_location_fields(*, session_scope: str) -> dict:
     timezone_name = timezone_for_land(land)
     st.caption(f"Zeitzone (aus Land): **{timezone_name}**")
     region = _render_region_select(session_scope=session_scope, land=land)
-    default_pv_tilt, default_pv_azimuth = _render_pv_default_row(
-        session_scope=session_scope
-    )
-    netznutzung = _render_nne_arbeitspreis(
-        session_scope=session_scope, land=land, region=region
-    )
     return {
         "land": land,
         "region": region,
         "latitude": latitude,
         "longitude": longitude,
         "timezone_name": timezone_name,
-        "default_pv_tilt": default_pv_tilt,
-        "default_pv_azimuth": default_pv_azimuth,
-        "netznutzung": netznutzung,
     }
 
 def _render_thermal_rc_fields(

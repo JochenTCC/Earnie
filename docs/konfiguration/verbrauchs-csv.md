@@ -35,7 +35,7 @@ Beim Upload schreibt Earnie eine **normalisierte** Datei nach `earnie_env/config
 
 ## Importmodus (Hausprofil)
 
-Unter **Historische Jahres-Leistungsprofile [kW] (CSV)** stehen drei Modi zur Wahl:
+In der Gruppe **Historische Messdaten (CSV)** des Hausprofils stehen drei Modi zur Wahl:
 
 
 | Modus                     | Inhalt                                                                                                                        |
@@ -63,9 +63,9 @@ Gespeicherte Pfade im Hausprofil:
 - `historical_csv_source`: gewählter Modus (`separate` / `energiemonitor` / `balance`)
 - `balance_sign_inverts`: nur im Modus Bilanz, Vorzeichen-Umkehr je Serie (`pv`, `battery`, `grid`)
 
-### Historische Jahres-Leistungsprofile [kW] (CSV)
+### Historische Messdaten (CSV)
 
-Die Überschrift **Historische Jahres-Leistungsprofile [kW]** weist darauf hin, dass der Import **optional** ist. Darunter folgt der **aufklappbare Bereich** „Historische Jahres-Leistungsprofile [kW] (CSV)“. Er enthält den Datenimport (getrennte CSVs, Energiemonitor oder Bilanz) und einen Leistungsplot zur Kontrolle (QC).
+Die Gruppe **Historische Messdaten (CSV)** ist **optional** und beim Öffnen zugeklappt; ihr Titel zeigt, ob ein Lastprofil hinterlegt ist. Sie enthält den Datenimport (getrennte CSVs, Energiemonitor oder Bilanz) und einen Leistungsplot zur Kontrolle (QC).
 
 ### Gesamt-Lastverhalten
 

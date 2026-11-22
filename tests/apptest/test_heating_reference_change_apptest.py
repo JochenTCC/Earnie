@@ -174,8 +174,13 @@ def test_gas_to_heat_pump_with_csv_warns(tmp_path) -> None:
     assert len(warnings) == 1 and "CSV-Messdaten" in warnings[0]
     assert _reference()["heat_source"]["type"] == "gas"  # held
     # Shown in the consumer's expander under the heat-source select box, not at the page end.
+    # Consumer expanders only: the group „Verbraucher“ around them is an expander too.
     in_expanders = [
-        w.value for exp in at.expander for w in exp.warning if "Heizsystem geändert" in w.value
+        w.value
+        for exp in at.expander
+        if "_consumer_expander_" in str(exp.key or "")
+        for w in exp.warning
+        if "Heizsystem geändert" in w.value
     ]
     assert in_expanders == warnings
 

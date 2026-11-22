@@ -448,13 +448,8 @@ def _render_ev_power_fields(consumer: dict, index: int, *, session_scope: str) -
             _render_pair_caption({**item, "label": consumer.get("label")})
     item.update(
         {
-            "min_on_quarterhours": labeled_number_input(
-                "Mindest-Ladedauer (Viertelstunden)",
-                min_value=1,
-                value=int(consumer.get("min_on_quarterhours", 1)),
-                ratios=WIDE_LABEL_RATIOS,
-                key=_scoped_key(session_scope, f"hc_ev_min_qh_{index}"),
-            ),
+            # Rendered under „Erweitert“ in ``_render_ev_fields``; the slot keeps the key order.
+            "min_on_quarterhours": None,
             "battery_capacity_kwh": labeled_number_input(
                 "Akkukapazität (kWh)",
                 min_value=0.1,
@@ -527,16 +522,24 @@ def _render_ev_fields(consumer: dict, index: int, *, session_scope: str) -> dict
         dynamic=is_dynamic_ev(item),
     )
     pair = ev_form_pair(item)
-    item["charging_schedule"]["milp"] = _render_ev_milp_fields(
-        sched.get("milp") or {},
-        pair["min_power_kw"]
-        if pair is not None
-        else _pair_kw(
-            item["min_current_a"], voltage_v=NEW_WALLBOX_VOLTAGE_V, phases=item["phases"]
-        ),
-        index,
-        session_scope=session_scope,
-    )
+    with st.expander("Erweitert", key=_scoped_key(session_scope, f"hc_ev_advanced_{index}")):
+        item["min_on_quarterhours"] = labeled_number_input(
+            "Mindest-Ladedauer (Viertelstunden)",
+            min_value=1,
+            value=int(consumer.get("min_on_quarterhours", 1)),
+            ratios=WIDE_LABEL_RATIOS,
+            key=_scoped_key(session_scope, f"hc_ev_min_qh_{index}"),
+        )
+        item["charging_schedule"]["milp"] = _render_ev_milp_fields(
+            sched.get("milp") or {},
+            pair["min_power_kw"]
+            if pair is not None
+            else _pair_kw(
+                item["min_current_a"], voltage_v=NEW_WALLBOX_VOLTAGE_V, phases=item["phases"]
+            ),
+            index,
+            session_scope=session_scope,
+        )
     if _live_markers_enabled():
         st.caption(
             "E-Auto-Bindings unter **Daemon Control → EHAL-Com** "

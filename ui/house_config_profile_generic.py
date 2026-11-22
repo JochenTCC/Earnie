@@ -434,6 +434,10 @@ def _render_generic_fields(
 ) -> dict:
     sched = consumer.get("schedule") or {}
     defaults = _schedule_defaults(sched)
+    # The role decides which fields follow, so it comes first.
+    earnie_role = _render_generic_role_select(
+        consumer, index, session_scope=session_scope
+    )
     st.caption(
         "**Läufe pro Woche = 0:** kein synthetisches Wochenmuster — nur sinnvoll für "
         "**Bekannt** mit aktivem CSV („Von Basis-Last abziehen“). "
@@ -448,9 +452,6 @@ def _render_generic_fields(
             "0 = inaktiv / kein Wochenmuster. "
             "Nur bei Bekannt+CSV erlaubt; sonst ≥ 1."
         ),
-    )
-    earnie_role = _render_generic_role_select(
-        consumer, index, session_scope=session_scope
     )
     item: dict = {
         "nominal_power_kw": nominal,

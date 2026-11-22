@@ -94,3 +94,35 @@ def labeled_checkbox(
     """
     del ratios  # API compat only; native checkbox keeps label beside the box
     return st.checkbox(label, **kwargs)
+
+
+def form_group_label(title: str, *, status: str = "", required: bool = False) -> str:
+    """Title of a :func:`form_group`: bold name, „Pflicht“ marker, status after a dash."""
+    label = f"**{title}**"
+    if required:
+        label += " · Pflicht"
+    if status:
+        label += f" — {status}"
+    return label
+
+
+def form_group(
+    title: str,
+    *,
+    key: str,
+    expanded: bool = False,
+    status: str = "",
+    required: bool = False,
+) -> Any:
+    """Collapsible group of a long editor form (house profile, scenario editor).
+
+    No ``on_change``: the content runs while the group is collapsed, so its widgets keep
+    their values (a widget that is not rendered drops its session value). The ``key`` gives
+    the group a stable identity, so a changing ``status`` in the title does not reset the
+    open state.
+    """
+    return st.expander(
+        form_group_label(title, status=status, required=required),
+        expanded=expanded,
+        key=key,
+    )

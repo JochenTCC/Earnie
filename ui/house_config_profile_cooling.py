@@ -1,4 +1,4 @@
-"""House-profile section „Kühlung“ with the switch „Kühlung betrachten“.
+"""House-profile group „Kühlung“ with the switch „Kühlung betrachten“.
 
 The air conditioning is the ``cooling`` block of the house's heating consumer
 (``house_config.house_cooling``); the switch is independent of „Heizung betrachten“. It needs the
@@ -119,7 +119,6 @@ def render_house_cooling_section(*, session_scope: str, existing: dict, heating:
 
     The block is ``None`` for a house without a stored device and the switch off.
     """
-    st.subheader("Kühlung")
     carrier = _heating_consumer(existing)
     stored = (carrier or {}).get(COOLING_KEY)
     ready = carrier is not None and heating.get(HOUSE_THERMAL_KEY) is not None
@@ -139,7 +138,8 @@ def render_house_cooling_section(*, session_scope: str, existing: dict, heating:
     if not ready:
         st.caption(
             "Kühlung braucht das Hausmodell: einmal „Heizung betrachten“ einschalten und "
-            "„Gebäude / Wärmebedarf“ ausfüllen. Danach lässt sich die Heizung wieder ausschalten."
+            "die Gebäudedaten in der Gruppe „Heizung“ ausfüllen. Danach lässt sich die "
+            "Heizung wieder ausschalten."
         )
         return {COOLING_ENABLED_KEY: False, COOLING_KEY: stored}
     if not enabled:
