@@ -407,7 +407,7 @@ Ablauf:
 
 1. Optional Anhänge hochladen (z. B. Screenshots).
 2. Variante wählen:
-   - **Konfiguration + Anhänge herunterladen:** nur das Konfigurations-ZIP (wie unter [Speichern / Laden](../konfiguration/speichern-laden.md)) plus Anhänge – ohne Historie und Logs. Hilft nur bei Fragen, die **nicht** den Live-Betrieb betreffen (Einrichtung, Hausprofil, Szenarien, Backtesting).
+   - **Konfiguration + Anhänge erstellen**, dann **Konfiguration + Anhänge herunterladen:** nur das Konfigurations-ZIP (wie unter [Speichern / Laden](../konfiguration/speichern-laden.md)) plus Anhänge – ohne Historie und Logs. Hilft nur bei Fragen, die **nicht** den Live-Betrieb betreffen (Einrichtung, Hausprofil, Szenarien, Backtesting).
    - **Support-Paket erstellen:** das vollständige Paket für Fragen zum Live-Betrieb. Optional Titel und Symptom eintragen und bei Bedarf **Vollständige Optimierer-Historie beilegen** ankreuzen, dann **Support-Paket erstellen** und anschließend **Support-Paket herunterladen**.
 
 Das vollständige Paket enthält die Optimierungshistorie der Recorder-Tage (wie `recorder_retention_days`, Standard 7) und die aktiven Inputs. Die gesamte Historie seit Inbetriebnahme kommt nur mit dem Häkchen **Vollständige Optimierer-Historie beilegen** hinein; sie macht das Paket deutlich größer. Die Chart-Daten der Oberfläche (UI-Payload) schreibt Earnie mit, wenn die Monitor-Seite in dieser Browser-Sitzung schon geöffnet war (Stand: letzter Besuch der Seite); sonst fehlen sie.

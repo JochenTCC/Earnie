@@ -216,14 +216,15 @@ def _render_user_fixed_import_cent(
     imp_cent_key = scoped_widget_key(session_scope, "scenario_user_import_cent")
     if imp_cent_key not in st.session_state:
         saved = scenario_settings.get(USER_IMPORT_CENT_KEY)
-        st.session_state[imp_cent_key] = (
-            float(saved) if saved is not None else 20.0
-        )
+        # Empty until the user enters a price: no invented default (no-implicit-fallbacks).
+        st.session_state[imp_cent_key] = float(saved) if saved is not None else None
     container.number_input(
         "Bezugspreis (Cent/kWh)",
         min_value=0.01,
+        value=None,
         step=0.1,
         format="%.2f",
+        placeholder="Bitte eingeben",
         key=imp_cent_key,
         help=(
             "Lieferanten-Arbeitspreis inkl. USt. "
@@ -246,14 +247,14 @@ def _render_user_fixed_export_cent(
     exp_cent_key = scoped_widget_key(session_scope, "scenario_user_export_cent")
     if exp_cent_key not in st.session_state:
         saved = scenario_settings.get(USER_EXPORT_CENT_KEY)
-        st.session_state[exp_cent_key] = (
-            float(saved) if saved is not None else 0.0
-        )
+        st.session_state[exp_cent_key] = float(saved) if saved is not None else None
     container.number_input(
         "Einspeisevergütung (Cent/kWh)",
         min_value=0.0,
+        value=None,
         step=0.1,
         format="%.2f",
+        placeholder="Bitte eingeben (0 = keine Vergütung)",
         key=exp_cent_key,
     )
 

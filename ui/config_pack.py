@@ -68,8 +68,11 @@ def _render_config_pack_import() -> None:
         st.error(str(exc))
         logger.warning("config pack import rejected: %s", exc)
         return
-    st.success(f"Importiert: {len(written)} Datei(en).")
+    from ui.flash import flash
+
     _clear_session_after_config_import()
+    # After the clear: a flash survives the rerun, ``st.success`` would not.
+    flash("success", f"Importiert: {len(written)} Datei(en).")
     st.cache_data.clear()
     st.rerun()
 
@@ -84,13 +87,19 @@ def build_config_pack_for_sidebar() -> bytes | None:
         return None
 
 
-def render_config_pack_controls(payload: bytes | None) -> None:
+def render_config_pack_controls() -> None:
+    """Export on request only: the pack zips every upload, too costly for each rerun."""
     st.markdown("#### Konfiguration sichern / laden")
     st.caption(
         "JSON-Konfiguration und CSV-Uploads als ZIP (ohne .env / Zugangsdaten) — "
         "als Backup oder zum Umzug auf ein anderes Gerät."
     )
-    _render_config_pack_export(payload)
+    if st.button(
+        "Konfigurations-ZIP erstellen",
+        key="config_pack_build_btn",
+        width="stretch",
+    ):
+        _render_config_pack_export(build_config_pack_for_sidebar())
     _render_config_pack_import()
 
 
@@ -99,7 +108,6 @@ def render_backup_transfer_sidebar(*, expanded: bool = False) -> None:
     from ui.support_package import render_support_package_controls
 
     with st.sidebar.expander("Sichern & Übertragen", expanded=expanded):
-        payload = build_config_pack_for_sidebar()
-        render_config_pack_controls(payload)
+        render_config_pack_controls()
         st.divider()
-        render_support_package_controls(payload)
+        render_support_package_controls()

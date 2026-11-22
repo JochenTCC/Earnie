@@ -100,14 +100,17 @@ def test_te2_manual_land_filter_stays_while_the_profile_stays():
 # --- TE3: own fixed price ---------------------------------------------------------------
 
 
-def test_te3_own_fixed_price_shows_the_default_and_hides_when_deselected():
+def test_te3_own_fixed_price_starts_empty_and_hides_when_deselected():
+    """ui/ review 2026-11-22: no invented 20 ct; nothing is saved until a price is entered."""
     at = _session()
     catalog_pick = at.selectbox(key=_P + "scenario_import").value
     assert not [n for n in at.number_input if n.key == _P + "scenario_user_import_cent"]
     at.selectbox(key=_P + "scenario_import").set_value(_user_fixed_option(at, _P + "scenario_import")).run()
     assert not at.exception
     cent = at.number_input(key=_P + "scenario_user_import_cent")
-    assert cent.value == 20.0
+    assert cent.value is None
+    assert any("Bezugspreis des eigenen Festpreises fehlt" in w.value for w in at.warning)
+    assert _stored_settings().get("import_tariff_id") != "__user_fixed__"
     cent.set_value(31.5).run()
     settings = _stored_settings()
     assert (settings["import_tariff_id"], settings["user_import_cent_kwh"]) == ("__user_fixed__", 31.5)
@@ -140,6 +143,8 @@ def test_te6_scenario_switch_keeps_no_values_of_the_previous_scenario():
     at = _session()
     at.selectbox(key=_P + "scenario_tariff_land").set_value("CH").run()
     at.selectbox(key=_P + "scenario_import").set_value(_user_fixed_option(at, _P + "scenario_import")).run()
+    # The own fixed price starts empty: enter one so the form is saved, not held as dirty.
+    at.number_input(key=_P + "scenario_user_import_cent").set_value(31.5).run()
     at.radio(key="scenario_select").set_value(other).run()
     assert not at.exception
     shown = {

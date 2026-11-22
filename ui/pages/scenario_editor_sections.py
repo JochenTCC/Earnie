@@ -383,6 +383,23 @@ def _render_scenario_import_cap(ctx: dict, picks: dict) -> tuple[str, ...]:
     return check.errors
 
 
+def user_fixed_price_blockers(
+    import_tariff_id: str | None,
+    export_tariff_id: str | None,
+    user_import_cent: float | None,
+    user_export_cent: float | None,
+) -> list[str]:
+    """Prices of *Eigener Festpreis* the user has not entered yet (the fields start empty)."""
+    from house_config.tariffs_store import is_user_fixed_tariff_id
+
+    blockers: list[str] = []
+    if is_user_fixed_tariff_id(import_tariff_id) and user_import_cent is None:
+        blockers.append("Bezugspreis des eigenen Festpreises fehlt")
+    if is_user_fixed_tariff_id(export_tariff_id) and user_export_cent is None:
+        blockers.append("Einspeisevergütung des eigenen Festpreises fehlt")
+    return blockers
+
+
 def _scenario_persist_payload(
     ctx: dict,
     label: str,
@@ -406,6 +423,14 @@ def _scenario_persist_payload(
     user_import_cent, user_export_cent = _user_fixed_cents_from_session(
         session_scope, import_tariff_id, export_tariff_id
     )
+    missing_prices = user_fixed_price_blockers(
+        import_tariff_id, export_tariff_id, user_import_cent, user_export_cent
+    )
+    if missing_prices:
+        from ui.auto_persist import warn_not_saved
+
+        warn_not_saved("Szenario", missing_prices)
+        ready = False
     battery_picks = picks.get("battery_picks") or picks.get("battery_pick") or []
     if isinstance(battery_picks, str):
         battery_picks = [battery_picks]

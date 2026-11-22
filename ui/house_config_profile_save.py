@@ -245,43 +245,48 @@ def _perform_house_profile_save(
     try:
         from ui.house_config_historical_csv import historical_csv_save_fields
 
-        from house_config.own_grid_fee import persist_own_grid_fee
+        from house_config.own_grid_fee import persist_own_grid_fee, stored_own_grid_fee
+        from ui.house_config_io import check_house_profile
 
         hist = historical_csv_save_fields(session_scope, existing)
-        netznutzung = persist_own_grid_fee(
+        profile = {
+            "id": profile_id,
+            "label": label.strip() or profile_id,
+            "annual_kwh": float(annual_kwh),
+            "absent_mode": bool(absent_mode),
+            "land": location.get("land", "AT"),
+            "region": location.get("region", ""),
+            "latitude": location["latitude"],
+            "longitude": location["longitude"],
+            "default_pv_tilt": location["default_pv_tilt"],
+            "default_pv_azimuth": location["default_pv_azimuth"],
+            **stored_horizon_fields(location),
+            "netznutzung": stored_own_grid_fee(
+                location["netznutzung"], profile_id=profile_id
+            ),
+            "consumers": resolved,
+            "total_profile_csv": hist["total_profile_csv"],
+            "pv_profile_csv": hist["pv_profile_csv"],
+            "battery_profile_csv": hist.get("battery_profile_csv", ""),
+            "grid_profile_csv": hist.get("grid_profile_csv", ""),
+            "historical_csv_source": hist["historical_csv_source"],
+            "baseload_distribution": hist.get(
+                "baseload_distribution", "equal"
+            ),
+            **_balance_signs_payload(hist),
+            **house_heating_payload(heating),
+            **_vat_payload(existing),
+        }
+        # Checks first (label, baseload, heating catalog): a rejected save must not
+        # have written the profile's own grid-fee area already.
+        check_house_profile(profile)
+        profile["netznutzung"] = persist_own_grid_fee(
             location["netznutzung"],
             profile_id=profile_id,
             profile_label=label.strip() or profile_id,
             land=location.get("land"),
         )
-        upsert_house_profile(
-            {
-                "id": profile_id,
-                "label": label.strip() or profile_id,
-                "annual_kwh": float(annual_kwh),
-                "absent_mode": bool(absent_mode),
-                "land": location.get("land", "AT"),
-                "region": location.get("region", ""),
-                "latitude": location["latitude"],
-                "longitude": location["longitude"],
-                "default_pv_tilt": location["default_pv_tilt"],
-                "default_pv_azimuth": location["default_pv_azimuth"],
-                **stored_horizon_fields(location),
-                "netznutzung": netznutzung,
-                "consumers": resolved,
-                "total_profile_csv": hist["total_profile_csv"],
-                "pv_profile_csv": hist["pv_profile_csv"],
-                "battery_profile_csv": hist.get("battery_profile_csv", ""),
-                "grid_profile_csv": hist.get("grid_profile_csv", ""),
-                "historical_csv_source": hist["historical_csv_source"],
-                "baseload_distribution": hist.get(
-                    "baseload_distribution", "equal"
-                ),
-                **_balance_signs_payload(hist),
-                **house_heating_payload(heating),
-                **_vat_payload(existing),
-            }
-        )
+        upsert_house_profile(profile)
     except ValueError as exc:
         st.error(str(exc))
         return None

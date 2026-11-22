@@ -98,8 +98,9 @@ def _seed_user_tariff_cent_widgets(session_scope: str, settings: dict) -> None:
     exp_cent_key = scoped_widget_key(session_scope, "scenario_user_export_cent")
     saved_imp = settings.get(USER_IMPORT_CENT_KEY)
     saved_exp = settings.get(USER_EXPORT_CENT_KEY)
-    st.session_state[imp_cent_key] = float(saved_imp) if saved_imp is not None else 20.0
-    st.session_state[exp_cent_key] = float(saved_exp) if saved_exp is not None else 0.0
+    # Empty until the user enters a price: no invented default (no-implicit-fallbacks).
+    st.session_state[imp_cent_key] = float(saved_imp) if saved_imp is not None else None
+    st.session_state[exp_cent_key] = float(saved_exp) if saved_exp is not None else None
 
 
 def _entity_ref_empty(settings: dict, key: str) -> bool:

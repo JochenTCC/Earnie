@@ -305,15 +305,23 @@ def test_failed_migration_does_not_start_the_daemon(monkeypatch, _mock_pending_p
     assert any("kaputt" in e.value for e in at.error)
 
 
-def test_continue_failure_shows_error_and_keeps_the_report(monkeypatch, _mock_pending_plan):
+def test_continue_failure_leaves_the_report_and_flashes_the_error(
+    monkeypatch, _mock_pending_plan
+):
+    """ui/ review 2026-11-22: staying on the report trapped the user; the
+    Optimierer-Dienst page the error names is only reachable from the app."""
     from runtime_store.main_daemon import DaemonError
 
     at = _open_report(monkeypatch, MagicMock(side_effect=DaemonError("Lock belegt")))
     at = next(b for b in at.button if b.label == "Weiter zur App").click().run()
     assert not at.exception
-    assert any("main.py konnte nicht gestartet werden: Lock belegt" in e.value for e in at.error)
-    assert any("Migration abgeschlossen" in s.value for s in at.success)
-    assert any(b.label == "Weiter zur App" for b in at.button)
+    assert "cfg_mig_phase" not in at.session_state
+    notices = at.session_state["_flash_notices"]
+    assert any(
+        kind == "error" and "main.py konnte nicht gestartet werden: Lock belegt" in text
+        for kind, text in notices
+    )
+    assert not any(b.label == "Weiter zur App" for b in at.button)
 
 
 def test_app_keeps_showing_the_report_after_a_finished_run():
