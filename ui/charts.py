@@ -309,9 +309,28 @@ def build_power_soc_chart_figure(
     return fig
 
 
-# Chart 1 on desktop and tablet: twice Plotly's default height (450 px). Phones keep the
-# default, the chart would otherwise be taller than the screen.
-CHART1_DESKTOP_HEIGHT_PX = 900
+# Chart 1 on desktop and tablet: constant width:height ratio, so a wide window does not
+# get a flat chart and a narrow one not a tall chart. The browser sizes the box from its
+# width (CSS aspect-ratio) and the figure stretches to it. Phones keep Plotly's default
+# height (450 px): at 4:1 the chart would be under 100 px high there.
+CHART1_ASPECT_RATIO = 4.0
+CHART1_MIN_HEIGHT_PX = 320
+CHART1_BOX_KEY = "chart1_aspect_box"
+
+
+def chart1_aspect_css(
+    ratio: float = CHART1_ASPECT_RATIO, *, min_height_px: int = CHART1_MIN_HEIGHT_PX
+) -> str:
+    """CSS for the Chart 1 box: height from its width at *ratio*, never below *min_height_px*."""
+    if ratio <= 0:
+        raise ValueError(f"Chart-1-Seitenverhältnis muss > 0 sein (ist {ratio}).")
+    return (
+        "<style>"
+        f".st-key-{CHART1_BOX_KEY} {{ aspect-ratio: {ratio:g} / 1; "
+        f"min-height: {int(min_height_px)}px; }}"
+        f".st-key-{CHART1_BOX_KEY} [data-testid=\"stPlotlyChart\"] {{ height: 100%; }}"
+        "</style>"
+    )
 
 
 def render_power_soc_chart(
@@ -364,13 +383,16 @@ def render_power_soc_chart(
         slot_shadow_soc=slot_shadow_soc,
         pv_compare_series=pv_compare_series,
     )
-    if not is_phone_request():
-        fig.update_layout(height=CHART1_DESKTOP_HEIGHT_PX)
     plotly_kwargs: dict = {"width": "stretch"}
     if chart_key:
         plotly_kwargs["key"] = chart_key
     inject_mobile_legend_css()
-    st.plotly_chart(localized_figure(fig), **plotly_kwargs)
+    if is_phone_request():
+        st.plotly_chart(localized_figure(fig), **plotly_kwargs)
+    else:
+        st.markdown(chart1_aspect_css(), unsafe_allow_html=True)
+        with st.container(key=CHART1_BOX_KEY):
+            st.plotly_chart(localized_figure(fig), height="stretch", **plotly_kwargs)
     render_collapsible_legend_from_figure(fig)
 
 
