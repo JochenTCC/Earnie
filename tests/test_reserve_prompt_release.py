@@ -158,13 +158,13 @@ def reserve_setup(tmp_path, monkeypatch):
             "default_runtime_h": 0.5,
         }
     ]
-    monkeypatch.setattr(powerstation_live, "_planning_powerstations", lambda: powerstations)
-    monkeypatch.setattr(powerstation_live, "_reserve_appliances", lambda: appliances)
-    monkeypatch.setattr(powerstation_live, "_consumers_by_id", lambda: {})
+    monkeypatch.setattr(powerstation_live, "_planning_powerstations", lambda *_a: powerstations)
+    monkeypatch.setattr(powerstation_live, "_reserve_appliances", lambda *_a: appliances)
+    monkeypatch.setattr(powerstation_live, "_consumers_by_id", lambda *_a: {})
     running = {"waschmaschine": False}
     signal_calls: list[str] = []
 
-    def fake_signal(appliance_id, *, telemetry, consumers_by_id):
+    def fake_signal(appliance_id, *, telemetry, consumers_by_id, on_read_error=None):
         assert telemetry is None
         signal_calls.append(appliance_id)
         return running.get(appliance_id, False)
@@ -237,8 +237,8 @@ def test_physical_reserve_is_not_checked(reserve_setup):
 
 
 def test_no_reserve_appliances_never_wakes(monkeypatch):
-    monkeypatch.setattr(powerstation_live, "_planning_powerstations", lambda: [])
-    monkeypatch.setattr(powerstation_live, "_reserve_appliances", lambda: [])
+    monkeypatch.setattr(powerstation_live, "_planning_powerstations", lambda *_a: [])
+    monkeypatch.setattr(powerstation_live, "_reserve_appliances", lambda *_a: [])
 
     def fail_states():
         raise AssertionError("no state read without reserves")

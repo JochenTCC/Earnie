@@ -64,6 +64,12 @@ the wait with a new out-of-band label, next to `request_optimize`.
   contradicts "the plan decides".
 - A hub can already do the same from outside by sending `Earnie_Request_Optimize` when
   the appliance starts. That needs no code and stays possible.
+- Review fixes 2026-11-22: a run that plans an earlier slot than the one it ends in (a
+  release run started shortly before the tick) is followed at once by a regular run for the
+  current slot (`start_scheduler.missed_slot_start`), instead of the old setpoints staying
+  until the tick after. Failed live reads in the wait-loop check are logged once per source
+  and wait (`powerstation_live.WaitReadErrors`), not swallowed; the loop goes on. Signals
+  only present in the cycle telemetry are not seen by the wait loop.
 
 ### 2. Price-aware floor per slot (Reserve P2)
 
@@ -120,19 +126,30 @@ Implemented (2026-11-22), decisions by the maintainer the same day:
   (`p_charge · eff`, `p_discharge / eff`).
 - **Hold cost** per kWh of reserve: `fill / efficiency · idle_drain_hold_kwh(hold_h) / R`,
   i.e. the drain over the hold time, bought again through the charge path and spread over
-  the reserve `R`. Hold time from a horizon slot `s`: `(t − s) · dt`; from the basis: the
-  time since the basis timestamp up to the start of slot `t`. Without a drain it is 0.
+  the reserve `R`. Hold time from a horizon slot `s`: `(t − s) · dt`; from the basis:
+  `t · dt`, from the start of slot 0 (review fix 2026-11-22). For energy already stored the
+  fill price and the hold time up to now are sunk; only keeping it from now on costs. The
+  first version counted the hold from the basis timestamp, so the hold cost grew every cycle
+  and the floor dropped about 2 h into a long expensive phase. The basis timestamp stays the
+  record of when the energy was bought. Without a drain the hold cost is 0.
 - **Energy already stored (option A).** The matrix has no past prices, so with horizon
   slots alone every re-plan inside an expensive phase would see only expensive slots
   before `t` and drop the floor. The reserve state keeps a fill basis per virtual reserve
   (`fill_basis_price`, `fill_basis_at` in `runtime_store/powerstation_reserves.json`; no
   pack JSON change). After each live plan (`powerstation_live.update_reserve_fill_basis`,
-  called from `main.py`): if the floor is held at the end of slot 0, the fill price and
+  called from `main.py` after the setpoint writes, so a failure there never leaves the slot
+  without control): if the floor is held at the end of slot 0, the fill price and
   time behind the first paying slot become the basis; otherwise the basis is cleared
   (cheap phase). A trigger (`set_trigger`) and an emptied reserve clear it too. The
   cheapest basis among the virtual reserves reaches the MILP as
   `_virtual_reserve_basis_price` / `_virtual_reserve_basis_at`.
 - **Slot 0** has no slot before it and pays only through the basis.
+- **Fill times** of the horizon slots that justify a paying slot are validated
+  (`slot_datetime`, tz-aware) inside `reserve_price_floor`, i.e. before the MILP is built;
+  a missing one fails loud there and not later when the basis is persisted.
+- **Start below `min_soc`** (`milp_soc_recovery`): the recovery is forced (`recovered = 1`)
+  in the first slot whose bound is above the base, so the solver cannot charge without it
+  and skip the floor. That bound is reachable by construction (`reachable_floor_kwh`).
 - **Where the floor binds.** `e_batt[k]` is the energy at the end of slot `k`. It carries
   the reserve when slot `k` or slot `k + 1` pays, so the reserve is there during the whole
   paying slot (start and end). Elsewhere the bound is the base `min_soc`.
@@ -224,8 +241,9 @@ Open after P3: live check (count forced charge slots per day). **Hold cost findi
 drain configured, the hold cost of P2 is large for a small reserve (1 %/h of 15 kWh on 1.1 kWh,
 fill at 25 ct: about 3.6 ct per kWh and hour held). A basis kept from the start of an expensive
 phase stops paying after a few hours (at 35 ct after about 1.8 h), and the floor then drops in
-the middle of the phase. Whether the drain should count fully as hold cost (it runs whenever the
-SoC is above the base, also without the reserve held at the floor) is a P2 question.
+the middle of the phase. Fixed 2026-11-22 (review finding 1): the basis counts the hold from
+slot 0, not from the fill time. Still open: whether the drain should count fully as hold cost
+(it runs whenever the SoC is above the base, also without the reserve held at the floor).
 
 ### 4. Idle drain in the model (Reserve P4)
 

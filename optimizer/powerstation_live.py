@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Callable
 
 import config
 from house_config.powerstation import BACKING_VIRTUAL, MODE_RESERVE
@@ -39,10 +39,41 @@ def _status_key(field_key: str, kind: str) -> str:
         return field_key
     return kind or field_key
 
-def _planning_powerstations() -> list[dict]:
+# Reports a failed live read (source, error) instead of dropping it (Reserve P1 wait loop).
+ReadErrorReporter = Callable[[str, Exception], None]
+
+
+class WaitReadErrors:
+    """Logs each failing read source once per wait between two runs (Reserve P1).
+
+    The wait-loop release check reads every 30 s; a lasting outage would flood the log, a
+    swallowed one hides that no release can happen. One warning per source and wait, the
+    loop goes on (the next regular run reads with its own error handling).
+    """
+
+    def __init__(self) -> None:
+        self._seen: set[str] = set()
+
+    def __call__(self, source: str, exc: Exception) -> None:
+        if source in self._seen:
+            return
+        self._seen.add(source)
+        logger.warning(
+            "Reserve-Freigabe (Warteschleife): %s nicht lesbar (%s: %s) — über dieses Signal "
+            "keine Freigabe bis zum nächsten Lauf; weitere Fehler dieser Quelle in dieser "
+            "Wartezeit werden nicht geloggt.",
+            source,
+            type(exc).__name__,
+            exc,
+        )
+
+
+def _planning_powerstations(on_read_error: ReadErrorReporter | None = None) -> list[dict]:
     try:
         resolved = config.get_resolved_runtime_settings()
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001
+        if on_read_error is not None:
+            on_read_error("Powerstation-Konfiguration", exc)
         return []
     if not isinstance(resolved, dict):
         return []
@@ -50,13 +81,16 @@ def _planning_powerstations() -> list[dict]:
     return list(value) if isinstance(value, list) else []
 
 
-def _reserve_appliances() -> list[dict]:
+def _reserve_appliances(on_read_error: ReadErrorReporter | None = None) -> list[dict]:
     from house_config.powerstation import MODE_RESERVE
 
     try:
         appliances = config.get_appliances()
-    except Exception:  # noqa: BLE001
-        logger.warning("powerstation_live: get_appliances failed")
+    except Exception as exc:  # noqa: BLE001
+        if on_read_error is not None:
+            on_read_error("Geräte-Konfiguration", exc)
+        else:
+            logger.warning("powerstation_live: get_appliances failed")
         return []
     return [
         a for a in appliances if str(a.get("mode") or "") == MODE_RESERVE
@@ -78,10 +112,12 @@ def apply_reserves_to_battery_params(
     return prepare_battery_params_for_reserves(battery_params, active)
 
 
-def _consumers_by_id() -> dict[str, dict]:
+def _consumers_by_id(on_read_error: ReadErrorReporter | None = None) -> dict[str, dict]:
     try:
         consumers = config.get_flexible_consumers()
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001
+        if on_read_error is not None:
+            on_read_error("Verbraucher-Konfiguration", exc)
         return {}
     out: dict[str, dict] = {}
     for consumer in consumers or []:
@@ -105,7 +141,9 @@ def _telemetry_number(telemetry: dict[str, Any] | None, key: str) -> float | Non
         return None
 
 
-def _digital_active_from_consumer(consumer: dict) -> bool | None:
+def _digital_active_from_consumer(
+    consumer: dict, on_read_error: ReadErrorReporter | None = None
+) -> bool | None:
     """Read ``sens_consumer_active`` Merker when mapped; None if unavailable."""
     from settings.ehal_marker_resolve import marker_sens_consumer_active
 
@@ -116,7 +154,9 @@ def _digital_active_from_consumer(consumer: dict) -> bool | None:
         from integrations.ehal_live import read_generic_value as fetch_loxone_generic_value
 
         raw = fetch_loxone_generic_value(io_name)
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001
+        if on_read_error is not None:
+            on_read_error(f"Laufsignal {io_name}", exc)
         return None
     if raw is None:
         return None
@@ -126,12 +166,16 @@ def _digital_active_from_consumer(consumer: dict) -> bool | None:
         return None
 
 
-def _live_power_kw(consumer: dict) -> float | None:
+def _live_power_kw(
+    consumer: dict, on_read_error: ReadErrorReporter | None = None
+) -> float | None:
     try:
         from integrations.ehal_live import resolve_consumer_live_power_kw
 
         return resolve_consumer_live_power_kw(consumer)
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001
+        if on_read_error is not None:
+            on_read_error(f"Leistung von {consumer.get('id') or '?'}", exc)
         return None
 
 
@@ -150,8 +194,13 @@ def appliance_run_signal_active(
     *,
     telemetry: dict[str, Any] | None,
     consumers_by_id: dict[str, dict] | None = None,
+    on_read_error: ReadErrorReporter | None = None,
 ) -> bool:
-    """OR trigger: digital active, power threshold, or telemetry keys (2.7.p)."""
+    """OR trigger: digital active, power threshold, or telemetry keys (2.7.p).
+
+    ``on_read_error``: receives failed live reads (wait loop); without it they count as no
+    signal, as in the cycle, which has the telemetry.
+    """
     cid = str(appliance_id or "").strip()
     if not cid:
         return False
@@ -173,10 +222,10 @@ def appliance_run_signal_active(
     consumer = (consumers_by_id or {}).get(cid)
     if consumer is None:
         return False
-    live_digital = _digital_active_from_consumer(consumer)
+    live_digital = _digital_active_from_consumer(consumer, on_read_error)
     if live_digital is True:
         return True
-    live_power = _live_power_kw(consumer)
+    live_power = _live_power_kw(consumer, on_read_error)
     return detect_trigger_from_power(live_power)
 
 
@@ -217,21 +266,26 @@ def sync_triggers_from_telemetry(
             set_trigger(ps_id, active=True)
 
 
-def release_virtual_reserves_on_appliance_start() -> list[str]:
+def release_virtual_reserves_on_appliance_start(
+    on_read_error: ReadErrorReporter | None = None,
+) -> list[str]:
     """Wait-loop check (Reserve P1): latch filled virtual reserves whose appliance runs.
 
     Only reserves that hold energy (``protected_kwh`` > 0) and are not latched
     yet are checked, so one appliance start latches once; the latch stays until
     the reserve is empty (``advance_reserve_after_slot``). Reads live signals
-    (no cycle telemetry between runs) and writes the reserve state only on a
-    trigger. Returns the latched powerstation ids.
+    (no cycle telemetry between runs: signals only present in the cycle telemetry
+    are not seen here) and writes the reserve state only on a trigger. Failed
+    reads go to ``on_read_error`` (default: a ``WaitReadErrors`` for this call, so
+    each one is logged). Returns the latched powerstation ids.
     """
+    report = on_read_error if on_read_error is not None else WaitReadErrors()
     ps_by_id = {
         str(p["id"]): p
-        for p in _planning_powerstations()
+        for p in _planning_powerstations(report)
         if isinstance(p, dict) and p.get("id")
     }
-    groups = _group_reserve_appliances(_reserve_appliances(), ps_by_id, warn=False)
+    groups = _group_reserve_appliances(_reserve_appliances(report), ps_by_id, warn=False)
     if not groups:
         return []
     states = load_reserve_states()
@@ -246,11 +300,14 @@ def release_virtual_reserves_on_appliance_start() -> list[str]:
         if protected_kwh_from_state(entry) <= 1e-9:
             continue
         if consumers is None:
-            consumers = _consumers_by_id()
+            consumers = _consumers_by_id(report)
         for appliance in group:
             appliance_id = str(appliance.get("id") or "").strip()
             if appliance_id and appliance_run_signal_active(
-                appliance_id, telemetry=None, consumers_by_id=consumers
+                appliance_id,
+                telemetry=None,
+                consumers_by_id=consumers,
+                on_read_error=report,
             ):
                 set_trigger(ps_id, active=True)
                 logger.info(

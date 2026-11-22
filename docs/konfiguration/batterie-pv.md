@@ -66,6 +66,9 @@ Solange ein Gerät aktiv ist, gibt Earnie die gehaltene Reserve frei, der SoC-Fl
 
 - Pro Gerätestart gibt es genau einen Zusatzlauf. Die Freigabe bleibt bestehen, bis die Reserve leer ist; ein weiter laufendes Gerät weckt Earnie also nicht erneut.
 - Beginnt der nächste reguläre Lauf ohnehin innerhalb seiner erwarteten Laufzeit (Vorlauf des Frühstarts), weckt Earnie nicht. Der reguläre Lauf übernimmt die Freigabe.
+- Endet der Zusatzlauf erst nach dem nächsten Viertelstunden-Takt, startet Earnie sofort einen regulären Lauf für die neue Viertelstunde. Sonst blieben die Sollwerte der alten Viertelstunde bis zum übernächsten Takt stehen.
+- Die Prüfung zwischen den Läufen liest nur Signale, die Earnie live abfragen kann: das digitale Aktiv-Signal (`sens_consumer_active`) und die Live-Leistung des Geräts. Signale, die nur in der Telemetrie eines Laufs stehen (etwa die Ausgangsleistung einer physischen Powerstation), sieht erst der nächste reguläre Lauf.
+- Kann Earnie ein Signal nicht lesen (z. B. Smarthome nicht erreichbar), schreibt es eine Warnung ins Log, einmal pro Quelle und Wartezeit, und prüft weiter. Über ein nicht lesbares Signal gibt Earnie bis zum nächsten Lauf nichts frei.
 - Leere Reserven und physische Powerstations lösen keinen Zusatzlauf aus. Physische Powerstations gibt weiterhin der reguläre Lauf frei.
 - Ein Smarthome kann denselben Effekt weiterhin von außen auslösen, indem es beim Gerätestart `Earnie_Request_Optimize` sendet.
 
@@ -77,6 +80,8 @@ Solange ein Gerät aktiv ist, gibt Earnie die gehaltene Reserve frei, der SoC-Fl
 - In einer günstigen Phase gibt es keinen Floor. Eine volle Reserve wird dort nicht herausgedrängt; der Plan nutzt die Energie nur, wenn sich das lohnt. Ein SoC unter dem Floor löst in einer günstigen Phase keine Nachladung aus.
 - Bei flachen Preisen lohnt sich die Reserve nie; Earnie hält und lädt dann nichts.
 - Hält der Plan die Reserve gerade, merkt sich Earnie den Preis, zu dem sie geladen wurde (Laufzeitdatei `powerstation_reserves.json`, Felder `fill_basis_price` und `fill_basis_at`). Der nächste Lauf mitten in der teuren Phase sieht so weiter, dass die gespeicherte Energie günstig war, und hält den Floor. Fällt der Floor in einer günstigen Phase weg, wird die Reserve freigegeben oder ist sie leer, löscht Earnie diesen Preis.
+- Für gespeicherte Energie zählt die Selbstentladung erst ab jetzt: Ladepreis und bisherige Haltezeit sind bereits bezahlt. Eine lange teure Phase hält den Floor deshalb bis zu ihrem Ende, auch wenn die Reserve schon Stunden davor geladen wurde.
+- Liegt der SoC beim Start unter dem Mindest-SoC, führt Earnie ihn zurück und baut die Reserve bis zur ersten Viertelstunde auf, in der sie sich lohnt (soweit die Ladeleistung reicht).
 - Reicht die Ladeleistung nicht, um die Reserve bis zur ersten teuren Viertelstunde aufzubauen, baut Earnie sie so schnell wie möglich auf und schreibt eine Warnung ins Log.
 
 - Im Modus **Automatik** begrenzt Earnie das geschriebene Entladelimit auf die Energie über diesem Floor, die in einer Viertelstunde abfließen darf. Das gilt nur, wenn die Reserve in der aktuellen Viertelstunde gehalten wird; ohne Floor bleibt das volle Entladelimit. Bei 14 % SoC und einem Floor von 12,3 % sind das rund 0,9 kW. So kann ein großer Verbraucher (z. B. SwimSpa) die Reserve nicht innerhalb eines Slots leeren, die danach aus dem Netz nachgeladen werden müsste. Weiter über dem Floor bleibt das volle Entladelimit.

@@ -12,7 +12,11 @@ The virtual reserve of a powerstation raises the lower bound only in the slots w
 (Reserve P2, ``reserve_price_floor``); those bounds are per slot. A start between the configured
 ``min_soc`` and the reserve floor needs no recovery: the floor is only due in paying slots and
 is capped to what the battery can reach. A start below ``min_soc`` is led back to each slot's
-own bound.
+own bound, and ``recovered`` is forced in the first slot whose bound lies above ``min_soc`` (a
+reserve floor): otherwise the solver could charge without setting it and skip the floor. That
+bound is reachable from the start, because ``reachable_floor_kwh`` lowers an unreachable floor
+to what the battery can reach, and never above ``min_soc`` while ``min_soc`` itself is out of
+reach.
 """
 from __future__ import annotations
 
@@ -33,12 +37,14 @@ def _add_one_sided_recovery(
     e_start: float,
     e_limits: list[float],
     below: bool,
+    due_slot: int | None = None,
 ) -> None:
     """Relax the limit to the start energy and lock the power that leads away from it.
 
     ``recovered[t]`` = 1 says the energy is back inside the limit at the end of slot ``t``;
     it never falls back to 0. ``locked_power`` (discharge below the limit, charge above it)
-    needs ``recovered`` at the start of its slot.
+    needs ``recovered`` at the start of its slot. ``due_slot``: the energy must be back by the
+    end of this slot (``recovered`` = 1 there).
     """
     side = "low" if below else "high"
     recovered = [
@@ -68,6 +74,8 @@ def _add_one_sided_recovery(
             locked_power[t] <= max_power * recovered[t - 1],
             f"soc_recovery_lock_{side}_{slug}_{t}",
         )
+    if due_slot is not None:
+        prob += recovered[due_slot] == 1, f"soc_recovery_due_{side}_{slug}"
 
 
 def add_soc_recovery_constraints(
@@ -102,6 +110,11 @@ def add_soc_recovery_constraints(
         e_start = float(e_init_by_ess[ess_id])
         slug = ess_id.replace("-", "_")
         if e_start < e_min - _ENERGY_TOLERANCE_KWH:
+            # Reserve floor (per-slot bound above min_soc): due in its first slot.
+            due_slot = next(
+                (t for t, low in enumerate(lows) if low > e_min + _ENERGY_TOLERANCE_KWH),
+                None,
+            )
             _add_one_sided_recovery(
                 prob,
                 slug,
@@ -110,6 +123,7 @@ def add_soc_recovery_constraints(
                 e_start=e_start,
                 e_limits=lows,
                 below=True,
+                due_slot=due_slot,
             )
         elif e_start > e_max + _ENERGY_TOLERANCE_KWH:
             _add_one_sided_recovery(

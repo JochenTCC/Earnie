@@ -41,6 +41,7 @@ from optimizer.start_scheduler import (
     LEAD_MAX_SEC,
     decide_lead,
     early_start_enabled,
+    missed_slot_start,
     next_regular_start,
 )
 from optimizer.run_trigger import (
@@ -202,12 +203,17 @@ def _observe_idle_drain() -> None:
 
 def _reserve_release_wait_poll(*, wait_sec: float, run_estimate_sec: float):
     """``on_poll`` for the wait between regular runs: sampler + reserve release (Reserve P1)."""
-    from optimizer.powerstation_live import release_virtual_reserves_on_appliance_start
+    from optimizer.powerstation_live import (
+        WaitReadErrors,
+        release_virtual_reserves_on_appliance_start,
+    )
     from optimizer.run_trigger import reserve_release_poll
 
+    # One warning per failing read source and wait (no 30-s log flood, no silent outage).
+    read_errors = WaitReadErrors()
     return reserve_release_poll(
         base_poll=_daemon_wait_poll,
-        check_release=lambda: bool(release_virtual_reserves_on_appliance_start()),
+        check_release=lambda: bool(release_virtual_reserves_on_appliance_start(read_errors)),
         wake_until=time.monotonic() + float(wait_sec) - float(run_estimate_sec),
     )
 
@@ -837,10 +843,6 @@ def _main_cycle(
             dt_h=DEFAULT_DT_H,
             matrix=optimization_matrix,
         )
-        # Reserve P2: keep the fill price of a held reserve for the next re-plan.
-        update_reserve_fill_basis(
-            battery_params, optimization_matrix, active_reserves, dt_h=DEFAULT_DT_H
-        )
         if automatik_discharge_cap is not None and mode == 0:
             logger.info(
                 "Automatik discharge limit capped at %.2f kW (virtual reserve floor)",
@@ -966,6 +968,12 @@ def _main_cycle(
             loxone_writes = serialize_write_records(
                 list(huawei_writes) + list(flex_writes) + list(powerstation_writes)
             ) + list(inv_rows) + list(unassigned_rows)
+
+        # Reserve P2: keep the fill price of a held reserve for the next re-plan. After the
+        # setpoint writes: a failure here must not leave the slot without control.
+        update_reserve_fill_basis(
+            battery_params, optimization_matrix, active_reserves, dt_h=DEFAULT_DT_H
+        )
 
         if live_power is None:
             live_power = ehal_live.read_live_power_kw()
@@ -1394,6 +1402,7 @@ if __name__ == "__main__":
                 + timedelta(minutes=optimization_schedule.QUARTER_HOUR_MINUTES)
             ):
                 cycle_tick = None
+            cycle_started_at, cycle_trigger = datetime.now(), next_trigger
             completed = main(
                 run_trigger=next_trigger,
                 woke_at=cycle_woke_at,
@@ -1426,6 +1435,19 @@ if __name__ == "__main__":
                 )
             lead_was_capped = decision.capped
             now = datetime.now()
+            missed = missed_slot_start(cycle_started_at, cycle_tick, now)
+            if missed is not None:
+                # E.g. a reserve release run (P1) started shortly before the tick and ended
+                # after it: the current slot gets its own plan now, not a quarter hour late.
+                logger.warning(
+                    "Lauf (%s, Start %s) endete nach dem Takt %s — regulärer Lauf für den "
+                    "laufenden Slot startet sofort.",
+                    cycle_trigger,
+                    cycle_started_at.strftime("%H:%M:%S"),
+                    missed.strftime("%H:%M"),
+                )
+                woke_at = now
+                continue
             next_tick, start_at = next_regular_start(now, decision.lead_sec)
             _prefetch_for_next_cycle(next_tick, start_at)
             now = datetime.now()

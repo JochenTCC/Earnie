@@ -171,12 +171,17 @@ def test_fill_basis_keeps_the_floor_inside_an_expensive_phase() -> None:
     assert not any(plain.pays)
 
 
-def test_fill_basis_needs_a_timed_matrix() -> None:
+def test_fill_slot_needs_a_timed_matrix() -> None:
+    # The basis counts the hold from slot 0 (review fix 2026-11-22) and needs no slot time;
+    # a horizon slot that becomes the fill source does (it may become the persisted basis).
     battery = _prepared(_reserve(basis=(25.0, _START)))
-    matrix = _matrix([35.0] * 4)
+    untimed = _matrix([35.0] * 4)
+    del untimed[0]["slot_datetime"]
+    assert all(reserve_price_floor(battery, untimed, horizon=4, dt_h=_DT_H).pays)
+    matrix = _matrix([20.0] + [35.0] * 3)
     del matrix[0]["slot_datetime"]
     with pytest.raises(ValueError, match="slot_datetime"):
-        reserve_price_floor(battery, matrix, horizon=4, dt_h=_DT_H)
+        reserve_price_floor(_prepared(), matrix, horizon=4, dt_h=_DT_H)
 
 
 def test_released_reserve_has_no_floor() -> None:

@@ -8,7 +8,8 @@ The reserve is held in slot ``t`` only where feeding from the battery is cheaper
 
 - from a slot ``s < t`` of the horizon: ``price[s] / eta_rt + hold(s, t)``,
 - from energy already stored (the persisted fill basis, see
-  ``runtime_store.powerstation_reserves``): ``basis / eta_rt + hold(basis time, t)``.
+  ``runtime_store.powerstation_reserves``): ``basis / eta_rt + hold(slot 0, t)``. The fill
+  price is paid and the hold time up to now is sunk; only the hold from now on counts.
 
 ``eta_rt`` is the round trip of the battery, ``efficiency ** 2`` (the MILP applies
 ``efficiency`` once on charge and once on discharge). ``hold`` is the idle drain over the hold
@@ -90,7 +91,7 @@ def slot_start(matrix: list[dict[str, Any]], index: int) -> datetime:
         raise ValueError(
             "Virtuelle Reserve: Matrix-Slot "
             f"{index} hat keinen Zeitpunkt mit Zeitzone (slot_datetime={slot!r}); "
-            "Haltedauer der gespeicherten Reserve nicht bestimmbar."
+            "Füllzeitpunkt der Reserve nicht bestimmbar."
         )
     return slot
 
@@ -136,10 +137,8 @@ def reserve_price_floor(
 
     basis_price = bat.get(BASIS_PRICE_KEY)
     basis_at: datetime | None = None
-    basis_held_h = 0.0
     if basis_price is not None and horizon > 0:
         basis_at = _parse_basis_at(bat[BASIS_AT_KEY])
-        basis_held_h = max(0.0, (slot_start(matrix, 0) - basis_at).total_seconds() / 3600.0)
 
     pays: list[bool] = []
     fill_price: list[float | None] = []
@@ -147,19 +146,28 @@ def reserve_price_floor(
     for t in range(horizon):
         best_cost: float | None = None
         best_price: float | None = None
-        best_at: datetime | None = None
+        # Fill source: index of the horizon slot, or None for the persisted basis.
+        best_slot: int | None = None
         if basis_price is not None:
-            best_cost = cost(float(basis_price), basis_held_h + t * dt_h)
-            best_price, best_at = float(basis_price), basis_at
+            # Energy already stored: fill price and past hold time are sunk, the hold
+            # from the start of slot 0 on is what keeping it costs from now.
+            best_cost = cost(float(basis_price), t * dt_h)
+            best_price = float(basis_price)
         for s in range(t):
             c = cost(prices[s], (t - s) * dt_h)
             if best_cost is None or c < best_cost - _EPS:
-                best_cost, best_price = c, prices[s]
-                best_at = matrix[s].get("slot_datetime")
+                best_cost, best_price, best_slot = c, prices[s], s
         ok = best_cost is not None and prices[t] > best_cost + _EPS
         pays.append(ok)
         fill_price.append(best_price if ok else None)
-        fill_at.append(best_at if ok else None)
+        if not ok:
+            fill_at.append(None)
+        elif best_slot is None:
+            fill_at.append(basis_at)
+        else:
+            # The fill time becomes the persisted basis (update_reserve_fill_basis):
+            # validated here, before the model is built, not after the plan.
+            fill_at.append(slot_start(matrix, best_slot))
 
     floor_kwh = [
         reserve_floor_kwh if (pays[k] or (k + 1 < horizon and pays[k + 1])) else base_kwh

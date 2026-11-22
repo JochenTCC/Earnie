@@ -142,3 +142,26 @@ def next_regular_start(now: datetime, lead_sec: float) -> tuple[datetime, dateti
     tick = quarter_hour_slot_start(now) + timedelta(minutes=QUARTER_HOUR_MINUTES)
     start_at = max(now, tick - timedelta(seconds=float(lead_sec)))
     return tick, start_at
+
+
+def missed_slot_start(
+    run_started_at: datetime, planned_tick: datetime | None, now: datetime
+) -> datetime | None:
+    """Start of the current slot when the run that just ended planned an earlier one.
+
+    A run plans for ``planned_tick`` (early start) or else for the slot it started in. When
+    it ends after the next tick (an out-of-band run such as a reserve release started shortly
+    before the tick, or an overlong run), the current slot has no plan of its own yet:
+    ``next_regular_start`` would wait for the tick after it and leave the old slot's
+    setpoints in place for up to a quarter hour. The caller then starts a regular run at
+    once. ``None``: the run planned the current slot (or a later one).
+    """
+    from optimizer.schedule import quarter_hour_slot_start
+
+    planned_slot = (
+        quarter_hour_slot_start(planned_tick)
+        if planned_tick is not None
+        else quarter_hour_slot_start(run_started_at)
+    )
+    current_slot = quarter_hour_slot_start(now)
+    return current_slot if planned_slot < current_slot else None
