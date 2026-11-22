@@ -553,7 +553,15 @@ def render_account_chart(
     kwargs: dict = {"width": "stretch"}
     if chart_key:
         kwargs["key"] = chart_key
-    st.plotly_chart(localized_figure(fig), **kwargs)
+    from ui.chart_aspect import render_plotly_with_aspect
+
+    # Width:height from ui.chart_aspect_ratios.chart2 (phones: the figure's 520 px).
+    render_plotly_with_aspect(
+        fig,
+        chart_id="chart2",
+        instance=chart_key or key_prefix,
+        **kwargs,
+    )
     render_collapsible_legend_from_figure(fig)
     hint = energy_difference_hint(view)
     if hint:

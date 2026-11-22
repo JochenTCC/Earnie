@@ -11,7 +11,7 @@ from data import live_consumption
 from integrations import ehal_live
 from runtime_store import run_state
 from runtime_store.ehal_setup import active_ehal_backend, backend_label
-from ui.number_format import format_decimal, localized_figure
+from ui.number_format import format_decimal
 from ui.fragment_refresh import STATUS_FRAGMENT_RUN_EVERY
 from ui.runtime_config import reload_runtime_config
 from ui import sankey_produktiv as produktiv
@@ -524,4 +524,14 @@ def _render_live_power_flow_body(current_soc: float | None) -> None:
         breakdown=snapshot,
         main_state=main_state,
     )
-    st.plotly_chart(localized_figure(fig), width="stretch", key="live_power_flow_sankey")
+    from ui.chart_aspect import render_plotly_with_aspect
+
+    # Width:height from ui.chart_aspect_ratios.sankey; never lower than the height its
+    # consumers need (phones: that height).
+    render_plotly_with_aspect(
+        fig,
+        chart_id="sankey",
+        min_height_px=int(fig.layout.height),
+        width="stretch",
+        key="live_power_flow_sankey",
+    )

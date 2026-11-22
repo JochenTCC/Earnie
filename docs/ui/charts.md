@@ -19,6 +19,8 @@ Wartet die Seite auf **main.py**, erscheint **über** den Charts ein blauer Sync
 
 **Überschrift:** Fensterbezeichnung und Datumsbereich, z. B. „SA₀→SA₂ (Live)“ am Desktop bzw. „SA₀→SA₁ (Live)“ mobil. Das **?** daneben erklärt die Hintergrundzonen (grau, neutral, grün) und die Navigation.
 
+**Größe:** Auf Desktop und Tablet behält Chart 1 ein festes Seitenverhältnis Breite:Höhe, standardmäßig 3:1, und ist mindestens 320 px hoch. Ein breites Fenster macht den Chart also höher, ein schmales flacher. Siehe [Seitenverhältnis der Charts](#seitenverhältnis-der-charts).
+
 **Linke Y-Achse (kW):** Die Balkenhöhe zeigt die Leistung. Die Balkenbreite folgt der Slotdauer (**15 min** über den ganzen Horizont), die Fläche ist also proportional zur Energie. **Ausnahme Verbraucher:** Generic-Schedules werden intern stündlich modelliert und auf Viertelstunden gehalten. Läufe mit `duration_h < 1` können deshalb als mittlere Leistung erscheinen (`nominal × duration_h` in `generic_schedule`).
 
 | Spur | Darstellung | Bedeutung |
@@ -137,6 +139,18 @@ Die Wärmepumpe („Freigabe, aber nicht angesprungen“) bewertet Earnie genaus
 | `swimspa_filter_should_run_missing` | pool_filter | Fehler |
 | `swimspa_filter_runs_unexpectedly` | pool_filter | Fehler |
 | `swimspa_filter_over_nominal` | pool_filter | Warnung |
+
+## Seitenverhältnis der Charts
+
+Chart 1, Chart 2 und das Energiefluss-Diagramm (Sankey) behalten auf Desktop und Tablet ein festes Seitenverhältnis Breite:Höhe. Die Werte stehen in `config.json` unter `ui.chart_aspect_ratios`, je Chart eine Zahl größer 0 und höchstens 10:
+
+```json
+"ui": {
+  "chart_aspect_ratios": { "chart1": 3, "chart2": 3, "sankey": 3 }
+}
+```
+
+Fehlt ein Wert, gilt 3 (also 3:1). Jeder Chart ist mindestens 320 px hoch, das Sankey mindestens so hoch, wie seine Verbraucher Platz brauchen. Eine Änderung wirkt beim nächsten Neuladen der Seite, ohne Neustart. Auf dem Smartphone behalten die Charts ihre feste Höhe (Chart 1 450 px, Chart 2 520 px, Sankey nach Anzahl der Verbraucher).
 
 ## Navigation nach Chart 1
 

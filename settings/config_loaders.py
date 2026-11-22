@@ -102,6 +102,7 @@ def load_system_and_ui_params(
             raw_config
         ),
         "UI_STREAMLIT_PORT": system_settings.load_ui_streamlit_port(raw_config),
+        "UI_CHART_ASPECT_RATIOS": system_settings.load_ui_chart_aspect_ratios(raw_config),
         "UI_PRICE_FORECAST_PAGE_ENABLED": system_settings.load_ui_bool(
             raw_config, "price_forecast_page_enabled", False
         ),

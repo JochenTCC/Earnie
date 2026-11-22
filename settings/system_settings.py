@@ -121,6 +121,44 @@ def load_ui_fragment_refresh_sec(raw_config: dict, key: str, default: int) -> in
     return value
 
 
+# Width:height of the Monitor charts on desktop and tablet (``ui.chart_aspect_ratios``).
+UI_CHART_ASPECT_IDS = ("chart1", "chart2", "sankey")
+DEFAULT_UI_CHART_ASPECT_RATIO = 3.0
+
+
+def load_ui_chart_aspect_ratios(raw_config: dict) -> dict[str, float]:
+    """``ui.chart_aspect_ratios`` per chart (> 0, at most 10); an absent chart → 3.0."""
+    raw = raw_config.get("ui", {}).get("chart_aspect_ratios")
+    if raw is None:
+        raw = {}
+    if not isinstance(raw, dict):
+        raise ValueError(
+            "Kritischer Konfigurationsfehler: ui.chart_aspect_ratios muss ein Objekt sein "
+            f"({', '.join(UI_CHART_ASPECT_IDS)})."
+        )
+    unknown = sorted(set(raw) - set(UI_CHART_ASPECT_IDS))
+    if unknown:
+        raise ValueError(
+            "Kritischer Konfigurationsfehler: ui.chart_aspect_ratios kennt "
+            f"{', '.join(unknown)} nicht (erlaubt: {', '.join(UI_CHART_ASPECT_IDS)})."
+        )
+    ratios: dict[str, float] = {}
+    for chart_id in UI_CHART_ASPECT_IDS:
+        value = raw.get(chart_id)
+        if value is None:
+            ratios[chart_id] = DEFAULT_UI_CHART_ASPECT_RATIO
+            continue
+        key = f"ui.chart_aspect_ratios.{chart_id}"
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise ValueError(f"Kritischer Konfigurationsfehler: {key} muss eine Zahl sein.")
+        if not 0.0 < float(value) <= 10.0:
+            raise ValueError(
+                f"Kritischer Konfigurationsfehler: {key} muss größer 0 und höchstens 10 sein."
+            )
+        ratios[chart_id] = float(value)
+    return ratios
+
+
 def _validate_ui_bool(raw: object, source: str) -> bool:
     if not isinstance(raw, bool):
         raise ValueError(

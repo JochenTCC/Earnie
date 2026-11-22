@@ -12,7 +12,6 @@ import plotly.graph_objects as go
 
 from data.planning_window import UiChartWindow
 from optimizer.deviation_eval import DeviationEvent
-from ui.number_format import localized_figure
 from ui.chart_decorations import (
     ChartSunMarkers,
     _add_deviation_markers,
@@ -43,7 +42,7 @@ from ui.chart_legend_mobile import (
     render_collapsible_legend_from_figure,
 )
 from ui.help_hint import render_title_with_help
-from ui.s2_viewport import is_phone_request
+from ui.chart_aspect import render_plotly_with_aspect
 
 logger = logging.getLogger(__name__)
 
@@ -309,30 +308,6 @@ def build_power_soc_chart_figure(
     return fig
 
 
-# Chart 1 on desktop and tablet: constant width:height ratio, so a wide window does not
-# get a flat chart and a narrow one not a tall chart. The browser sizes the box from its
-# width (CSS aspect-ratio) and the figure stretches to it. Phones keep Plotly's default
-# height (450 px): at 4:1 the chart would be under 100 px high there.
-CHART1_ASPECT_RATIO = 4.0
-CHART1_MIN_HEIGHT_PX = 320
-CHART1_BOX_KEY = "chart1_aspect_box"
-
-
-def chart1_aspect_css(
-    ratio: float = CHART1_ASPECT_RATIO, *, min_height_px: int = CHART1_MIN_HEIGHT_PX
-) -> str:
-    """CSS for the Chart 1 box: height from its width at *ratio*, never below *min_height_px*."""
-    if ratio <= 0:
-        raise ValueError(f"Chart-1-Seitenverhältnis muss > 0 sein (ist {ratio}).")
-    return (
-        "<style>"
-        f".st-key-{CHART1_BOX_KEY} {{ aspect-ratio: {ratio:g} / 1; "
-        f"min-height: {int(min_height_px)}px; }}"
-        f".st-key-{CHART1_BOX_KEY} [data-testid=\"stPlotlyChart\"] {{ height: 100%; }}"
-        "</style>"
-    )
-
-
 def render_power_soc_chart(
     df: pd.DataFrame,
     baseline_df: pd.DataFrame | None = None,
@@ -387,12 +362,10 @@ def render_power_soc_chart(
     if chart_key:
         plotly_kwargs["key"] = chart_key
     inject_mobile_legend_css()
-    if is_phone_request():
-        st.plotly_chart(localized_figure(fig), **plotly_kwargs)
-    else:
-        st.markdown(chart1_aspect_css(), unsafe_allow_html=True)
-        with st.container(key=CHART1_BOX_KEY):
-            st.plotly_chart(localized_figure(fig), height="stretch", **plotly_kwargs)
+    # Width:height from ui.chart_aspect_ratios.chart1 (phones: Plotly default height).
+    render_plotly_with_aspect(
+        fig, chart_id="chart1", instance=chart_key or "", **plotly_kwargs
+    )
     render_collapsible_legend_from_figure(fig)
 
 

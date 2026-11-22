@@ -368,6 +368,12 @@ class Config:
     def get_ui_chart_debug_capture_dir(self) -> str:
         return str(self.get("UI_CHART_DEBUG_CAPTURE_DIR", default="chart_debug"))
 
+    def get_ui_chart_aspect_ratio(self, chart_id: str) -> float:
+        ratios = self.UI_CHART_ASPECT_RATIOS
+        if chart_id not in ratios:
+            raise ValueError(f"Unbekannte Chart-Kennung für das Seitenverhältnis: {chart_id!r}.")
+        return float(ratios[chart_id])
+
     def is_shadow_feed_enabled(self) -> bool:
         return bool(self.get("SHADOW_FEED_ENABLED", default=False))
 
@@ -656,6 +662,10 @@ def get_ui_main_sync_poll_sec() -> int:
 
 def get_ui_chart_debug_capture_dir() -> str:
     return CONFIG.get_ui_chart_debug_capture_dir()
+
+
+def get_ui_chart_aspect_ratio(chart_id: str) -> float:
+    return CONFIG.get_ui_chart_aspect_ratio(chart_id)
 
 
 def is_shadow_feed_enabled() -> bool:

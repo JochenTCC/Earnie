@@ -31,6 +31,11 @@ class _FakeSt:
 def fake_st(monkeypatch):
     fake = _FakeSt()
     monkeypatch.setattr(sankey, "st", fake)
+    # The Sankey is drawn through the aspect box helper (phone path: plain plotly_chart).
+    from ui import chart_aspect
+
+    monkeypatch.setattr(chart_aspect, "st", fake)
+    monkeypatch.setattr(chart_aspect, "is_phone_request", lambda: True)
     monkeypatch.setattr(sankey, "reload_runtime_config", lambda: None)
     monkeypatch.setattr(sankey.run_state, "load_run_state", lambda: None)
     monkeypatch.setattr(sankey.produktiv, "produktiv_caption", lambda _s: "")

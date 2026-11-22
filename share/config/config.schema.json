@@ -202,6 +202,31 @@
           "minimum": 1,
           "description": "Auto-Refresh für Charts 1+2 in Sekunden (Standard: 60)."
         },
+        "chart_aspect_ratios": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Seitenverhältnis Breite:Höhe der Monitor-Charts auf Desktop und Tablet, je Chart eine Zahl (3 = 3:1). Mindesthöhe 320 px, beim Sankey die Höhe, die seine Verbraucher brauchen. Gilt beim nächsten Neuladen der Seite, ohne Neustart. Telefone behalten die feste Höhe.",
+          "properties": {
+            "chart1": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 10,
+              "description": "Chart 1: Leistung, SoC & Preis (Standard: 3)."
+            },
+            "chart2": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 10,
+              "description": "Chart 2: Kontostand (Standard: 3)."
+            },
+            "sankey": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 10,
+              "description": "Energiefluss (Sankey) (Standard: 3)."
+            }
+          }
+        },
         "fragment_refresh_status_sec": {
           "type": "integer",
           "minimum": 1,
