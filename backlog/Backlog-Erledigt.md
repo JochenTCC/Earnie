@@ -2,6 +2,11 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### UI coverage tests and dead UI code removal (2026-11-23)
+
+- [x] **UI coverage: every UI function runs in at least one test** `[test]` *(done 2026-11-22, `d73fe0e2`)*: a full-suite coverage run over `ui/` and `app.py` found about 240 UI functions no test executed. 359 new tests (unit tests in `tests/test_ui_cov_*.py`, AppTests in `tests/apptest/*_cov_apptest.py` with scripts `tests/apptest/scripts/run_cov_*.py`) now run and assert them: app shell and banners, devices and consumer analysis, Szenario-Explorer results, cockpit/charts/EHAL test tools, house configuration and setup forms. UI line coverage rose from 81 % to 91 %. The tests found the PV tab bug below.
+- [x] **Dead UI code removed** `[refactor]` *(done 2026-11-22/23, `99b159bb`, `300aa8af`)*: 24 UI functions without any caller, plus `_segment_hover_labels` (only used by one of them), `render_optimization_results` (`live_mode` renders the parts itself), the old recommendation DataFrame helpers on the devices page, `ui.runtime_config.get_runtime_settings` and the retired dev dashboard `ui/dev/app_test_data.py`; with the tests and imports only they used.
+
 ### PV tab: no PV field created on open (2026-11-22)
 
 - [x] **Bugfix — opening the PV tab without a Live PV field wrote `components.json`** *(found 2026-11-22 by the new UI coverage tests; fixed and verified (AppTest) 2026-11-22)*: with no Live PV field the PV-Felder tab (`ui/planning_pv_form.py`) opened on "— neu —" and `auto_persist` saved the seeded draft ("Dach Süd") on the first render; picking "— neu —" by hand next to an existing field created a copy at once. Same class as the fixed house-profile / inverter "— neu —" bugs, and it conflicted with PV being optional.
