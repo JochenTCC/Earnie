@@ -78,3 +78,67 @@ def test_several_measured_hours_of_a_slot_are_averaged(profile_files, monkeypatc
 
     base = _profile(profile_files["base"])["Consumption"]
     assert base.loc[(11, 0, 5)] == pytest.approx(0.6)
+
+
+FIXED_KW = 0.2  # known consumers without own meter (cooking, TV, ...) as the live overlay adds them
+
+
+@pytest.fixture
+def fixed_overlay(monkeypatch):
+    """Live house profile with fixed consumers worth FIXED_KW in every hour."""
+    from house_config import planning_flex_bridge
+
+    profile = {"consumers": []}
+    monkeypatch.setattr(
+        pm.config, "get_resolved_runtime_settings", lambda: {"_house_profile": profile}
+    )
+    monkeypatch.setattr(
+        planning_flex_bridge,
+        "fixed_generic_hourly_overlay",
+        lambda _profile, slots, **_k: [FIXED_KW] * len(slots),
+    )
+    monkeypatch.setattr(
+        planning_flex_bridge, "thermal_hourly_overlay", lambda _p, slots, **_k: [0.0] * len(slots)
+    )
+    monkeypatch.setattr(planning_flex_bridge, "milp_flex_thermal_annual_ids", lambda _c: set())
+    monkeypatch.setattr(pm.config, "get_flexible_consumers", lambda: [])
+    monkeypatch.setattr(
+        "optimizer.absent_mode.resolve_live_absent_skip_ids", lambda _profile: set()
+    )
+    return profile
+
+
+def test_measured_base_load_drops_the_fixed_consumers_the_live_plan_adds(
+    profile_files, fixed_overlay, monkeypatch
+):
+    """Measured base load holds the unmetered fixed consumers; the plan must count them once."""
+    cons = pd.concat(
+        [
+            _rows("2025-11-04 00:00", 24, base=0.03, source=store.SOURCE_SYNTHETIC),
+            _rows("2026-11-02 00:00", 24, base=0.6, source=store.SOURCE_MEASURED),
+        ]
+    )
+    monkeypatch.setattr(store, "load_cons_data", lambda *_a, **_k: cons)
+
+    pm.generate_consumption_profile()
+
+    base = _profile(profile_files["base"])["Consumption"]
+    assert base.loc[(11, 0, 10)] == pytest.approx(0.4)  # measured 0.6 minus fixed 0.2
+    assert base.loc[(11, 1, 10)] == pytest.approx(0.03)  # synthetic rows hold no fixed load
+    total = _profile(profile_files["total"])["Consumption"]
+    assert total.loc[(11, 0, 10)] == pytest.approx(1.6)  # total stays as measured
+
+    from datetime import datetime
+
+    planned = pm._load_consumption_profile([datetime(2026, 11, 23, 10)])  # a Monday
+    assert planned == [pytest.approx(0.6)]  # profile + live overlay = measured load
+
+
+def test_peeling_never_makes_the_base_load_negative(profile_files, fixed_overlay, monkeypatch):
+    cons = _rows("2026-11-02 00:00", 24, base=0.15, source=store.SOURCE_MEASURED)
+    monkeypatch.setattr(store, "load_cons_data", lambda *_a, **_k: cons)
+
+    pm.generate_consumption_profile()
+
+    base = _profile(profile_files["base"])["Consumption"]
+    assert base.loc[(11, 0, 10)] == pytest.approx(0.0)

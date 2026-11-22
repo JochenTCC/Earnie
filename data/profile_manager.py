@@ -92,6 +92,35 @@ def _prefer_measured_hours(df: pd.DataFrame) -> pd.DataFrame:
     return df[measured | ~slot_has_measured]
 
 
+def _peel_fixed_consumers_from_measured(df: pd.DataFrame) -> pd.DataFrame:
+    """Take the live plan's fixed consumers out of the measured base load.
+
+    Only the controllable consumers have their own meter; known fixed consumers (cooking,
+    TV, ...) stay inside the measured base load. The live plan adds them again from the
+    house profile (``_apply_house_profile_baseload_overlay``), so the profile subtracts the
+    same modeled kW here. Synthetic rows hold no fixed load and stay as they are.
+    """
+    measured = df["Measured"].astype(bool)
+    profile = config.get_resolved_runtime_settings().get("_house_profile")
+    if not profile or not measured.any():
+        return df
+    from house_config.planning_flex_bridge import fixed_generic_hourly_overlay
+
+    slots = list(df.index[measured].to_pydatetime())
+    fixed_kw = fixed_generic_hourly_overlay(profile, slots, meter_residual_mode=False)
+    peeled = df.loc[measured, "BaseLoad"] - pd.Series(fixed_kw, index=df.index[measured])
+    below_zero = int((peeled < 0).sum())
+    if below_zero:
+        logger.warning(
+            "Verbrauchsprofile: in %d gemessenen Stunden liegt die Grundlast unter den festen "
+            "Verbrauchern des Hausprofils; diese Stunden zählen mit 0 kW Grundlast.",
+            below_zero,
+        )
+    df = df.copy()
+    df.loc[measured, "BaseLoad"] = peeled.clip(lower=0.0)
+    return df
+
+
 def _load_profile_source_dataframe() -> pd.DataFrame | None:
     """Datenquelle für Profile und Historie: ausschließlich cons_data.csv."""
     return load_cons_data_profile_dataframe()
@@ -151,6 +180,7 @@ def generate_consumption_profile() -> None:
         df['Hour'] = df.index.hour
 
         df = _prefer_measured_hours(df)
+        df = _peel_fixed_consumers_from_measured(df)
 
         profile = df.groupby(_PROFILE_SLOT)['BaseLoad'].mean().reset_index()
         profile.rename(columns={'BaseLoad': 'Consumption'}, inplace=True)
