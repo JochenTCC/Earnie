@@ -239,6 +239,11 @@ def generate(
     else:
         raise SystemExit(f"Unbekannte Quelle: {source}")
 
+    # Read right before writing: main.py appends measured hours to the same file.
+    existing = load_cons_data(output)
+    df = cons_data_store.keep_measured_rows(df, existing)
+    measured = int((df["source"] != SOURCE_SYNTHETIC).sum()) if not df.empty else 0
+    print(f"[OK] {measured} gemessene Stunden übernommen.")
     save_cons_data(df, output)
     _warn_if_unbalanced(df)
     return df

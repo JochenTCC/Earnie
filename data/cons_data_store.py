@@ -172,6 +172,21 @@ def load_cons_data(path: str | None = None) -> pd.DataFrame:
     return _normalize_cons_dataframe(df.set_index("timestamp"))
 
 
+def keep_measured_rows(synthetic: pd.DataFrame, existing: pd.DataFrame) -> pd.DataFrame:
+    """Synthetic rows from a new generation, with every non-synthetic row of ``existing``.
+
+    A regeneration after a house-profile change must not drop the measured history: a
+    measured (or Loxone) hour wins over the synthetic hour at the same timestamp.
+    """
+    if existing.empty:
+        return synthetic
+    kept = existing[existing["source"] != SOURCE_SYNTHETIC]
+    if kept.empty:
+        return synthetic
+    fresh = synthetic[~synthetic.index.isin(kept.index)]
+    return _normalize_cons_dataframe(pd.concat([fresh, kept]).sort_index())
+
+
 _CURRENT_FINGERPRINT = object()
 
 

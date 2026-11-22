@@ -154,7 +154,10 @@ def render_optimization_savings_and_chart(current_soc: float) -> None:
     """
     from ui.capacity_charge_panel import render_capacity_charge_panel
 
+    from ui.cons_data_refresh import render_stale_baseline_notice
+
     reload_runtime_config()
+    render_stale_baseline_notice()
     _live_optimization_prepare_fragment(current_soc)
     _live_optimization_chart1_fragment(current_soc)
     render_s2_nav_buttons(now=live_now())

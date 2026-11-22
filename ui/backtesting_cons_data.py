@@ -4,7 +4,7 @@ from __future__ import annotations
 import streamlit as st
 
 from data import cons_data_store
-from scripts.generate_cons_data import generate
+from ui.cons_data_refresh import regenerate_consumption_baseline
 from ui.backtesting_results_helpers import cons_data_has_flex_energy
 from ui.backtesting_time_ranges import cons_data_section_caption, render_time_range_help
 from ui.consumption_display import ConsumptionDisplayMode, render_consumption_display
@@ -86,7 +86,7 @@ def _render_cons_data_balance(df) -> None:
 
 def _render_cons_data_generate_button(*, run_active: bool) -> None:
     clicked = st.button(
-        "Verbrauchsdaten generieren (synthetisch)",
+        "Verbrauchsdaten generieren (synthetisch, Messwerte bleiben)",
         key="backtesting_cons_data_generate_btn",
         disabled=run_active,
     )
@@ -98,7 +98,7 @@ def _render_cons_data_generate_button(*, run_active: bool) -> None:
         return
     with st.status("Generiere Verbrauchsdaten…", expanded=True) as status:
         try:
-            generate(source="synthetic")
+            regenerate_consumption_baseline()
         except Exception as exc:
             status.update(label="Generierung fehlgeschlagen", state="error")
             st.error(f"Generierung fehlgeschlagen: {exc}")
