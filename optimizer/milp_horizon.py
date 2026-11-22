@@ -8,7 +8,7 @@ import pulp
 
 logger = logging.getLogger(__name__)
 
-from .battery import effective_p_act
+from .battery import IDLE_DRAIN_KEY, effective_p_act, idle_drain_floor_soc, idle_drain_kw
 from .consumer_power import power_limits_kw
 from .eauto_milp import milp_binary_charge_kw
 from .milp_consumers import (
@@ -88,6 +88,8 @@ def primary_battery_with_plant_power(batteries: list[dict]) -> dict:
     agg["standby_power_kw"] = sum(
         float(b.get("standby_power_kw") or 0.0) for b in batteries
     )
+    if any(IDLE_DRAIN_KEY in b for b in batteries):
+        agg[IDLE_DRAIN_KEY] = sum(idle_drain_kw(b) for b in batteries)
     agg["max_charge_power_kw"] = sum(
         float(b.get("max_charge_power_kw", b.get("max_power_kw") or 0.0) or 0.0)
         for b in batteries
@@ -408,6 +410,42 @@ def _add_consumer_var_block(
     return block
 
 
+def _idle_drain_kwh_term(
+    prob: pulp.LpProblem,
+    bat: dict,
+    eid: str,
+    *,
+    t: int,
+    prev_e,
+    dt_h: float,
+):
+    """Energy the idle drain takes from battery ``eid`` in slot ``t`` (Reserve P4).
+
+    The drain applies while the energy at the start of the slot is above the drain floor
+    (``idle_drain_floor_soc``). Slot 0 starts at a known energy: the drain is a constant, cut
+    to the room above the floor as in the simulation (``apply_soc_change``). Later slots get a
+    binary ``idle_drain_off``: it may only be 1 when the start energy lies within one slot's
+    drain of the floor, and then the slot has no drain. Near the floor the plan is thus at most
+    one slot's drain more optimistic than the simulation. Without drain the term is 0 and the
+    model has no extra variables.
+    """
+    drain_kw = idle_drain_kw(bat)
+    capacity = float(bat.get("battery_capacity_kwh") or 0.0)
+    if drain_kw <= 0.0 or capacity <= 0.0:
+        return 0.0
+    drain_kwh = drain_kw * dt_h
+    floor_kwh = idle_drain_floor_soc(bat) / 100.0 * capacity
+    if t == 0:
+        return min(drain_kwh, max(0.0, float(prev_e) - floor_kwh))
+    slug = str(eid).replace("-", "_")
+    off = pulp.LpVariable(f"idle_drain_off_{slug}_{t}", cat=pulp.LpBinary)
+    prob += (
+        prev_e - floor_kwh <= drain_kwh + capacity * (1 - off),
+        f"idle_drain_floor_{slug}_{t}",
+    )
+    return drain_kwh * (1 - off)
+
+
 def _add_slot_power_balance_and_soc(
     prob: pulp.LpProblem,
     matrix_row: dict[str, Any],
@@ -481,6 +519,7 @@ def _add_slot_power_balance_and_soc(
                 - grid_vars.p_discharge_by_ess[eid][t] / efficiency
             )
             * dt_h
+            - _idle_drain_kwh_term(prob, bat, eid, t=t, prev_e=prev_e, dt_h=dt_h)
         )
         _add_control_slot_constraints(
             prob,

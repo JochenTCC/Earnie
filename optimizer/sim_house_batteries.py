@@ -149,6 +149,7 @@ def step_house_batteries(
             float(params["min_soc"]),
             float(params["max_soc"]),
             dt_h=DEFAULT_DT_H,
+            **bat.idle_drain_kwargs(params),
         )
         if control.mode not in _FORCED_MODES:
             residual -= action

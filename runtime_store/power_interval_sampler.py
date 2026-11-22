@@ -455,6 +455,12 @@ def tick(
     return True
 
 
+def latest_sample(*, state_path: str | None = None) -> dict[str, Any] | None:
+    """The newest sample of the open intervals (``None`` without any)."""
+    samples = _load_state(state_path or _state_path()).get("samples") or []
+    return dict(samples[-1]) if samples else None
+
+
 def sample_log_days() -> int:
     """``EARNIE_POWER_SAMPLE_LOG_DAYS``: days of raw samples to keep; 0 or unset = off."""
     from runtime_store.env_vars import read_env

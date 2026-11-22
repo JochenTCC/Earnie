@@ -1,7 +1,8 @@
 # Virtual reserve: hold it only when it pays, release it promptly
 
 Status: draft, 2026-11-22. P1 (prompt release) implemented 2026-11-22, live check
-open; P2–P4 not implemented. Backlog: epic **Reserve**
+open; P4 (idle drain) implemented 2026-11-22, not yet configured live; P2–P3 not
+implemented. Backlog: epic **Reserve**
 (`backlog/Backlog.md`).
 
 ## Problem
@@ -136,6 +137,56 @@ Open: size of the band (fixed in percent, or from the idle drain and the slot le
 Open: whether the device covers its idle consumption from the AC side at its own
 minimum SoC (seen for one hour at 5 %). If it does, a device-side hold is cheaper than
 any hold above the minimum.
+
+Implemented (2026-11-22):
+
+- **Parameter.** `idle_drain_kw` on the battery (`components.json` → `batteries[]`,
+  optional, missing = 0, no migration step: an absent key has one meaning). It is kept
+  apart from `standby_power_kw`: standby is an AC load in the house balance
+  (`effective_p_act`), the drain is DC energy leaving the store. Both can be set; on the
+  maintainer's plant the 26 W AC standby stays and the drain comes on top.
+- **Floor of the drain.** The configured `min_soc` (`idle_drain_floor_soc`): with a
+  virtual reserve the drain runs through the reserve floor down to the base minimum stored
+  under `VIRTUAL_RESERVE_BASE_MIN_SOC_KEY`. Earnie does not know the device's own minimum
+  (only `get_ess_soc_min` is read); using `min_soc` keeps the plan feasible at the
+  configured minimum, as before.
+- **MILP** (`milp_horizon._idle_drain_kwh_term`): the energy balance of each battery loses
+  `idle_drain_kw · dt_h` per slot. Slot 0 starts at a known energy, so its drain is a
+  constant cut to the room above the floor. Later slots get a binary `idle_drain_off`
+  that may be 1 only when the start energy lies within one slot's drain of the floor; the
+  plan is then at most one slot's drain more optimistic than the simulation. Without a
+  drain the model has no extra variables, so regression goldens stay unchanged.
+- **Simulation** (`apply_soc_change(..., **idle_drain_kwargs(params))`): the drain is taken
+  after the action and does not change the returned power. Wired into the plan simulation
+  (`sim_chart_rows`), the multi-battery step (`sim_house_batteries`), the vendor-mode step
+  (baseline, savings ledger), `sim_costs` and the horizon-end charge. Not wired: the
+  plausibility checks of measured SoC (`consistency.py`, `soc_plausibility.py`) and the UI
+  chart ramps (`ui/chart_soc_ramps.py`).
+- **Setpoint.** `derive_control_from_milp_plan` adds the slot's drain to the plan's SoC
+  before it turns the SoC step into a charge or discharge power. Otherwise a hold slot
+  would read as a small discharge and a charge would be short by the drain.
+- **Multi-battery.** The plant battery sums the drains (`primary_battery_with_plant_power`).
+  Its floor is that of the first battery, which is approximate when the batteries'
+  minimums differ.
+- **Learner** (`runtime_store/idle_drain_learner.py`, state `idle_drain_learner.json`):
+  the daemon feeds each 30 s sampler sample. An episode runs from one drop of the
+  reading to the next drop by one step, with every sample's battery power within
+  `threshold_power · max power` (idle) and no sample gap over 10 minutes; a rise starts
+  over (the crossing level of a rise differs from that of a drop). Episodes between
+  15 min and 48 h count; the value is the median of the last 20 once there are three.
+  With several house batteries the learner records the reason and does not run.
+  **Suggestion only** (maintainer, 2026-11-22): the plan uses the configured value; the
+  learned one is logged (`idle_drain_learner: ...`) and read with
+  `learned_idle_drain()`.
+- **Hold cost for P2/P3.** `optimizer.battery.idle_drain_hold_kwh(params, hold_hours)`:
+  the energy the configured drain takes over a holding time. P2 multiplies it with the
+  fill price; P3 can size the band from `idle_drain_soc_pct`.
+
+Open after P4: show the learned value in the UI (battery page or diagnosis) with a
+button to take it over, and an editor field for `idle_drain_kw` in the house configurator
+(today only `components.json`). **Gap:** saving the battery in the house configurator
+drops `idle_drain_kw` today (`ui/house_config_battery_io._battery_save_spec` builds the
+saved entry field by field); it must pass the key through before the value is set live.
 
 ## Field tests before the build (Reserve P0)
 

@@ -152,6 +152,7 @@ def _chart_row_from_controls(
         battery_params["min_soc"],
         battery_params["max_soc"],
         dt_h=DEFAULT_DT_H,
+        **bat.idle_drain_kwargs(battery_params),
     )
     chart_row = chart_row_layout(
         row,
@@ -297,6 +298,7 @@ def horizon_end_soc_percent(
         battery_params["min_soc"],
         battery_params["max_soc"],
         dt_h=DEFAULT_DT_H,
+        **bat.idle_drain_kwargs(battery_params),
     )
     return round(soc, 1)
 
@@ -324,6 +326,7 @@ def finalize_chart_row_energy(
         battery_params["min_soc"],
         battery_params["max_soc"],
         dt_h=DEFAULT_DT_H,
+        **bat.idle_drain_kwargs(battery_params),
     )
     from optimizer.export_power_limit import clip_grid_kw_to_export_cap
 

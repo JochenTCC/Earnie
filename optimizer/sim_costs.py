@@ -252,6 +252,7 @@ def _soc_after_row(row: dict, battery_params: dict) -> float:
         battery_params["min_soc"],
         battery_params["max_soc"],
         dt_h=DEFAULT_DT_H,
+        **bat.idle_drain_kwargs(battery_params),
     )
     return soc_next
 

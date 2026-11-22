@@ -212,6 +212,8 @@ def _serialize_battery(spec: dict) -> dict:
     standby = float(spec.get("standby_power_kw", 0.0) or 0.0)
     if standby > 0.0:
         out["standby_power_kw"] = standby
+    if "idle_drain_kw" in spec:
+        out["idle_drain_kw"] = float(spec["idle_drain_kw"])
     bindings = spec.get("ehal_bindings")
     if isinstance(bindings, dict) and bindings:
         out["ehal_bindings"] = {

@@ -229,6 +229,8 @@ def normalize_battery(raw: dict, index: int) -> dict:
     }
     if regulates_on is not None:
         out["regulates_on"] = regulates_on
+    if IDLE_DRAIN_FIELD in raw:
+        out[IDLE_DRAIN_FIELD] = _validated_idle_drain_kw(raw, battery_id=battery_id, index=index)
     if bat_type == BATTERY_TYPE_POWERSTATION:
         out.update(
             normalize_powerstation_fields(raw, battery_id=battery_id, index=index)
@@ -236,6 +238,27 @@ def normalize_battery(raw: dict, index: int) -> dict:
     _apply_battery_inverter_id(out, inverter_id, battery_id=battery_id, index=index)
     _apply_battery_id_lock_fields(out, raw)
     return out
+
+
+# Optional DC self-drain of the battery in kW (Reserve P4); missing = 0. Same key as in the
+# optimizer params (``optimizer.battery.IDLE_DRAIN_KEY``).
+IDLE_DRAIN_FIELD = "idle_drain_kw"
+
+
+def _validated_idle_drain_kw(raw: dict, *, battery_id: str, index: int) -> float:
+    value = raw[IDLE_DRAIN_FIELD]
+    try:
+        drain = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            f"batteries[{index}] ('{battery_id}'): {IDLE_DRAIN_FIELD} muss eine Zahl sein "
+            f"(got {value!r})."
+        ) from exc
+    if drain < 0.0:
+        raise ValueError(
+            f"batteries[{index}] ('{battery_id}'): {IDLE_DRAIN_FIELD} muss >= 0 sein."
+        )
+    return drain
 
 
 def _validated_soc_window(

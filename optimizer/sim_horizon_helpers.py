@@ -155,6 +155,7 @@ def _apply_forced_grid_recharge_at_horizon_end(
         min_soc,
         max_soc,
         dt_h=DEFAULT_DT_H,
+        **bat.idle_drain_kwargs(battery_params),
     )
     last["Geplante Batterie-Aktion (kW)"] = round(batt_new, 2)
     # Steuerbefehl must match the applied charge power (after SoC clip / prior action).

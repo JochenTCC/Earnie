@@ -226,6 +226,8 @@ def planning_battery_entry(bat: dict) -> dict:
     }
     if bat.get("regulates_on") is not None:
         entry["regulates_on"] = bat["regulates_on"]
+    if "idle_drain_kw" in bat:
+        entry["idle_drain_kw"] = float(bat["idle_drain_kw"])
     inv_id = str(bat.get("inverter_id") or "").strip()
     if inv_id:
         entry["inverter_id"] = inv_id
@@ -286,6 +288,9 @@ def battery_params_from_planning(entry: dict) -> dict:
         "limits_from_live": bool(entry.get("limits_from_live", False)),
         "ehal_bindings": dict(entry.get("ehal_bindings") or {}),
     }
+    if "idle_drain_kw" in entry:
+        # DC self-drain (Reserve P4): optimizer.battery.idle_drain_kw.
+        out["idle_drain_kw"] = float(entry["idle_drain_kw"])
     if entry.get("battery_wear") is not None:
         # MILP wear per battery (optimizer.milp._wear_cent_per_kwh_by_ess).
         out["battery_wear"] = dict(entry["battery_wear"])

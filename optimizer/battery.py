@@ -8,6 +8,8 @@ MODE_ZWANGS_LADEN = 1
 MODE_ENTLADESPERRE = 2
 MODE_ZWANGS_ENTLADEN = 3
 SOC_DELTA_THRESHOLD = 0.05
+# Battery key of the DC self-drain (kW) in optimizer params and components.json (Reserve P4).
+IDLE_DRAIN_KEY = "idle_drain_kw"
 
 
 def clamp_power(value: float, max_power: float) -> float:
@@ -22,6 +24,57 @@ def power_threshold_kw(max_power_kw: float) -> float:
 def standby_power_kw(battery_params: dict) -> float:
     """Dauerhafte AC-Standby-Leistung der Hausbatterie (kW)."""
     return max(0.0, float(battery_params.get("standby_power_kw") or 0.0))
+
+
+def idle_drain_kw(battery_params: dict) -> float:
+    """DC self-drain of the house battery (kW taken from the stored energy, Reserve P4).
+
+    Not an AC load: it lowers the stored energy, not the house balance. It applies while the
+    SoC is above ``idle_drain_floor_soc``. Default 0 (key missing).
+    """
+    value = float(battery_params.get(IDLE_DRAIN_KEY) or 0.0)
+    if value < 0.0:
+        raise ValueError(f"{IDLE_DRAIN_KEY} must be >= 0 (got {value!r}).")
+    return value
+
+
+def idle_drain_floor_soc(battery_params: dict) -> float:
+    """SoC (%) down to which the idle drain applies: the configured ``min_soc``.
+
+    A virtual reserve raises ``min_soc`` to its floor; the battery drains through that floor
+    down to the configured minimum (stored under the reserve's base key).
+    """
+    from .powerstation_reserve import VIRTUAL_RESERVE_BASE_MIN_SOC_KEY
+
+    base = battery_params.get(VIRTUAL_RESERVE_BASE_MIN_SOC_KEY)
+    if base is not None:
+        return float(base)
+    return float(battery_params["min_soc"])
+
+
+def idle_drain_soc_pct(soc: float, battery_params: dict, *, dt_h: float) -> float:
+    """SoC points the idle drain takes in one slot from ``soc`` (never below its floor)."""
+    drain_kw = idle_drain_kw(battery_params)
+    capacity = float(battery_params.get("battery_capacity_kwh") or 0.0)
+    if drain_kw <= 0.0 or capacity <= 0.0:
+        return 0.0
+    room = float(soc) - idle_drain_floor_soc(battery_params)
+    if room <= 0.0:
+        return 0.0
+    return min(drain_kw * dt_h / capacity * 100.0, room)
+
+
+def idle_drain_hold_kwh(battery_params: dict, hold_hours: float) -> float:
+    """Energy (kWh) the idle drain takes from a battery held above its floor for ``hold_hours``.
+
+    The hold cost of a reserve (Reserve P2) and the refill band (Reserve P3) read the drain
+    through this function. It is the value the plan and the simulation use
+    (``idle_drain_kw``); a learned value (``runtime_store.idle_drain_learner``) is only a
+    suggestion until it is configured.
+    """
+    if hold_hours < 0.0:
+        raise ValueError(f"hold_hours must be >= 0 (got {hold_hours!r}).")
+    return idle_drain_kw(battery_params) * float(hold_hours)
 
 
 def effective_p_act(matrix_row: dict, battery_params: dict) -> float:
@@ -77,6 +130,8 @@ def apply_soc_change(
     max_soc_limit: float,
     *,
     dt_h: float,
+    idle_drain_kw: float = 0.0,
+    idle_drain_floor_soc: float | None = None,
 ) -> tuple[float, float]:
     """SoC after one slot of ``batt_action`` (kW, charging positive) and the power that fits.
 
@@ -84,6 +139,10 @@ def apply_soc_change(
     ``batt_action`` and at most its size. A start outside the limits (measured SoC below
     ``min_soc`` or above ``max_soc``) stays where it is until an action moves it back in; it
     does not jump to the limit, and an action that would move it further out is dropped.
+
+    ``idle_drain_kw`` (Reserve P4): DC self-drain taken from the stored energy after the
+    action, down to ``idle_drain_floor_soc`` at most; it does not change the returned power.
+    Pass both with ``idle_drain_kwargs(battery_params)``.
     """
     if battery_capacity_kwh <= 0.0:
         return old_soc, 0.0
@@ -104,7 +163,24 @@ def apply_soc_change(
         new_soc = lower
         discharged_kwh = ((lower - old_soc) / 100) * battery_capacity_kwh
         batt_action = discharged_kwh * efficiency / dt_h
+    if idle_drain_kw > 0.0:
+        if idle_drain_floor_soc is None:
+            raise ValueError("apply_soc_change: idle_drain_kw needs idle_drain_floor_soc.")
+        room = new_soc - float(idle_drain_floor_soc)
+        if room > 0.0:
+            new_soc -= min(idle_drain_kw * dt_h / battery_capacity_kwh * 100.0, room)
     return new_soc, batt_action
+
+
+def idle_drain_kwargs(battery_params: dict) -> dict[str, float | None]:
+    """``apply_soc_change`` keywords of the idle drain of ``battery_params`` (empty without)."""
+    drain_kw = idle_drain_kw(battery_params)
+    if drain_kw <= 0.0:
+        return {}
+    return {
+        "idle_drain_kw": drain_kw,
+        "idle_drain_floor_soc": idle_drain_floor_soc(battery_params),
+    }
 
 
 def vendor_mode_step(
@@ -130,6 +206,7 @@ def vendor_mode_step(
         battery_params["min_soc"],
         battery_params["max_soc"],
         dt_h=dt_h,
+        **idle_drain_kwargs(battery_params),
     )
 
 
@@ -208,20 +285,25 @@ def _milp_full_control_setpoint(
     max_soc: float,
     dt_h: float,
     threshold: float,
+    drain_soc_pct: float = 0.0,
 ) -> tuple[int, float, float]:
     """Pick forced charge / discharge / Entladesperre for ``control=full``.
 
     The setpoint follows the plan's SoC also while the battery is outside its limits
     (``milp_soc_recovery``): the limits are widened to the current SoC, so the power is the
     plan's and not what would reach the limit within this slot.
+
+    ``drain_soc_pct``: SoC points the idle drain takes in this slot (Reserve P4). The plan's
+    SoC already lost them; the power is that of the plan's SoC plus the drain, so the action
+    alone matches the plan's charge or discharge.
     """
     soc_floor = min(min_soc, current_soc)
-    soc_ceiling = max(max_soc, current_soc)
+    soc_ceiling = max(max_soc, current_soc) + drain_soc_pct
     if opt_charge > threshold and opt_grid_buy > threshold:
         target_soc = round(max(current_soc, planned_soc), 1)
         target_power = charge_kw_for_hourly_soc(
             current_soc,
-            target_soc,
+            round(max(current_soc, planned_soc + drain_soc_pct), 1),
             battery_capacity,
             efficiency,
             max_power,
@@ -235,7 +317,7 @@ def _milp_full_control_setpoint(
         candidate_soc = round(min(current_soc, planned_soc), 1)
         candidate_power = discharge_kw_for_hourly_soc(
             current_soc,
-            candidate_soc,
+            round(min(current_soc, planned_soc + drain_soc_pct), 1),
             battery_capacity,
             efficiency,
             max_power,
@@ -319,6 +401,7 @@ def derive_control_from_milp_plan(
             max_soc=max_soc,
             dt_h=dt_h,
             threshold=threshold,
+            drain_soc_pct=idle_drain_soc_pct(current_soc, battery_params, dt_h=dt_h),
         )
     elif (
         net_pv_surplus < -threshold

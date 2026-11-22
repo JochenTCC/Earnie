@@ -187,6 +187,17 @@ def _daemon_wait_poll() -> None:
         from runtime_store.shadow.hooks import maybe_flush_after_sampler
 
         maybe_flush_after_sampler()
+        _observe_idle_drain()
+
+
+def _observe_idle_drain() -> None:
+    """Feed the new sample to the idle-drain learner (Reserve P4; suggestion only)."""
+    from runtime_store import idle_drain_learner
+
+    try:
+        idle_drain_learner.observe_latest_live_sample(config.get_battery_params_list())
+    except Exception as exc:  # noqa: BLE001 — never break the wait loop (as the sampler tick)
+        logger.warning("idle_drain_learner: observe failed: %s", exc)
 
 
 def _reserve_release_wait_poll(*, wait_sec: float, run_estimate_sec: float):
