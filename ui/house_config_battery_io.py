@@ -164,28 +164,36 @@ def _scrub_battery_ids_from_scenarios(target: str) -> bool:
 
 
 def _rewrite_shadow_battery_overlay(old_id: str, new_id: str) -> None:
-    try:
-        from runtime_store.shadow.hooks import read_overlay, write_overlay
-        from runtime_store.shadow.mode import is_shadow_config_readonly
+    """Move the shadow overlay bindings of a renamed battery to its new id.
 
-        if not is_shadow_config_readonly():
-            return
-        overlay = read_overlay()
-        by_bat = overlay.get("battery_bindings")
-        if not isinstance(by_bat, dict) or old_id not in by_bat:
-            return
-        from house_config.entity_id_lock import rewrite_ess_bindings_slug
+    A failed write is reported (``ValueError`` for the form), never swallowed: the
+    bindings would stay under the old id and the battery's signals would go unread.
+    """
+    from runtime_store.shadow.hooks import read_overlay, write_overlay
+    from runtime_store.shadow.mode import is_shadow_config_readonly
 
-        raw = by_bat.pop(old_id)
-        by_bat[new_id] = rewrite_ess_bindings_slug(
-            raw if isinstance(raw, dict) else {},
-            old_id=old_id,
-            new_id=new_id,
-        )
-        overlay["battery_bindings"] = by_bat
-        write_overlay(overlay)
-    except Exception:
+    if not is_shadow_config_readonly():
         return
+    overlay = read_overlay()
+    by_bat = overlay.get("battery_bindings")
+    if not isinstance(by_bat, dict) or old_id not in by_bat:
+        return
+    from house_config.entity_id_lock import rewrite_ess_bindings_slug
+
+    raw = by_bat.pop(old_id)
+    by_bat[new_id] = rewrite_ess_bindings_slug(
+        raw if isinstance(raw, dict) else {},
+        old_id=old_id,
+        new_id=new_id,
+    )
+    overlay["battery_bindings"] = by_bat
+    try:
+        write_overlay(overlay)
+    except OSError as exc:
+        raise ValueError(
+            f"Shadow-Overlay: Bindungen der Batterie '{old_id}' konnten nicht auf "
+            f"'{new_id}' umgeschrieben werden: {exc}"
+        ) from exc
 
 
 def _resolve_battery_bindings_src(

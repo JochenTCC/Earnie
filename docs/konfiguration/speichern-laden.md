@@ -14,7 +14,7 @@ Im Szenarienkonfigurator lassen sich gespeicherte Szenarien mit **Szenario entfe
 
 Die Streamlit-Seitenleiste bündelt unter **„Sichern & Übertragen“** alles, was Daten aus Earnie heraus oder hinein bringt. Der Abschnitt **Konfiguration sichern / laden** bietet zwei Aktionen:
 
-- **Konfiguration herunterladen:** Packt die aktuellen JSON-Dateien und alle CSV-Dateien unter `uploads/` in ein ZIP.
+- **Konfigurations-ZIP erstellen**, dann **Konfiguration herunterladen:** Packt die aktuellen JSON-Dateien und alle CSV-Dateien unter `uploads/` in ein ZIP. Earnie baut das ZIP erst auf Knopfdruck, damit nicht jeder Seitenaufbau alle CSV-Dateien neu packt.
 - **Konfiguration importieren (ZIP):** Ersetzt nach einer Versionsprüfung dieselben Dateien durch die Inhalte des ZIP.
 
 Enthaltene Dateien:

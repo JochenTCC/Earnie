@@ -319,6 +319,11 @@ def _house_profiles_payload(profile: dict) -> dict:
     }
 
 
+def check_house_profile(profile: dict) -> None:
+    """Run the checks of ``upsert_house_profile(profile)`` without writing (``ValueError``)."""
+    _house_profiles_payload(profile)
+
+
 def house_profile_write_pending(profile: dict) -> bool:
     """Would ``upsert_house_profile(profile)`` change a file? (dry run, nothing written)
 
@@ -453,6 +458,7 @@ __all__ = [
     "_stable_upload_csv_name",
     "append_tariff_monthly_rate",
     "apply_csv_path_pending",
+    "check_house_profile",
     "compute_baseload_kwh",
     "csv_upload_widget_key",
     "delete_battery",

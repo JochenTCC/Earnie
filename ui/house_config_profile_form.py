@@ -1,6 +1,7 @@
 """Hausprofil-Tab im Hauskonfigurator."""
 from __future__ import annotations
 
+import logging
 import os
 
 import streamlit as st
@@ -449,8 +450,15 @@ def _render_absent_mode_status(*, profile_absent: bool) -> None:
     }
     try:
         ehal_live, bound = read_ehal_absent_mode()
-    except Exception:
-        ehal_live, bound = None, False
+    except Exception as exc:  # noqa: BLE001 — shown and logged, the form goes on
+        # A crash is "not readable", never "not bound": the binding may well exist.
+        logging.getLogger(__name__).warning("EHAL absent_mode read failed: %s", exc)
+        effective = effective_absent_mode(profile_absent, None)
+        st.caption(
+            f"Smarthome (EHAL): **{ehal_labels['unreadable']}** ({exc}) · "
+            f"Wirksam (Live): **{'aktiv' if effective else 'inaktiv'}**"
+        )
+        return
     state = ehal_read_state(ehal_live, bound=bound)
     effective = effective_absent_mode(profile_absent, ehal_live)
     st.caption(

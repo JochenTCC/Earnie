@@ -140,6 +140,13 @@ def _render_config_only_download(attachments: list[Any]) -> None:
         "und Passwörter. Hilft nur bei Fragen, die **nicht** den Live-Betrieb betreffen "
         "(Einrichtung, Hausprofil, Szenarien, Backtesting)."
     )
+    # Built on request only: a pack per rerun of every page cost a full ZIP each time.
+    if not st.button(
+        "Konfiguration + Anhänge erstellen",
+        key="support_package_config_only_build_btn",
+        width="stretch",
+    ):
+        return
     try:
         payload = build_config_only_bundle_bytes(
             attachments, config_pack=build_config_pack_bytes(for_support=True)
@@ -224,8 +231,8 @@ def _render_full_package(attachments: list[Any]) -> None:
     )
 
 
-def render_support_package_controls(config_pack: bytes | None) -> None:
-    """Attachments + both variants; ``config_pack`` is None when its export failed."""
+def render_support_package_controls() -> None:
+    """Attachments + both variants; each ZIP is built only when its button is clicked."""
     st.markdown("#### Support-Paket")
     st.caption(
         "Für Anfragen an den Support. Das ZIP bleibt lokal: an ein öffentliches "
@@ -238,6 +245,5 @@ def render_support_package_controls(config_pack: bytes | None) -> None:
         key="support_package_attachments",
     )
     attachment_list = list(attachments or [])
-    if config_pack is not None:
-        _render_config_only_download(attachment_list)
+    _render_config_only_download(attachment_list)
     _render_full_package(attachment_list)

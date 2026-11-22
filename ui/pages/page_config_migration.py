@@ -82,7 +82,9 @@ def resolve_export_bytes(export_kind: str) -> tuple[bytes, str]:
 def continue_after_migration() -> None:
     """Start ``main.py`` when ``EARNIE_AUTO_START_MAIN=1``; caller should ``st.rerun()``.
 
-    Raises ``DaemonError`` when the start fails; the caller keeps the report page.
+    Raises ``DaemonError`` when the start fails; the caller still leaves the report
+    (the Optimierer-Dienst page, where the start can be retried, is only reachable
+    from the app) and carries the error there as a flash notice.
     """
     from runtime_store.main_daemon import maybe_auto_start
 
@@ -352,14 +354,18 @@ def _render_report_view() -> None:
     if st.button("Weiter zur App", type="primary", key="cfg_mig_continue"):
         from runtime_store.main_daemon import DaemonError
 
+        from ui.flash import flash
+
         try:
             continue_after_migration()
         except DaemonError as exc:
-            st.error(
+            # Leave the report anyway: the Optimierer-Dienst page named here is only
+            # reachable from the app, so staying would trap the user on this page.
+            flash(
+                "error",
                 f"main.py konnte nicht gestartet werden: {exc} — unter "
-                "**Optimierer-Dienst** erneut starten oder den Container neu starten."
+                "**Optimierer-Dienst** erneut starten oder den Container neu starten.",
             )
-            return
         _clear_report_session()
         st.rerun()
 
