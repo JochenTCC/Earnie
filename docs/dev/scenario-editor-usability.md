@@ -1,6 +1,6 @@
 # Scenario editor — usability proposal
 
-Status: **proposal**. Mockup: artboard "Szenarienkonfigurator – Vorschlag" on the canvas "Hausprofil Neuordnung" (claude.ai artifact, private to the maintainer). Companion of `docs/dev/house-profile-layout.md` (same expander pattern).
+Status: **A–D implemented 2026-11-22** (before the beta); E and drag and drop open. Mockup: artboard "Szenarienkonfigurator – Vorschlag" on the canvas "Hausprofil Neuordnung" (claude.ai artifact, private to the maintainer). Companion of `docs/dev/house-profile-layout.md` (same expander pattern).
 
 Scope: `ui/pages/page_scenario_editor.py` and `ui/pages/scenario_editor_{session,form,sections,tariffs}.py`, plus the read-only scenario list in the Scenario Explorer (`ui/backtesting.py::render_configured_scenarios`).
 
@@ -70,3 +70,13 @@ Replace the read-only list in `render_configured_scenarios` with the same activa
 - Delete requires confirmation; Live has no delete.
 - Opening the page and switching scenarios without edits writes nothing (existing `_matches_stored_scenario` guarantee).
 - User docs (`docs/konfiguration/`, user manual) updated in the same change.
+
+## 5. Implementation notes (A–D, 2026-11-22)
+
+- **Selection moved into the rows.** The radio `scenario_select` is gone; each row's label is a button (`scenario_open__<id>`, `type="primary"` for the open one) whose callback sets `scenario_editor_request`. `_resolve_scenario_selection` reads the request, keeps the unsaved-edit prompt (`scenario_switch_discard` / `scenario_switch_cancel`) and renders the overview (`ui/pages/scenario_editor_overview.py`, container key `scenario_overview`).
+- **Row widgets only queue.** `scenario_active__<id>` and `scenario_pos__<id>` queue their change in `on_change`; `apply_pending_overview_writes` runs at the top of the next run, before the catalogs are read, writes with `set_scenario_enabled` / `reorder_scenarios` and updates the editor's file stamp, so the open form is not reseeded. Both widgets are seeded from the file on every run (a failed write snaps back).
+- **`enabled` left the form:** no `scenario_enabled` widget; the save payload takes `enabled` from the scenario as read this run; `normalize_scenario_form_snapshot` no longer carries `enabled`, so a table toggle is never an unsaved edit.
+- **New scenario:** „Duplizieren“ / „Neu (leer)“ set the template source (`scenario_editor_template_source`, `__empty__` for empty) and request `— neu —`; the draft is saved on its first render as before and opened.
+- **Groups:** Bezeichnung, Komponenten, Tarife (open), Bezugsgrenze / Leistungspreis (collapsed, cap in the title). The next-month rate entry stays visible inside „Tarife“ (it is a time-limited prompt and must not be collapsed).
+- **Delete:** „Szenario entfernen …“ → warning with „Entfernen“ (`scenario_delete_confirm_yes`) / „Abbrechen“.
+- **Tests:** `tests/apptest/test_scenario_overview_apptest.py`; existing AppTests select through `tests/apptest/helpers.open_scenario`; Playwright smoke (`tests/apptest/e2e/test_smoke.py`) uses the overview container.

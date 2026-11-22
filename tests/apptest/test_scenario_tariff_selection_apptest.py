@@ -14,6 +14,8 @@ from zoneinfo import ZoneInfo
 
 from streamlit.testing.v1 import AppTest
 
+from tests.apptest.helpers import open_scenario
+
 from tests.apptest.fields import SCENARIO_ID, SCENARIO_RADIO_LABEL
 
 _SCRIPT = Path(__file__).parent / "scripts" / "run_page_scenario_editor.py"
@@ -24,7 +26,7 @@ _USER_FIXED_LABEL = "Eigener Festpreis"
 
 def _session(radio_label: str = SCENARIO_RADIO_LABEL) -> AppTest:
     at = AppTest.from_file(str(_SCRIPT), default_timeout=_TIMEOUT_S).run()
-    at.radio(key="scenario_select").set_value(radio_label).run()
+    open_scenario(at, radio_label)
     assert not at.exception
     return at
 
@@ -145,7 +147,7 @@ def test_te6_scenario_switch_keeps_no_values_of_the_previous_scenario():
     at.selectbox(key=_P + "scenario_import").set_value(_user_fixed_option(at, _P + "scenario_import")).run()
     # The own fixed price starts empty: enter one so the form is saved, not held as dirty.
     at.number_input(key=_P + "scenario_user_import_cent").set_value(31.5).run()
-    at.radio(key="scenario_select").set_value(other).run()
+    open_scenario(at, other)
     assert not at.exception
     shown = {
         sb.key.removeprefix("fixture_5kwh_fixed__"): sb.value

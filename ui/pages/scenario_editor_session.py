@@ -2,10 +2,7 @@
 from __future__ import annotations
 
 import config
-from ui.pages.page_scenario_editor import (
-    _remember_template_source,
-    _scenario_explorer_ui_enabled,
-)
+from ui.pages.page_scenario_editor import _scenario_explorer_ui_enabled
 
 import streamlit as st
 
@@ -31,11 +28,6 @@ from ui.tariff_filter_helpers import (
     render_shared_land_filter,
     render_tariff_type_filter,
 )
-from ui.label_select import (
-    label_select_choices,
-    refresh_label_select_display,
-    resolve_label_select,
-)
 from ui.scenario_form_helpers import (
     NEW_SCENARIO_OPTION,
     SCENARIO_FILTER_KEY_BASES,
@@ -52,7 +44,6 @@ from ui.scenario_form_helpers import (
     render_profile_geo_caption,
     resolve_scenario_id,
     scenario_form_is_dirty,
-    scenario_new_option,
     scenario_session_scope,
     scoped_widget_key,
     seed_entity_multiselect_state,
@@ -73,20 +64,14 @@ _SESSION_SELECT_PENDING_KEY = "scenario_select_pending"
 _SESSION_ACTIVE_SELECT_KEY = "scenario_editor_active_select"
 _SESSION_TEMPLATE_SOURCE_KEY = "scenario_editor_template_source"
 _SESSION_SWITCH_TARGET_KEY = "scenario_editor_switch_target"
-_SESSION_SWITCH_DISCARD_KEY = "scenario_editor_switch_discard"
-# Set by the dirty-switch prompt: its pending select resets the radio, the target stays.
-_SESSION_KEEP_SWITCH_TARGET_KEY = "scenario_editor_keep_switch_target"
 
 
 
 def _apply_pending_scenario_select() -> None:
     pending = st.session_state.pop(_SESSION_SELECT_PENDING_KEY, None)
     if pending is not None:
-        st.session_state["scenario_select"] = pending
         st.session_state[_SESSION_ACTIVE_SELECT_KEY] = pending
-        if not st.session_state.pop(_SESSION_KEEP_SWITCH_TARGET_KEY, False):
-            st.session_state.pop(_SESSION_SWITCH_TARGET_KEY, None)
-        _remember_template_source(pending)
+        st.session_state.pop(_SESSION_SWITCH_TARGET_KEY, None)
 
 def _seed_user_tariff_cent_widgets(session_scope: str, settings: dict) -> None:
     from house_config.tariffs_store import (
@@ -242,9 +227,6 @@ def _seed_scenario_widget_state(
     st.session_state[scoped_widget_key(session_scope, "scenario_use_imported_pv")] = bool(
         settings.get("use_imported_pv")
     )
-    st.session_state[scoped_widget_key(session_scope, "scenario_enabled")] = (
-        scenario.get("enabled", True) is not False
-    )
     _seed_import_cap_widgets(session_scope, settings)
     from ui.scenario_heating_picks import seed_heating_picks
 
@@ -322,68 +304,23 @@ def _sync_scenario_session(
         st.session_state[_SESSION_FILE_STAMP_KEY] = file_stamp
 
 def _ensure_active_scenario_select(default_pick: str) -> None:
-    if "scenario_select" not in st.session_state:
-        st.session_state["scenario_select"] = default_pick
     if _SESSION_ACTIVE_SELECT_KEY not in st.session_state:
-        st.session_state[_SESSION_ACTIVE_SELECT_KEY] = st.session_state["scenario_select"]
+        st.session_state[_SESSION_ACTIVE_SELECT_KEY] = default_pick
 
 def _force_active_scenario(target: str) -> None:
-    """Move the radio/active select to `target` and drop the sync stamp."""
+    """Open `target` and drop the sync stamp."""
     st.session_state[_SESSION_ACTIVE_SELECT_KEY] = target
-    st.session_state["scenario_select"] = target
     st.session_state[_SESSION_SYNC_KEY] = None
     st.rerun()
 
 def _apply_scenario_switch_guards(*, allow_new: bool, default_pick: str) -> None:
-    """Reset an impossible '— neu —' selection and honour a pending discard."""
+    """Reset an impossible '— neu —' selection."""
     active_now = st.session_state.get(_SESSION_ACTIVE_SELECT_KEY)
     if not allow_new and active_now == NEW_SCENARIO_OPTION:
         _force_active_scenario(default_pick)
 
-    if st.session_state.pop(_SESSION_SWITCH_DISCARD_KEY, False):
-        target = st.session_state.pop(_SESSION_SWITCH_TARGET_KEY, None)
-        if target is not None:
-            _force_active_scenario(target)
-
-def _render_scenario_radio(
-    *,
-    scenario_ids: list[str],
-    scenario_labels: dict[str, str],
-    new_option: str | None,
-) -> tuple[str, object]:
-    """Render the scenario radio; returns (requested_id, reorder_container)."""
-    scenario_map = {
-        sid: {"id": sid, "label": scenario_labels.get(sid, sid)} for sid in scenario_ids
-    }
-    options, id_by_display = label_select_choices(
-        scenario_map, scenario_ids, new_option=new_option
-    )
-    refresh_label_select_display(
-        select_key="scenario_select",
-        selected_id=st.session_state.get(_SESSION_ACTIVE_SELECT_KEY),
-        entity_map=scenario_map,
-        entity_ids=scenario_ids,
-        id_by_display=id_by_display,
-        new_option=new_option,
-    )
-
-    list_col, reorder_col = st.columns([5, 1], vertical_alignment="top")
-    list_col.radio(
-        "Szenario",
-        options=options,
-        key="scenario_select",
-    )
-    requested = resolve_label_select(st.session_state["scenario_select"], id_by_display)
-    return requested, reorder_col
-
-def _render_dirty_switch_prompt(*, active: str, requested: str) -> None:
-    """Ask whether to discard unsaved edits before switching scenarios."""
-    switch_target = st.session_state.get(_SESSION_SWITCH_TARGET_KEY)
-    if requested != active and switch_target != requested:
-        st.session_state[_SESSION_SELECT_PENDING_KEY] = active
-        st.session_state[_SESSION_SWITCH_TARGET_KEY] = requested
-        st.session_state[_SESSION_KEEP_SWITCH_TARGET_KEY] = True
-        st.rerun()
+def _render_dirty_switch_prompt(*, target: str) -> None:
+    """Ask whether to discard unsaved edits before opening `target`."""
     st.warning(
         "Es gibt ungespeicherte Änderungen am aktuellen Szenario. "
         "Wechseln und Änderungen verwerfen?"
@@ -393,11 +330,10 @@ def _render_dirty_switch_prompt(*, active: str, requested: str) -> None:
         "Verwerfen und wechseln",
         key="scenario_switch_discard",
     ):
-        st.session_state[_SESSION_SWITCH_DISCARD_KEY] = True
-        st.rerun()
+        st.session_state.pop(_SESSION_SWITCH_TARGET_KEY, None)
+        _force_active_scenario(target)
     if col_cancel.button("Abbrechen", key="scenario_switch_cancel"):
         st.session_state.pop(_SESSION_SWITCH_TARGET_KEY, None)
-        st.session_state[_SESSION_SELECT_PENDING_KEY] = active
         st.rerun()
 
 def _active_scenario_form_is_dirty(
@@ -423,16 +359,17 @@ def _active_scenario_form_is_dirty(
 def _resolve_scenario_selection(
     *,
     scenario_ids: list[str],
-    scenario_labels: dict[str, str],
     live_id: str,
-    profiles: dict[str, dict],
-    batteries: list[dict],
-    pv_systems: list[dict],
-    import_tariffs: list[dict],
-    export_tariffs: list[dict],
+    catalogs: dict,
 ) -> str:
+    """Open scenario of this run: the row the user clicked, unless unsaved edits hold it.
+
+    Renders the overview table (``scenario_editor_overview``) and, when the open form has
+    unsaved edits, the prompt that asks whether to discard them.
+    """
+    from ui.pages.scenario_editor_overview import REQUEST_KEY, render_scenario_overview
+
     allow_new = _scenario_explorer_ui_enabled()
-    new_option = scenario_new_option(allow_new=allow_new)
     default_pick = default_scenario_pick(
         live_id=live_id,
         scenario_ids=scenario_ids,
@@ -440,45 +377,41 @@ def _resolve_scenario_selection(
     )
     _ensure_active_scenario_select(default_pick)
     _apply_scenario_switch_guards(allow_new=allow_new, default_pick=default_pick)
-
-    requested, reorder_col = _render_scenario_radio(
-        scenario_ids=scenario_ids,
-        scenario_labels=scenario_labels,
-        new_option=new_option,
-    )
     active = st.session_state[_SESSION_ACTIVE_SELECT_KEY]
+    if active != NEW_SCENARIO_OPTION and active not in scenario_ids:
+        # Deleted or renamed elsewhere: fall back like a fresh page.
+        _force_active_scenario(default_pick)
 
-    from ui.pages.scenario_editor_form import _render_scenario_reorder_controls
-
-    def _reorder(selected: str) -> None:
-        _render_scenario_reorder_controls(
-            selected=selected,
-            scenario_ids=scenario_ids,
-            live_id=live_id,
-            container=reorder_col,
+    requested = st.session_state.pop(REQUEST_KEY, None)
+    if requested == NEW_SCENARIO_OPTION and not allow_new:
+        requested = None
+    if requested is not None and requested != active:
+        dirty = _active_scenario_form_is_dirty(
+            active,
+            profiles=catalogs["profiles"],
+            batteries=catalogs["batteries"],
+            pv_systems=catalogs["pv_systems"],
+            import_tariffs=catalogs["import_tariffs"],
+            export_tariffs=catalogs["export_tariffs"],
         )
+        if dirty:
+            st.session_state[_SESSION_SWITCH_TARGET_KEY] = requested
+        else:
+            st.session_state.pop(_SESSION_SWITCH_TARGET_KEY, None)
+            st.session_state[_SESSION_ACTIVE_SELECT_KEY] = requested
+            active = requested
+    elif requested == NEW_SCENARIO_OPTION and active == NEW_SCENARIO_OPTION:
+        # Another template for the open draft: reseed it.
+        st.session_state[_SESSION_SYNC_KEY] = None
 
-    if requested == active and st.session_state.get(_SESSION_SWITCH_TARGET_KEY) is None:
-        _reorder(active)
-        _remember_template_source(active)
-        return active
-
-    dirty = _active_scenario_form_is_dirty(
-        active,
-        profiles=profiles,
-        batteries=batteries,
-        pv_systems=pv_systems,
-        import_tariffs=import_tariffs,
-        export_tariffs=export_tariffs,
+    render_scenario_overview(
+        scenario_ids=scenario_ids,
+        active=active,
+        live_id=live_id,
+        catalogs=catalogs,
+        allow_new=allow_new,
     )
-    if dirty:
-        _reorder(active)
-        _render_dirty_switch_prompt(active=active, requested=requested)
-        _remember_template_source(active)
-        return active
-
-    st.session_state[_SESSION_ACTIVE_SELECT_KEY] = requested
-    st.session_state.pop(_SESSION_SWITCH_TARGET_KEY, None)
-    _remember_template_source(requested)
-    _reorder(requested)
-    return requested
+    target = st.session_state.get(_SESSION_SWITCH_TARGET_KEY)
+    if target is not None and target != active:
+        _render_dirty_switch_prompt(target=target)
+    return active

@@ -57,14 +57,17 @@ def _label_input(page: Page) -> Locator:
 
 
 def _select_scenario(page: Page, radio_label: str) -> None:
-    page.locator(".st-key-scenario_select label", has_text=radio_label).click()
+    # Row of the overview table; exact name: the duplicate button also carries the label.
+    page.locator(".st-key-scenario_overview").get_by_role(
+        "button", name=radio_label, exact=True
+    ).click()
     _wait_until_idle(page)
     expect(_label_input(page)).to_be_visible(timeout=_TIMEOUT_MS)
 
 
 def _open_scenario_editor(page: Page, server: AppServer) -> None:
     page.goto(f"{server.url}/scenario-editor")
-    expect(page.locator(".st-key-scenario_select")).to_be_visible(timeout=_TIMEOUT_MS)
+    expect(page.locator(".st-key-scenario_overview")).to_be_visible(timeout=_TIMEOUT_MS)
     _wait_until_idle(page)
     _select_scenario(page, _SCENARIO_RADIO_LABEL)
 
@@ -90,7 +93,7 @@ def _save_new_label(page: Page) -> None:
 
 def _reopen_scenario_editor_with_new_label(page: Page, url: str) -> None:
     page.goto(url)
-    expect(page.locator(".st-key-scenario_select")).to_be_visible(timeout=_TIMEOUT_MS)
+    expect(page.locator(".st-key-scenario_overview")).to_be_visible(timeout=_TIMEOUT_MS)
     _wait_until_idle(page)
     _select_scenario(page, _NEW_LABEL)
 
@@ -102,7 +105,7 @@ def test_t6_value_survives_page_switch_and_back(page: Page, app_server: AppServe
     _go_to(page, "Hauskonfigurator")
     expect(page.locator(".st-key-test_home__house_annual_kwh")).to_be_visible(timeout=_TIMEOUT_MS)
     _go_to(page, "Szenarienkonfigurator")
-    expect(page.locator(".st-key-scenario_select")).to_be_visible(timeout=_TIMEOUT_MS)
+    expect(page.locator(".st-key-scenario_overview")).to_be_visible(timeout=_TIMEOUT_MS)
     _wait_until_idle(page)
     _select_scenario(page, _NEW_LABEL)
 
@@ -156,7 +159,7 @@ def test_tariffs_user_tariff_created_and_selected_in_a_scenario(page: Page, app_
     assert (saved["id"], saved["fix_cent_kwh"], saved["land"]) == (_USER_TARIFF_ID, 24.5, "AT")
 
     _go_to(page, "Szenarienkonfigurator")
-    expect(page.locator(".st-key-scenario_select")).to_be_visible(timeout=_TIMEOUT_MS)
+    expect(page.locator(".st-key-scenario_overview")).to_be_visible(timeout=_TIMEOUT_MS)
     _wait_until_idle(page)
     _select_scenario(page, _SCENARIO_RADIO_LABEL)
     page.locator(f".st-key-{_SCENARIO_ID}__scenario_import").get_by_role("combobox").click()

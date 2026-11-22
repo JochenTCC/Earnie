@@ -421,21 +421,21 @@ def test_normalize_scenario_form_snapshot_keeps_label_and_settings():
     )
     assert snapshot == {
         "label": "Variante A",
-        "enabled": True,
         "settings": {"battery_ids": ["bat1"]},
     }
     assert "id" not in snapshot
 
 
-def test_normalize_scenario_form_snapshot_keeps_enabled_false():
-    snapshot = normalize_scenario_form_snapshot(
-        {
-            "label": "Off",
-            "enabled": False,
-            "settings": {"battery_ids": ["bat1"]},
-        },
+def test_normalize_scenario_form_snapshot_leaves_enabled_out():
+    """``enabled`` is written by the overview row, never by the form (no unsaved edit)."""
+    on = normalize_scenario_form_snapshot(
+        {"label": "Off", "enabled": True, "settings": {"battery_ids": ["bat1"]}},
     )
-    assert snapshot["enabled"] is False
+    off = normalize_scenario_form_snapshot(
+        {"label": "Off", "enabled": False, "settings": {"battery_ids": ["bat1"]}},
+    )
+    assert "enabled" not in off
+    assert on == off
 
 
 def test_normalize_scenario_form_snapshot_has_no_own_reference():

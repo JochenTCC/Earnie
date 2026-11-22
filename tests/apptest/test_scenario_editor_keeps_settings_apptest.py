@@ -14,6 +14,8 @@ from pathlib import Path
 
 from streamlit.testing.v1 import AppTest
 
+from tests.apptest.helpers import open_scenario
+
 _SCRIPT = Path(__file__).parent / "scripts" / "run_page_scenario_editor.py"
 _TIMEOUT_S = 30.0
 _FLAT = "fixture_5kwh_fixed"
@@ -33,7 +35,7 @@ def _stored() -> dict:
 
 def _session(radio_label: str) -> AppTest:
     at = AppTest.from_file(str(_SCRIPT)).run(timeout=_TIMEOUT_S)
-    at.radio(key="scenario_select").set_value(radio_label).run(timeout=_TIMEOUT_S)
+    open_scenario(at, radio_label, timeout=_TIMEOUT_S)
     assert not at.exception
     return at
 
@@ -92,7 +94,7 @@ def test_unsaveable_form_asks_before_switching_and_discard_switches():
     at = _session(_ENTITY_RADIO)
     # An empty label cannot be saved: the edit stays in the form.
     at.text_input(key=f"{_ENTITY}__scenario_label").set_value("").run(timeout=_TIMEOUT_S)
-    at.radio(key="scenario_select").set_value(_FLAT_RADIO).run(timeout=_TIMEOUT_S)
+    open_scenario(at, _FLAT_RADIO, timeout=_TIMEOUT_S)
     assert not at.exception
     assert any("ungespeicherte Änderungen" in w.value for w in at.warning)
     at.button(key="scenario_switch_discard").click().run(timeout=_TIMEOUT_S)
@@ -104,7 +106,7 @@ def test_unsaveable_form_asks_before_switching_and_discard_switches():
 def test_new_scenario_is_saved_again_after_deleting_the_same_one():
     at = _session(_ENTITY_RADIO)
     ids_before = set(_stored())
-    at.radio(key="scenario_select").set_value(_NEW_OPTION).run(timeout=_TIMEOUT_S)
+    at.button(key="scenario_duplicate").click().run(timeout=_TIMEOUT_S)
     assert not at.exception
     created = set(_stored()) - ids_before
     assert len(created) == 1
@@ -112,11 +114,12 @@ def test_new_scenario_is_saved_again_after_deleting_the_same_one():
     at.run(timeout=_TIMEOUT_S)
     assert at.session_state["scenario_editor_active_select"] == new_id
     at.button(key="scenario_delete").click().run(timeout=_TIMEOUT_S)
+    at.button(key="scenario_delete_confirm_yes").click().run(timeout=_TIMEOUT_S)
     assert not at.exception
     assert new_id not in _stored()
 
-    # Template source is the scenario selected last: pick entity_test again, then "— neu —".
-    at.radio(key="scenario_select").set_value(_ENTITY_RADIO).run(timeout=_TIMEOUT_S)
-    at.radio(key="scenario_select").set_value(_NEW_OPTION).run(timeout=_TIMEOUT_S)
+    # Duplicate entity_test again: the copy gets the deleted id back.
+    open_scenario(at, _ENTITY_RADIO, timeout=_TIMEOUT_S)
+    at.button(key="scenario_duplicate").click().run(timeout=_TIMEOUT_S)
     assert not at.exception
     assert new_id in _stored()

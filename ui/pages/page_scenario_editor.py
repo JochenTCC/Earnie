@@ -67,13 +67,6 @@ _SESSION_SELECT_PENDING_KEY = "scenario_select_pending"
 _SESSION_ACTIVE_SELECT_KEY = "scenario_editor_active_select"
 _SESSION_TEMPLATE_SOURCE_KEY = "scenario_editor_template_source"
 _SESSION_SWITCH_TARGET_KEY = "scenario_editor_switch_target"
-_SESSION_SWITCH_DISCARD_KEY = "scenario_editor_switch_discard"
-
-
-def _remember_template_source(scenario_id: str) -> None:
-    sid = str(scenario_id or "").strip()
-    if sid and sid != NEW_SCENARIO_OPTION:
-        st.session_state[_SESSION_TEMPLATE_SOURCE_KEY] = sid
 
 
 def _planning_now():
@@ -134,7 +127,6 @@ from ui.pages.scenario_editor_session import (  # noqa: E402
     _SESSION_ACTIVE_SELECT_KEY,
     _SESSION_FILE_STAMP_KEY,
     _SESSION_SELECT_PENDING_KEY,
-    _SESSION_SWITCH_DISCARD_KEY,
     _SESSION_SWITCH_TARGET_KEY,
     _SESSION_SYNC_KEY,
     _SESSION_TEMPLATE_SOURCE_KEY,
@@ -149,6 +141,5 @@ from ui.pages.scenario_editor_session import (  # noqa: E402
 from ui.pages.scenario_editor_form import (  # noqa: E402
     _next_month_in_planning_tz,
     _render_next_month_rate_entry,
-    _render_scenario_reorder_controls,
     _render_scenarios_tab,
 )

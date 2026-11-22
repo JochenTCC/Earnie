@@ -45,3 +45,33 @@ def select_table_rows(at: AppTest, key_prefix: str, row_keys: list[str], *, time
     shown = list(frame.index)
     at.session_state[key] = {"selection": {"rows": [shown.index(r) for r in row_keys], "columns": []}}
     return at.run(timeout=timeout)
+
+
+def open_scenario(at: AppTest, label: str, *, timeout: float = 30.0) -> AppTest:
+    """Öffnet im Szenarienkonfigurator das Szenario mit dieser Bezeichnung (Zeile der Übersicht).
+
+    ``"— neu —"`` klickt „Neu (leer)“.
+    """
+    if label == "— neu —":
+        return at.button(key="scenario_new_empty").click().run(timeout=timeout)
+    button = next(
+        b for b in at.button if str(b.key or "").startswith("scenario_open__") and b.label == label
+    )
+    return button.click().run(timeout=timeout)
+
+
+def scenario_row_labels(at: AppTest) -> list[str]:
+    """Bezeichnungen der Übersichtszeilen in Anzeigereihenfolge."""
+    return [b.label for b in at.button if str(b.key or "").startswith("scenario_open__")]
+
+
+def open_scenario_label(at: AppTest) -> str | None:
+    """Bezeichnung der Zeile, deren Szenario unten im Formular offen ist."""
+    return next(
+        (
+            b.label
+            for b in at.button
+            if str(b.key or "").startswith("scenario_open__") and b.proto.type == "primary"
+        ),
+        None,
+    )

@@ -255,11 +255,15 @@ Typische Vergleiche:
 
 **Live-Szenario:** Das Live-Szenario (ID `live`) ist die Basis für den späteren Produktivbetrieb. Alle weiteren Szenarien dienen nur der Analyse im Szenario-Explorer.
 
-**Auswahl und Reihenfolge:** Die Szenarien stehen in einer Liste. Mit ↑/↓ rechts daneben lässt sich die Reihenfolge der weiteren Szenarien ändern (das Live-Szenario bleibt oben). In dieser Reihenfolge erscheinen sie später in Listen und Kostenvergleichen – das dient nur der Übersicht.
+**Übersicht:** Oben steht eine Tabelle mit einer Zeile je Szenario: Position, Bezeichnung, **Aktiv im Explorer**, Hausprofil, Bezugs- und Einspeisetarif und Status (**Live**, **OK** oder **Verweis fehlt**, wenn das Szenario auf einen gelöschten Eintrag verweist).
 
-**Pro Szenario einstellbar:**
+- **Öffnen:** Ein Klick auf die Bezeichnung öffnet das Szenario im Formular darunter; die offene Zeile ist hervorgehoben. Hat das offene Szenario ungespeicherte Änderungen, fragt Earnie vor dem Wechsel nach.
+- **Aktiv im Explorer:** Deaktivierte Varianten überspringt der Szenario-Explorer. Der Haken wirkt sofort, ohne das Szenario zu öffnen; vorhandene Ergebnisse werden dadurch ungültig. Das Live-Szenario ist immer aktiv, weil der Szenario-Explorer alle Varianten mit ihm vergleicht.
+- **Reihenfolge:** Die Positionsauswahl am Zeilenanfang setzt ein Szenario direkt an die gewählte Stelle; das Live-Szenario bleibt auf Position 1. In dieser Reihenfolge erscheinen die Szenarien später in Listen und Kostenvergleichen – das dient nur der Übersicht.
+- **Neues Szenario:** **„…“ duplizieren** legt eine Kopie des offenen Szenarios an, **Neu (leer)** ein Szenario ohne Einstellungen. Beide werden sofort gespeichert und geöffnet.
+- **Entfernen:** **Szenario entfernen …** am Ende des Formulars fragt vor dem Löschen nach. Das Live-Szenario lässt sich nicht entfernen.
 
-- **Aktiv für Szenario-Explorer:** Deaktivierte Varianten überspringt der Szenario-Explorer. Vorhandene Ergebnisse werden dadurch ungültig. Das Live-Szenario ist immer aktiv, weil der Szenario-Explorer alle Varianten mit ihm vergleicht.
+**Formular:** Das offene Szenario ist in aufklappbare Gruppen geteilt: **Bezeichnung**, **Komponenten** (Hausprofil, Batterien, PV-Felder, Heizsystem), **Tarife** und **Bezugsgrenze / Leistungspreis** (zugeklappt, der Titel zeigt die Grenze).
 
 Welche Referenzen der Szenario-Explorer rechnet, wird dort für den ganzen Lauf gewählt, nicht je Szenario (siehe [Szenario-Explorer ausführen](#szenario-explorer-ausführen)).
 

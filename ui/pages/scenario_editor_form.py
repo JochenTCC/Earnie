@@ -3,10 +3,8 @@ from __future__ import annotations
 
 import streamlit as st
 
-from runtime_store.shadow.errors import ConfigReadOnlyError
-from ui.auto_persist import SHADOW_READONLY_CAPTION
 import config
-from ui.house_config_io import reorder_scenarios
+from ui.form_layout import form_group
 from ui.pages.scenario_editor_sections import (
     _persist_or_delete_scenario,
     _prepare_scenario_tab,
@@ -19,96 +17,49 @@ from ui.pages.scenario_editor_tariffs import (
     _render_next_month_rate_entry,
     _render_scenario_tariff_block,
 )
-from ui.scenario_form_helpers import (
-    NEW_SCENARIO_OPTION,
-    backtesting_scenarios_file_stamp,
-)
-
-# Local copies avoid circular import with page_scenario_editor → form.
-_SESSION_FILE_STAMP_KEY = "scenario_editor_file_stamp"
-_SESSION_SELECT_PENDING_KEY = "scenario_select_pending"
+from ui.scenario_form_helpers import scoped_widget_key
 
 
-def _render_scenario_reorder_controls(
-    *,
-    selected: str,
-    scenario_ids: list[str],
-    live_id: str,
-    container=None,
-) -> None:
-    root = container if container is not None else st
-    non_live = [sid for sid in scenario_ids if sid != live_id]
-    can_reorder = (
-        selected != NEW_SCENARIO_OPTION
-        and selected != live_id
-        and selected in non_live
-    )
-    root.caption("Live bleibt oben.")
-    if not can_reorder:
-        root.button(
-            "↑",
-            key="scenario_reorder_up",
-            disabled=True,
-            help="Szenario nach oben verschieben",
-        )
-        root.button(
-            "↓",
-            key="scenario_reorder_down",
-            disabled=True,
-            help="Szenario nach unten verschieben",
-        )
-        return
-    idx = non_live.index(selected)
-    if root.button(
-        "↑",
-        key="scenario_reorder_up",
-        disabled=idx <= 0,
-        help="Szenario nach oben verschieben",
-    ):
-        ordered = list(non_live)
-        ordered[idx - 1], ordered[idx] = ordered[idx], ordered[idx - 1]
-        try:
-            reorder_scenarios(ordered)
-        except ConfigReadOnlyError:
-            st.caption(SHADOW_READONLY_CAPTION)
-            return
-        except ValueError as exc:
-            st.error(str(exc))
-            return
-        st.session_state[_SESSION_SELECT_PENDING_KEY] = selected
-        st.session_state[_SESSION_FILE_STAMP_KEY] = backtesting_scenarios_file_stamp()
-        st.rerun()
-    if root.button(
-        "↓",
-        key="scenario_reorder_down",
-        disabled=idx >= len(non_live) - 1,
-        help="Szenario nach unten verschieben",
-    ):
-        ordered = list(non_live)
-        ordered[idx + 1], ordered[idx] = ordered[idx], ordered[idx + 1]
-        try:
-            reorder_scenarios(ordered)
-        except ConfigReadOnlyError:
-            st.caption(SHADOW_READONLY_CAPTION)
-            return
-        except ValueError as exc:
-            st.error(str(exc))
-            return
-        st.session_state[_SESSION_SELECT_PENDING_KEY] = selected
-        st.session_state[_SESSION_FILE_STAMP_KEY] = backtesting_scenarios_file_stamp()
-        st.rerun()
+# Form groups (docs/dev/scenario-editor-usability.md § D); stable keys keep the open state.
+GROUP_KEYS = {
+    "label": "scenario_group_label",
+    "components": "scenario_group_components",
+    "tariffs": "scenario_group_tariffs",
+    "import_cap": "scenario_group_import_cap",
+}
+
+
+def _form_heading(ctx: dict) -> str:
+    if ctx["is_new"]:
+        return "Neues Szenario"
+    existing = ctx["existing"] or {}
+    return str(existing.get("label") or ctx["stable_scenario_id"])
+
+
+def _import_cap_status(ctx: dict) -> str:
+    cap = st.session_state.get(scoped_widget_key(ctx["session_scope"], "scenario_import_cap"))
+    return "keine Grenze" if cap is None else f"{float(cap):.2f} kW".replace(".", ",")
 
 
 def _render_scenarios_tab() -> None:
     live_id = config.get_live_scenario_id()
-    st.subheader("Szenarien")
     st.caption(
         "Live-Szenario ist die Baseline für Szenario-Explorer "
         "und Echtzeit-Betrieb. Standort und Zeitzone kommen aus dem Hausprofil."
     )
     ctx = _prepare_scenario_tab(live_id)
-    label = _render_scenario_identity_fields(ctx)
-    picks = _render_scenario_entity_picks(ctx)
-    tariffs = _render_scenario_tariff_block(ctx, picks)
-    import_cap_errors = _render_scenario_import_cap(ctx, picks)
+    st.divider()
+    st.subheader(_form_heading(ctx))
+    with form_group("Bezeichnung", key=GROUP_KEYS["label"], expanded=True):
+        label = _render_scenario_identity_fields(ctx)
+    with form_group("Komponenten", key=GROUP_KEYS["components"], expanded=True):
+        picks = _render_scenario_entity_picks(ctx)
+    with form_group("Tarife", key=GROUP_KEYS["tariffs"], expanded=True):
+        tariffs = _render_scenario_tariff_block(ctx, picks)
+    with form_group(
+        "Bezugsgrenze / Leistungspreis",
+        key=GROUP_KEYS["import_cap"],
+        status=_import_cap_status(ctx),
+    ):
+        import_cap_errors = _render_scenario_import_cap(ctx, picks)
     _persist_or_delete_scenario(ctx, label, picks, tariffs, import_cap_errors)

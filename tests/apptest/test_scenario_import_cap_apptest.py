@@ -7,6 +7,8 @@ from pathlib import Path
 
 from streamlit.testing.v1 import AppTest
 
+from tests.apptest.helpers import open_scenario, scenario_row_labels
+
 from tests.apptest.fields import SCENARIO_ID, SCENARIO_RADIO_LABEL
 
 _SCRIPT = Path(__file__).parent / "scripts" / "run_page_scenario_editor.py"
@@ -19,7 +21,7 @@ _PROFILE = f"{SCENARIO_ID}__scenario_profile"
 
 def _session() -> AppTest:
     at = AppTest.from_file(str(_SCRIPT), default_timeout=_TIMEOUT_S).run()
-    at.radio(key="scenario_select").set_value(SCENARIO_RADIO_LABEL).run()
+    open_scenario(at, SCENARIO_RADIO_LABEL)
     assert not at.exception
     return at
 
@@ -130,9 +132,9 @@ def test_stored_cap_does_not_mark_the_form_as_edited():
     at = _session()
     at.number_input(key=_CAP).set_value(5.0).run()
     at = _session()
-    labels = at.radio(key="scenario_select").options
+    labels = scenario_row_labels(at)
     other = next(option for option in labels if option != SCENARIO_RADIO_LABEL)
-    at.radio(key="scenario_select").set_value(other).run()
+    open_scenario(at, other)
     assert not at.exception
     assert not [button for button in at.button if button.key == "scenario_switch_cancel"]
 
