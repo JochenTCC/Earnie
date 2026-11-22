@@ -1,4 +1,4 @@
-"""Tests for Live Monitor SOC plausibility: BL Ziel SOC + ghost bars."""
+"""Tests for Live Monitor SOC plausibility: BL Ziel SOC, no flex ghost outlines."""
 from __future__ import annotations
 
 from datetime import datetime, timedelta
@@ -10,7 +10,6 @@ import pytest
 
 from runtime_store.live_display_loader import savings_info_from_snapshot
 from runtime_store.live_optimization_debug import build_debug_payload
-from ui.chart_flow_balance import add_matched_flex_ghost_traces
 from ui.chart_slot_axis import ChartSlotAxis
 from ui.charts import build_power_soc_chart_figure
 from ui.history_navigation import s2_zone_help_text
@@ -99,126 +98,19 @@ def test_chart_has_bl_ziel_not_opt_last_when_plausibility_enabled():
     assert "SoC bei Opt-Last" not in names
 
 
-def test_ghost_bars_from_matched_flex(monkeypatch):
-    ev = {
-        "id": "eauto",
-        "name": "E-Auto",
-        "type": "ev",
-        "chart_color_index": 0,
-        "nominal_power_kw": 3.5,
-    }
-    monkeypatch.setattr(
-        "ui.chart_flow_balance._chart_flex_consumers",
-        lambda **_: [ev],
-    )
-    matched = _slot_df(flex_kw=3.5)
-    axis = ChartSlotAxis.from_dataframe(matched)
-    fig = go.Figure()
-    add_matched_flex_ghost_traces(
-        fig,
-        matched,
-        axis,
-        flex_consumers=[(ev, "E-Auto (kW)")],
+def test_live_chart_draws_no_original_schedule_outlines():
+    """Live Chart 1 shows only the optimized flex; matched-baseline flex gets no outline."""
+    opt = _slot_df(soc=50.0)
+    matched = _slot_df(soc=45.0, flex_kw=3.5)
+    fig = build_power_soc_chart_figure(
+        opt,
+        matched_baseline_df=matched,
+        show_soc_plausibility=True,
         history_slot_count=1,
+        chart_now=opt["slot_datetime"].iloc[1].to_pydatetime(),
     )
-    ghost = [trace for trace in fig.data if trace.name == "Original-Schedule"]
-    assert ghost
-    assert ghost[0].marker.line.width == 2.5
-    assert "rgba(0,0,0,0)" in str(ghost[0].marker.color)
-    # Hourly slots: height is power (kW); energy filter uses kW × 1 h
-    assert abs(ghost[0].y[0]) == pytest.approx(3.5)
-    assert "kW" in ghost[0].hovertemplate
-    assert "kWh" not in ghost[0].hovertemplate
-
-
-def test_ghost_bars_capped_to_nominal_power(monkeypatch):
-    """Matched baseline may exceed nominal; ghost outline height is capped."""
-    ev = {
-        "id": "eauto",
-        "name": "E-Auto",
-        "type": "ev",
-        "chart_color_index": 0,
-        "nominal_power_kw": 3.5,
-    }
-    monkeypatch.setattr(
-        "ui.chart_flow_balance._chart_flex_consumers",
-        lambda **_: [ev],
-    )
-    matched = _slot_df(flex_kw=10.87)
-    axis = ChartSlotAxis.from_dataframe(matched)
-    fig = go.Figure()
-    add_matched_flex_ghost_traces(
-        fig,
-        matched,
-        axis,
-        flex_consumers=[(ev, "E-Auto (kW)")],
-        history_slot_count=1,
-    )
-    ghost = [trace for trace in fig.data if trace.name == "Original-Schedule"]
-    assert ghost
-    assert abs(ghost[0].y[0]) == pytest.approx(3.5)
-    assert ghost[0].customdata[0][1] == pytest.approx(3.5)
-
-
-def test_ghost_bars_skipped_below_one_kwh_equivalent(monkeypatch):
-    ev = {
-        "id": "eauto",
-        "name": "E-Auto",
-        "type": "ev",
-        "chart_color_index": 0,
-        "nominal_power_kw": 3.5,
-    }
-    monkeypatch.setattr(
-        "ui.chart_flow_balance._chart_flex_consumers",
-        lambda **_: [ev],
-    )
-    matched = _slot_df(flex_kw=0.5)
-    axis = ChartSlotAxis.from_dataframe(matched)
-    fig = go.Figure()
-    add_matched_flex_ghost_traces(
-        fig,
-        matched,
-        axis,
-        flex_consumers=[(ev, "E-Auto (kW)")],
-        history_slot_count=1,
-    )
-    ghost = [trace for trace in fig.data if trace.name == "Original-Schedule"]
-    assert ghost == []
-
-
-def test_ghost_bars_on_quarter_hour_slots_use_power_threshold():
-    """2 kW on 15-min slots is 0.5 kWh per slot; the outline is still drawn."""
-    ev = {
-        "id": "eauto",
-        "name": "E-Auto",
-        "type": "ev",
-        "chart_color_index": 0,
-        "nominal_power_kw": 3.5,
-    }
-    matched = _slot_df(flex_kw=2.0)
-    start = matched["slot_datetime"].iloc[0]
-    matched["slot_datetime"] = [
-        start + timedelta(minutes=15 * index) for index in range(len(matched))
-    ]
-    axis = ChartSlotAxis.from_dataframe(matched)
-    fig = go.Figure()
-    add_matched_flex_ghost_traces(
-        fig,
-        matched,
-        axis,
-        flex_consumers=[(ev, "E-Auto (kW)")],
-        history_slot_count=1,
-    )
-    ghost = [trace for trace in fig.data if trace.name == "Original-Schedule"]
-    assert ghost
-    assert abs(ghost[0].y[0]) == pytest.approx(2.0)
-
-
-def test_ghost_bars_skipped_without_matched_df():
-    fig = go.Figure()
-    axis = ChartSlotAxis.from_dataframe(_slot_df())
-    add_matched_flex_ghost_traces(fig, None, axis, history_slot_count=0)
-    assert len(fig.data) == 0
+    assert not [trace for trace in fig.data if trace.name == "Original-Schedule"]
+    assert not [trace for trace in fig.data if getattr(trace, "legendgroup", None) == "ghost_bl_ziel"]
 
 
 def test_s2_zone_help_includes_soc_plausibility_when_requested():
@@ -227,4 +119,4 @@ def test_s2_zone_help_includes_soc_plausibility_when_requested():
     rich = s2_zone_help_text(include_soc_plausibility=True)
     assert "SoC BL Ziel" in rich
     assert "SoC bei Opt-Last" not in rich
-    assert "Original-Schedule" in rich
+    assert "Original-Schedule" not in rich

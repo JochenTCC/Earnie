@@ -1,4 +1,4 @@
-"""Flow-balance Plotly traces (Chart 1); flex ghosts live in ``chart_flow_ghosts``."""
+"""Flow-balance Plotly traces (Chart 1)."""
 from __future__ import annotations
 
 import math
@@ -20,7 +20,6 @@ from optimizer.targets import (
     consumer_pv_follow_column_name,
 )
 
-from ui.chart_flow_ghosts import add_matched_flex_ghost_traces  # noqa: F401
 from ui.flow_balance_allocate import FlowAllocation, allocate_slot_flows
 from ui.chart_colors import (
     COLOR_BASELOAD,

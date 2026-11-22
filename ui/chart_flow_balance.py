@@ -52,7 +52,6 @@ from ui.chart_flow_segments import (  # noqa: F401
 )
 from ui.chart_flow_traces import (  # noqa: F401
     add_flow_balance_traces,
-    add_matched_flex_ghost_traces,
     flow_balance_plotly_trace_specs,
     flow_balance_plotly_traces,
 )
@@ -106,7 +105,6 @@ __all__ = [
     "FlowBalanceTraceSpec",
     "_chart_flex_consumers",
     "add_flow_balance_traces",
-    "add_matched_flex_ghost_traces",
     "build_flow_balance_segments",
     "build_flow_balance_slots_from_df",
     "energy_balance_residual_kw",

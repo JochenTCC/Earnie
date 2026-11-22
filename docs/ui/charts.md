@@ -93,7 +93,7 @@ PV, Last, Netz, Batterieflüsse und **Flex-Verbraucher** zeigen im grauen Bereic
 | Preis (rot) | Strompreis skaliert | Hover: Cent/kWh |
 | Einspeisepreis (orange, gestrichelt) | Einspeisevergütung skaliert | Hover: Cent/kWh |
 
-**SoC-Plausibilität (Live-Monitor):** Der Abstand zwischen **SoC BL Ziel** und **SoC** entsteht durch Lastverschiebung (Flex oder E-Auto zeitlich anders platziert) und/oder durch die Batteriestrategie (Netzladen, Entladen, Halten). Umrandete Flex-Balken (**Original-Schedule**, nur Kanten, ohne Füllung) zeigen, wo Flex laut BL-Ziel gelaufen wäre. Die gefüllten Flex-Balken zeigen weiterhin die Optimierung. Solche Ghost-Segmente entfallen, wenn ihr Energie-Äquivalent (`kW × Slotdauer`) unter **1 kWh** liegt.
+**SoC-Plausibilität (Live-Monitor):** Der Abstand zwischen **SoC BL Ziel** und **SoC** entsteht durch Lastverschiebung (Flex oder E-Auto zeitlich anders platziert) und/oder durch die Batteriestrategie (Netzladen, Entladen, Halten).
 
 ### Hintergrundzonen und Marker
 

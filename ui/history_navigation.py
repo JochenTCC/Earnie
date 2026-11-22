@@ -133,8 +133,7 @@ def s2_zone_help_text(*, include_soc_plausibility: bool = False) -> str:
         "SoC BL Ziel = gleiche Flex-Energie wie die Optimierung, aber Profilform "
         "und Batterie nur aus PV-Überschuss. "
         "Abstand BL Ziel → SoC = Lastverschiebung und/oder andere Batteriestrategie "
-        "(z. B. Netzladen/Entladen). "
-        "Umrandete Flex-Balken (Original-Schedule) = wo Flex laut BL-Ziel gelaufen wäre."
+        "(z. B. Netzladen/Entladen)."
     )
 
 

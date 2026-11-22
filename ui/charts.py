@@ -59,9 +59,6 @@ def add_power_traces(
     matrix: list[dict] | None = None,
     chart_window: UiChartWindow | None = None,
     chart_zones=None,
-    matched_baseline_df: pd.DataFrame | None = None,
-    show_soc_plausibility: bool = False,
-    history_slot_count: int | None = None,
 ) -> None:
     from house_config.known_chart_display import apply_known_generic_to_dataframe
 
@@ -76,7 +73,6 @@ def add_power_traces(
 
     from ui.chart_flow_balance import (
         add_flow_balance_traces,
-        add_matched_flex_ghost_traces,
         build_flow_balance_slots_from_df,
     )
 
@@ -91,13 +87,6 @@ def add_power_traces(
         flex_consumers=active_consumers,
         chart_zones=chart_zones,
     )
-    if show_soc_plausibility:
-        add_matched_flex_ghost_traces(
-            fig,
-            matched_baseline_df,
-            axis,
-            history_slot_count=history_slot_count,
-        )
 
 
 @dataclass(frozen=True)
@@ -139,9 +128,6 @@ def _add_power_layer(
         matrix=options.optimization_matrix,
         chart_window=options.chart_window,
         chart_zones=options.chart_zones,
-        matched_baseline_df=options.matched_baseline_df,
-        show_soc_plausibility=options.show_soc_plausibility,
-        history_slot_count=options.history_slot_count,
     )
     if options.pv_compare_series:
         from ui.chart_pv_compare import add_pv_compare_traces

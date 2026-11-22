@@ -207,7 +207,7 @@ class _SavingsRows(NamedTuple):
     """Simulationszeilen der Vergleichsläufe einer Einsparungsrechnung.
 
     ``matched_baseline`` carries the profile fallback (config consumers with target 0
-    and profile energy) for the BL Ziel SoC and the ghost flex bars in Chart 1.
+    and profile energy) for the BL Ziel SoC in Chart 1.
     ``matched_baseline_costed`` runs the same matched baseline on the optimizer's own
     targets only; BL Ziel € and kWh come from it, so the optimizer is never compared
     against energy it does not plan (savings-ledger D3). Without any fallback both
