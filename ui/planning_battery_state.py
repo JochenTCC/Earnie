@@ -73,6 +73,7 @@ def new_battery_template(
         "battery_max_soc": float(source.get("battery_max_soc", 100.0)),
         "threshold_power": float(source.get("threshold_power", 0.05)),
         "standby_power_kw": float(source.get("standby_power_kw", 0.0) or 0.0),
+        "idle_drain_kw": float(source.get("idle_drain_kw", 0.0) or 0.0),
         "control": str(source.get("control") or "full").strip().lower() or "full",
         "regulates_on": str(source.get("regulates_on") or REGULATES_ON_GRID)
         .strip()
@@ -149,6 +150,7 @@ def _battery_seed_from_existing(existing: dict) -> dict:
         "max_soc": float(existing.get("battery_max_soc", 100.0)),
         "threshold_percent": float(existing.get("threshold_power", 0.05)) * 100.0,
         "standby_power": float(existing.get("standby_power_kw", 0.0) or 0.0),
+        "idle_drain": float(existing.get("idle_drain_kw", 0.0) or 0.0),
         "control": control,
         "regulates_on": regulates_on,
         "bat_type": str(existing.get("type") or "house").strip().lower() or "house",
@@ -176,6 +178,7 @@ def _battery_seed_defaults() -> dict:
         "max_soc": 100.0,
         "threshold_percent": 5.0,
         "standby_power": 0.0,
+        "idle_drain": 0.0,
         "control": DEFAULT_BATTERY_CONTROL,
         "regulates_on": REGULATES_ON_GRID,
         "bat_type": "house",
@@ -201,6 +204,7 @@ _BATTERY_DIRECT_WIDGETS = (
     ("planning_battery_max_soc", "max_soc"),
     ("planning_battery_threshold", "threshold_percent"),
     ("planning_battery_standby", "standby_power"),
+    ("planning_battery_idle_drain", "idle_drain"),
     ("planning_battery_limits_from_live", "limits_from_live"),
     ("planning_battery_wear_enabled", "wear_enabled"),
     ("planning_battery_wear_replacement_cost", "wear_replacement_cost"),

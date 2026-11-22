@@ -243,6 +243,8 @@ def _battery_spec_from_raw(raw_spec: dict, *, entity_id: str, label: str) -> dic
         "standby_power_kw": float(raw_spec.get("standby_power_kw", 0.0) or 0.0),
         "limits_from_live": bool(raw_spec.get("limits_from_live", False)),
     }
+    if raw_spec.get("idle_drain_kw") is not None:
+        spec["idle_drain_kw"] = float(raw_spec["idle_drain_kw"])
     # Virtual PS may omit electrical fields; inheritance fills them before normalize.
     for key, sources in _BATTERY_FLOAT_SOURCES:
         raw_val = None
@@ -285,6 +287,7 @@ def _merge_existing_battery_fields(
     existing_wear = None
     existing_control = None
     existing_regulates_on = None
+    existing_idle_drain = None
     existing_type_fields: dict = {}
     if lookup_id:
         for item in batteries:
@@ -292,6 +295,7 @@ def _merge_existing_battery_fields(
                 existing_wear = item.get("battery_wear")
                 existing_control = item.get("control")
                 existing_regulates_on = item.get("regulates_on")
+                existing_idle_drain = item.get("idle_drain_kw")
                 for key in _EXISTING_TYPE_FIELD_KEYS:
                     if key in item:
                         existing_type_fields[key] = item[key]
@@ -308,6 +312,9 @@ def _merge_existing_battery_fields(
         spec["regulates_on"] = existing_regulates_on
     for key, value in existing_type_fields.items():
         spec.setdefault(key, value)
+    # A caller without the field (auto-persist of other fields) keeps the stored drain.
+    if "idle_drain_kw" not in spec and existing_idle_drain is not None:
+        spec["idle_drain_kw"] = float(existing_idle_drain)
     if raw_spec.get("battery_wear") is not None:
         spec["battery_wear"] = raw_spec["battery_wear"]
     elif existing_wear is not None:
@@ -438,6 +445,9 @@ def _battery_save_spec(
     }
     if normalized.get("regulates_on") is not None:
         save_spec["regulates_on"] = normalized["regulates_on"]
+    # Reserve P4: optional DC self-drain; absent and 0 mean the same, so 0 is not written.
+    if float(normalized.get("idle_drain_kw") or 0.0) > 0.0:
+        save_spec["idle_drain_kw"] = float(normalized["idle_drain_kw"])
     if not id_locked and provisional:
         save_spec[ID_PROVISIONAL_LABEL_KEY] = provisional
     inv_persist = str(normalized.get("inverter_id") or "").strip()

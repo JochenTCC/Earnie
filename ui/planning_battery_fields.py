@@ -242,6 +242,7 @@ def _virtual_ps_inherited_ui_fields(
         "max_soc": float(fill["battery_max_soc"]),
         "threshold_percent": float(fill["threshold_power"]) * 100.0,
         "standby_power": float(fill["standby_power_kw"]),
+        "idle_drain": 0.0,
         "control": fill["control"],
         "battery_wear": dict(fill["battery_wear"]),
         "inverter_id": "",
@@ -305,6 +306,21 @@ def _render_battery_core_fields(session_scope: str) -> dict:
     }
 
 
+def _render_idle_drain_suggestion() -> None:
+    """Caption with the live-learned idle drain (Reserve P4), when there is one."""
+    from runtime_store.idle_drain_learner import learned_idle_drain
+
+    learned = learned_idle_drain()
+    drain = learned.get("drain_kw")
+    if drain is None:
+        return
+    st.caption(
+        f"Gelernt im Live-Betrieb ({learned.get('battery_id') or '?'}, "
+        f"{learned.get('episodes')} Messabschnitte): {float(drain):.3f} kW. "
+        "Wird nicht automatisch übernommen."
+    )
+
+
 def _render_battery_regulates_on(session_scope: str) -> str:
     regulates_labels = {
         REGULATES_ON_GRID: "Netz-Zähler (Eigenverbrauch / Zero-Export)",
@@ -356,6 +372,17 @@ def _render_battery_limit_fields(
         help="Dauerhafte AC-Eigenleistung der Batterie (24/7 Verbrauch).",
         key=_scoped_key(session_scope, "planning_battery_standby"),
     )
+    idle_drain = labeled_number_input(
+        "Selbstentladung (kW)",
+        min_value=0.0,
+        step=0.005,
+        format="%.3f",
+        help="Energie, die im Leerlauf direkt aus dem Speicher verschwindet "
+        "(DC-seitig, bis zum minimalen SoC). Getrennt von der Standby-Leistung, "
+        "die als Hausverbrauch zählt. 0 = keine.",
+        key=_scoped_key(session_scope, "planning_battery_idle_drain"),
+    )
+    _render_idle_drain_suggestion()
     control_labels = [CONTROL_LABELS_DE[v] for v in sorted(BATTERY_CONTROL_VALUES)]
     control_label = labeled_selectbox(
         "Steuerbarkeit",
@@ -372,6 +399,7 @@ def _render_battery_limit_fields(
         "max_soc": max_soc,
         "threshold_percent": threshold_percent,
         "standby_power": standby_power,
+        "idle_drain": idle_drain,
         "control": control,
     }
     if str(bat_type or "house").strip().lower() == "house":
