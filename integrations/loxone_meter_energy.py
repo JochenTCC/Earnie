@@ -51,11 +51,28 @@ def meter_is_bidirectional(meta: dict[str, Any] | None) -> bool:
     return bool(str(states.get("totalNeg") or "").strip())
 
 
-def energy_binding_activated(bindings: dict[str, Any] | None, field: str) -> bool:
-    """True when the energy field key is present (Merker name may be empty)."""
+def energy_binding_activated(
+    bindings: dict[str, Any] | None,
+    field: str,
+    *,
+    qualified_id: str | None = None,
+) -> bool:
+    """True when the energy field key is present (Merker name may be empty).
+
+    Consumers may hold the kind bare (``sens_energy_total``, meter import) or under the
+    qualified id the mapping page stores (``consumer.kochen.sens_energy_total``); pass that
+    consumer's own ``qualified_id`` so both count, and only for this consumer.
+    """
     if not isinstance(bindings, dict):
         return False
-    return field in bindings
+    return field in bindings or (qualified_id is not None and qualified_id in bindings)
+
+
+def _consumer_total_id(consumer: dict[str, Any]) -> str:
+    from ehal.qualified_ids import qualified_consumer_id
+
+    cid = str(consumer.get("id") or "").strip()
+    return qualified_consumer_id(cid, str(consumer.get("type") or ""), FIELD_CONSUMER_TOTAL)
 
 
 def activate_plant_energy_bindings(
@@ -190,7 +207,9 @@ def flex_energy_meter_config(
         if not cid or _consumer_has_shared_meter(consumer):
             continue
         bindings = consumer.get("ehal_bindings")
-        if not energy_binding_activated(bindings, FIELD_CONSUMER_TOTAL):
+        if not energy_binding_activated(
+            bindings, FIELD_CONSUMER_TOTAL, qualified_id=_consumer_total_id(consumer)
+        ):
             continue
         out[cid] = {}
     return out
@@ -203,8 +222,6 @@ def read_flex_energy_readings(
     now: Any = None,
 ) -> dict[str, dict[str, float]]:
     """``{consumer_id: {total}}`` from fresh inbox counters (mono only)."""
-    from ehal.qualified_ids import qualified_consumer_id
-
     readings: dict[str, dict[str, float]] = {}
     for consumer in consumers or []:
         if not isinstance(consumer, dict):
@@ -212,11 +229,11 @@ def read_flex_energy_readings(
         cid = str(consumer.get("id") or "").strip()
         if not cid or _consumer_has_shared_meter(consumer):
             continue
-        bindings = consumer.get("ehal_bindings")
-        if not energy_binding_activated(bindings, FIELD_CONSUMER_TOTAL):
+        total_id = _consumer_total_id(consumer)
+        if not energy_binding_activated(
+            consumer.get("ehal_bindings"), FIELD_CONSUMER_TOTAL, qualified_id=total_id
+        ):
             continue
-        ctype = str(consumer.get("type") or "")
-        total_id = qualified_consumer_id(cid, ctype, FIELD_CONSUMER_TOTAL)
         total = _read_counter(total_id, read_counter=read_counter, now=now)
         if total is None:
             continue

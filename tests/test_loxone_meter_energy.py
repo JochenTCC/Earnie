@@ -211,3 +211,37 @@ def test_flex_energy_skips_shared_meter_and_reads_inbox():
     assert "swimspa" not in readings
     assert readings["kochen"] == {"total": 5.0}
     assert readings["wallbox"] == {"total": 12.0}
+
+
+def test_flex_energy_accepts_the_qualified_key_the_mapping_page_stores():
+    """Bug: the mapping page stores ``consumer.<id>.sens_energy_total``; the reader only
+    looked for the bare kind, so no consumer counter was ever used (all Ist from power)."""
+    consumers = [
+        {
+            "id": "kochen",
+            "type": "generic",
+            "ehal_bindings": {"consumer.kochen.sens_energy_total": ""},
+        },
+        {
+            "id": "waermepumpe",
+            "type": "thermal_annual",
+            "ehal_bindings": {"heatpump.waermepumpe.sens_energy_total": ""},
+        },
+        {
+            # A qualified key of another consumer does not activate this one.
+            "id": "tv",
+            "type": "generic",
+            "ehal_bindings": {"consumer.kochen.sens_energy_total": ""},
+        },
+    ]
+    assert flex_energy_meter_config(consumers) == {"kochen": {}, "waermepumpe": {}}
+
+    inbox = {
+        "consumer.kochen.sens_energy_total": 156.5,
+        "heatpump.waermepumpe.sens_energy_total": 103.858,
+        "consumer.tv.sens_energy_total": 3774.0,
+    }
+    readings = read_flex_energy_readings(
+        consumers, read_counter=lambda ehal_id, **_k: inbox.get(ehal_id)
+    )
+    assert readings == {"kochen": {"total": 156.5}, "waermepumpe": {"total": 103.858}}
