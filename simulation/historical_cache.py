@@ -7,6 +7,9 @@ import pandas as pd
 from data import profile_manager
 from optimizer.slot_duration import DEFAULT_DT_H
 
+# Mirrored days before and after the simulation period (see `_maybe_season_mirror`).
+_MIRROR_MARGIN_DAYS = 1
+
 
 def _floor_dedup_to_hour(series_or_frame):
     """Floor a DatetimeIndex series/frame to the parent clock-hour, keep last per hour.
@@ -26,17 +29,57 @@ def _floor_dedup_to_hour(series_or_frame):
     return hourly[~hourly.index.duplicated(keep="last")]
 
 
+def _missing_hours_error(
+    missing_hours: list[datetime], hourly_index: pd.DatetimeIndex
+) -> profile_manager.MissingConsumptionDataError:
+    """Error naming each day and its clock hours that a window needs but cons_data lacks."""
+    by_day: dict = {}
+    for hour in sorted(set(missing_hours)):
+        by_day.setdefault(hour.date(), []).append(hour.hour)
+    days_with_rows = set(pd.DatetimeIndex(hourly_index).date)
+    parts = []
+    for day, hours in by_day.items():
+        if day not in days_with_rows:
+            parts.append(f"{day:%d.%m.%Y}: keine Daten")
+        else:
+            listed = ", ".join(f"{hour:02d}" for hour in hours)
+            parts.append(f"{day:%d.%m.%Y}: {len(hours)} Stunden fehlen ({listed} Uhr)")
+    return profile_manager.MissingConsumptionDataError(
+        "cons_data.csv: Verbrauchsdaten fehlen für den Simulationszeitraum — "
+        + "; ".join(parts)
+        + ". Den Zeitraum auf Tage mit vollständigen Verbrauchsdaten einschränken oder die "
+        "Verbrauchsdaten neu erzeugen."
+    )
+
+
 def _hold_from_hourly(hourly, slot_datetimes: list[datetime]):
-    """Reindex an already hour-floored series/frame onto QH slots (holds parent-hour value)."""
+    """Reindex an already hour-floored series/frame onto QH slots (holds parent-hour value).
+
+    Every clock hour the slots need must have a cons_data row: a missing hour raises
+    :class:`data.profile_manager.MissingConsumptionDataError` (a logged day is not simulated
+    with invented zeros). Only the clock hour skipped on the spring DST day has no row by
+    nature; its slots are 0 kW, so the window holds the energy of the real 23 hours.
+    """
     from optimizer.slot_duration import floor_to_hour_slot
 
     idx = pd.DatetimeIndex(slot_datetimes)
     parent_idx = pd.DatetimeIndex(
         [floor_to_hour_slot(pd.Timestamp(ts).to_pydatetime()) for ts in slot_datetimes]
     )
+    absent = sorted({ts.to_pydatetime() for ts in parent_idx[~parent_idx.isin(hourly.index)]})
+    if absent:
+        existing_by_day = {
+            day: set(profile_manager._local_hours_of_day(day))
+            for day in {hour.date() for hour in absent}
+        }
+        missing = [hour for hour in absent if hour.hour in existing_by_day[hour.date()]]
+        if missing:
+            raise _missing_hours_error(missing, hourly.index)
     held = hourly.reindex(parent_idx)
     held.index = idx
-    return held.fillna(0.0)
+    if absent:
+        held = held.fillna(0.0)
+    return held
 
 
 def _hour_hold_reindex(series_or_frame, slot_datetimes: list[datetime]):
@@ -76,10 +119,13 @@ class HistoricalDataCache:
         window = self._season_mirror_window
         if window is None:
             window = wall_clock_simulation_window()
+        # Windows reach one day past the period: a charging plan's window starts the day
+        # before (ready_by), a sunrise book chain runs from the day before to the day after.
+        margin = pd.Timedelta(days=_MIRROR_MARGIN_DAYS)
         return season_mirror_cons_dataframe(
             cons_df,
-            target_start=window[0],
-            target_end=window[1],
+            target_start=pd.Timestamp(window[0]) - margin,
+            target_end=pd.Timestamp(window[1]) + margin,
         )
 
     def load(self) -> None:

@@ -6,7 +6,7 @@ Versionierte Mini-Daten für Backtesting-Tests **ohne** lokale `cons_data.csv`.
 
 | Datei | Zweck |
 |-------|--------|
-| `cons_data.csv` | Auszug aus Produktiv-Logs (158 Stunden) |
+| `cons_data.csv` | Auszug aus Produktiv-Logs (158 Stunden) plus 145 Stunden mit 0 kW und `source=synthetic`: Lücken des Auszugs am 24./25.06.2026 sowie der 21. und 26.–29.06.2026, in die Rechenfenster der Tests reichen (Ladeplan-Vortag, Sonnenaufgangs-Folgetag) (Backtesting bricht bei fehlenden Stunden ab; die Nullen hielten die Testzahlen von vorher) |
 | `config.json` | Minimale Config mit Pfad auf diese CSV |
 | `backtesting_scenarios.json` | Ein schnelles 5-kWh-Szenario |
 | `grid_fees.json` | Arbeitspreise des Netzentgelt-Katalogs `share/config/grid_fees.json` mit `components: []`, ohne Abgaben und feste Beträge, damit die Preise der Suite gleich bleiben (Tarifformat 1) |

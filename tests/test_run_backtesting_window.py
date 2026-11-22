@@ -100,7 +100,7 @@ class TestResolveBacktestingWindow:
         assert resolved_start <= resolved_end
 
     def test_june_2026_clamped_to_fixture_data(self, monkeypatch):
-        """Juni 2026: Enddatum wird auf letzten Log-Tag (2026-06-25) begrenzt."""
+        """Juni 2026: Enddatum wird auf letzten Log-Tag (2026-06-29) begrenzt."""
         monkeypatch.setattr(
             "scripts.run_backtesting.pd.Timestamp.now",
             lambda: pd.Timestamp("2026-07-03"),
@@ -113,7 +113,7 @@ class TestResolveBacktestingWindow:
             "last_12_months",
         )
         assert resolved_start == pd.Timestamp("2026-06-01")
-        assert resolved_end == pd.Timestamp("2026-06-25")
+        assert resolved_end == pd.Timestamp("2026-06-29")
 
     def test_requires_both_months(self):
         start = _parse_month("6")
