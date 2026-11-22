@@ -18,13 +18,13 @@ jobs:
           ref: stats-raw
           fetch-depth: 0
 
-      - name: Fetch traffic stats for both repos
+      - name: Fetch traffic stats for all public repos
         env:
           GH_TOKEN: ${{ secrets.GH_REPO_STATS_TOKEN }}
         run: |
           mkdir -p traffic
           DATE=$(date -u +%Y%m%dT%H%M)
-          REPOS=("JochenTCC/Earnie" "JochenTCC/ha-addon-earnie")
+          REPOS=("JochenTCC/Earnie" "JochenTCC/Edibert" "JochenTCC/ha-addon-earnie")
           for REPO in "${REPOS[@]}"; do
             NAME=$(basename "$REPO")
             curl -s -H "Authorization: Bearer $GH_TOKEN" \
