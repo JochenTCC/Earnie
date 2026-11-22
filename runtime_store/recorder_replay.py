@@ -470,7 +470,6 @@ def _prepare_replay_inputs(entry: dict[str, Any], config_module: Any) -> _Prepar
                     start_state,
                 ),
                 start_state,
-                float(soc),
             ),
             soc_by_id,
             start_state,
@@ -740,12 +739,11 @@ def _battery_params_from_config(config_module: Any) -> dict | list[dict]:
 def _battery_params_with_recorded_reserves(
     battery_params: dict | list[dict],
     start_state: dict[str, Any],
-    current_soc: float,
 ) -> dict | list[dict]:
     """Apply the reserves the live cycle planned with (virtual refill carve-out).
 
-    Cycles recorded before ``active_reserves`` existed keep plain config params.
-    ``current_soc`` relaxes the floor by the SoC reading resolution, as live does.
+    Cycles recorded before ``active_reserves`` existed keep plain config params. The SoC
+    reading tolerance at the floor follows from the replayed SoC inside the MILP (Reserve P3).
     """
     if "active_reserves" not in start_state:
         return battery_params
@@ -754,9 +752,7 @@ def _battery_params_with_recorded_reserves(
         raise TypeError("start_state.active_reserves must be a list when present")
     from optimizer.powerstation_live import apply_reserves_to_battery_params
 
-    return apply_reserves_to_battery_params(
-        battery_params, reserves, current_soc=current_soc
-    )
+    return apply_reserves_to_battery_params(battery_params, reserves)
 
 
 def _battery_params_with_recorded_ess_limits(

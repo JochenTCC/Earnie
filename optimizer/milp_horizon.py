@@ -739,19 +739,20 @@ def _apply_reserve_price_floor(
 
     Returns the lower bound per slot (kWh, end of slot) and the primary battery's start energy,
     or ``None`` without a virtual reserve.
-    A floor the battery cannot reach from its start energy is lowered to what it can reach
+    A start inside the tolerance band at the floor is held (Reserve P3, ``banded_floor_kwh``);
+    a floor the battery cannot reach from its start energy is lowered to what it can reach
     (``reachable_floor_kwh``). A start below the base ``min_soc`` is led back by
     ``add_soc_recovery_constraints`` with these per-slot bounds.
     """
-    from .reserve_price_floor import reachable_floor_kwh, reserve_price_floor
+    from .reserve_price_floor import effective_floor_kwh
 
     primary_id = grid_vars.ess_ids[0]
     bat = grid_vars.battery_params_by_id[primary_id]
-    plan = reserve_price_floor(bat, matrix, horizon=horizon, dt_h=dt_h)
-    if plan is None:
-        return None
     e_init = _initial_energy_by_ess(grid_vars, current_soc, current_soc_by_id)[primary_id]
-    floors = reachable_floor_kwh(plan, bat, e_init=e_init, dt_h=dt_h)
+    effective = effective_floor_kwh(bat, matrix, horizon=horizon, e_init=e_init, dt_h=dt_h)
+    if effective is None:
+        return None
+    _plan, floors = effective
     for e_var, floor in zip(grid_vars.e_batt_by_ess[primary_id], floors):
         if floor > float(e_var.lowBound) + 1e-9:
             e_var.lowBound = min(floor, float(e_var.upBound))

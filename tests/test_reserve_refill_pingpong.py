@@ -6,7 +6,9 @@ and the next cycle refilled from the grid; at a reading of 12 % the MILP forced 
 charge every slot to restore 12.3 %.
 
 Since Reserve P2 the floor applies only where the reserve pays; these tests hold it with a
-persisted fill basis (stored reserve bought at 25 ct, prices 45 ct).
+persisted fill basis (stored reserve bought at 25 ct, prices 45 ct). Since Reserve P3 the
+reading tolerance is a band around the floor (``tests/test_reserve_floor_band.py``); the
+one-step relaxation of the floor key (``relax_reserve_floor_for_soc_reading``) is gone.
 """
 from __future__ import annotations
 
@@ -16,9 +18,7 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from optimizer.powerstation_reserve import (
-    SOC_READING_RESOLUTION_PCT,
     prepare_battery_params_for_reserves,
-    relax_reserve_floor_for_soc_reading,
     reserve_floor_discharge_cap_kw,
 )
 
@@ -59,55 +59,36 @@ def test_floor_without_soc_is_the_reserve_floor() -> None:
     assert battery["min_soc"] == pytest.approx(5.0)
 
 
-@pytest.mark.parametrize(
-    ("soc", "expected_min_soc"),
-    [
-        (12.0, 12.0),  # one reading step below: relaxed to the reading
-        (_FLOOR - SOC_READING_RESOLUTION_PCT, _FLOOR - SOC_READING_RESOLUTION_PCT),
-        (11.0, _FLOOR),  # more than a step below: the reserve must be refilled
-        (13.0, _FLOOR),  # above the floor: unchanged
-    ],
-)
-def test_floor_relaxed_only_within_one_reading_step(soc: float, expected_min_soc: float) -> None:
-    battery = prepare_battery_params_for_reserves(_battery(), _reserves(), current_soc=soc)
-    assert battery[_FLOOR_KEY] == pytest.approx(expected_min_soc)
-
-
-def test_relaxation_never_goes_below_the_configured_min_soc() -> None:
-    small = [{"backing": "virtual", "protected_kwh": 0.03, "asap_charge_kwh": 0.0}]  # +0.2 %
-    battery = prepare_battery_params_for_reserves(_battery(), small, current_soc=4.6)
-    assert battery[_FLOOR_KEY] == pytest.approx(5.2)
-
-
 def test_without_virtual_floor_nothing_changes() -> None:
     battery = _battery()
-    assert relax_reserve_floor_for_soc_reading(battery, 4.5) == battery
+    assert prepare_battery_params_for_reserves(battery, []) == battery
     assert reserve_floor_discharge_cap_kw(battery, 50.0, dt_h=0.25, matrix=_flat_matrix()) is None
 
 
-def test_list_params_relax_the_primary_only() -> None:
+def test_list_params_carry_the_floor_on_the_primary_only() -> None:
     other = {**_battery(), "id": "second", "min_soc": 20.0}
-    out = prepare_battery_params_for_reserves([_battery(), other], _reserves(), current_soc=12.0)
-    assert out[0][_FLOOR_KEY] == pytest.approx(12.0)
+    out = prepare_battery_params_for_reserves([_battery(), other], _reserves())
+    assert out[0][_FLOOR_KEY] == pytest.approx(_FLOOR)
     assert _FLOOR_KEY not in out[1]
     assert out[1]["min_soc"] == pytest.approx(20.0)
 
 
 def test_discharge_cap_is_the_energy_above_the_floor_per_slot() -> None:
-    battery = prepare_battery_params_for_reserves(_battery(), _reserves(), current_soc=13.0)
-    cap = reserve_floor_discharge_cap_kw(battery, 13.0, dt_h=0.25, matrix=_flat_matrix())
-    expected = (13.0 - _FLOOR) / 100.0 * _CAP_KWH * _ETA / 0.25
+    battery = prepare_battery_params_for_reserves(_battery(), _reserves())
+    # 14 %: more than one reading step above the floor (13 % releases nothing, Reserve P3)
+    cap = reserve_floor_discharge_cap_kw(battery, 14.0, dt_h=0.25, matrix=_flat_matrix())
+    expected = (14.0 - _FLOOR) / 100.0 * _CAP_KWH * _ETA / 0.25
     assert cap == pytest.approx(expected)
-    assert cap == pytest.approx(0.376, abs=1e-3)
+    assert cap == pytest.approx(0.940, abs=1e-3)
 
 
-def test_discharge_cap_is_zero_at_a_relaxed_floor_and_large_far_above() -> None:
-    at_floor = prepare_battery_params_for_reserves(_battery(), _reserves(), current_soc=12.0)
-    assert reserve_floor_discharge_cap_kw(
-        at_floor, 12.0, dt_h=0.25, matrix=_flat_matrix()
-    ) == pytest.approx(0.0)
-    high = prepare_battery_params_for_reserves(_battery(), _reserves(), current_soc=50.0)
-    assert reserve_floor_discharge_cap_kw(high, 50.0, dt_h=0.25, matrix=_flat_matrix()) > 5.0
+def test_discharge_cap_is_zero_near_the_floor_and_large_far_above() -> None:
+    battery = prepare_battery_params_for_reserves(_battery(), _reserves())
+    for soc in (12.0, 13.0):
+        assert reserve_floor_discharge_cap_kw(
+            battery, soc, dt_h=0.25, matrix=_flat_matrix()
+        ) == pytest.approx(0.0)
+    assert reserve_floor_discharge_cap_kw(battery, 50.0, dt_h=0.25, matrix=_flat_matrix()) > 5.0
 
 
 def test_discharge_cap_fails_loud_without_efficiency() -> None:
@@ -172,16 +153,12 @@ def _milp_mode(battery: dict, soc: float) -> tuple[int, float]:
 
 def test_milp_reading_one_step_below_the_floor_forces_no_charge() -> None:
     """At a reading of 12 % under a 12.3 % floor the plan holds instead of force-charging."""
-    unrelaxed = prepare_battery_params_for_reserves(_battery(), _reserves())
-    mode, power = _milp_mode(unrelaxed, 12.0)
-    assert mode == 1 and power > 0.0, "precondition: the hard floor forces a slot-0 charge"
-
-    relaxed = prepare_battery_params_for_reserves(_battery(), _reserves(), current_soc=12.0)
-    mode, _power = _milp_mode(relaxed, 12.0)
+    battery = prepare_battery_params_for_reserves(_battery(), _reserves())
+    mode, _power = _milp_mode(battery, 12.0)
     assert mode != 1
 
 
 def test_milp_far_below_the_floor_still_refills() -> None:
-    battery = prepare_battery_params_for_reserves(_battery(), _reserves(), current_soc=9.0)
+    battery = prepare_battery_params_for_reserves(_battery(), _reserves())
     mode, power = _milp_mode(battery, 9.0)
     assert mode == 1 and power > 0.0

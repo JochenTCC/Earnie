@@ -2,7 +2,8 @@
 
 Status: draft, 2026-11-22. P1 (prompt release) implemented 2026-11-22, live check
 open; P4 (idle drain) implemented 2026-11-22, not yet configured live; P2 (price-aware
-floor) implemented 2026-11-22, live check open; P3 not implemented. Backlog: epic **Reserve**
+floor) implemented 2026-11-22, live check open; P3 (tolerance at the floor) implemented
+2026-11-22, live check open. Backlog: epic **Reserve**
 (`backlog/Backlog.md`).
 
 ## Problem
@@ -149,7 +150,7 @@ Implemented (2026-11-22), decisions by the maintainer the same day:
   whether a battery starts below its limits and leads it back to each slot's own bound. A
   start between base and floor needs no recovery.
 - **Reading resolution.** `relax_reserve_floor_for_soc_reading` lowers the floor SoC of
-  the paying slots to a reading at most one step below it.
+  the paying slots to a reading at most one step below it. *(Replaced by the band of P3.)*
 - **Automatik cap** (`reserve_floor_discharge_cap_kw`, now with the matrix): the energy
   above the end-of-slot-0 floor; `None` when the reserve is not held in slot 0.
 - **Sunrise anchor.** PV-only charging through sunrise is skipped when a paying slot up to
@@ -175,6 +176,56 @@ In the slots where the floor applies, the whole-percent reading still causes pul
   reserve pays, like the build-up in P2.
 
 Open: size of the band (fixed in percent, or from the idle drain and the slot length).
+
+Implemented (2026-11-22):
+
+- **One rule** (`optimizer/reserve_price_floor.py::banded_floor_kwh`), applied after the P2
+  floor and before the reachability cap (`effective_floor_kwh`). Both the MILP bound
+  (`milp_horizon._apply_reserve_price_floor`) and the Automatik cap
+  (`reserve_floor_discharge_cap_kw`) take the floor from `effective_floor_kwh`, with the start
+  energy from the SoC reading. Only the paying run that starts at slot 0 changes; later paying
+  runs keep the full floor, so a gap inside the band is due at the next paying run and built in
+  the cheapest slots before it (as in P2).
+- **Zones** (`F` floor, `s` one reading step `SOC_READING_RESOLUTION_PCT`, `B` band, `d` drain
+  per slot):
+  - `e_init > F + s`: unchanged; the energy above the floor is free energy.
+  - `F − B ≤ e_init ≤ F + s`: hold. Bound at the end of slot `k`: `e_init − d · (k + 1)`, the
+    energy the drain alone leaves. No discharge (the Automatik cap is 0 at 13 % over 12.33 %),
+    no charge.
+  - `e_init < F − B`: one block up to the floor. Bound `F` at the end of slot 0, `F − d · k`
+    after it, so the block is the gap plus the drain of slot 0 and nothing is topped up later.
+    A block the battery cannot charge in one slot is spread by `reachable_floor_kwh`.
+  - All bounds stay at or above the base `min_soc`.
+- **Bound follows the drain, not held at `F − B`.** A bound held at the band bottom makes the
+  plan top up the drain in small charges; with equal prices the solver puts them in slot 0
+  (seen in the tests: 0.21 kW at a reading of 11 %). The band bottom is therefore enforced by
+  the next cycles: once the reading leaves the band, slot 0 gets the refill block. The plan
+  inside the band is optimistic by the refill it does not show.
+- **Up to the floor, not floor + band.** Energy above `F + s` is free energy (P2): a block to
+  `F + B` would read two steps above the floor at the next cycle, and the plan or Automatik
+  would release it again, which is the next pulse. A block up to `F` lands in the tolerance
+  zone and is held until the drain takes it below the band.
+- **Band size** (`reserve_floor_band_soc_pct`): `max(BAND_MIN_READING_STEPS · s, drain over
+  BAND_HOLD_SLOTS slots)` with `BAND_MIN_READING_STEPS = 2`, `BAND_HOLD_SLOTS = 8`; the drain via
+  `idle_drain_hold_kwh`. Without a drain the band is 2 %. With 1 %/h on 15 kWh and 15-minute
+  slots it is 2 % (the minimum), a block lasts about 2.5 h.
+- **Automatik cap** subtracts the drain of slot 0 from the start energy before it compares with
+  the floor of slot 0 (the floor follows the drain, so otherwise the drain would be released).
+- **Removed:** `relax_reserve_floor_for_soc_reading` and the `current_soc` argument of
+  `prepare_battery_params_for_reserves` / `apply_reserves_to_battery_params` (live and the
+  recorder replay); the floor key keeps the reserve floor, the reading enters through the MILP
+  start energy.
+- **Replay** (`tests/test_reserve_floor_band.py`): a day of 96 live cycles, floor held all day,
+  drain 1 %/h, readings truncated or rounded to whole percent: 9 forced charge slots and no
+  Automatik release; the one-step relaxation of P2 with the drain in the model gives 42 in the
+  same replay (22 live on 2026-11-21, before the drain was modelled).
+
+Open after P3: live check (count forced charge slots per day). **Hold cost finding:** with the
+drain configured, the hold cost of P2 is large for a small reserve (1 %/h of 15 kWh on 1.1 kWh,
+fill at 25 ct: about 3.6 ct per kWh and hour held). A basis kept from the start of an expensive
+phase stops paying after a few hours (at 35 ct after about 1.8 h), and the floor then drops in
+the middle of the phase. Whether the drain should count fully as hold cost (it runs whenever the
+SoC is above the base, also without the reserve held at the floor) is a P2 question.
 
 ### 4. Idle drain in the model (Reserve P4)
 

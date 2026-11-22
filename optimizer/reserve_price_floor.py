@@ -19,6 +19,12 @@ The floor binds the stored energy at the start and the end of a paying slot. ``e
 the energy at the end of slot ``k`` (start of ``k + 1``), so it carries the reserve when slot
 ``k`` or slot ``k + 1`` pays. The cost objective then builds the reserve in the cheapest slots
 before the first paying slot, like an EV charging deadline.
+
+Tolerance at the floor (Reserve P3, ``banded_floor_kwh``): the plant reads the SoC in whole
+percent. In the paying slots from slot 0 on, a start energy inside the band below the floor or
+within one reading step above it is held where it is: the bound follows the idle drain, so the
+plan neither releases a discharge nor refills a gap at once. A start below the band is refilled
+in one block up to the floor.
 """
 from __future__ import annotations
 
@@ -37,6 +43,16 @@ FLOOR_SOC_KEY = "_virtual_reserve_floor_soc"
 BASE_MIN_SOC_KEY = "_virtual_reserve_base_min_soc"
 BASIS_PRICE_KEY = "_virtual_reserve_basis_price"
 BASIS_AT_KEY = "_virtual_reserve_basis_at"
+
+# The plant reports the SoC in whole percent; a floor such as 12.33 % reads as 12 % or 13 %
+# although the true SoC sits on the floor.
+SOC_READING_RESOLUTION_PCT = 1.0
+# Refill band (Reserve P3): at least this many reading steps, so that one reading step of drain
+# never triggers a refill.
+BAND_MIN_READING_STEPS = 2
+# Refill band (Reserve P3): at least the idle drain over this many slots, so that one refill
+# block lasts that long before the next one.
+BAND_HOLD_SLOTS = 8
 
 _EPS = 1e-9
 
@@ -160,14 +176,100 @@ def reserve_price_floor(
     )
 
 
-def reachable_floor_kwh(
+def reserve_floor_band_soc_pct(bat: dict, *, dt_h: float) -> float:
+    """Width of the refill band below the reserve floor in SoC points (Reserve P3).
+
+    ``max(BAND_MIN_READING_STEPS · SOC_READING_RESOLUTION_PCT, drain over BAND_HOLD_SLOTS)``:
+    the idle drain (``idle_drain_hold_kwh``) of ``BAND_HOLD_SLOTS`` slots, so that one refill
+    block lasts that many slots, but never less than two reading steps. Without a configured
+    drain the band is the minimum.
+    """
+    if dt_h <= 0.0:
+        raise ValueError(f"reserve_floor_band_soc_pct: dt_h must be > 0, got {dt_h}")
+    capacity = float(bat["battery_capacity_kwh"])
+    if capacity <= 0.0:
+        raise ValueError(f"Virtuelle Reserve: battery_capacity_kwh {capacity!r} <= 0.")
+    minimum = BAND_MIN_READING_STEPS * SOC_READING_RESOLUTION_PCT
+    drain_pct = idle_drain_hold_kwh(bat, BAND_HOLD_SLOTS * dt_h) / capacity * 100.0
+    return max(minimum, drain_pct)
+
+
+def banded_floor_kwh(
     plan: ReserveFloorPlan,
     bat: dict,
     *,
     e_init: float,
     dt_h: float,
 ) -> list[float]:
-    """``plan.floor_kwh`` lowered where the battery cannot reach it from ``e_init``.
+    """``plan.floor_kwh`` with the tolerance at the floor applied (Reserve P3).
+
+    Only the paying run that starts at slot 0 (``floor_kwh[k]`` above the base from ``k = 0``
+    on) changes; later paying runs keep the full floor, which the plan builds up in the slots
+    before them as in P2. With ``F`` the reserve floor, ``s`` one reading step, ``B`` the band
+    (``reserve_floor_band_soc_pct``) and ``d`` the idle drain of one slot:
+
+    - ``e_init > F + s``: unchanged. The energy above the floor is free energy.
+    - ``F − B ≤ e_init ≤ F + s`` (inside the band): hold. The bound at the end of slot ``k`` is
+      ``e_init − d · (k + 1)``, the energy the drain alone leaves. The plan neither discharges
+      (no Automatik release one step above the floor) nor has to charge (no refill of a gap
+      inside the band).
+    - ``e_init < F − B`` (gap beyond the band): one block up to the floor. The bound is ``F`` at
+      the end of slot 0 and ``F − d · k`` after it, so the block is exactly the gap plus the
+      drain of slot 0, and nothing is topped up afterwards. ``reachable_floor_kwh`` spreads a
+      block the battery cannot charge in one slot over the next slots.
+
+    All bounds stay at or above the base ``min_soc``. In the run the bound follows the drain
+    and is not held at ``F − B``: the band is enforced by the next cycles, which see the
+    reading leave the band and refill. A bound held at ``F − B`` would make the plan top up the
+    drain in small charges, and with equal prices in slot 0.
+    """
+    floors = list(plan.floor_kwh)
+    if not plan.held_now:
+        return floors
+    capacity = float(bat["battery_capacity_kwh"])
+    step_kwh = SOC_READING_RESOLUTION_PCT / 100.0 * capacity
+    band_kwh = reserve_floor_band_soc_pct(bat, dt_h=dt_h) / 100.0 * capacity
+    floor = plan.reserve_floor_kwh
+    bottom = max(plan.base_kwh, floor - band_kwh)
+    start = float(e_init)
+    if start > floor + step_kwh + _EPS:
+        return floors
+    drain_kwh = idle_drain_kw(bat) * dt_h
+    refill = start < bottom - _EPS
+    for k, value in enumerate(floors):
+        if value <= plan.base_kwh + _EPS:
+            break
+        held = floor - drain_kwh * k if refill else start - drain_kwh * (k + 1)
+        floors[k] = max(plan.base_kwh, held)
+    if refill:
+        logger.info(
+            "Virtuelle Reserve: Start %.3f kWh unter dem Band (%.3f kWh) – ein Nachladeblock "
+            "bis zur Untergrenze %.3f kWh.",
+            start,
+            bottom,
+            floor,
+        )
+    else:
+        logger.info(
+            "Virtuelle Reserve: Start %.3f kWh im Toleranzband [%.3f, %.3f] kWh um die "
+            "Untergrenze %.3f kWh – halten, weder nachladen noch entladen.",
+            start,
+            bottom,
+            floor + step_kwh,
+            floor,
+        )
+    return floors
+
+
+def reachable_floor_kwh(
+    floors: list[float],
+    plan: ReserveFloorPlan,
+    bat: dict,
+    *,
+    e_init: float,
+    dt_h: float,
+) -> list[float]:
+    """``floors`` (the plan's floor per slot) lowered where the battery cannot reach it from ``e_init``.
 
     Reachable by the end of slot ``k``: ``e_init`` plus ``k + 1`` slots of full charge power
     through the charge path, minus the idle drain. A floor above that is lowered to it (never
@@ -179,7 +281,7 @@ def reachable_floor_kwh(
     step = (max_charge * eff - idle_drain_kw(bat)) * dt_h
     out: list[float] = []
     short_slots = 0
-    for k, floor in enumerate(plan.floor_kwh):
+    for k, floor in enumerate(floors):
         if floor <= plan.base_kwh + _EPS:
             out.append(floor)
             continue
@@ -198,3 +300,22 @@ def reachable_floor_kwh(
             float(e_init),
         )
     return out
+
+
+def effective_floor_kwh(
+    bat: dict,
+    matrix: list[dict[str, Any]],
+    *,
+    horizon: int,
+    e_init: float,
+    dt_h: float,
+) -> tuple[ReserveFloorPlan, list[float]] | None:
+    """Price-aware floor per slot with tolerance and reachability; ``None`` without a reserve.
+
+    The one place the MILP bound and the Automatik discharge cap take the floor from.
+    """
+    plan = reserve_price_floor(bat, matrix, horizon=horizon, dt_h=dt_h)
+    if plan is None:
+        return None
+    banded = banded_floor_kwh(plan, bat, e_init=e_init, dt_h=dt_h)
+    return plan, reachable_floor_kwh(banded, plan, bat, e_init=e_init, dt_h=dt_h)

@@ -729,9 +729,7 @@ def _main_cycle(
         # Re-load after trigger updates so MILP sees discharging state.
         active_reserves = load_active_reserves()
         cycle_recorder.record_active_reserves(recorder_token, active_reserves)
-        battery_params = apply_reserves_to_battery_params(
-            battery_params, active_reserves, current_soc=float(current_soc)
-        )
+        battery_params = apply_reserves_to_battery_params(battery_params, active_reserves)
         battery_params = ehal_live.filter_planning_batteries_with_soc(
             battery_params, current_soc_by_id
         )

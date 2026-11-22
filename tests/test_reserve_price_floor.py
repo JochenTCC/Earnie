@@ -69,10 +69,8 @@ def _reserve(*, state: str = "standby", basis: tuple[float, datetime] | None = N
     }
 
 
-def _prepared(reserve: dict | None = None, *, soc: float | None = None, **bat) -> dict:
-    return prepare_battery_params_for_reserves(
-        _battery(**bat), [reserve or _reserve()], current_soc=soc
-    )
+def _prepared(reserve: dict | None = None, **bat) -> dict:
+    return prepare_battery_params_for_reserves(_battery(**bat), [reserve or _reserve()])
 
 
 def _matrix(prices: list[float], *, load_kw: float = 0.4) -> list[dict]:
@@ -219,7 +217,7 @@ def test_milp_full_reserve_at_a_cheap_phase_is_not_forced_out() -> None:
 
 def test_milp_live_pattern_no_floor_in_slot_0_forces_no_charge() -> None:
     """Reading 11 % under a 12.33 % floor at cheap prices (2026-11-21): no slot-0 charge."""
-    battery = _prepared(soc=11.0)
+    battery = _prepared()
     flat = _schedule(_matrix([25.4] * 16), 11.0, battery)
     assert max(_charge_kw(flat)) <= _KW_TOL
     # an expensive phase later: the reserve is built in the cheapest slots before it, not now
@@ -257,10 +255,11 @@ def test_discharge_cap_only_where_the_reserve_is_held_now() -> None:
     assert reserve_floor_discharge_cap_kw(
         battery, 13.0, dt_h=_DT_H, matrix=_matrix([30.0] * 8)
     ) is None
+    # 14 % is more than one reading step above the floor (Reserve P3: 13 % releases nothing)
     cap = reserve_floor_discharge_cap_kw(
-        battery, 13.0, dt_h=_DT_H, matrix=_matrix([20.0] + [35.0] * 7)
+        battery, 14.0, dt_h=_DT_H, matrix=_matrix([20.0] + [35.0] * 7)
     )
-    assert cap == pytest.approx((13.0 - _FLOOR_SOC) / 100.0 * _CAP_KWH * _ETA / _DT_H)
+    assert cap == pytest.approx((14.0 - _FLOOR_SOC) / 100.0 * _CAP_KWH * _ETA / _DT_H)
 
 
 # --- fill basis persistence --------------------------------------------------------------------

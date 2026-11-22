@@ -259,70 +259,29 @@ def apply_virtual_reserve_floor(
 def prepare_battery_params_for_reserves(
     battery_params: dict | list[dict],
     reserves: list[dict[str, Any]],
-    *,
-    current_soc: float | None = None,
 ) -> dict | list[dict]:
     """Apply the virtual reserve and its fill basis for the live/MILP call.
 
-    With ``current_soc`` the floor also honours the SoC reading resolution
-    (``relax_reserve_floor_for_soc_reading``).
+    The SoC reading resolution is handled per slot from the start energy
+    (Reserve P3, ``reserve_price_floor.banded_floor_kwh``).
     """
-    out = apply_virtual_reserve_floor(
+    return apply_virtual_reserve_floor(
         battery_params,
         reserve_kwh=virtual_reserve_kwh(reserves),
         fill_basis=virtual_fill_basis(reserves),
     )
-    if current_soc is None:
-        return out
-    return relax_reserve_floor_for_soc_reading(out, current_soc)
 
-
-# The plant reports the SoC in whole percent; a floor such as 12.3 % reads as
-# "below" at 12 % although the gap (0.3 % of the capacity) is reading noise.
-SOC_READING_RESOLUTION_PCT = 1.0
 
 _FLOOR_SOC_KEY = FLOOR_SOC_KEY
 _BASE_MIN_SOC_KEY = BASE_MIN_SOC_KEY
 # Read by the MILP: the configured min_soc below the virtual reserve floor.
 VIRTUAL_RESERVE_BASE_MIN_SOC_KEY = _BASE_MIN_SOC_KEY
-_FLOOR_RELAXED_KEY = "_virtual_reserve_floor_relaxed_to"
 
 
 def _primary(battery_params: dict | list[dict]) -> dict | None:
     if isinstance(battery_params, list):
         return battery_params[0] if battery_params else None
     return battery_params
-
-
-def relax_reserve_floor_for_soc_reading(
-    battery_params: dict | list[dict],
-    current_soc: float,
-) -> dict | list[dict]:
-    """Lower the virtual-reserve floor to ``current_soc`` when it is within one reading step.
-
-    Without this, a reading of 12 % under a 12.3 % floor makes the MILP restore the floor with
-    a low-power forced charge every cycle (reserve-refill ping-pong). It lowers the floor of the
-    slots where the reserve pays, never below the configured ``min_soc``; a SoC more than one
-    step below the floor still has to be refilled before the next paying slot.
-    """
-    out = [dict(b) for b in battery_params] if isinstance(battery_params, list) else dict(battery_params)
-    bat = _primary(out)
-    if bat is None or _FLOOR_SOC_KEY not in bat:
-        return out
-    floor = float(bat[_FLOOR_SOC_KEY])
-    base = float(bat[_BASE_MIN_SOC_KEY])
-    soc = float(current_soc)
-    if not (floor - SOC_READING_RESOLUTION_PCT - 1e-9 <= soc < floor) or soc < base:
-        return out
-    bat[_FLOOR_SOC_KEY] = soc
-    bat[_FLOOR_RELAXED_KEY] = soc
-    logger.info(
-        "Virtual reserve floor %.2f %% relaxed to SoC reading %.1f %% (within %.0f %% resolution)",
-        floor,
-        soc,
-        SOC_READING_RESOLUTION_PCT,
-    )
-    return out
 
 
 def reserve_floor_discharge_cap_kw(
@@ -336,11 +295,15 @@ def reserve_floor_discharge_cap_kw(
 
     In Automatik the plant follows its own rule down to its own minimum SoC, so a large flex
     load can drain the virtual reserve within one slot, and the next cycle refills it from the
-    grid. Capping the written discharge limit at the energy above the floor of the current slot
-    (AC side, through the path efficiency) prevents that. ``None`` without a virtual reserve or
-    when the reserve is not held in the current slot (Reserve P2: no floor, no cap).
+    grid. Capping the written discharge limit at the energy above the floor at the end of the
+    current slot (after the idle drain of the slot, AC side through the path efficiency)
+    prevents that. The floor is the MILP's (``effective_floor_kwh``): a reading inside the
+    tolerance band, also one step above the floor, gives no release (Reserve P3). ``None``
+    without a virtual reserve or when the reserve is not held in the current slot (Reserve P2:
+    no floor, no cap).
     """
-    from .reserve_price_floor import reserve_price_floor
+    from .battery import idle_drain_soc_pct
+    from .reserve_price_floor import effective_floor_kwh
 
     bat = _primary(battery_params)
     if bat is None or _FLOOR_SOC_KEY not in bat:
@@ -349,11 +312,14 @@ def reserve_floor_discharge_cap_kw(
         raise ValueError(f"reserve_floor_discharge_cap_kw: dt_h must be > 0, got {dt_h}")
     if "efficiency" not in bat:
         raise ValueError("reserve_floor_discharge_cap_kw: battery params without efficiency")
-    plan = reserve_price_floor(bat, matrix, horizon=len(matrix), dt_h=dt_h)
-    if plan is None or not plan.held_now:
-        return None
     capacity = float(bat["battery_capacity_kwh"])
-    above_kwh = max(0.0, float(current_soc) / 100.0 * capacity - plan.floor_kwh[0])
+    soc = float(current_soc)
+    e_init = soc / 100.0 * capacity
+    effective = effective_floor_kwh(bat, matrix, horizon=len(matrix), e_init=e_init, dt_h=dt_h)
+    if effective is None or not effective[0].held_now:
+        return None
+    drain_kwh = idle_drain_soc_pct(soc, bat, dt_h=dt_h) / 100.0 * capacity
+    above_kwh = max(0.0, e_init - drain_kwh - effective[1][0])
     return above_kwh * float(bat["efficiency"]) / float(dt_h)
 
 
