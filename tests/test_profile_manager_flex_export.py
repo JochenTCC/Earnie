@@ -51,6 +51,7 @@ def test_generate_consumption_profile_writes_canonical_flex_columns(tmp_path, mo
             "total_kw": [1.0, 1.2, 0.9],
             "baseload_kw": [0.5, 0.6, 0.4],
             "pv_kw": [0.0, 0.0, 0.0],
+            "source": ["measured", "measured", "measured"],
             "ev_kw": [0.5, 0.6, 0.5],
         },
         index=index,

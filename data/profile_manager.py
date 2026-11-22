@@ -51,6 +51,7 @@ def _cons_data_to_profile_dataframe(cons_df: pd.DataFrame) -> pd.DataFrame:
     df = pd.DataFrame(index=cons_df.index)
     df["Total"] = cons_df["total_kw"]
     df["BaseLoad"] = cons_df["baseload_kw"]
+    df["Measured"] = cons_df["source"] != cons_data_store.SOURCE_SYNTHETIC
     consumer_ids = expected_cons_data_consumer_ids()
     labels = consumer_labels_for_ids(consumer_ids)
     for consumer_id in consumer_ids:
@@ -74,6 +75,21 @@ def load_cons_data_pv_series() -> pd.Series:
     if cons_df.empty:
         return pd.Series(dtype=float)
     return cons_df["pv_kw"]
+
+
+_PROFILE_SLOT = ["Month", "Weekday", "Hour"]
+
+
+def _prefer_measured_hours(df: pd.DataFrame) -> pd.DataFrame:
+    """Drop synthetic hours of every month/weekday/hour slot that has measured hours.
+
+    Measured data describe the house as it is; synthetic rows only fill slots without
+    measurements. Averaging both let a regenerated synthetic baseline pull the live
+    profile away from the measured load.
+    """
+    measured = df["Measured"].astype(bool)
+    slot_has_measured = measured.groupby([df[col] for col in _PROFILE_SLOT]).transform("any")
+    return df[measured | ~slot_has_measured]
 
 
 def _load_profile_source_dataframe() -> pd.DataFrame | None:
@@ -134,19 +150,21 @@ def generate_consumption_profile() -> None:
         df['Weekday'] = df.index.weekday
         df['Hour'] = df.index.hour
 
-        profile = df.groupby(['Month', 'Weekday', 'Hour'])['BaseLoad'].mean().reset_index()
+        df = _prefer_measured_hours(df)
+
+        profile = df.groupby(_PROFILE_SLOT)['BaseLoad'].mean().reset_index()
         profile.rename(columns={'BaseLoad': 'Consumption'}, inplace=True)
         profile['Consumption'] = profile['Consumption'].round(3)
         profile.to_csv(consumption_profiles_file(), index=False, sep=';')
 
-        total_profile = df.groupby(['Month', 'Weekday', 'Hour'])['Total'].mean().reset_index()
+        total_profile = df.groupby(_PROFILE_SLOT)['Total'].mean().reset_index()
         total_profile.rename(columns={'Total': 'Consumption'}, inplace=True)
         total_profile['Consumption'] = total_profile['Consumption'].round(3)
         total_profile.to_csv(total_consumption_profiles_file(), index=False, sep=';')
 
         label_cols, rename_to_csv = _flex_profile_export_spec(df)
         if label_cols:
-            flex_profile = df.groupby(["Month", "Weekday", "Hour"])[
+            flex_profile = df.groupby(_PROFILE_SLOT)[
                 label_cols
             ].mean().reset_index()
             flex_profile.rename(columns=rename_to_csv, inplace=True)

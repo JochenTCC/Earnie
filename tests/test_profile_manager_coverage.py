@@ -247,6 +247,7 @@ def test_cons_data_to_profile_dataframe_maps_columns(monkeypatch):
             "baseload_kw": [1.0, 1.5],
             "pv_kw": [0.2, 0.3],
             "ev_kw": [0.5, 0.7],
+            "source": ["measured", "synthetic"],
         },
         index=idx,
     )
@@ -262,6 +263,7 @@ def test_cons_data_to_profile_dataframe_maps_columns(monkeypatch):
     assert list(frame["Total"]) == [2.0, 3.0]
     assert list(frame["BaseLoad"]) == [1.0, 1.5]
     assert list(frame["Smart"]) == [0.5, 0.7]
+    assert list(frame["Measured"]) == [True, False]
 
 
 def test_generate_consumption_profile_without_cons_data_raises(monkeypatch):
@@ -295,7 +297,7 @@ def test_generate_consumption_profile_writes_base_and_total(tmp_path, monkeypatc
     flex_path = tmp_path / "flexible_consumer_profiles.csv"
     idx = pd.date_range("2024-06-01 10:00:00", periods=2, freq="h")
     source = pd.DataFrame(
-        {"Total": [2.0, 3.0], "BaseLoad": [1.0, 1.5]},
+        {"Total": [2.0, 3.0], "BaseLoad": [1.0, 1.5], "Measured": [True, True]},
         index=idx,
     )
     monkeypatch.setattr(pm, "_load_profile_source_dataframe", lambda: source)
