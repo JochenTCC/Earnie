@@ -1,9 +1,11 @@
 # pv_forecast.py
-"""PV forecast per PV system: forecast.solar, else Open-Meteo tilted irradiance.
+"""PV forecast per PV system: forecast.solar and Open-Meteo tilted irradiance.
 
-Order per system: forecast.solar (API, in-memory cache, disk cache across restarts,
-Shadow: Prod feed) → Open-Meteo ``global_tilted_irradiance`` for the system's tilt and
-azimuth → :class:`PvForecastUnavailableError` (the cycle aborts; no invented curve).
+Order per system (``plant.pv_forecast_source``, default forecast.solar first): the primary
+source, then the other one, then :class:`PvForecastUnavailableError` (the cycle aborts; no
+invented curve). forecast.solar: API, in-memory cache, disk cache across restarts, Shadow:
+Prod feed. Open-Meteo: ``global_tilted_irradiance`` (model ``best_match``) for the system's
+tilt and azimuth.
 """
 import json
 import os
@@ -38,6 +40,8 @@ _DISK_CACHE_CHECKED_URLS: set[str] = set()
 _RATE_LIMIT_RETRY_AT: Optional[datetime] = None
 _LAST_FETCH_SOURCE: str = "api"
 _SOURCE_BY_SYSTEM: dict[str, str] = {}
+# Primary source of the last multi-system call (``plant.pv_forecast_source``).
+_PRIMARY_SOURCE: str = SOURCE_FORECAST_SOLAR
 
 
 class PvForecastUnavailableError(RuntimeError):
@@ -86,8 +90,12 @@ def get_api_status() -> dict:
         "source": _LAST_FETCH_SOURCE,
         "cache_available": bool(_CACHED_HOURLY_WATTS_BY_URL),
         "source_by_system": dict(_SOURCE_BY_SYSTEM),
-        "open_meteo_systems": sorted(
-            sid for sid, src in _SOURCE_BY_SYSTEM.items() if src == SOURCE_OPEN_METEO
+        "primary_source": _PRIMARY_SOURCE,
+        # Systems planned with the substitute because the primary source had no data.
+        "substituted_systems": sorted(
+            sid
+            for sid, src in _SOURCE_BY_SYSTEM.items()
+            if src not in (_PRIMARY_SOURCE, SOURCE_NONE)
         ),
     }
 
@@ -551,6 +559,46 @@ def _open_meteo_pv_vector(
     return [kw_by_hour[floor_to_hour_slot(dt)] for dt in target_hours]
 
 
+class _SourceFailed(Exception):
+    """One source delivered nothing usable for a PV system; the message says why."""
+
+
+def _forecast_solar_vector(
+    *, lat: float, lon: float, tilt: float, azimuth: float, kwp: float, target_hours: list, shading
+) -> list[float]:
+    """forecast.solar kW per target hour; :class:`_SourceFailed` when it has no usable data."""
+    url = _forecast_solar_url(
+        lat=lat, lon=lon, tilt=tilt, azimuth=azimuth, kwp=kwp, shading=shading
+    )
+    hourly_watts = _check_and_fetch_api_data(url, kwp)
+    if not hourly_watts:
+        raise _SourceFailed(f"keine Daten (Quelle {_LAST_FETCH_SOURCE})")
+    uncovered = _uncovered_daylight_days(hourly_watts, target_hours, lat=lat, lon=lon)
+    if uncovered:
+        raise _SourceFailed(
+            "Daten decken die Tage mit Tageslicht nicht ab "
+            f"({', '.join(day.isoformat() for day in uncovered)} fehlen, "
+            f"Quelle {_LAST_FETCH_SOURCE})"
+        )
+    pv_vector, success = _map_hourly_data_to_vector(hourly_watts, target_hours)
+    if not success:
+        raise _SourceFailed(
+            f"Daten ohne passende Zeitstempel für {len(target_hours)} Zielstunden "
+            f"(Quelle {_LAST_FETCH_SOURCE})"
+        )
+    return pv_vector
+
+
+def _open_meteo_attempt(**kwargs) -> list[float]:
+    try:
+        return _open_meteo_pv_vector(**kwargs)
+    except Exception as exc:  # any failure of the substitute is reported, never swallowed
+        raise _SourceFailed(str(exc)) from exc
+
+
+_SOURCE_NAMES = {SOURCE_FORECAST_SOLAR: "forecast.solar", SOURCE_OPEN_METEO: "Open-Meteo"}
+
+
 def _forecast_one_system(
     *,
     lat: float,
@@ -560,64 +608,54 @@ def _forecast_one_system(
     kwp: float,
     target_hours: list,
     shading,
+    primary: str,
 ) -> tuple[list[float], str]:
     """Returns (vector, source); raises :class:`PvForecastUnavailableError`.
 
+    ``primary`` (``plant.pv_forecast_source``) is asked first, the other source only when
+    it delivers nothing usable for this system.
+
     ``shading``: the Live profile's manual horizon or None. Without it forecast.solar uses
     its own PVGIS terrain horizon and the URL is the one from before SUSI P3a-2; with it the
-    URL carries ``?horizon=`` (which replaces that terrain horizon) and the Open-Meteo
-    substitute shades the beam with the same line.
+    URL carries ``?horizon=`` (which replaces that terrain horizon) and Open-Meteo shades
+    the beam with the same line.
     """
+    from house_config.pv_forecast_source import substitute_source
+
     if kwp <= 0.0:
         return [0.0] * len(target_hours), SOURCE_NONE
 
-    url = _forecast_solar_url(
-        lat=lat, lon=lon, tilt=tilt, azimuth=azimuth, kwp=kwp, shading=shading
+    kwargs = dict(
+        lat=lat,
+        lon=lon,
+        tilt=tilt,
+        azimuth=azimuth,
+        kwp=kwp,
+        target_hours=target_hours,
+        shading=shading,
     )
-    hourly_watts = _check_and_fetch_api_data(url, kwp)
-    if hourly_watts:
-        uncovered = _uncovered_daylight_days(hourly_watts, target_hours, lat=lat, lon=lon)
-        pv_vector, success = (
-            _map_hourly_data_to_vector(hourly_watts, target_hours)
-            if not uncovered
-            else ([], False)
-        )
-        if success:
-            return pv_vector, SOURCE_FORECAST_SOLAR
-        if uncovered:
-            reason = (
-                "Daten decken die Tage mit Tageslicht nicht ab "
-                f"({', '.join(day.isoformat() for day in uncovered)} fehlen, "
-                f"Quelle {_LAST_FETCH_SOURCE})"
-            )
-        else:
-            reason = (
-                f"Daten ohne passende Zeitstempel für {len(target_hours)} Zielstunden "
-                f"(Quelle {_LAST_FETCH_SOURCE})"
-            )
-    else:
-        reason = f"keine Daten (Quelle {_LAST_FETCH_SOURCE})"
-
-    print(
-        f"[WARN] forecast.solar: {reason} — PV-Prognose für Neigung {tilt}°, "
-        f"Azimut {azimuth}° aus Open-Meteo-Einstrahlung."
+    attempts = {
+        SOURCE_FORECAST_SOLAR: _forecast_solar_vector,
+        SOURCE_OPEN_METEO: _open_meteo_attempt,
+    }
+    if primary not in attempts:
+        raise ValueError(f"Unbekannte PV-Prognosequelle {primary!r}.")
+    reasons: list[str] = []
+    for source in (primary, substitute_source(primary)):
+        try:
+            return attempts[source](**kwargs), source
+        except _SourceFailed as exc:
+            reasons.append(f"{_SOURCE_NAMES[source]}: {exc}")
+            if source == primary:
+                print(
+                    f"[WARN] {_SOURCE_NAMES[source]}: {exc} — PV-Prognose für Neigung "
+                    f"{tilt}°, Azimut {azimuth}° aus "
+                    f"{_SOURCE_NAMES[substitute_source(primary)]}."
+                )
+    raise PvForecastUnavailableError(
+        f"Keine PV-Prognose für Anlage (Neigung {tilt}°, Azimut {azimuth}°, "
+        f"{kwp} kWp): {'; '.join(reasons)}"
     )
-    try:
-        vector = _open_meteo_pv_vector(
-            lat=lat,
-            lon=lon,
-            tilt=tilt,
-            azimuth=azimuth,
-            kwp=kwp,
-            target_hours=target_hours,
-            shading=shading,
-        )
-    except Exception as exc:
-        raise PvForecastUnavailableError(
-            f"Keine PV-Prognose für Anlage (Neigung {tilt}°, Azimut {azimuth}°, "
-            f"{kwp} kWp): forecast.solar {reason}; Open-Meteo: {exc}"
-        ) from exc
-    return vector, SOURCE_OPEN_METEO
 
 
 def _forecast_solar_url(
@@ -629,6 +667,14 @@ def _forecast_solar_url(
     from data.solar_horizon import forecast_solar_horizon_param
 
     return f"{url}?horizon={forecast_solar_horizon_param(shading)}"
+
+
+def _primary_pv_source() -> str:
+    """``plant.pv_forecast_source`` of the house file (absent → forecast.solar)."""
+    from house_config.pv_forecast_source import plant_pv_forecast_source
+    from optimizer.live_export_limit import load_house_doc
+
+    return plant_pv_forecast_source(load_house_doc())
 
 
 def _live_profile_horizon():
@@ -671,9 +717,12 @@ def get_hourly_pv_forecast_by_system_for_hours(
 
     Raises :class:`PvForecastUnavailableError` when a system has neither
     forecast.solar nor Open-Meteo data; the source per system is in
-    :func:`get_api_status` (``source_by_system``).
+    :func:`get_api_status` (``source_by_system``). The order follows
+    ``plant.pv_forecast_source``.
     """
-    global _SOURCE_BY_SYSTEM
+    from house_config.pv_forecast_source import substitute_source
+
+    global _SOURCE_BY_SYSTEM, _PRIMARY_SOURCE
 
     if not target_hours:
         raise ValueError(
@@ -689,6 +738,8 @@ def get_hourly_pv_forecast_by_system_for_hours(
     lat = float(config.get("LATITUDE", cast=float))
     lon = float(config.get("LONGITUDE", cast=float))
     shading = _live_profile_horizon()
+    primary = _primary_pv_source()
+    _PRIMARY_SOURCE = primary
     by_system: dict[str, List[float]] = {}
     sources: dict[str, str] = {}
     for system in systems:
@@ -701,15 +752,19 @@ def get_hourly_pv_forecast_by_system_for_hours(
             kwp=float(system.get("pv_kwp", 0.0) or 0.0),
             target_hours=target_hours,
             shading=shading,
+            primary=primary,
         )
         by_system[sid] = vector
         sources[sid] = source
 
     _SOURCE_BY_SYSTEM = sources
-    substituted = sorted(sid for sid, src in sources.items() if src == SOURCE_OPEN_METEO)
+    substituted = sorted(
+        sid for sid, src in sources.items() if src not in (primary, SOURCE_NONE)
+    )
     if substituted:
         print(
-            f"[WARN] PV-Prognose aus Open-Meteo statt forecast.solar für "
+            f"[WARN] PV-Prognose aus {_SOURCE_NAMES[substitute_source(primary)]} statt "
+            f"{_SOURCE_NAMES[primary]} für "
             f"{', '.join(substituted)} ({len(substituted)}/{len(systems)} Anlage(n))."
         )
     return by_system

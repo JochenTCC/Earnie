@@ -178,3 +178,57 @@ def render_plant_grid_meter_assertions() -> None:
         save=lambda: _save_plant(_plant_out()),
         rerun_follows=False,
     )
+
+
+_PLANT_PV_SOURCE_KEY = "house_config_plant_pv_forecast_source"
+
+
+def render_plant_pv_forecast_source() -> None:
+    """Primary PV forecast source on ``plant.pv_forecast_source`` (the other is the substitute)."""
+    from house_config.pv_forecast_source import (
+        DEFAULT_PV_FORECAST_SOURCE,
+        PV_FORECAST_SOURCE_KEY,
+        PV_FORECAST_SOURCE_LABELS,
+        PV_FORECAST_SOURCES,
+        plant_pv_forecast_source,
+    )
+
+    if _PLANT_PV_SOURCE_KEY not in st.session_state:
+        st.session_state[_PLANT_PV_SOURCE_KEY] = plant_pv_forecast_source(load_house_profiles())
+
+    st.markdown("##### PV-Prognose (Anlage / Live)")
+    st.caption(
+        "Quelle, mit der Earnie die PV-Erzeugung plant. Liefert sie für eine Anlage keine "
+        "Daten, nimmt Earnie die andere Quelle."
+    )
+    source = st.selectbox(
+        "Hauptquelle der PV-Prognose",
+        options=list(PV_FORECAST_SOURCES),
+        format_func=lambda value: PV_FORECAST_SOURCE_LABELS[value],
+        key=_PLANT_PV_SOURCE_KEY,
+        help="plant.pv_forecast_source",
+    )
+
+    def _plant_out() -> dict:
+        doc = load_house_profiles()
+        plant_out = (
+            dict(doc.get("plant") or {})
+            if isinstance(doc.get("plant"), dict)
+            else {}
+        )
+        # The default stays absent in the file: opening the page writes nothing.
+        if source == DEFAULT_PV_FORECAST_SOURCE:
+            plant_out.pop(PV_FORECAST_SOURCE_KEY, None)
+        else:
+            plant_out[PV_FORECAST_SOURCE_KEY] = source
+        return plant_out
+
+    payload = {"source": source}
+    if _seed_plant_persist("house_config_plant_pv_source", payload, _plant_out()):
+        return
+    auto_persist(
+        state_key="house_config_plant_pv_source",
+        payload=payload,
+        save=lambda: _save_plant(_plant_out()),
+        rerun_follows=False,
+    )

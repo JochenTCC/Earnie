@@ -488,6 +488,14 @@ def _normalize_plant(raw: dict | None) -> dict:
     grid_meter = _normalize_grid_meter(raw.get("grid_meter"))
     if grid_meter is not None:
         out["grid_meter"] = grid_meter
+    from house_config.pv_forecast_source import (
+        PV_FORECAST_SOURCE_KEY,
+        normalize_pv_forecast_source,
+    )
+
+    pv_source = normalize_pv_forecast_source(raw.get(PV_FORECAST_SOURCE_KEY))
+    if pv_source is not None:
+        out[PV_FORECAST_SOURCE_KEY] = pv_source
     # Retired: multi-inv plant PV is always Σ inv/pv · η_inv (key dropped on load).
     for key in ("balance_tolerance_pct", "balance_tolerance_w"):
         tolerance = _plant_nonneg_float(raw, key)

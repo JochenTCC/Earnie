@@ -23,6 +23,8 @@ def reset_pv_forecast_state(tmp_path, monkeypatch):
     monkeypatch.setattr(pf.config, "get_planning_pv_systems", lambda: [])
     # No manual horizon unless a test sets one (the real Live profile may carry one).
     monkeypatch.setattr(pf, "_live_profile_horizon", lambda: None)
+    # forecast.solar first (the real house file may choose otherwise).
+    monkeypatch.setattr(pf, "_primary_pv_source", lambda: pf.SOURCE_FORECAST_SOLAR)
     # No real Open-Meteo calls: a dark sky unless a test patches its own irradiance.
     monkeypatch.setattr(
         "data.outdoor_forecast.get_hourly_tilted_irradiance_forecast_wm2",
@@ -216,7 +218,7 @@ def test_http_error_does_not_update_last_api_call(get_mock, _config_mock, _timeo
         pf.get_hourly_pv_forecast_for_hours(_target_hours())
 
     assert pf._LAST_API_CALL_BY_URL == {}
-    assert pf.get_api_status()["open_meteo_systems"] == ["pv"]
+    assert pf.get_api_status()["substituted_systems"] == ["pv"]
 
 
 @patch("data.pv_forecast.config.get_global_timeout", return_value=10)
@@ -227,7 +229,7 @@ def test_timeout_with_warm_cache_keeps_api_values(get_mock, _config_mock, _timeo
     get_mock.return_value = _ok_response()
     first = pf.get_hourly_pv_forecast_for_hours(_target_hours())
     assert first == [1.5, 2.5, 3.5]
-    assert pf.get_api_status()["open_meteo_systems"] == []
+    assert pf.get_api_status()["substituted_systems"] == []
 
     _age_last_api_calls(timedelta(minutes=20))
     get_mock.side_effect = requests.exceptions.Timeout()
@@ -235,7 +237,7 @@ def test_timeout_with_warm_cache_keeps_api_values(get_mock, _config_mock, _timeo
     second = pf.get_hourly_pv_forecast_for_hours(_target_hours())
 
     assert second == [1.5, 2.5, 3.5]
-    assert pf.get_api_status()["open_meteo_systems"] == []
+    assert pf.get_api_status()["substituted_systems"] == []
     assert pf.get_api_status()["source"] == "cache_after_error"
 
 
@@ -431,7 +433,7 @@ def test_disk_cache_older_than_limit_is_not_used(get_mock, _config_mock, _timeou
 
     assert get_mock.call_count == 1
     assert result == [0.4, 0.5, 0.6]
-    assert pf.get_api_status()["open_meteo_systems"] == ["pv"]
+    assert pf.get_api_status()["substituted_systems"] == ["pv"]
 
 
 @patch("data.pv_forecast.config.get_global_timeout", return_value=10)
@@ -545,7 +547,7 @@ def test_open_meteo_only_for_system_without_forecast_solar(systems_mock, _config
         "south": pf.SOURCE_FORECAST_SOLAR,
         "north": pf.SOURCE_OPEN_METEO,
     }
-    assert status["open_meteo_systems"] == ["north"]
+    assert status["substituted_systems"] == ["north"]
 
 
 # ---------------------------------------------------------------------------

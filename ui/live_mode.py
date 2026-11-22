@@ -120,16 +120,28 @@ def _render_main_down_notice(snapshot: dict | None, *, persisted_fresh: bool) ->
 
 
 def _render_pv_source_notice(main_state: dict | None) -> None:
-    """Warn when the last main.py cycle planned a PV system without forecast.solar."""
-    sources = (main_state or {}).get("pv_forecast_sources") or {}
-    substituted = sorted(sid for sid, src in sources.items() if src == "open_meteo")
+    """Warn when the last main.py cycle planned a PV system with the substitute source."""
+    from house_config.pv_forecast_source import (
+        PV_FORECAST_SOURCE_LABELS,
+        PV_SOURCE_FORECAST_SOLAR,
+        substitute_source,
+    )
+
+    state = main_state or {}
+    sources = state.get("pv_forecast_sources") or {}
+    # Runs before plant.pv_forecast_source existed carry no primary: they planned with
+    # forecast.solar first, the only order there was.
+    primary = state.get("pv_forecast_primary") or PV_SOURCE_FORECAST_SOLAR
+    substitute = substitute_source(primary)
+    substituted = sorted(sid for sid, src in sources.items() if src == substitute)
     if not substituted:
         return
+    primary_label = PV_FORECAST_SOURCE_LABELS[primary]
     st.warning(
-        "PV-Prognose ohne forecast.solar: Für **"
+        f"PV-Prognose ohne {primary_label}: Für **"
         + ", ".join(substituted)
-        + "** hat main.py mit der Open-Meteo-Einstrahlung geplant "
-        "(forecast.solar lieferte keine Daten)."
+        + f"** hat main.py mit {PV_FORECAST_SOURCE_LABELS[substitute]} geplant "
+        f"({primary_label} lieferte keine Daten)."
     )
 
 

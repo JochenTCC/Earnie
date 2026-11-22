@@ -439,6 +439,7 @@ def _main_cycle(
         cycle_duration_stats.set_horizon_slots(len(optimization_matrix))
         pv_api_status = pv_forecast.get_api_status()
         pv_forecast_sources = pv_api_status["source_by_system"]
+        pv_forecast_primary = pv_api_status["primary_source"]
         if pv_api_status["retry_at"]:
             logger.warning(
                 "forecast.solar Rate-Limit (HTTP 429): Nächster API-Aufruf erlaubt ab %s "
@@ -447,11 +448,12 @@ def _main_cycle(
                 pv_api_status["source"],
                 "ja" if pv_api_status["cache_available"] else "nein",
             )
-        if pv_api_status["open_meteo_systems"]:
+        if pv_api_status["substituted_systems"]:
             logger.warning(
-                "PV-Prognose aus Open-Meteo statt forecast.solar für: %s "
-                "(keine forecast.solar-Daten, PV-Quelle: %s).",
-                ", ".join(pv_api_status["open_meteo_systems"]),
+                "PV-Prognose aus der Ersatzquelle statt %s für: %s "
+                "(Hauptquelle ohne Daten, forecast.solar-Abruf: %s).",
+                pv_forecast_primary,
+                ", ".join(pv_api_status["substituted_systems"]),
                 pv_api_status["source"],
             )
         from data.planning_window import sunrise_anchor_slot_index
@@ -1137,6 +1139,7 @@ def _main_cycle(
                 ),
                 "forecast_pv_kw": round(pv_forecast_kw_for_log, 3),
                 "pv_forecast_sources": pv_forecast_sources,
+                "pv_forecast_primary": pv_forecast_primary,
                 "forecast_consumption_kw": round(
                     float(optimization_matrix[0]["expected_p_act"]), 3
                 ),

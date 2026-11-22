@@ -72,6 +72,9 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
   - The PV field inverter select (`ui/planning_pv_form.py::_pv_capable_inverters`) silently hides battery inverters, so the second inverter was missing there without a hint.
   - Fix: own inverter labels (e.g. full = PV curtailment via AC limit, read_only = no AC limit / no curtailment), clearer type help, and a caption under the PV field select when battery inverters are hidden. User docs (`docs/konfiguration/batterie-pv.md`, Hauskonfigurator pages) in the same change.
 
+- [ ] **Selectable primary PV forecast source** *(asked 2026-11-22 after comparing the PV forecast lines on the production install: Open-Meteo ICON seamless matched, forecast.solar did not; built 2026-11-22, live check open)*: forecast.solar first with Open-Meteo as the substitute was hard-wired in `data/pv_forecast._forecast_one_system`. New plant-wide `plant.pv_forecast_source` (`forecast_solar` | `open_meteo`, absent = forecast.solar, so no migration) in `house_profiles.json`, set in the Hauskonfigurator (group "Sonne & Horizont", "Anlagenweit"); the other source stays the substitute per PV system. Open-Meteo keeps the model `best_match` (user decision 2026-11-22; ICON seamless explicitly is a later option). Log warning, cockpit notice and run state (`pv_forecast_primary`) name the primary. Tests: `tests/test_pv_forecast_source_choice.py`. Docs: `docs/konfiguration/batterie-pv.md`.
+  - **Tracker:** after deploying, choose "Open-Meteo (best_match)" on the production install and check in the next runs that `pv_forecast_sources` shows `open_meteo` and the forecast matches the yield better.
+
 
 
 ## Document Review Findings (Do not remove this chapter — even if empty)

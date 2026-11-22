@@ -92,6 +92,12 @@
           "type": "number",
           "minimum": 0,
           "description": "Topology P2: absolute floor for derived-load negative-balance tolerance in W (default 100 when absent)."
+        },
+        "pv_forecast_source": {
+          "type": "string",
+          "enum": ["forecast_solar", "open_meteo"],
+          "default": "forecast_solar",
+          "description": "Primary PV forecast source for planning; the other one is the substitute when it has no data for a PV system. Missing = forecast_solar."
         }
       }
     },

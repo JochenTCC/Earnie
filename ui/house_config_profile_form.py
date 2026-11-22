@@ -529,6 +529,11 @@ def _render_sun_group(ctx: dict, location: dict) -> None:
         location["default_pv_tilt"], location["default_pv_azimuth"] = _render_pv_default_row(
             session_scope=session_scope
         )
+        from ui.house_config_plant import render_plant_pv_forecast_source
+
+        with st.container(border=True):
+            st.markdown("**Anlagenweit – gilt für alle Profile**")
+            render_plant_pv_forecast_source()
 
 
 def _render_heating_group(ctx: dict, *, persons: int, annual_kwh: float) -> dict:
