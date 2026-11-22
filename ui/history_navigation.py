@@ -235,6 +235,3 @@ def render_s2_nav_buttons(now: datetime | None = None) -> None:
             _apply_s2_nav_state(new_cycle, new_segment)
 
 
-def render_s2_navigation(now: datetime | None = None) -> None:
-    """SA-Segment- und Zyklus-Navigation für Sunset-2-Sunset (Legacy)."""
-    render_s2_nav_buttons(now=now)

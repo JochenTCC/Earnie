@@ -274,17 +274,6 @@ def _add_deviation_markers(
 _CHART_BOTTOM_MARGIN = 0
 
 
-def _chart_legend() -> dict:
-    return dict(
-        orientation="h",
-        yanchor="top",
-        y=-0.22,
-        x=0.5,
-        xanchor="center",
-        font=dict(size=10),
-    )
-
-
 def _collapsible_chart_layout(*, top_margin: int) -> dict:
     """Layout für Cockpit-Charts: Plotly-Legende aus, HTML-Legende darunter."""
     return dict(

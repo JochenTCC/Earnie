@@ -77,5 +77,3 @@ def plausibility_window_consumption_chart(
     return fig
 
 
-def cockpit_hint_caption() -> str:
-    return _COCKPIT_HINT

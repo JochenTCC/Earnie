@@ -29,7 +29,6 @@ __all__ = [
     "lands_present",
     "lands_union",
     "render_shared_land_filter",
-    "tariff_meta_caption",
     "tariff_parameter_rows",
     "type_caption",
     "types_present",
@@ -47,20 +46,6 @@ def _export_type_matches(item_type: str, filter_type: str) -> bool:
     if filter_type in EXPORT_MONTHLY_UI_TYPES:
         return item_type in EXPORT_MONTHLY_UI_TYPES
     return item_type == filter_type
-
-
-def tariff_meta_caption(tariff: dict) -> str:
-    parts: list[str] = []
-    land = tariff.get("land")
-    currency = tariff.get("currency")
-    if land:
-        parts.append(f"Land: {land}")
-    if currency:
-        parts.append(f"Währung: {currency}")
-    notes = tariff.get("notes")
-    if notes:
-        parts.append(str(notes))
-    return " · ".join(parts)
 
 
 def lands_present(tariffs: list[dict]) -> list[str]:

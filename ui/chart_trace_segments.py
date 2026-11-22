@@ -62,16 +62,6 @@ def _line_hover(uhrzeit: pd.Series, y_format: str) -> dict:
     )
 
 
-def _bar_hover(uhrzeit: pd.Series, y_format: str) -> dict:
-    return dict(
-        customdata=uhrzeit,
-        hovertemplate=(
-            "Uhrzeit: %{customdata}<br>%{fullData.name}: "
-            f"%{{y:{y_format}}}<extra></extra>"
-        ),
-    )
-
-
 def _price_extrapolated_mask(df: pd.DataFrame) -> pd.Series:
     if "Preis extrapoliert" not in df.columns:
         return pd.Series(False, index=df.index)
@@ -303,110 +293,6 @@ def _segment_connected_line_xy(
         line_x = pd.concat([pd.Series([boundary_x]), line_x], ignore_index=True)
         line_y = pd.concat([pd.Series([bridge_y]), line_y], ignore_index=True)
     return line_x, line_y
-
-
-def _segment_hover_labels(
-    uhrzeit: pd.Series,
-    start: int,
-    end: int,
-    *,
-    step_line: bool = True,
-    point_count: int | None = None,
-) -> list[str]:
-    if start >= end:
-        return []
-    if not step_line:
-        segment = uhrzeit.iloc[start:end]
-        if start > 0:
-            labels = [str(uhrzeit.iloc[start - 1])]
-            labels.extend(str(value) for value in segment)
-        else:
-            labels = [str(value) for value in segment]
-        if end == len(uhrzeit) and not segment.empty:
-            labels.append(str(segment.iloc[-1]))
-        if point_count is not None:
-            return labels[:point_count]
-        return labels
-    labels = _extended_hover_labels(uhrzeit.iloc[start:end])
-    if start > 0:
-        labels = [str(uhrzeit.iloc[start - 1])] + labels
-    if point_count is not None:
-        return labels[:point_count]
-    return labels
-
-
-def _add_segmented_hv_line(
-    fig: go.Figure,
-    axis: ChartSlotAxis,
-    y: pd.Series,
-    uhrzeit: pd.Series,
-    segments: list[tuple[int, int, bool]],
-    *,
-    name: str,
-    line_kwargs: dict,
-    yaxis: str = "y",
-    y_format: str = ".2f",
-    base_opacity: float = 1.0,
-    tail_y: float | None = None,
-    custom_hover_values: pd.Series | None = None,
-    hover_template: str | None = None,
-    segment_hover_template: str | None = None,
-    anchor_fraction: float = _LINE_ANCHOR_SLOT_START,
-    bridge_left: bool = True,
-) -> None:
-    for index, (start, end, _is_extrapolated) in enumerate(segments):
-        if start >= end:
-            continue
-        seg_tail = tail_y if end == len(axis.starts) else None
-        line_x, line_y = _segment_connected_line_xy(
-            axis,
-            y,
-            start,
-            end,
-            tail_y=seg_tail,
-            step_line=True,
-            anchor_fraction=anchor_fraction,
-            bridge_left=bridge_left,
-        )
-        if line_x.empty:
-            continue
-        trace_kwargs: dict = dict(
-            x=line_x,
-            y=line_y,
-            name=name,
-            showlegend=index == 0,
-            mode="lines",
-            line=dict(line_kwargs),
-            opacity=base_opacity,
-            yaxis=yaxis,
-        )
-        if custom_hover_values is not None and hover_template is not None:
-            hover_values = custom_hover_values.iloc[start:end]
-            cent_labels = pd.concat(
-                [hover_values, pd.Series([hover_values.iloc[-1]])],
-                ignore_index=True,
-            ).tolist()
-            if start > 0:
-                cent_labels = [float(custom_hover_values.iloc[start - 1])] + cent_labels
-            trace_kwargs.update(
-                customdata=cent_labels,
-                hovertemplate=hover_template,
-                text=_segment_hover_labels(uhrzeit, start, end),
-            )
-        elif segment_hover_template is not None:
-            trace_kwargs.update(
-                customdata=_segment_hover_labels(uhrzeit, start, end),
-                hovertemplate=segment_hover_template,
-            )
-        else:
-            trace_kwargs.update(
-                customdata=_segment_hover_labels(uhrzeit, start, end),
-                hovertemplate=(
-                    "Uhrzeit: %{customdata}<br>%{fullData.name}: "
-                    f"%{{y:{y_format}}}<extra></extra>"
-                ),
-            )
-        fig.add_trace(go.Scatter(**trace_kwargs))
 
 
 def _add_pv_trace(

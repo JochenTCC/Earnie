@@ -43,11 +43,6 @@ def modeled_monthly_kwh(profile: dict, *, hours: int = 8760) -> dict[str, float]
     return dict(sorted(monthly.items()))
 
 
-def load_csv_monthly_kwh(csv_path: str) -> dict[str, float]:
-    series = load_hourly_profile_csv(csv_path)
-    return csv_series_to_monthly_kwh(series)
-
-
 def cons_dataframe_to_series(df: pd.DataFrame) -> list[tuple[str, float]]:
     """Mappt cons_data DataFrame (total_kw) auf (timestamp, kW)-Serie."""
     if df.empty:
@@ -177,27 +172,6 @@ def _format_hour_axis_label(ts_raw: str) -> str:
     ts = _parse_csv_timestamp(ts_raw)
     weekday = _WEEKDAY_LABELS[ts.weekday()]
     return f"{weekday} {ts:%H:%M}"
-
-
-def monthly_comparison_chart(
-    actual: dict[str, float],
-    modeled: dict[str, float],
-) -> go.Figure:
-    months = sorted(set(actual) | set(modeled))
-    actual_vals = [actual.get(month, 0.0) for month in months]
-    modeled_vals = [modeled.get(month, 0.0) for month in months]
-    fig = go.Figure()
-    fig.add_bar(name="Ist-Verbrauch", x=months, y=actual_vals)
-    fig.add_bar(name="Modell", x=months, y=modeled_vals)
-    fig.update_layout(
-        barmode="group",
-        title="Monatsverbrauch: Ist vs. Modell (kWh)",
-        xaxis_title="Monat",
-        yaxis_title="kWh",
-        height=380,
-        margin=dict(l=40, r=20, t=50, b=40),
-    )
-    return fig
 
 
 def timeseries_comparison_from_series(

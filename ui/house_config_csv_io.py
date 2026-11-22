@@ -219,41 +219,6 @@ def save_energiemonitor_profile_csvs(
         min_hours=hours,
     )
 
-def save_energiemonitor_balance_profile_csvs(
-    profile_id: str,
-    content: bytes,
-    filename: str,
-    *,
-    min_hours: int = 0,
-    invert_pv: bool = False,
-    invert_battery: bool = False,
-    invert_grid: bool = False,
-) -> dict[str, object]:
-    """Energiemonitor → Bilanz (PV+Batt+Grid) → derived Verbrauch."""
-    from house_config.consumption_csv import (
-        MIN_HOURS_IMPORT,
-        import_energiemonitor_balance_to_canonical,
-    )
-
-    uploads_dir = Path(resolve_uploads_dir())
-    uploads_dir.mkdir(parents=True, exist_ok=True)
-    safe_name = Path(filename).name or "energiemonitor.csv"
-    if not safe_name.lower().endswith(".csv"):
-        safe_name = f"{safe_name}.csv"
-    raw_path = uploads_dir / f"{profile_id}_energiemonitor_balance_raw_{safe_name}"
-    raw_path.write_bytes(content)
-    hours = min_hours if min_hours > 0 else MIN_HOURS_IMPORT
-    return import_energiemonitor_balance_to_canonical(
-        raw_path.as_posix(),
-        verbrauch_dest=f"config/uploads/{profile_id}_balance_verbrauch.csv",
-        pv_dest=f"config/uploads/{profile_id}_balance_pv.csv",
-        battery_dest=f"config/uploads/{profile_id}_balance_battery.csv",
-        grid_dest=f"config/uploads/{profile_id}_balance_grid.csv",
-        min_hours=hours,
-        invert_pv=invert_pv,
-        invert_battery=invert_battery,
-        invert_grid=invert_grid,
-    )
 
 def save_balance_total_from_component_paths(
     profile_id: str,

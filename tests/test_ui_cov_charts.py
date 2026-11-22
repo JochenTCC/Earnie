@@ -12,7 +12,6 @@ from ui.chart_consumer_stack import chart_flex_consumers_context
 from ui.chart_decorations import _power_chart_ymax, _sunrise_chart_title
 from ui.chart_flow_traces import _flex_legend_placeholder_traces
 from ui.chart_slot_axis import ChartSlotAxis, _slot_index_at_or_after, _slot_time_in_chart
-from ui.chart_trace_segments import _segment_hover_labels
 from ui.flow_balance_allocate import FlowAllocation, allocate_slot_flows
 
 _TZ = ZoneInfo("Europe/Vienna")
@@ -113,38 +112,6 @@ def test_slot_index_at_or_after() -> None:
     assert _slot_index_at_or_after(axis, starts[1]) == 1
     assert _slot_index_at_or_after(axis, starts[1] + timedelta(minutes=1)) == 2
     assert _slot_index_at_or_after(axis, starts[2] + timedelta(minutes=1)) is None
-
-
-# --- chart_trace_segments --------------------------------------------------------------
-
-
-_UHRZEIT = pd.Series(["10:00", "11:00", "12:00", "13:00"])
-
-
-def test_segment_hover_labels_step_line_repeats_last_and_bridges_left() -> None:
-    assert _segment_hover_labels(_UHRZEIT, 0, 2) == ["10:00", "11:00", "11:00"]
-    assert _segment_hover_labels(_UHRZEIT, 1, 3) == ["10:00", "11:00", "12:00", "12:00"]
-    assert _segment_hover_labels(_UHRZEIT, 1, 3, point_count=2) == ["10:00", "11:00"]
-
-
-def test_segment_hover_labels_plain_line() -> None:
-    assert _segment_hover_labels(_UHRZEIT, 0, 2, step_line=False) == ["10:00", "11:00"]
-    assert _segment_hover_labels(_UHRZEIT, 2, 4, step_line=False) == [
-        "11:00",
-        "12:00",
-        "13:00",
-        "13:00",
-    ]
-    assert _segment_hover_labels(_UHRZEIT, 2, 4, step_line=False, point_count=3) == [
-        "11:00",
-        "12:00",
-        "13:00",
-    ]
-
-
-def test_segment_hover_labels_empty_segment() -> None:
-    assert _segment_hover_labels(_UHRZEIT, 2, 2) == []
-    assert _segment_hover_labels(_UHRZEIT, 3, 1, step_line=False) == []
 
 
 # --- flow_balance_allocate -------------------------------------------------------------

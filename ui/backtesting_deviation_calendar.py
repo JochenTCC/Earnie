@@ -257,21 +257,6 @@ def cases_for_date_and_scenario(
     return cell.cases_by_scenario.get(scenario_id)
 
 
-def scenario_ids_for_date(
-    index: dict[date, CalendarCellState],
-    cell_date: date,
-    *,
-    fallback_scenario_ids: list[str],
-) -> list[str]:
-    cell = index.get(cell_date)
-    if cell is None or not cell.in_run:
-        return []
-    from_index = sorted(cell.cases_by_scenario.keys())
-    if from_index:
-        return from_index
-    return list(fallback_scenario_ids)
-
-
 def _month_grid_weeks(year: int, month: int) -> list[list[int | None]]:
     cal = calendar.Calendar(firstweekday=0)
     weeks: list[list[int | None]] = []

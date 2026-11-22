@@ -85,8 +85,6 @@ def try_get_backtesting_scenarios() -> tuple[dict[str, dict] | None, str | None]
         return None, str(exc)
 
 
-
-
 def log_stale_reason(meta: dict) -> str | None:
     """'legacy' | 'mismatch' wenn veraltet, sonst None."""
     stored = meta.get("config_fingerprint")
@@ -100,14 +98,6 @@ def log_stale_reason(meta: dict) -> str | None:
     if stored != current:
         return "mismatch"
     return None
-
-
-def log_matches_current_config(meta: dict) -> bool:
-    return log_stale_reason(meta) is None
-
-
-
-
 
 
 def render_configured_scenarios() -> None:
@@ -156,36 +146,6 @@ def sync_horizon_selectbox_from_log(meta: dict) -> None:
         return
     st.session_state.backtesting_horizon_mode = log_horizon_mode(meta)
     st.session_state[_BACKTESTING_LOG_ANCHOR_KEY] = anchor
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 def render_backtesting_block() -> None:

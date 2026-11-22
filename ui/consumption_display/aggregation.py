@@ -56,11 +56,6 @@ def iso_weeks_in_timestamps(
     return iso_weeks_in_series(filtered)
 
 
-def format_month_label(month_key: str) -> str:
-    year_str, month_str = month_key.split("-", 1)
-    return f"{month_str}/{year_str}"
-
-
 def _month_key(ts_raw: str) -> str:
     """``YYYY-MM`` of one timestamp; ISO strings are sliced, anything else parsed."""
     if len(ts_raw) >= 7 and ts_raw[4] == "-" and ts_raw[:4].isdigit() and ts_raw[5:7].isdigit():

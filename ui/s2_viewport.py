@@ -70,11 +70,3 @@ def resolve_s2_span() -> ChartSpan:
     return "full"
 
 
-def set_s2_span_override(span: ChartSpan | None) -> None:
-    """Test/helper: pin span in session, or clear with None."""
-    if span is None:
-        st.session_state.pop(SESSION_S2_SPAN_OVERRIDE, None)
-        return
-    if span not in ("segment", "full"):
-        raise ValueError(f"span muss 'segment' oder 'full' sein, erhalten: {span!r}.")
-    st.session_state[SESSION_S2_SPAN_OVERRIDE] = span

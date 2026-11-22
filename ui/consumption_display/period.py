@@ -71,10 +71,6 @@ def resolve_rolling_window(anchor_end: datetime, *, days: int) -> TimeWindow:
     return TimeWindow(start=start, end=anchor_end, kind=_kind_for_days(days))
 
 
-def resolve_rolling_kind_window(anchor_end: datetime, kind: PeriodKind) -> TimeWindow:
-    return resolve_rolling_window(anchor_end, days=rolling_days(kind))
-
-
 def timestamp_in_window(ts: datetime, window: TimeWindow) -> bool:
     if window.kind == PeriodKind.ISO_WEEK and window.iso_year is not None:
         return ts.isocalendar()[:2] == (window.iso_year, window.iso_week)

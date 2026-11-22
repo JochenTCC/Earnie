@@ -44,7 +44,6 @@ from ui.chart_colors import (
 )
 
 
-
 FLOW_BALANCE_BAR_WIDTH_FRACTION = 0.9
 
 KIND_BASELOAD = "baseload"
@@ -221,14 +220,6 @@ class FlowBalanceSlot:
     def is_visually_balanced(self) -> bool:
         return abs(self.up_total_kw - self.down_total_kw) < 1e-6
 
-    @property
-    def is_balanced_externally(self) -> bool:
-        return abs(self.offset_kw) < 1e-6
-
-    @property
-    def down_sinks_kw(self) -> float:
-        """Gesamte Down-Säule (Kompatibilität zu älteren Tests)."""
-        return self.down_total_kw
 
 @dataclass(frozen=True)
 class FlowBalanceTraceSpec:

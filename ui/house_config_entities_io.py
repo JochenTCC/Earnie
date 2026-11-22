@@ -386,15 +386,6 @@ def delete_pv_system(entity_id: str) -> None:
             _io.save_backtesting_scenarios(doc)
 
 
-
-
-
-
-
-
-
-
-
 def _rewrite_id_list_in_scenarios(key: str, old_id: str, new_id: str) -> bool:
     """Replace ``old_id`` with ``new_id`` in scenario settings lists."""
     from ui import house_config_io as _io
@@ -429,10 +420,6 @@ def _rewrite_id_list_in_scenarios(key: str, old_id: str, new_id: str) -> bool:
     if changed:
         _io.save_backtesting_scenarios(doc)
     return changed
-
-
-
-
 
 
 def _live_scenario_settings() -> dict:
@@ -514,41 +501,6 @@ def resolve_live_profile_id(house_doc: dict) -> str:
         return profile_id if profile_id in ids else ""
     return ids[0] if ids else ""
 
-def save_live_scenario_refs(
-    *,
-    battery_ids: list[str] | None = None,
-    battery_id: str = "",
-    pv_system_ids: list[str],
-    import_tariff_id: str,
-    export_tariff_id: str,
-    house_profile_id: str,
-) -> None:
-    """Speichert Entitäts-Referenzen für das Live-Szenario."""
-    cleaned_pv = [
-        str(item or "").strip() for item in pv_system_ids if str(item or "").strip()
-    ]
-    cleaned_bat = [
-        str(item or "").strip()
-        for item in (battery_ids or [])
-        if str(item or "").strip()
-    ]
-    if not cleaned_bat:
-        legacy = str(battery_id or "").strip()
-        if legacy:
-            cleaned_bat = [legacy]
-    config.update_live_scenario_settings(
-        {
-            "battery_ids": cleaned_bat,
-            "pv_system_ids": cleaned_pv,
-            "import_tariff_id": import_tariff_id.strip(),
-            "export_tariff_id": export_tariff_id.strip(),
-            "house_profile_id": house_profile_id.strip(),
-        }
-    )
-
-def save_live_scenario_id(scenario_id: str) -> None:
-    """Setzt live_scenario_id in config.json."""
-    config.set_live_scenario_id(scenario_id.strip())
 
 def upsert_scenario(scenario: dict) -> None:
     from ui import house_config_io as _io

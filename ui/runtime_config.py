@@ -1,8 +1,6 @@
 """Laufzeit-Konfiguration und Session-Cache für die Streamlit-UI."""
 from __future__ import annotations
 
-import importlib
-
 import streamlit as st
 
 import config
@@ -56,12 +54,3 @@ def invalidate_live_optimization_cache() -> None:
         st.session_state.pop(key, None)
 
 
-def update_config_file(settings_dict: dict) -> None:
-    """Aktualisiert runtime_settings-Referenzen (IDs + Geo) über config.update_runtime_settings."""
-    try:
-        config.update_runtime_settings(settings_dict)
-        importlib.reload(config)
-        invalidate_live_optimization_cache()
-        st.success("✅ Alle Parameter erfolgreich gespeichert und im System aktualisiert!")
-    except Exception as e:
-        st.error(f"🚨 Fehler beim Speichern der Konfiguration: {e}")

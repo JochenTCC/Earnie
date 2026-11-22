@@ -99,33 +99,6 @@ def bundle_from_cons_data(df: pd.DataFrame) -> ConsumptionSeriesBundle:
     )
 
 
-def with_modeled_pv_by_system(
-    bundle: ConsumptionSeriesBundle,
-    scenario_params: dict | None,
-) -> ConsumptionSeriesBundle:
-    """Attach per-PV modeled series from one scenario; ``bundle.pv`` stays the sum."""
-    planning = (scenario_params or {}).get("_planning_pv_systems")
-    if not isinstance(planning, list) or not planning:
-        return bundle
-    if not bundle.timestamps:
-        return bundle
-
-    from datetime import datetime
-
-    from data.modeled_climate import ModeledClimateContext
-
-    climate = ModeledClimateContext.from_scenario(scenario_params or {})
-    slots = [datetime.strptime(ts, "%Y-%m-%d %H:%M:%S") for ts in bundle.timestamps]
-    by_system = climate.pv_kw_by_system_for_slots(slots)
-    if not by_system:
-        return bundle
-    return replace(
-        bundle,
-        pv_by_system=by_system,
-        pv_system_labels=climate.pv_system_labels(),
-    )
-
-
 def collect_unique_planning_pv(scenarios: dict[str, dict]) -> list[dict]:
     """Union of ``_planning_pv_systems`` across scenarios (dedupe by id, first wins)."""
     ordered: list[dict] = []

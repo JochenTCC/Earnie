@@ -515,14 +515,6 @@ def filter_slots_calendar_month(
     )
 
 
-def filter_slots_calendar_year(
-    slots: Sequence[CostAnalysisSlot],
-    *,
-    year: int,
-) -> tuple[CostAnalysisSlot, ...]:
-    return tuple(slot for slot in slots if slot.slot_start.year == year)
-
-
 def iso_weeks_in_slots(slots: Sequence[CostAnalysisSlot]) -> list[tuple[int, int]]:
     weeks: list[tuple[int, int]] = []
     seen: set[tuple[int, int]] = set()

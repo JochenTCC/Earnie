@@ -52,8 +52,6 @@ from ui.simulation_results import (
 )
 
 
-
-
 VIEW_MODE_24H = "24h"
 
 VIEW_MODE_SUNRISE = "sunrise"
@@ -171,23 +169,6 @@ def _battery_params_from_snapshot(snapshot: dict) -> dict | list[dict]:
         )
     return live
 
-def _planning_moment(
-    window_anchor: str,
-    tz_name: str,
-    *,
-    view_mode: str,
-) -> datetime:
-    anchor = pd.Timestamp(window_anchor)
-    if anchor.tzinfo is None:
-        anchor = anchor.tz_localize(tz_name)
-    else:
-        anchor = anchor.tz_convert(tz_name)
-    anchor_dt = anchor.to_pydatetime()
-    if view_mode == VIEW_MODE_SUNRISE:
-        moment = window_start_before_anchor(anchor_dt, tz_name)
-    else:
-        moment = anchor_dt
-    return align_to_planning_timezone(moment, tz_name)
 
 def _slot_datetimes_from_sim_rows(
     sim_rows: list[dict],

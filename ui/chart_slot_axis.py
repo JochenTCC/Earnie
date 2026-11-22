@@ -10,7 +10,6 @@ import pandas as pd
 from data.planning_window import (
     UiChartWindow,
     align_to_planning_timezone,
-    normalize_hour_slot,
 )
 
 
@@ -284,20 +283,6 @@ def _zone_right_edge(axis: ChartSlotAxis, moment: datetime) -> datetime:
     return _zone_slot_right(axis, history_end_idx)
 
 
-def _zone_left_edge(axis: ChartSlotAxis, moment: datetime) -> datetime:
-    """Linker Rand des ersten Slots mit Beginn >= QH-floor(``moment``)."""
-    from optimizer.slot_duration import normalize_quarter_hour_slot
-
-    target = normalize_quarter_hour_slot(moment)
-    index = _slot_index_at_or_after(axis, target)
-    if index is None:
-        last = len(axis.starts) - 1
-        if last < 0:
-            raise ValueError("ChartSlotAxis.starts darf nicht leer sein.")
-        return _zone_slot_right(axis, last)
-    return _zone_slot_left(axis, index)
-
-
 def _history_zone_x1(
     axis: ChartSlotAxis,
     history_end: datetime,
@@ -321,15 +306,6 @@ def _forecast_zone_x0(
         if slot == forecast_start:
             return max(_zone_slot_left(axis, index), x_left)
     return max(forecast_start, x_left)
-
-
-def _slot_indices_for_hour(axis: ChartSlotAxis, hour: datetime) -> list[int]:
-    indices: list[int] = []
-    for index in range(len(axis.starts)):
-        slot = axis.starts.iloc[index].to_pydatetime()
-        if normalize_hour_slot(slot) == hour:
-            indices.append(index)
-    return indices
 
 
 def _chart_xaxis_config(axis: ChartSlotAxis, *, range_start: datetime | None = None) -> dict:
