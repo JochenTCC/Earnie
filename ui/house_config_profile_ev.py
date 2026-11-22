@@ -95,6 +95,27 @@ DEFAULT_EV_MAX_CURRENT_A = 16.0
 NEW_WALLBOX_VOLTAGE_V = 230.0
 
 
+def ev_preview_view(item: dict) -> dict:
+    """The form's EV as the loader resolves it: pair power and limits (a copy).
+
+    The form stores no ``nominal_power_kw`` on an EV; the charts and the Grundlast preview
+    model its charging from the pair power like planning does. Without a usable wallbox
+    the power is unknown: ``ValueError`` instead of a silent 0 kW.
+    """
+    import copy
+
+    from house_config.wallboxes import resolve_ev_pair
+
+    label = str(item.get("label") or item.get("id") or "E-Auto")
+    if WALLBOX_ASSIGNMENT_KEY not in item:
+        raise ValueError(f"E-Auto '{label}': keine Wallbox gewählt, Ladeleistung unbekannt.")
+    from ui.house_config_wallbox_io import wallboxes_map
+
+    view = copy.deepcopy(item)
+    resolve_ev_pair(view, wallboxes_map(), label=f"E-Auto '{label}'")
+    return view
+
+
 def _pair_kw(current_a: float, *, voltage_v: float, phases: int) -> float:
     return float(current_a) * float(voltage_v) * int(phases) / 1000.0
 

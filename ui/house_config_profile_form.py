@@ -234,6 +234,9 @@ def _preview_consumers(consumers: list[dict], heating: dict) -> list[dict]:
             continue
         if consumer.get("type") == "thermal_annual":
             consumer = {**consumer, **thermal_preview_fields(heating)}
+        if consumer.get("type") == "ev":
+            # The form stores no power on an EV; the charts charge it with the pair power.
+            consumer = ev_preview_view(consumer)
         out.append(consumer)
     return out
 
@@ -277,7 +280,12 @@ def _edit_and_sync_consumers(
         horizon_fields=location,
     )
     st.session_state[_SESSION_CONSUMERS_KEY] = resolved_for_preview
-    return resolved, _preview_consumers(resolved_for_preview, heating)
+    try:
+        preview_consumers = _preview_consumers(resolved_for_preview, heating)
+    except ValueError as exc:
+        st.error(f"Verbraucher nicht berechenbar: {exc}")
+        st.stop()
+    return resolved, preview_consumers
 
 
 def _render_baseload_preview(
@@ -793,6 +801,7 @@ from ui.house_config_profile_ev import (  # noqa: E402
     _render_day_schedule,
     _render_ev_fields,
     _seed_ev_defaults_on_type_switch,
+    ev_preview_view,
 )
 from ui.house_config_profile_thermal import (  # noqa: E402
     _consumer_expander_title,
