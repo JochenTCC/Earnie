@@ -2,6 +2,13 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Consumer energy counters from the mapping page (2026-11-22)
+
+- [x] **Bugfix — consumer energy counters bound on the mapping page were never read** *(found 2026-11-22 while checking the heat pump counter on the production install; fixed and verified live 2026-11-22)*: the mapping page stores a consumer counter under its qualified id (`consumer.kochen.sens_energy_total`), but `integrations/loxone_meter_energy.energy_binding_activated` only looked for the bare kind `sens_energy_total` (written by the meter import). So no consumer counter was activated although every counter arrived in the push inbox; the slot Ist of every consumer came from the 30 s power mean (`ist_power_source` "mean").
+  - **Fixed (2026-11-22):** `energy_binding_activated(..., qualified_id=...)` also accepts the consumer's own qualified id; `flex_energy_meter_config` and `read_flex_energy_readings` pass it. Tests: `tests/test_loxone_meter_energy.py::test_flex_energy_accepts_the_qualified_key_the_mapping_page_stores`.
+  - **Not covered:** plant counters (grid, PV) are a separate config question; on the production install they are not bound at all.
+  - **Verified (2026-11-22, 2.8.0-dev.37):** on the production install the closed interval 19:00 shows `ist_power_source` "counter" for every bound consumer (heat pump, cooking, TV, dryer, washing machine) and for PV and grid; consumers without a counter stay "mean".
+
 ### Consumption baseline: stale fingerprint and regeneration (2026-11-22)
 
 - [x] **Bugfix — measured cons_data appends re-stamp stale synthetic rows as current** *(found 2026-11-22 via a 5 h dryer outline in Chart 1; fixed and verified live 2026-11-22)*: `save_cons_data` wrote the current house-profile fingerprint into the cons_data meta on every hourly measured append, so synthetic rows generated from an older house profile never showed `profile_mismatch`. On the production install the synthetic history (Nov 2024 – Jun 2026) still has the dryer at 2.5 kW twice a week while the house profile now says 1.0 kW, 3 runs a week; `flexible_consumer_profiles.csv` (the flex shape for planning and the SoC BL Ziel line) therefore expects 2.5 kW on Monday and Thursday 12–14.
