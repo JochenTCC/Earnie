@@ -92,7 +92,36 @@ Cooling (F) depends on the "Haus Wärme" row in both variants; Variant 1 makes t
 | `absent_mode` on the profile | Operational live switch, not configuration. | Not obsolete; candidate to move to the Cockpit, show status only here. |
 | `plant.pv_covers_all_inverters` | Silently popped on grid-meter save (`ui/house_config_plant.py`). | Not a field; move the cleanup to `runtime_store/migration/`. |
 
-## 6. Implementation notes
+## 6. Staging
+
+Decided 2026-11-22: stage 1 before the beta, stage 2 after.
+
+### Stage 1 — reorganise only (no data-flow or behaviour change)
+
+Acceptance: opening a saved profile and leaving the page writes nothing, and every existing AppTest passes unchanged in what it asserts (widget keys stay the same).
+
+- Groups as `st.expander` with a stable `key` (default `on_change="ignore"`, so collapsed content still runs and no widget value is dropped).
+- **Variant 2:** "Haus Wärme" stays in the consumer list.
+- Render order keeps today's data flow, so it differs from §4 where a later group feeds an earlier one:
+  1. header: Profil, Entfernen, Bezeichnung
+  2. A Verbrauch & Haushalt
+  3. B Standort
+  4. C Netzanschluss & Netzentgelt (Netzbereich + plant-wide box)
+  5. H Sonne & Horizont — before the consumers, because they read the horizon fields
+  6. E Heizung (building, control, gains; sub-headings, H override last)
+  7. F Kühlung
+  8. D Verbraucher + balance
+  9. I Abwesenheit (profile switch + EHAL status only)
+  10. G Historische Messdaten (CSV) + Gesamt-Lastverhalten (unchanged module)
+- Consumer form: generic role before runs per week; "Inaktiv wenn abwesend" moves to the end, before "Interner Gewinn"; its key position in the saved consumer dict stays the same.
+- EV: "Mindest-Ladedauer" and MILP tuning in a nested "Erweitert" expander.
+- Unchanged in stage 1: heating setback stays in E (control), "Interner Gewinn" always shown, both auto-save calls, Basislast-Verteilung inside the chart view, PV defaults kept.
+
+### Stage 2 — after the beta
+
+Variant 1 ("Haus Wärme" fields into E), consumers before heating (split state from rendering), absence merged (setback into I), "Interner Gewinn" hidden without heating/cooling (value passed through), one auto-save call, Basislast-Verteilung into G, obsolete parameters (§5), `absent_mode` to the Cockpit.
+
+## 7. Implementation notes
 
 - No JSON change for the regrouping itself; no config migration needed. Variant 1 changes how the `thermal_annual` row is created — still no schema change, but a behaviour change to test (new profile, heating on/off, cooling without heating).
 - Render order constraint: `house_heating_state` must be set before consumer forms render (`RuntimeError` otherwise). With D before E, the heating section must compute its state first and render later, or the state must be split from rendering.
