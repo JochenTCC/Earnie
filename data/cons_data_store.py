@@ -172,7 +172,22 @@ def load_cons_data(path: str | None = None) -> pd.DataFrame:
     return _normalize_cons_dataframe(df.set_index("timestamp"))
 
 
-def save_cons_data(df: pd.DataFrame, path: str | None = None, *, apply_retention: bool = True) -> str:
+_CURRENT_FINGERPRINT = object()
+
+
+def save_cons_data(
+    df: pd.DataFrame,
+    path: str | None = None,
+    *,
+    apply_retention: bool = True,
+    synthesis_fingerprint: str | None | object = _CURRENT_FINGERPRINT,
+) -> str:
+    """Write cons_data and its meta.
+
+    ``synthesis_fingerprint`` is the house profile the synthetic rows were generated
+    from. Default: the current profile (a full generation). Appending measured hours
+    passes the stored value instead, so older synthetic rows stay detectable as stale.
+    """
     path = path or get_output_path()
     df = _normalize_cons_dataframe(df)
     if apply_retention:
@@ -198,7 +213,11 @@ def save_cons_data(df: pd.DataFrame, path: str | None = None, *, apply_retention
             "retention_months": get_retention_months(),
             "consumer_ids": expected_cons_data_consumer_ids()
             or _consumer_ids_from_dataframe(df),
-            "house_profile_fingerprint": current_cons_data_synthesis_fingerprint(),
+            "house_profile_fingerprint": (
+                current_cons_data_synthesis_fingerprint()
+                if synthesis_fingerprint is _CURRENT_FINGERPRINT
+                else synthesis_fingerprint
+            ),
             "date_range": {"min": str(df.index.min()), "max": str(df.index.max())},
             "row_count": len(df),
             "source_counts": df["source"].value_counts().to_dict() if not df.empty else {},
@@ -239,8 +258,25 @@ def append_measured_hours(
         merged = pd.concat([existing, incoming])
         merged = merged[~merged.index.duplicated(keep="last")].sort_index()
 
-    save_cons_data(merged, path)
+    save_cons_data(
+        merged,
+        path,
+        synthesis_fingerprint=_fingerprint_after_measured_append(merged, path),
+    )
     return merged
+
+
+def _fingerprint_after_measured_append(merged: pd.DataFrame, path: str) -> str | None | object:
+    """Fingerprint for the meta after a measured append.
+
+    Measured rows do not depend on the house profile: without synthetic rows the
+    current fingerprint applies. With synthetic rows the stored one stays (None
+    without meta), so a changed house profile still reports ``profile_mismatch``.
+    """
+    if not (merged["source"] == SOURCE_SYNTHETIC).any():
+        return _CURRENT_FINGERPRINT
+    meta = load_cons_data_meta(path)
+    return meta.get("house_profile_fingerprint") if meta else None
 
 
 def build_hour_row_from_measurements(
