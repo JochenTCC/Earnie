@@ -255,12 +255,16 @@ def wait_for_optimize_or_timeout(
     event: threading.Event | None = None,
     on_poll: Callable[[], None] | None = None,
     clock_fn: Callable[[], float] | None = None,
+    stop_fn: Callable[[], bool] | None = None,
 ) -> bool:
     """Sleep until timeout or optimize Event; return True if Event fired.
 
     The wait runs against a monotonic deadline (``clock_fn``, default
     ``time.monotonic``), so time spent in ``on_poll`` counts towards
     ``total_wait_sec`` instead of extending the wait.
+
+    ``stop_fn`` (checked after each ``on_poll``) ends the wait early without the
+    Event; the result is then ``False`` and the caller knows why it stopped.
     """
     import time
 
@@ -284,6 +288,8 @@ def wait_for_optimize_or_timeout(
             else:
                 ev.clear()
             return True
+        if stop_fn is not None and stop_fn():
+            return False
         remaining = deadline - clock()
         if remaining <= 0:
             return False

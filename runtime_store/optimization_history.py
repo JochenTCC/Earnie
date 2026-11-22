@@ -157,6 +157,8 @@ def _format_run_trigger_label(run_trigger: str | None) -> str:
         return "Viertelstunde"
     if run_trigger == "request_optimize":
         return "Request Optimize"
+    if run_trigger == "reserve_release":
+        return "Reserve-Freigabe"
     if run_trigger.startswith("event:"):
         return run_trigger.split(":", 1)[1]
     if run_trigger.startswith("ev_plugged_in:"):

@@ -168,9 +168,12 @@ def resolve_next_trigger(
     *,
     optimize_trigger: str,
 ) -> str:
-    """Merge local early wake with Shadow feed optimize-trigger mirror."""
-    if early == optimize_trigger:
-        return optimize_trigger
+    """Merge local early wake with Shadow feed optimize-trigger mirror.
+
+    Any local wake label (request optimize, reserve release) wins.
+    """
+    if early is not None:
+        return early
     if shadow_mode.is_shadow_mode() and _client("cycle").consume_optimize_trigger():
         return optimize_trigger
     return next_trigger

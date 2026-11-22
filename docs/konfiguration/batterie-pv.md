@@ -61,6 +61,13 @@ Mehrere manuelle Geräte können dieselbe virtuelle Powerstation nutzen. Sie tei
 
 Solange ein Gerät aktiv ist, gibt Earnie die gehaltene Reserve frei, der SoC-Floor der Hausbatterie sinkt also. Nach dem Lauf bucht Earnie den Restvorrat weiter ab. Danach lädt Earnie **preisoptimal** nach, mit einer harten Frist von **24 h**.
 
+**Freigabe ohne Warten auf die nächste Viertelstunde:** Zwischen zwei Läufen prüft Earnie alle 30 Sekunden die Geräte virtueller Reserven, die Energie halten und noch nicht freigegeben sind (digitales Signal und Live-Leistung). Startet ein Gerät, gibt Earnie die Reserve sofort frei und startet einen außerplanmäßigen Lauf (Trigger **Reserve-Freigabe** im Verlauf). Der neue Plan entscheidet, wann die freigegebene Energie genutzt wird; die Batterie muss das Gerät nicht selbst versorgen. Die Verzögerung liegt bei bis zu 30 Sekunden plus der Laufzeit der Optimierung.
+
+- Pro Gerätestart gibt es genau einen Zusatzlauf. Die Freigabe bleibt bestehen, bis die Reserve leer ist; ein weiter laufendes Gerät weckt Earnie also nicht erneut.
+- Beginnt der nächste reguläre Lauf ohnehin innerhalb seiner erwarteten Laufzeit (Vorlauf des Frühstarts), weckt Earnie nicht. Der reguläre Lauf übernimmt die Freigabe.
+- Leere Reserven und physische Powerstations lösen keinen Zusatzlauf aus. Physische Powerstations gibt weiterhin der reguläre Lauf frei.
+- Ein Smarthome kann denselben Effekt weiterhin von außen auslösen, indem es beim Gerätestart `Earnie_Request_Optimize` sendet.
+
 **Schutz der gehaltenen Reserve:** Der SoC-Floor ist der Mindest-SoC der Hausbatterie plus der Carve-out (z. B. 5 % + 1,1 kWh von 15 kWh = 12,3 %).
 
 - Im Modus **Automatik** begrenzt Earnie das geschriebene Entladelimit auf die Energie über diesem Floor, die in einer Viertelstunde abfließen darf. Bei 13 % SoC sind das rund 0,4 kW. So kann ein großer Verbraucher (z. B. SwimSpa) die Reserve nicht innerhalb eines Slots leeren, die danach aus dem Netz nachgeladen werden müsste. Weiter über dem Floor bleibt das volle Entladelimit.

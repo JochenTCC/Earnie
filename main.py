@@ -189,6 +189,18 @@ def _daemon_wait_poll() -> None:
         maybe_flush_after_sampler()
 
 
+def _reserve_release_wait_poll(*, wait_sec: float, run_estimate_sec: float):
+    """``on_poll`` for the wait between regular runs: sampler + reserve release (Reserve P1)."""
+    from optimizer.powerstation_live import release_virtual_reserves_on_appliance_start
+    from optimizer.run_trigger import reserve_release_poll
+
+    return reserve_release_poll(
+        base_poll=_daemon_wait_poll,
+        check_release=lambda: bool(release_virtual_reserves_on_appliance_start()),
+        wake_until=time.monotonic() + float(wait_sec) - float(run_estimate_sec),
+    )
+
+
 def _wait_after_aborted_cycle() -> str:
     """Back off after a cycle that aborted before planning; returns the next trigger.
 
@@ -1382,10 +1394,10 @@ if __name__ == "__main__":
 
             spawn_maybe_send_ping()
 
+            stats_records = cycle_duration_stats.load_records()
+            stats_platform = cycle_duration_stats.platform_info()["id"]
             decision = decide_lead(
-                cycle_duration_stats.load_records(),
-                platform=cycle_duration_stats.platform_info()["id"],
-                enabled=early_start_on,
+                stats_records, platform=stats_platform, enabled=early_start_on
             )
             if decision.capped and not lead_was_capped:
                 logger.warning(
@@ -1418,9 +1430,20 @@ if __name__ == "__main__":
                     start_at.strftime("%H:%M:%S"),
                     wait_sec,
                 )
+            # Reserve P1: no release wake when the regular run starts within its
+            # expected run time anyway (the lead; also measured with early start off).
+            run_estimate_sec = (
+                decision.lead_sec
+                if early_start_on
+                else decide_lead(
+                    stats_records, platform=stats_platform, enabled=True
+                ).lead_sec
+            )
             early = wait_until_next_run(
                 total_wait_sec=wait_sec,
-                on_poll=_daemon_wait_poll,
+                on_poll=_reserve_release_wait_poll(
+                    wait_sec=wait_sec, run_estimate_sec=run_estimate_sec
+                ),
             )
             woke_at = datetime.now()
             next_trigger = resolve_next_trigger(

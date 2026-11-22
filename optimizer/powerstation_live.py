@@ -6,16 +6,18 @@ from datetime import datetime, timezone
 from typing import Any
 
 import config
-from house_config.powerstation import MODE_RESERVE
+from house_config.powerstation import BACKING_VIRTUAL, MODE_RESERVE
 from optimizer.powerstation_reserve import (
+    _group_reserve_appliances,
     advance_reserve_after_slot,
     collect_active_reserves,
     detect_trigger_from_power,
     physical_reserves,
     prepare_battery_params_for_reserves,
+    protected_kwh_from_state,
     virtual_asap_charge_kwh,
 )
-from runtime_store.powerstation_reserves import set_trigger
+from runtime_store.powerstation_reserves import load_reserve_states, set_trigger
 
 logger = logging.getLogger(__name__)
 
@@ -217,6 +219,52 @@ def sync_triggers_from_telemetry(
             triggered = detect_trigger_from_power(power)
         if triggered:
             set_trigger(ps_id, active=True)
+
+
+def release_virtual_reserves_on_appliance_start() -> list[str]:
+    """Wait-loop check (Reserve P1): latch filled virtual reserves whose appliance runs.
+
+    Only reserves that hold energy (``protected_kwh`` > 0) and are not latched
+    yet are checked, so one appliance start latches once; the latch stays until
+    the reserve is empty (``advance_reserve_after_slot``). Reads live signals
+    (no cycle telemetry between runs) and writes the reserve state only on a
+    trigger. Returns the latched powerstation ids.
+    """
+    ps_by_id = {
+        str(p["id"]): p
+        for p in _planning_powerstations()
+        if isinstance(p, dict) and p.get("id")
+    }
+    groups = _group_reserve_appliances(_reserve_appliances(), ps_by_id, warn=False)
+    if not groups:
+        return []
+    states = load_reserve_states()
+    consumers: dict[str, dict] | None = None
+    latched: list[str] = []
+    for ps_id, group in groups.items():
+        if str(ps_by_id[ps_id].get("backing") or BACKING_VIRTUAL) != BACKING_VIRTUAL:
+            continue
+        entry = states.get(ps_id)
+        if entry is None or entry.get("trigger_active"):
+            continue
+        if protected_kwh_from_state(entry) <= 1e-9:
+            continue
+        if consumers is None:
+            consumers = _consumers_by_id()
+        for appliance in group:
+            appliance_id = str(appliance.get("id") or "").strip()
+            if appliance_id and appliance_run_signal_active(
+                appliance_id, telemetry=None, consumers_by_id=consumers
+            ):
+                set_trigger(ps_id, active=True)
+                logger.info(
+                    "Reserve %s freigegeben: Gerät %s läuft — Plan wird neu berechnet.",
+                    ps_id,
+                    appliance_id,
+                )
+                latched.append(ps_id)
+                break
+    return latched
 
 
 def advance_virtual_reserves_from_plan(

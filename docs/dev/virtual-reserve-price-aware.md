@@ -1,6 +1,7 @@
 # Virtual reserve: hold it only when it pays, release it promptly
 
-Status: draft, 2026-11-22. Nothing here is implemented. Backlog: epic **Reserve**
+Status: draft, 2026-11-22. P1 (prompt release) implemented 2026-11-22, live check
+open; P2–P4 not implemented. Backlog: epic **Reserve**
 (`backlog/Backlog.md`).
 
 ## Problem

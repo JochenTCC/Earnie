@@ -67,8 +67,13 @@ def asap_charge_kwh_from_state(entry: dict[str, Any]) -> float:
 def _group_reserve_appliances(
     appliances: list[dict],
     ps_by_id: dict[str, dict],
+    *,
+    warn: bool = True,
 ) -> dict[str, list[dict]]:
-    """powerstation_id → reserve appliances (single_use PS only)."""
+    """powerstation_id → reserve appliances (single_use PS only).
+
+    ``warn=False`` for the 30 s wait-loop check: the cycle warns once per run.
+    """
     groups: dict[str, list[dict]] = {}
     for appliance in appliances:
         if str(appliance.get("mode") or "") != MODE_RESERVE:
@@ -78,6 +83,8 @@ def _group_reserve_appliances(
             continue
         ps = ps_by_id.get(ps_id)
         if ps is None or not is_powerstation(ps):
+            if not warn:
+                continue
             logger.warning(
                 "Reserve appliance %s: powerstation_id '%s' fehlt oder ist keine Powerstation.",
                 appliance.get("id"),
