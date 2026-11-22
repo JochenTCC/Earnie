@@ -15,6 +15,8 @@ from pathlib import Path
 import pytest
 from streamlit.testing.v1 import AppTest
 
+from tests.apptest.helpers import open_scenario
+
 _SCRIPTS = Path(__file__).parent / "scripts"
 _TIMEOUT_S = 30.0
 
@@ -193,13 +195,13 @@ _RADIO_B = "Fixture 5 kWh fixe Einspeise"
 
 def _scenario_session() -> AppTest:
     at = AppTest.from_file(str(_SCRIPTS / "run_page_scenario_editor.py")).run(timeout=_TIMEOUT_S)
-    at.radio(key="scenario_select").set_value(_RADIO_A).run(timeout=_TIMEOUT_S)
+    open_scenario(at, _RADIO_A, timeout=_TIMEOUT_S)
     assert not at.exception
     return at
 
 
 def _select_scenario(at: AppTest, radio_label: str) -> AppTest:
-    at.radio(key="scenario_select").set_value(radio_label).run(timeout=_TIMEOUT_S)
+    open_scenario(at, radio_label, timeout=_TIMEOUT_S)
     assert not at.exception
     return at
 

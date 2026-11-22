@@ -55,7 +55,8 @@ def _session() -> AppTest:
 
 def test_form_shows_building_and_heating_system_sections() -> None:
     at = _session()
-    assert "Gebäude / Wärmebedarf" in [h.value for h in at.subheader]
+    # Building fields live in the house group „Heizung“ (layout doc, stage 1).
+    assert any(e.label.startswith("**Heizung**") for e in at.expander)
     texts = [m.value for m in at.markdown]
     assert "**Gebäude / Wärmebedarf**" not in texts
     assert f"**Heizsystem (Referenzsystem: {_reference()['label']})**" in texts

@@ -13,6 +13,8 @@ from pathlib import Path
 import pytest
 from streamlit.testing.v1 import AppTest
 
+from tests.apptest.helpers import open_scenario, open_scenario_label
+
 from tests.apptest.fields import SCENARIO_ID, SCENARIO_RADIO_LABEL
 
 _SCRIPT = Path(__file__).parent / "scripts" / "run_page_scenario_editor.py"
@@ -58,7 +60,7 @@ def _gas_variant():
 
 def _session(radio_label: str = SCENARIO_RADIO_LABEL) -> AppTest:
     at = AppTest.from_file(str(_SCRIPT)).run(timeout=_TIMEOUT_S)
-    at.radio(key="scenario_select").set_value(radio_label).run(timeout=_TIMEOUT_S)
+    open_scenario(at, radio_label, timeout=_TIMEOUT_S)
     assert not at.exception
     return at
 
@@ -104,14 +106,14 @@ def test_scenario_with_variant_switches_to_other_scenarios() -> None:
     assert _scenario()["settings"]["heating_system_ids"] == {"wp": "gas_variante"}
 
     at = _session()
-    at.radio(key="scenario_select").set_value("Live").run(timeout=_TIMEOUT_S)
+    open_scenario(at, "Live", timeout=_TIMEOUT_S)
     assert not at.exception
-    assert at.radio(key="scenario_select").value == "Live"
+    assert open_scenario_label(at) == "Live"
 
     at = _session()
-    at.radio(key="scenario_select").set_value("— neu —").run(timeout=_TIMEOUT_S)
+    at.button(key="scenario_duplicate").click().run(timeout=_TIMEOUT_S)
     assert not at.exception
-    assert at.radio(key="scenario_select").value not in ("— neu —", SCENARIO_RADIO_LABEL)
+    assert open_scenario_label(at) not in (None, SCENARIO_RADIO_LABEL)
 
 
 def test_live_scenario_names_the_reference_system_without_select() -> None:

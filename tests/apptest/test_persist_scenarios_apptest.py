@@ -2,7 +2,7 @@
 
 Autosave (``auto_persist``) in ``backtesting_scenarios.json``. Getestet wird das
 Nicht-Live-Szenario ``entity_test``: Widget-Keys ``entity_test__<suffix>``, die
-Auswahl erfolgt über das Radio ``scenario_select``.
+Auswahl erfolgt über die Zeilen der Übersicht (``open_scenario``).
 """
 from __future__ import annotations
 
@@ -12,6 +12,8 @@ from pathlib import Path
 
 import pytest
 from streamlit.testing.v1 import AppTest
+
+from tests.apptest.helpers import open_scenario
 
 from tests.apptest.fields import (
     ABSENT,
@@ -27,7 +29,7 @@ _TIMEOUT_S = 30.0
 
 def _new_session(radio_label: str = SCENARIO_RADIO_LABEL) -> AppTest:
     at = AppTest.from_file(str(_SCRIPT)).run(timeout=_TIMEOUT_S)
-    at.radio(key="scenario_select").set_value(radio_label).run(timeout=_TIMEOUT_S)
+    open_scenario(at, radio_label, timeout=_TIMEOUT_S)
     assert not at.exception
     return at
 
@@ -124,7 +126,7 @@ def test_t5_several_fields_changed_are_all_persisted() -> None:
     by_key = {}
     for spec in SCENARIO_FIELDS:
         by_key.setdefault(spec.suffix, spec)
-    picks = ["scenario_enabled", "scenario_battery"]
+    picks = ["scenario_label", "scenario_battery"]
     at = _new_session()
     for suffix in picks:
         _widget(at, by_key[suffix]).set_value(by_key[suffix].valid)
@@ -135,9 +137,9 @@ def test_t5_several_fields_changed_are_all_persisted() -> None:
 
 
 def test_t8_second_session_sees_value_saved_by_first() -> None:
-    spec = next(s for s in SCENARIO_FIELDS if s.suffix == "scenario_enabled")
-    _set(_new_session(), spec, False)
-    assert _widget(_new_session(), spec).value is False
+    spec = next(s for s in SCENARIO_FIELDS if s.suffix == "scenario_battery")
+    _set(_new_session(), spec, spec.valid)
+    assert _widget(_new_session(), spec).value == spec.valid
 
 
 def test_live_scenario_label_is_locked() -> None:
@@ -146,11 +148,10 @@ def test_live_scenario_label_is_locked() -> None:
 
 
 def test_live_scenario_is_always_active_for_the_scenario_explorer() -> None:
-    """Live always runs in the SE: its box is ticked and locked, no own-reference box."""
+    """Live always runs in the SE: its row box is ticked and locked, no own-reference box."""
     at = _new_session("Live")
-    box = at.checkbox(key="live__scenario_enabled")
+    box = at.checkbox(key="scenario_active__live")
     assert box.value is True
     assert box.disabled is True
     assert not [w for w in at.checkbox if str(w.key).endswith("scenario_own_reference")]
-    other = _widget(_new_session(), next(s for s in SCENARIO_FIELDS if s.suffix == "scenario_enabled"))
-    assert other.disabled is False
+    assert at.checkbox(key=f"scenario_active__{SCENARIO_ID}").disabled is False

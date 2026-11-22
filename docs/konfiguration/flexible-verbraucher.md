@@ -25,8 +25,8 @@ Die folgenden Hausprofil-Felder wirken nur in der **Live**-Optimierung; der Szen
 | ---- | --- | --------- |
 | `absent_mode` | Profil | Earnie-Schalter „Abwesend / Urlaub“ |
 | `absent_mode_enabled` | Verbraucher | „Inaktiv wenn abwesend“. Bei wirksamem Modus nimmt Earnie diese Verbraucher aus der Live-MILP. Die Haus-Wärme hat das Feld nicht, sie wird über `thermal.absent_mode_enabled` abgesenkt. |
-| `thermal.absent_mode_enabled` | Profil (Gebäude / Wärmebedarf) | „Absenken wenn abwesend“. Bei wirksamem Modus bleibt die Haus-Wärme in der Planung, mit abgesenkter Solltemperatur. |
-| `thermal.absent_temp_reduction_c` | Profil (Gebäude / Wärmebedarf) | Absenkung in K; Live-Soll = `target_temp_c` − Absenkung. Warmwasser (`persons`) ist dann 0. |
+| `thermal.absent_mode_enabled` | Profil (Gruppe Heizung) | „Absenken wenn abwesend“. Bei wirksamem Modus bleibt die Haus-Wärme in der Planung, mit abgesenkter Solltemperatur. |
+| `thermal.absent_temp_reduction_c` | Profil (Gruppe Heizung) | Absenkung in K; Live-Soll = `target_temp_c` − Absenkung. Warmwasser (`persons`) ist dann 0. |
 | `plant.ehal_bindings.sens_absent_mode` | Plant | Optionales Smarthome-Signal 0/1, per **oder** mit `absent_mode` verknüpft. Live-Lesen über das aktive EHAL-Backend: Loxone-VO/Merker (Default-Name `Earnie_Abwesend`), HA-Entity (`binary_sensor` / `input_boolean` / …), OpenEMS-Kanal als `componentId/ChannelId` |
 
 Der Modus ist wirksam, sobald der Schalter im Hauskonfigurator **oder** das EHAL-Live-Signal aktiv ist (alle Backends). Der Schalter `absent_mode` wirkt dabei **backend-unabhängig**. Verbraucher mit Opt-in nimmt Earnie aus der Live-MILP-Liste. Die Haus-Wärme bleibt in der Optimierung, mit reduzierter Solltemperatur, wenn „Absenken wenn abwesend“ an ist.
@@ -56,12 +56,12 @@ Darunter vergleicht Earnie den **Haushaltsstrom** des Profils mit dem Richtwert 
 
 ## Gebäude / Wärmebedarf (Hausprofil)
 
-Die wärmetechnischen Eigenschaften gehören zum Haus, nicht zur Heizung. Im Hauskonfigurator stehen sie im Abschnitt **Gebäude / Wärmebedarf** des Hausprofils, vor den Verbrauchern.
+Die wärmetechnischen Eigenschaften gehören zum Haus, nicht zur Heizung. Im Hauskonfigurator stehen sie in der Gruppe **Heizung** des Hausprofils, vor den Verbrauchern: Gebäude, Regelung, Wärmegewinne und unter **Experte** der Verlustkoeffizient H.
 
 **Schalter „Heizung betrachten“** (`heating_enabled`):
 
-- **Aus** (Standard für ein neues Haus): Abschnitt und Verbraucher „Haus Wärme“ sind ausgeblendet, die Heizung wird nicht geplant. Ihr Verbrauch bleibt in der Grundlast. Wer die Heizung nicht betrachten will, gibt hier nichts ein.
-- **An:** Earnie plant die Heizung mit den Gebäudedaten dieses Abschnitts. Den Verbraucher „Haus Wärme“ legt man unter **Verbraucher** an; der Typ ist nur bei eingeschaltetem Schalter wählbar.
+- **Aus** (Standard für ein neues Haus): Gebäudefelder und Verbraucher „Haus Wärme“ sind ausgeblendet, die Heizung wird nicht geplant. Ihr Verbrauch bleibt in der Grundlast. Wer die Heizung nicht betrachten will, gibt hier nichts ein.
+- **An:** Earnie plant die Heizung mit den Gebäudedaten dieser Gruppe. Den Verbraucher „Haus Wärme“ legt man unter **Verbraucher** an; der Typ ist nur bei eingeschaltetem Schalter wählbar.
 - Ausschalten löscht nichts: Gebäudedaten und Haus-Wärme bleiben gespeichert und sind beim Wiedereinschalten unverändert da. Ein Szenario, das für dieses Haus ein Heizsystem wählt, meldet bei ausgeschaltetem Schalter einen Fehler.
 
 | Feld | Bedeutung |
@@ -613,7 +613,7 @@ Ladeziel in kWh (vereinfacht; die Akkukapazität stammt aus Live-EHAL, wenn gebu
 | SOC-Min Sofort | `get_evcs_soc_min_immediate` / `Earnie_EAuto_SOCMinSofort` | Sofort-Boden: Earnie erzwingt bis zu diesem SOC eine Lieferung so schnell wie möglich (MILP) und plant danach normal bis zum Limit. Ein Wert ≤ 0 oder ein fehlendes Binding = inaktiv; ein Wert über dem Limit wird auf das Limit begrenzt. |
 | Sofortladen | `set_evcs_mode=now` / Legacy-Sofortsignal | Volllast bis zum Limit, **außerhalb** der MILP-Planung (das Smarthome steuert). Unterscheidet sich von SOC-Min Sofort. |
 
-Der Block `charging_schedule.milp` am EV-Verbraucher ist **Pflicht**, sobald Earnie den Ladestrom vorgibt (`set_evcs_max_current` gebunden). Ohne ihn bricht die Live-Optimierung mit einer Meldung ab, die das E-Auto nennt. Der Szenario-Explorer braucht ihn nicht. Die Werte stehen im Hauskonfigurator beim E-Auto unter **MILP-Feintuning**:
+Der Block `charging_schedule.milp` am EV-Verbraucher ist **Pflicht**, sobald Earnie den Ladestrom vorgibt (`set_evcs_max_current` gebunden). Ohne ihn bricht die Live-Optimierung mit einer Meldung ab, die das E-Auto nennt. Der Szenario-Explorer braucht ihn nicht. Die Werte stehen im Hauskonfigurator beim E-Auto im zugeklappten Bereich **Erweitert** unter **MILP-Feintuning**:
 
 | Feld (UI) | Schlüssel | Bedeutung | Vorschlag |
 | --- | --- | --- | --- |

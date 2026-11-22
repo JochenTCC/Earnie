@@ -8,7 +8,8 @@ import streamlit as st
 from runtime_store.shadow.errors import ConfigReadOnlyError
 from ui.auto_persist import SHADOW_READONLY_CAPTION
 from ui.flash import flash
-from ui.form_layout import labeled_checkbox
+from ui.form_layout import labeled_checkbox, labeled_text_input
+from ui.pages.scenario_editor_overview import TEMPLATE_EMPTY
 from ui.house_config_io import (
     delete_scenario,
     list_batteries,
@@ -119,13 +120,8 @@ def _resolve_and_sync_scenario(live_id: str, catalogs: dict) -> dict:
     )
     selected = _resolve_scenario_selection(
         scenario_ids=scenario_ids,
-        scenario_labels=catalogs["scenario_labels"],
         live_id=live_id,
-        profiles=catalogs["profiles"],
-        batteries=catalogs["batteries"],
-        pv_systems=catalogs["pv_systems"],
-        import_tariffs=catalogs["import_tariffs"],
-        export_tariffs=catalogs["export_tariffs"],
+        catalogs=catalogs,
     )
     resolved = _scenario_template_and_scope(live_id, catalogs, selected, scenario_ids)
     _sync_scenario_session(
@@ -141,6 +137,18 @@ def _resolve_and_sync_scenario(live_id: str, catalogs: dict) -> dict:
     return resolved
 
 
+def _new_scenario_template(scenarios: list[dict], live_id: str) -> dict:
+    """Template of a new scenario as the overview buttons asked for it.
+
+    „Neu (leer)“ (``TEMPLATE_EMPTY``): no settings. „Duplizieren“: a copy of the named scenario
+    (Live when the session holds none, e.g. a page opened on „— neu —“ without a button).
+    """
+    source_id = str(st.session_state.get(_SESSION_TEMPLATE_SOURCE_KEY) or live_id or "").strip()
+    if source_id == TEMPLATE_EMPTY:
+        return new_scenario_template(scenarios)
+    return new_scenario_template(scenarios, source_id=source_id, live_id=live_id)
+
+
 def _scenario_template_and_scope(
     live_id: str,
     catalogs: dict,
@@ -153,11 +161,8 @@ def _scenario_template_and_scope(
         if not is_new
         else None
     )
-    source_id = str(
-        st.session_state.get(_SESSION_TEMPLATE_SOURCE_KEY) or live_id or ""
-    ).strip()
     scenario_template = (
-        new_scenario_template(catalogs["scenarios"], source_id=source_id, live_id=live_id)
+        _new_scenario_template(catalogs["scenarios"], live_id)
         if is_new
         else dict(existing or {})
     )
@@ -175,9 +180,12 @@ def _scenario_template_and_scope(
 
 
 def _prepare_scenario_tab(live_id: str) -> dict:
+    from ui.pages.scenario_editor_overview import apply_pending_overview_writes
     from ui.pages.scenario_editor_session import _apply_pending_scenario_select
 
     _apply_pending_scenario_select()
+    # Writes queued by the overview rows (enabled, position), before the file is read.
+    apply_pending_overview_writes(live_id)
     catalogs = _load_scenario_catalogs()
     resolved = _resolve_and_sync_scenario(live_id, catalogs)
     maps = _entity_option_maps(catalogs)
@@ -195,31 +203,16 @@ def _render_scenario_identity_fields(ctx: dict) -> str:
 
     is_live = bool(existing) and str(existing.get("id", "")).strip() == live_id
     label_key = scoped_widget_key(session_scope, "scenario_label")
-    enabled_key = scoped_widget_key(session_scope, "scenario_enabled")
 
-    label_col, enabled_col = st.columns(2)
-    label = label_col.text_input(
+    label = labeled_text_input(
         "Bezeichnung",
         key=label_key,
         disabled=is_live,
     )
     if is_live and existing:
         label = str(existing.get("label") or existing.get("id") or "").strip()
-    if is_live:
-        # Live always runs in the SE: every other scenario is compared with it.
-        st.session_state[enabled_key] = True
-    enabled_col.checkbox(
-        "Aktiv für Szenario-Explorer",
-        key=enabled_key,
-        disabled=is_live,
-        help=(
-            "Das Live-Szenario läuft im Szenario-Explorer immer, alle anderen werden mit ihm "
-            "verglichen."
-            if is_live
-            else "Deaktivierte Szenarien erscheinen nicht in der SE-Berechnung. "
-            "Änderungen machen vorhandene SE-Ergebnisse ungültig."
-        ),
-    )
+    # „Aktiv im Explorer“ has one writer: the overview row (scenario_editor_overview).
+    st.caption("Aktivierung für den Szenario-Explorer in der Übersicht oben.")
     return label
 
 
@@ -482,9 +475,8 @@ def _scenario_persist_payload(
         {
             "id": save_id,
             "label": str(label or "").strip() or save_id,
-            "enabled": bool(
-                st.session_state.get(scoped_widget_key(session_scope, "scenario_enabled"), True)
-            ),
+            # Written by the overview row only; the form keeps what the file holds.
+            "enabled": template.get("enabled", True) is not False,
             "settings": settings,
         }
     )
@@ -586,12 +578,35 @@ def _auto_persist_scenario(
         st.rerun()
 
 
+_DELETE_CONFIRM_KEY = "scenario_delete_confirm"
+
+
+def _confirm_scenario_delete(ctx: dict) -> bool:
+    """„Szenario entfernen …“ asks first; True once the user confirmed for this scenario."""
+    scenario_id = ctx["stable_scenario_id"]
+    if st.session_state.get(_DELETE_CONFIRM_KEY) != scenario_id:
+        if st.button("Szenario entfernen …", key="scenario_delete"):
+            st.session_state[_DELETE_CONFIRM_KEY] = scenario_id
+            st.rerun()
+        return False
+    label = str((ctx["existing"] or {}).get("label") or scenario_id)
+    st.warning(f"„{label}“ wirklich entfernen? Das lässt sich nicht rückgängig machen.")
+    yes_col, no_col, _rest = st.columns([1, 1, 3])
+    if no_col.button("Abbrechen", key="scenario_delete_cancel"):
+        st.session_state.pop(_DELETE_CONFIRM_KEY, None)
+        st.rerun()
+    if not yes_col.button("Entfernen", key="scenario_delete_confirm_yes", type="primary"):
+        return False
+    st.session_state.pop(_DELETE_CONFIRM_KEY, None)
+    return True
+
+
 def _render_scenario_delete_button(ctx: dict) -> None:
     if ctx["is_new"] or not ctx["stable_scenario_id"]:
         return
     if ctx["stable_scenario_id"] == ctx["live_id"]:
         return
-    if not st.button("Szenario entfernen", key="scenario_delete"):
+    if not _confirm_scenario_delete(ctx):
         return
     from ui.auto_persist import forget_persisted
 

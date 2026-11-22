@@ -219,7 +219,7 @@ def _scen(kind, suffix, key, valid, stored=None, boundaries=()):
 SCENARIO_FIELDS = [
     _scen("text_input", "scenario_label", "label", "Neu Ünï – 日本 🏠"),
     _scen("text_input", "scenario_label", "label", "S"),
-    _scen("checkbox", "scenario_enabled", "enabled", False),
+    # „Aktiv im Explorer“ is a row of the overview: tests/apptest/test_scenario_overview_apptest.py
     _scen("selectbox", "scenario_import", "settings.import_tariff_id",
           "aWATTar Österreich", stored="awattar_at"),
     _scen("selectbox", "scenario_profile", "settings.house_profile_id",

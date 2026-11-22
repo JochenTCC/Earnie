@@ -126,7 +126,7 @@ def render_configured_scenarios() -> None:
     if not scenarios:
         st.caption(
             "Keine aktiven Szenarien für den Szenario-Explorer. "
-            "Im Szenarienkonfigurator „Aktiv für Szenario-Explorer“ setzen."
+            "Im Szenarienkonfigurator in der Übersicht „Aktiv im Explorer“ setzen."
         )
 
 _HORIZON_MODE_LABELS = {

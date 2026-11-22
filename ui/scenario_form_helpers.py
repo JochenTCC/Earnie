@@ -540,12 +540,12 @@ def normalize_scenario_form_snapshot(scenario: dict) -> dict:
         import_cap_margin_kw=_optional_user_cent(raw_settings, IMPORT_CAP_MARGIN_KEY),
         import_cap_mode=raw_settings.get(IMPORT_CAP_MODE_KEY),
     )
-    out = {
+    # No ``enabled``: the overview row writes it, the form never does (and never sees it
+    # as an unsaved edit).
+    return {
         "label": str(scenario.get("label", "") or "").strip(),
-        "enabled": scenario.get("enabled", True) is not False,
         "settings": settings,
     }
-    return out
 
 
 def _scenario_form_entity_maps(
@@ -681,9 +681,6 @@ def read_scenario_form_snapshot(
     ).strip()
     snapshot_src: dict = {
         "label": draft_label,
-        "enabled": bool(
-            session_state.get(scoped_widget_key(session_scope, "scenario_enabled"), True)
-        ),
         "settings": settings,
     }
     return normalize_scenario_form_snapshot(snapshot_src)

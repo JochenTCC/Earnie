@@ -175,7 +175,8 @@ def render_horizon_section(
         return {HORIZON_SOURCE_KEY: SOURCE_NONE, HORIZON_KEY: stored.as_list()}
     paths = _sun_paths(round(float(latitude), 3), round(float(longitude), 3), date.today().year)
     active = active_directions(paths)
-    with st.expander("Horizont in 16 Richtungen", expanded=True):
+    with st.container():
+        st.markdown("**Horizont in 16 Richtungen**")
         st.caption(
             "Höhenwinkel des Horizonts in Grad über der Waagrechten, je Himmelsrichtung "
             "(Azimut wie bei den PV-Feldern: Süd 0°, Ost -90°, West 90°). Balken mit der Maus ziehen oder mit "

@@ -146,7 +146,7 @@ Die Seite hat **keine Cockpit-Parameter**. In der Hauptansicht werden nur Szenar
 - **Kostenvergleich:** Gesamt- und Monatskosten der optimierten Szenarien, verglichen mit Live und den gewählten Referenzen.
 - **Plausibilisierung:** Plausibilitätsprüfung und Stundenverläufe pro Monat.
 - **Season-Mirror (optional):** Mit `scenario_explorer_conf.season_mirror_to_last_month` werden Verbrauch und PV nach Kalendermonat auf die letzten 12 vollständigen Wanduhr-Monate gespiegelt. Die CSV bleibt unverändert; so gelten die aktuellen Tarife.
-- **Szenarioauswahl:** Nur Szenarien mit `enabled` (Standard true) aus dem Szenarienkonfigurator erscheinen. Das Live-Szenario läuft immer; im Szenarienkonfigurator ist „Aktiv für Szenario-Explorer“ bei ihm gesperrt. Der Start der Verbrauchsdaten wird nur bei passendem Synthese-Fingerprint übernommen.
+- **Szenarioauswahl:** Nur Szenarien mit `enabled` (Standard true) aus dem Szenarienkonfigurator erscheinen. Das Live-Szenario läuft immer; in der Übersicht des Szenarienkonfigurators ist „Aktiv im Explorer“ bei ihm gesperrt. Der Start der Verbrauchsdaten wird nur bei passendem Synthese-Fingerprint übernommen.
 
 Der Szenario-Explorer hat keine Sonnenaufgang-Navigation wie der Monitor und führt das Produktiv-Log nicht mit ein. Für den täglichen Produktivbetrieb ist er nicht gedacht.
 

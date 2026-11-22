@@ -129,13 +129,17 @@ Die Sidebar zeigt, welche Schritte der Ersteinrichtung noch fehlen.
 
 #### Hausprofil anlegen
 
-Ein **Hausprofil** beschreibt den Standort und wer bzw. was im Haus Strom verbraucht:
+Ein **Hausprofil** beschreibt den Standort und wer bzw. was im Haus Strom verbraucht. Unter Profilauswahl und **Bezeichnung** ist die Seite in **aufklappbare Gruppen** geteilt. Pflichtgruppen sind mit **Pflicht** markiert und beim Öffnen aufgeklappt; die übrigen zeigen ihren Stand im Titel, z. B. „Heizung — an“. Werte in zugeklappten Gruppen bleiben erhalten.
 
-- **Standort:** Breite, Länge und Land. Daraus leitet Earnie die Zeitzone ab, die für Sonnenzeiten und PV-Prognose wichtig ist.
-- **Gebäude / Wärmebedarf:** Schalter **„Heizung betrachten“**. Aus (Standard) bleibt die Heizung in der Grundlast und es ist nichts weiter einzugeben. An: Wohnfläche, Gebäudeklasse bzw. HWB, Bauweise, Personen, Solltemperatur, Heizgrenze und Absenkung bei Abwesenheit des Hauses; danach unter **Verbraucher** die Haus-Wärme anlegen. Ausschalten löscht keine Werte. Details: [Gebäude / Wärmebedarf](../konfiguration/flexible-verbraucher.md#gebäude--wärmebedarf-hausprofil).
-- **Verbraucher im Profil:** z. B. Haus-Wärme, E-Auto, Pool oder generische Geräte.
-- **Grundlast:** typischer Haushaltsverbrauch über den Tag (Vorschau im Konfigurator prüfen).
-- **Abwesend / Urlaub:** Schalter für den Abwesenheitsmodus im Live-Betrieb; je Verbraucher optional **„Inaktiv wenn abwesend“**. Der Modus wirkt, sobald der Earnie-Schalter **oder** das Abwesenheitssignal am aktiven Smarthome-Backend eingeschaltet ist (EHAL-Feld `sens_absent_mode`, Zuordnung in der **Signalliste**; Loxone-Namenskatalog: `Earnie_Abwesend`). Details: [Flexible Verbraucher – Abwesenheitsmodus](../konfiguration/flexible-verbraucher.md#abwesenheitsmodus-live).
+- **Verbrauch & Haushalt** (Pflicht): Jahresverbrauch und Personen im Haushalt, darunter der Vergleich mit dem Richtwert für Haushaltsstrom.
+- **Standort** (Pflicht): Breite, Länge, Land und Region (Feiertage). Aus dem Land leitet Earnie die Zeitzone ab, die für Sonnenzeiten und PV-Prognose wichtig ist.
+- **Netzanschluss & Netzentgelt** (Pflicht): Netzbereich oder eigener Arbeitspreis; ohne Netzbereich wird das Profil nicht gespeichert. Im Kasten **„Anlagenweit – gilt für alle Profile“** stehen die Einspeisebegrenzung und die Angaben zum Netz-Zähler (Live).
+- **Sonne & Horizont:** Horizont (Berge, Nachbarhäuser, Bäume) und Vorschlagswerte für Neigung und Azimut neuer PV-Felder und des Solarkollektors.
+- **Heizung:** Schalter **„Heizung betrachten“**. Aus (Standard) bleibt die Heizung in der Grundlast und es ist nichts weiter einzugeben. An: Gebäude (Wohnfläche, Gebäudeklasse bzw. HWB, Bauweise), Regelung (Solltemperatur, Heizband, Heizgrenze, Absenkung bei Abwesenheit), Wärmegewinne und unter **Experte** der Verlustkoeffizient H; danach unter **Verbraucher** die Haus-Wärme anlegen. Ausschalten löscht keine Werte. Details: [Gebäude / Wärmebedarf](../konfiguration/flexible-verbraucher.md#gebäude--wärmebedarf-hausprofil).
+- **Kühlung:** Klimaanlage im Hausmodell, siehe [Kühlung](../konfiguration/flexible-verbraucher.md#kuehlung).
+- **Verbraucher:** z. B. Haus-Wärme, E-Auto, Pool oder generische Geräte. Direkt darunter die **Grundlast**: typischer Haushaltsverbrauch, der nach Abzug der Verbraucher bleibt.
+- **Abwesenheit:** Schalter **„Abwesend / Urlaub“** für den Abwesenheitsmodus im Live-Betrieb; je Verbraucher optional **„Inaktiv wenn abwesend“** (im Verbraucher unter **Betrieb**). Der Modus wirkt, sobald der Earnie-Schalter **oder** das Abwesenheitssignal am aktiven Smarthome-Backend eingeschaltet ist (EHAL-Feld `sens_absent_mode`, Zuordnung in der **Signalliste**; Loxone-Namenskatalog: `Earnie_Abwesend`). Details: [Flexible Verbraucher – Abwesenheitsmodus](../konfiguration/flexible-verbraucher.md#abwesenheitsmodus-live).
+- **Historische Messdaten (CSV):** optionale Messdaten, siehe unten.
 
 Zuerst das Profil anlegen, danach die Geräte ergänzen. Ohne Standort und ein sinnvolles Profil sind Jahresvergleiche wenig aussagekräftig.
 
@@ -143,7 +147,7 @@ Ein Profil wird mit **Entfernen** rechts neben der Profilauswahl gelöscht. Das 
 
 Je mehr Spielraum Earnie beim Verschieben der Verbraucher bekommt, desto größer ist das Einsparpotenzial.
 
-**Historische Leistungsprofile (optional):** Unter **Historische Jahres-Leistungsprofile [kW] (CSV)** lassen sich gemessene Verläufe hinterlegen – das Lastprofil (direkt oder als **Bilanz** aus PV, Batterie und Netz), optional ein PV-Erzeugungsprofil und Profile einzelner Verbraucher. Damit werden Ist und Modell vergleichbar, und die Rechnungen im Szenario-Explorer werden realistischer.
+**Historische Leistungsprofile (optional):** In der Gruppe **Historische Messdaten (CSV)** lassen sich gemessene Verläufe hinterlegen – das Lastprofil (direkt oder als **Bilanz** aus PV, Batterie und Netz), optional ein PV-Erzeugungsprofil und Profile einzelner Verbraucher. Damit werden Ist und Modell vergleichbar, und die Rechnungen im Szenario-Explorer werden realistischer.
 
 - Pro Verbraucher legt die Checkbox **„Von Basis-Last abziehen“** fest, ob die CSV-Last die berechnete Last ersetzt und von der Basislast abgezogen wird.
 - Wie Earnie die Profile je Verbrauchstyp behandelt, beschreibt [Historische Leistungsprofil-CSV](../konfiguration/verbrauchs-csv.md).
@@ -154,9 +158,9 @@ Je mehr Spielraum Earnie beim Verschieben der Verbraucher bekommt, desto größe
 
 Die Heizung des Hauses (Wärmepumpe oder andere Wärmequelle), nur wählbar bei eingeschaltetem **„Heizung betrachten“**:
 
-- **Gebäudedaten** stehen nicht hier, sondern im Abschnitt **Gebäude / Wärmebedarf** des Hausprofils. Ein Energieausweis des Gebäudes hilft dabei.
+- **Gebäudedaten** stehen nicht hier, sondern in der Gruppe **Heizung** des Hausprofils. Ein Energieausweis des Gebäudes hilft dabei.
 - **Heizsystem:** Wärmequelle, Heizleistung (kW, thermisch), Wärmespeicher und Heizstab; bei Wärmepumpe und Stromheizung zusätzlich die Mindestlaufzeit. Dazu der Solarthermie-Kollektor.
-- **Temperaturabsenkung wenn abwesend** (im Abschnitt Gebäude / Wärmebedarf): Bei wirksamem Abwesenheitsmodus und eingeschaltetem „Absenken wenn abwesend“ gilt im Live-Betrieb Solltemperatur minus Absenkung. Den Warmwasserbedarf rechnet Earnie dann mit 0 Personen.
+- **Temperaturabsenkung wenn abwesend** (in der Gruppe Heizung, Regelung): Bei wirksamem Abwesenheitsmodus und eingeschaltetem „Absenken wenn abwesend“ gilt im Live-Betrieb Solltemperatur minus Absenkung. Den Warmwasserbedarf rechnet Earnie dann mit 0 Personen.
 - **Wärmebedarf:** Earnie schätzt ihn aus Wetterdaten und den thermischen Parametern und plant den Strombedarf zeitlich ein.
 - **Live-Betrieb:** Die Anbindung erfolgt später über die **Signalliste** (Leistung, Freigabe, ggf. Temperaturen).
 
@@ -251,11 +255,15 @@ Typische Vergleiche:
 
 **Live-Szenario:** Das Live-Szenario (ID `live`) ist die Basis für den späteren Produktivbetrieb. Alle weiteren Szenarien dienen nur der Analyse im Szenario-Explorer.
 
-**Auswahl und Reihenfolge:** Die Szenarien stehen in einer Liste. Mit ↑/↓ rechts daneben lässt sich die Reihenfolge der weiteren Szenarien ändern (das Live-Szenario bleibt oben). In dieser Reihenfolge erscheinen sie später in Listen und Kostenvergleichen – das dient nur der Übersicht.
+**Übersicht:** Oben steht eine Tabelle mit einer Zeile je Szenario: Position, Bezeichnung, **Aktiv im Explorer**, Hausprofil, Bezugs- und Einspeisetarif und Status (**Live**, **OK** oder **Verweis fehlt**, wenn das Szenario auf einen gelöschten Eintrag verweist).
 
-**Pro Szenario einstellbar:**
+- **Öffnen:** Ein Klick auf die Bezeichnung öffnet das Szenario im Formular darunter; die offene Zeile ist hervorgehoben. Hat das offene Szenario ungespeicherte Änderungen, fragt Earnie vor dem Wechsel nach.
+- **Aktiv im Explorer:** Deaktivierte Varianten überspringt der Szenario-Explorer. Der Haken wirkt sofort, ohne das Szenario zu öffnen; vorhandene Ergebnisse werden dadurch ungültig. Das Live-Szenario ist immer aktiv, weil der Szenario-Explorer alle Varianten mit ihm vergleicht.
+- **Reihenfolge:** Die Positionsauswahl am Zeilenanfang setzt ein Szenario direkt an die gewählte Stelle; das Live-Szenario bleibt auf Position 1. In dieser Reihenfolge erscheinen die Szenarien später in Listen und Kostenvergleichen – das dient nur der Übersicht.
+- **Neues Szenario:** **„…“ duplizieren** legt eine Kopie des offenen Szenarios an, **Neu (leer)** ein Szenario ohne Einstellungen. Beide werden sofort gespeichert und geöffnet.
+- **Entfernen:** **Szenario entfernen …** am Ende des Formulars fragt vor dem Löschen nach. Das Live-Szenario lässt sich nicht entfernen.
 
-- **Aktiv für Szenario-Explorer:** Deaktivierte Varianten überspringt der Szenario-Explorer. Vorhandene Ergebnisse werden dadurch ungültig. Das Live-Szenario ist immer aktiv, weil der Szenario-Explorer alle Varianten mit ihm vergleicht.
+**Formular:** Das offene Szenario ist in aufklappbare Gruppen geteilt: **Bezeichnung**, **Komponenten** (Hausprofil, Batterien, PV-Felder, Heizsystem), **Tarife** und **Bezugsgrenze / Leistungspreis** (zugeklappt, der Titel zeigt die Grenze).
 
 Welche Referenzen der Szenario-Explorer rechnet, wird dort für den ganzen Lauf gewählt, nicht je Szenario (siehe [Szenario-Explorer ausführen](#szenario-explorer-ausführen)).
 

@@ -614,6 +614,25 @@ def reorder_scenarios(ordered_non_live_ids: list[str]) -> None:
     doc["scenarios"] = ordered
     _io.save_backtesting_scenarios(doc)
 
+def set_scenario_enabled(scenario_id: str, enabled: bool) -> None:
+    """Set ``enabled`` (Szenario-Explorer) of one scenario; nothing else in the file changes."""
+    from ui import house_config_io as _io
+    target = str(scenario_id or "").strip()
+    live_id = str(config.get_live_scenario_id() or "").strip()
+    if live_id and target == live_id and not enabled:
+        raise ValueError("Das Live-Szenario läuft im Szenario-Explorer immer mit.")
+    doc = _io.load_backtesting_scenarios_raw()
+    scenarios = list(doc.get("scenarios", []))
+    index = next(
+        (i for i, item in enumerate(scenarios) if str(item.get("id", "")).strip() == target),
+        None,
+    )
+    if index is None:
+        raise ValueError(f"Unbekanntes Szenario '{target}'.")
+    scenarios[index] = {**scenarios[index], "enabled": bool(enabled)}
+    doc["scenarios"] = scenarios
+    _io.save_backtesting_scenarios(doc)
+
 def delete_scenario(scenario_id: str) -> None:
     """Remove a non-live scenario from backtesting_scenarios.json."""
     from ui import house_config_io as _io
