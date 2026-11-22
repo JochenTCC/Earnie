@@ -259,8 +259,9 @@ def _add_profile(doc: dict) -> None:
 def _new_pv_field(monkeypatch) -> AppTest:
     """Open „— neu —“ with no field to clone (no template source, no Live PV field).
 
-    ``auto_persist`` is stubbed: the new-field draft would otherwise save itself on the
-    first run and the page would jump to the saved field (see the xfail test below).
+    ``auto_persist`` is stubbed: picking a profile default is a real edit, so the draft
+    would be saved and the page would jump to the saved field before the defaults block
+    can be checked.
     """
     monkeypatch.setattr("ui.planning_pv_form.get_live_scenario_refs", lambda: {"house_profile_id": "test_home"})
     monkeypatch.setattr("ui.planning_pv_form.auto_persist", lambda **kwargs: False)
@@ -270,23 +271,56 @@ def _new_pv_field(monkeypatch) -> AppTest:
     return at
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Bug: with no Live PV field the PV tab opens on „— neu —“ and auto_persist saves the "
-        "seeded draft („Dach Süd“) on the first render — opening the tab writes components.json "
-        "(same class as the fixed house-profile / inverter „— neu —“ bugs)."
-    ),
-)
-def test_opening_pv_tab_without_live_pv_field_writes_nothing(monkeypatch):
+def _no_live_pv(monkeypatch) -> None:
     monkeypatch.setattr(
         "ui.planning_pv_form.get_live_scenario_refs", lambda: {"house_profile_id": "test_home", "pv_system_ids": []}
     )
+
+
+def _pv_ids() -> list[str]:
+    doc = json.loads(Path(os.environ["EARNIE_COMPONENTS_PATH"]).read_text(encoding="utf-8"))
+    return [item["id"] for item in doc.get("pv_systems", [])]
+
+
+def test_opening_pv_tab_without_live_pv_field_writes_nothing(monkeypatch):
+    """Regression: the seeded "— neu —" draft was saved on the first render."""
+    _no_live_pv(monkeypatch)
     path = Path(os.environ["EARNIE_COMPONENTS_PATH"])
     before = path.read_bytes()
     at = AppTest.from_function(_pv_tab_app, default_timeout=_TIMEOUT_S).run()
     assert not at.exception
+    assert at.selectbox(key="planning_pv_select").value == "— neu —"
+    at.run()  # a second rerun (e.g. any other widget) must not save either
+    assert not at.exception
     assert path.read_bytes() == before
+    assert at.selectbox(key="planning_pv_select").value == "— neu —"
+
+
+def test_choosing_new_pv_field_by_hand_writes_nothing(monkeypatch):
+    """Regression: picking "— neu —" next to an existing field created a copy at once."""
+    path = Path(os.environ["EARNIE_COMPONENTS_PATH"])
+    at = AppTest.from_function(_pv_tab_app, default_timeout=_TIMEOUT_S).run()
+    assert not at.exception
+    before = path.read_bytes()
+    at.selectbox(key="planning_pv_select").set_value("— neu —").run()
+    assert not at.exception
+    assert path.read_bytes() == before
+    assert at.selectbox(key="planning_pv_select").value == "— neu —"
+
+
+def test_first_edit_of_new_pv_field_creates_and_selects_it(monkeypatch):
+    _no_live_pv(monkeypatch)
+    before_ids = _pv_ids()
+    at = AppTest.from_function(_pv_tab_app, default_timeout=_TIMEOUT_S).run()
+    _number_input(at, "Leistung (kWp)").set_value(7.5).run()
+    assert not at.exception
+    new_ids = [pid for pid in _pv_ids() if pid not in before_ids]
+    assert len(new_ids) == 1
+    doc = json.loads(Path(os.environ["EARNIE_COMPONENTS_PATH"]).read_text(encoding="utf-8"))
+    (saved,) = [item for item in doc["pv_systems"] if item["id"] == new_ids[0]]
+    assert float(saved.get("pv_kwp", saved.get("kwp"))) == 7.5
+    at.run()
+    assert at.selectbox(key="planning_pv_select").value != "— neu —"
 
 
 def test_new_pv_field_shows_profile_defaults_caption(monkeypatch):

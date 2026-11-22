@@ -44,6 +44,9 @@ _SESSION_SELECTED_ID_KEY = "planning_pv_selected_id"
 _SESSION_SUPPRESS_AUTOPERSIST_KEY = "planning_pv_suppress_autopersist"
 _SESSION_TEMPLATE_SOURCE_KEY = "planning_pv_template_source"
 _SESSION_PROVISIONAL_LABEL_KEY = "planning_pv_provisional_label"
+# Fingerprint of the freshly seeded "— neu —" draft: a new PV field is only created
+# after the user changed something (opening the tab must not write components.json).
+_NEW_PV_BASELINE_PREFIX = "planning_pv_new_baseline::"
 
 
 def new_pv_system_template(
@@ -225,6 +228,7 @@ def _sync_pv_session(
             profiles=profiles,
             default_profile=default_profile,
         )
+        st.session_state.pop(_NEW_PV_BASELINE_PREFIX + session_scope, None)
         st.session_state[_SESSION_SYNC_KEY] = session_scope
         st.session_state[_SESSION_FILE_STAMP_KEY] = file_stamp
 
@@ -475,6 +479,12 @@ def _persist_pv_form(
     payload = {"id": entity_id, **_pv_save_payload(fields)}
     persist_key = f"planning_pv::{stable_id or entity_id}"
     suppress = bool(st.session_state.pop(_SESSION_SUPPRESS_AUTOPERSIST_KEY, False))
+    if is_new:
+        baseline = st.session_state.setdefault(
+            _NEW_PV_BASELINE_PREFIX + "__new__", payload_fingerprint(payload)
+        )
+        if baseline == payload_fingerprint(payload):
+            return
     if suppress and ready:
         # Mark draft as clean without writing so delete-of-last is not undone.
         st.session_state[f"_auto_persist_fp::{persist_key}"] = payload_fingerprint(

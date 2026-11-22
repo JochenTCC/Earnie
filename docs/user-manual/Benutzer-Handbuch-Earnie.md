@@ -222,6 +222,8 @@ Im Komponenten-Katalog unter PV-Felder:
 
 Es können mehrere PV-Felder angelegt werden. Szenarien können sie einzeln auswählen und kombinieren – so lässt sich z. B. eine geplante Erweiterung vorab durchrechnen.
 
+PV ist optional: Das Öffnen des Tabs legt kein PV-Feld an. Ein neues Feld („— neu —“) zeigt Vorschlagswerte und wird erst gespeichert, sobald einer der Werte geändert wird.
+
 Den Standort übernimmt Earnie aus dem Hausprofil. Für die Ertragsprognose nutzt Earnie frei verfügbare, historische Wetterdaten.
 
 #### Batteriespeicher

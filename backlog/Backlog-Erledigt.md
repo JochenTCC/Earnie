@@ -2,6 +2,12 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### PV tab: no PV field created on open (2026-11-22)
+
+- [x] **Bugfix — opening the PV tab without a Live PV field wrote `components.json`** *(found 2026-11-22 by the new UI coverage tests; fixed and verified (AppTest) 2026-11-22)*: with no Live PV field the PV-Felder tab (`ui/planning_pv_form.py`) opened on "— neu —" and `auto_persist` saved the seeded draft ("Dach Süd") on the first render; picking "— neu —" by hand next to an existing field created a copy at once. Same class as the fixed house-profile / inverter "— neu —" bugs, and it conflicted with PV being optional.
+  - **Fixed (2026-11-22):** `_persist_pv_form` compares a new draft with the fingerprint of the freshly seeded defaults (`_NEW_PV_BASELINE_PREFIX`, reset on every re-seed in `_sync_pv_session`) and saves nothing while they are equal; the first changed value creates and selects the field (house-profile pattern). User manual: PV-Felder section.
+  - **Tests:** `tests/apptest/test_house_forms_cov_apptest.py` (`test_opening_pv_tab_without_live_pv_field_writes_nothing`, xfail removed; `test_choosing_new_pv_field_by_hand_writes_nothing`; `test_first_edit_of_new_pv_field_creates_and_selects_it`).
+
 ### Consumer energy counters from the mapping page (2026-11-22)
 
 - [x] **Bugfix — consumer energy counters bound on the mapping page were never read** *(found 2026-11-22 while checking the heat pump counter on the production install; fixed and verified live 2026-11-22)*: the mapping page stores a consumer counter under its qualified id (`consumer.kochen.sens_energy_total`), but `integrations/loxone_meter_energy.energy_binding_activated` only looked for the bare kind `sens_energy_total` (written by the meter import). So no consumer counter was activated although every counter arrived in the push inbox; the slot Ist of every consumer came from the 30 s power mean (`ist_power_source` "mean").
