@@ -1,7 +1,7 @@
 """
 loxone_log_import.py – Einlesen historischer Loxone-CSV-Logs (nur Migration / Tests).
 
-Nicht für main.py oder profile_manager; nutzen: scripts/generate_cons_data.py, ui/dev/app_test_data.py.
+Nicht für main.py oder profile_manager; nutzen: scripts/generate_cons_data.py.
 """
 from __future__ import annotations
 

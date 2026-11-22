@@ -288,13 +288,6 @@ def test_standby_backup_messages_read_components_file_when_not_given(monkeypatch
 # --- runtime_config -----------------------------------------------------------------------
 
 
-def test_get_runtime_settings_delegates_to_config(monkeypatch):
-    import config
-
-    monkeypatch.setattr(config, "get_runtime_settings", lambda: {"min_soc": 12})
-    assert runtime_config.get_runtime_settings() == {"min_soc": 12}
-
-
 def test_invalidate_live_optimization_cache_drops_only_live_keys(monkeypatch):
     live_keys = [
         "live_optimization_cache_key",

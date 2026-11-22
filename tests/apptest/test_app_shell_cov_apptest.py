@@ -1,7 +1,7 @@
 """AppTest: app.py shell paths no other test reached (coverage gap, 2026-11-22).
 
 Config error page, downgrade / config drift / Loxone auth warnings above the pages,
-first-run EHAL setup gate, and the dev dashboard ``ui/dev/app_test_data.py``.
+first-run EHAL setup gate.
 The page navigation is replaced by a stub so only the shell renders.
 """
 from __future__ import annotations
@@ -125,8 +125,3 @@ def test_ehal_gate_shows_setup_page_and_stops(shell):
     assert any(e.label == "Info / About" for e in at.sidebar.expander)
 
 
-def test_dev_dashboard_explains_it_is_retired():
-    at = AppTest.from_file(str(_ROOT / "ui" / "dev" / "app_test_data.py"), default_timeout=_TIMEOUT).run()
-    assert_clean(at)
-    assert at.title[0].value == "Verbraucher-Isolierung & Grundlast-Test"
-    assert "data-model v3" in at.error[0].value

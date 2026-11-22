@@ -1,7 +1,7 @@
 """Optimization result display (Chart 1, Chart 2, table, energy comparison) from synthetic rows.
 
 Mode from ``st.session_state["cov_mode"]`` (set by the test before the first run):
-``results`` -> ``render_optimization_results`` (live chart context, S-2 nav buttons),
+``results`` -> bundle + Chart 1, S-2 nav buttons, Chart 2 and the tail, as ``live_mode`` renders them,
 ``snapshot`` -> bundle from a persisted main.py snapshot + Chart 1 + data-basis expander,
 ``empty_snapshot`` -> snapshot without simulation rows (no bundle).
 No MILP runs: the rows are fixed numbers.
@@ -12,12 +12,15 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 import streamlit as st
 
-from ui.chart_context import build_live_chart_context
+from ui.chart_context import build_live_chart_context, live_now
+from ui.history_navigation import render_s2_nav_buttons
 from ui.simulation_results import (
     build_optimization_display_bundle_from_snapshot,
     render_live_display_data_basis_expander,
+    build_optimization_display_bundle,
     render_optimization_chart1,
-    render_optimization_results,
+    render_optimization_chart2,
+    render_optimization_results_tail,
 )
 
 NOW = datetime(2026, 7, 5, 10, 30, tzinfo=ZoneInfo("Europe/Vienna"))
@@ -83,13 +86,17 @@ savings_info = {
 }
 
 if mode == "results":
-    render_optimization_results(
+    bundle = build_optimization_display_bundle(
         savings_info,
         pd.DataFrame(rows),
         pd.DataFrame(rows),
         chart_context=ctx,
         optimization_matrix=rows,
     )
+    render_optimization_chart1(bundle)
+    render_s2_nav_buttons(now=live_now())
+    render_optimization_chart2(bundle)
+    render_optimization_results_tail(bundle)
 else:
     snapshot = {
         "completed_at": NOW.isoformat(),

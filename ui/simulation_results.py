@@ -22,13 +22,11 @@ from ui.chart_account_render import render_account_chart
 from ui.chart_baseline_label import chart_baseline_label_context
 from ui.chart_consumer_stack import _chart_flex_consumers, chart_flex_consumers_context
 from ui.chart_context import (
-    LiveChartContext,
     SLOT_MILP,
     align_rows_to_chart_slots,
     align_rows_to_display_slots,
     build_chart_display_context,
     build_display_savings_series,
-    live_now,
     s2_chart_header_label,
     savings_view_for_chart,
 )
@@ -38,19 +36,11 @@ from ui.charts import (
     render_power_soc_chart,
 )
 from ui.simulation_table_view import render_frozen_simulation_table
-from ui.history_navigation import render_s2_nav_buttons, s2_zone_help_text
+from ui.history_navigation import s2_zone_help_text
 
 logger = logging.getLogger("app")
 
 SESSION_LIVE_DISPLAY_BUNDLE = "live_display_bundle"
-
-
-
-
-
-
-
-
 
 
 def render_optimization_chart1(
@@ -408,32 +398,6 @@ def render_simulation_details(
         _render_simulation_table(df, slot_qualities)
 
 
-def render_optimization_results(
-    savings_info: dict,
-    optimized_df: pd.DataFrame,
-    baseline_df: pd.DataFrame,
-    matched_baseline_df: pd.DataFrame | None = None,
-    *,
-    simulation_table_title: str | None = "📋 Simulations-Details (Nächste 24 Stunden)",
-    chart_context: LiveChartContext | None = None,
-    optimization_matrix: list | None = None,
-) -> None:
-    bundle = build_optimization_display_bundle(
-        savings_info,
-        optimized_df,
-        baseline_df,
-        matched_baseline_df,
-        simulation_table_title=simulation_table_title,
-        chart_context=chart_context,
-        optimization_matrix=optimization_matrix,
-    )
-    render_optimization_chart1(bundle)
-    if bundle.chart_context is not None:
-        render_s2_nav_buttons(now=live_now())
-    render_optimization_chart2(bundle)
-    render_optimization_results_tail(bundle)
-
-
 def persist_simulation_debug(
     savings_info: dict,
     optimized_df: pd.DataFrame,
@@ -498,7 +462,6 @@ __all__ = [
     "render_live_display_data_basis_expander",
     "render_optimization_chart1",
     "render_optimization_chart2",
-    "render_optimization_results",
     "render_optimization_results_tail",
     "render_simulation_details",
 ]

@@ -6,7 +6,6 @@ zu Einspeisetarif, Rest zu Bezugspreis) im konfigurierten Empfehlungshorizont er
 """
 from __future__ import annotations
 
-import pandas as pd
 import streamlit as st
 
 import config
@@ -29,7 +28,7 @@ from runtime_store.live_display_loader import (
 )
 from ui.chart_colors import COLOR_COST_SAVINGS, COLOR_COST_SAVINGS_NEGATIVE
 from ui.help_hint import render_page_title_with_help
-from ui.number_format import decimal_separator, format_decimal, format_euro, format_general
+from ui.number_format import format_decimal, format_euro, format_general
 from ui.runtime_config import invalidate_live_optimization_cache
 
 _DEVICES_HELP = (
@@ -40,7 +39,6 @@ _DEVICES_HELP = (
     "manueller Trigger, wenn kein Leistungsmerker vorhanden."
 )
 _DEFAULT_RUNTIME_H = 2.0
-_COST_COLUMN = "Kosten (€)"
 _DELTA_COLUMN = "Delta"
 _DELTA_EPS = 0.005
 
@@ -556,36 +554,3 @@ def _render_cheapest_caption(rec: ApplianceRecommendation) -> None:
 
 def _stars_text(stars: int) -> str:
     return "★" * stars + "☆" * (STAR_MAX - stars)
-
-
-def _recommendation_dataframe(rec: ApplianceRecommendation) -> pd.DataFrame:
-    best_cost = rec.cheapest.cost_eur
-    return pd.DataFrame(
-        [
-            {
-                "Start": f"{option.start_datetime:%H:%M}",
-                "Güte": _stars_text(option.stars),
-                _COST_COLUMN: round(option.cost_eur, 2),
-                _DELTA_COLUMN: round(
-                    _delta_to_best_eur(option.cost_eur, best_cost), 2
-                ),
-            }
-            for option in rec.options
-        ]
-    )
-
-
-def _style_recommendation_dataframe(
-    rec: ApplianceRecommendation,
-) -> pd.io.formats.style.Styler:
-    df = _recommendation_dataframe(rec)
-
-    def _color_delta(val: float) -> str:
-        return _delta_cell_color(float(val))
-
-    decimal = decimal_separator()
-    return df.style.format(
-        {_COST_COLUMN: "{:.2f}", _DELTA_COLUMN: "{:+.2f}"}, decimal=decimal
-    ).map(
-        _color_delta, subset=[_DELTA_COLUMN]
-    )

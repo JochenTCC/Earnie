@@ -11,10 +11,6 @@ def reload_runtime_config() -> None:
     config.reload_config()
 
 
-def get_runtime_settings() -> dict:
-    return config.get_runtime_settings()
-
-
 def simulation_settings_fingerprint() -> str:
     """Stabile Kennung aller Laufzeitparameter, die die 24h-Simulation beeinflussen."""
     runtime = config.get_runtime_settings()
