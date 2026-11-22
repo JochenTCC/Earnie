@@ -1,9 +1,9 @@
 ---
 name: bugfix-regression-test
 description: >-
-  After each code bugfix, remind to add a regression and propose a concrete one:
-  a pytest regression (A; prefer a dedicated regression file, cite the GitHub
-  issue) and/or, when a debug dump with recorder/ shows the bug in a compared
+  Hard rule: every code bugfix comes with at least one new regression that fails
+  on the unfixed code: a pytest regression (A; prefer a dedicated regression
+  file, cite the GitHub issue, same commit as the fix) and/or, when a debug dump with recorder/ shows the bug in a compared
   metric, a private golden case (B) in Earnie-regression-private with a
   red→green proof. Use when implementing a bugfix from backlog/Backlog-Bugfixes.md,
   fixing a GitHub issue, intaking a customer debug dump as a regression case,
@@ -13,9 +13,13 @@ description: >-
 
 # Bugfix Regression Test
 
-Soft gate: for every **code** bugfix, remind and **propose** an appropriate
-regression so the same failure cannot silently return. Do **not** block the fix,
-commit, or backlog move if the user declines — record the skip reason briefly.
+**Hard gate** (decided 2026-11-22, same rule in Edibert and earnie-server,
+`earnie-workspace/ai/ECOSYSTEM.md` § Hard rules): a bug found outside the
+automated tests (by hand, in the UI, in a log or dump, by a user or a review) is
+fixed **only together with** at least one new automated regression that fails on
+the unfixed code and passes with the fix. Pytest **A** lands in the **same
+commit** as the fix; a golden **B** follows its own red→green steps below. A fix
+without its regression is not committed and not moved to Verifications Pending.
 
 Two kinds of regression (spec: [regression-suite.md §3a](../../../docs/workflow/regression-suite.md)):
 
@@ -30,16 +34,16 @@ Two kinds of regression (spec: [regression-suite.md §3a](../../../docs/workflow
 - A customer / production debug dump should become a regression case
 - Session-abschluss Phase 1 if the session included a code bugfix (see [session-abschluss](../session-abschluss/SKILL.md))
 
-## Exceptions (no new test required)
+## Exceptions (the only ones)
 
-State the exception once; do not invent a worthless test:
+State the exception in chat **and** in the backlog entry; do not invent a worthless test:
 
 | Exception | Action |
 |-----------|--------|
 | `## Document Review Findings` | Docs-only — skill `doc-review-findings`; skip |
 | Pure config / env / deployment mistake (wrong host path, mis-edited live JSON, compose pin) with **no** wrong code path | Note in backlog / reply; skip |
 | Live Miniserver / hardware-only (credentials, physical device) | Prefer `pytest.mark.skip` / existing live pattern if a thin unit edge exists; otherwise skip with reason |
-| User explicitly declines a regression | Note decline; continue |
+| Anything else | Only with the user's explicit decision in chat to skip; note it in the backlog entry. Do not ask for it as a routine question |
 
 ## Triage: A, B, both, or neither
 
@@ -66,7 +70,7 @@ Bug → release:
 - [ ] 0. Issue URL (B: mandatory) / backlog entry / dump path known?
 - [ ] 1. Triage: pytest A / golden B / both / exception (B only if visible in compared metrics)
 - [ ] 2. If B: pick cycle; --intake --private + selector; pre-fix baseline reproduces symptom?
-- [ ] 3. Fix code; propose pytest A; propose PATCH; commit + push Earnie (user OK)
+- [ ] 3. Write pytest A (red on unfixed code), fix code, A green; propose PATCH; commit fix + A together, push Earnie (user OK)
 - [ ] 4. If B: red on expected metric only → --update-golden; private commit with delta + Earnie SHA; push (user OK)
 - [ ] 5. Full run_regression --workers N: no unexpected deltas
 - [ ] 6. Move to Verifications Pending (note commit + test paths)
@@ -80,7 +84,7 @@ All PowerShell blocks assume the UTF-8 env in the same shell:
 $env:PYTHONIOENCODING='utf-8'; $env:PYTHONUTF8='1'
 ```
 
-## A — Pytest regression (remind + propose)
+## A — Pytest regression (write it with the fix)
 
 1. **Reproduce in the test** — Prefer the smallest inputs that failed before the fix (CSV snippet, synthetic series, config fragment). If a user dump exists under `debug-dumps/`, use **anonymized / minimal** fixtures under `tests/fixtures/` — do not commit secrets or full customer dumps.
 
@@ -101,13 +105,13 @@ $env:PYTHONIOENCODING='utf-8'; $env:PYTHONUTF8='1'
        ...
    ```
 
-4. **Propose before writing (default)** — In chat, propose:
+4. **Write it, do not ask first** — The test is part of the fix. In chat, name:
    - Target file path
    - One-sentence failure mode the test locks in
    - Key assertion(s)
    - Fixture source (inline / `tests/fixtures/…`)
 
-   Then implement only if the user accepts, or if they already asked to fix *and* add a test in the same turn.
+   When a bug is found but its fix is not wanted yet, commit the test as `xfail(strict=True)` with the reason, so it fails loudly once the fix lands.
 
 5. **Run** — After adding the test:
 
@@ -158,7 +162,7 @@ On the **unfixed** code, record a throwaway golden:
 
 ### B5. Fix (Earnie)
 
-1. Implement the code fix; propose pytest **A** as well if useful (§A).
+1. Implement the code fix; add pytest **A** as well whenever a small input reproduces it (§A).
 2. Focused pytest green.
 3. Propose a **PATCH** bump of `version.py` (completed bugfix → PATCH only) and wait — **never change `version.py` without explicit approval** (`versioning.mdc`).
 4. Commit (and push) the Earnie fix **before** the private golden commit, so the golden can cite an existing public SHA.
