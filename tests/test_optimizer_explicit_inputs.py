@@ -2,16 +2,12 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
-from types import SimpleNamespace
 from unittest.mock import patch
 
-import pulp
 import pytest
 
 from data import outdoor_forecast as of
 from optimizer import thermal_live_store as tls
-from optimizer.milp_horizon_extras import _add_virtual_reserve_deadline_charge
 
 _STORE = {
     "volume_liters": 500.0,
@@ -108,69 +104,6 @@ def test_missing_heat_pump_power_fails_loud(mock_readings):
         tls.build_heat_storage_observability(
             consumer, house_profile={"consumers": [consumer]}, ambient_forecast_c=[10.0] * 4
         )
-
-
-# --- Virtual reserve deadline ---------------------------------------------------------------
-
-_START = datetime(2026, 11, 18, 0, tzinfo=timezone.utc)
-
-
-def _reserve_model(horizon: int = 6):
-    prob = pulp.LpProblem("reserve", pulp.LpMinimize)
-    p_charge = [pulp.LpVariable(f"c{t}", lowBound=0) for t in range(horizon)]
-    model = SimpleNamespace(prob=prob, horizon=horizon, p_charge=p_charge, dt_h=1.0)
-    matrix = [{"slot_datetime": _START + timedelta(hours=t)} for t in range(horizon)]
-    return model, matrix
-
-
-def _constrained_slots(model) -> list[int]:
-    constraint = model.prob.constraints["virtual_reserve_deadline_charge"]
-    return sorted(int(var.name[1:]) for var in constraint.keys())
-
-
-def _add(model, matrix, deadline, refill_kwh=3.0):
-    _add_virtual_reserve_deadline_charge(
-        model,
-        matrix=matrix,
-        refill_kwh=refill_kwh,
-        max_charge_kw=2.0,
-        efficiency=1.0,
-        deadline=deadline,
-    )
-
-
-def test_reserve_deadline_limits_the_window():
-    model, matrix = _reserve_model()
-    _add(model, matrix, _START + timedelta(hours=4))
-    assert _constrained_slots(model) == [0, 1, 2, 3]
-
-
-def test_overdue_reserve_deadline_charges_as_soon_as_possible(caplog):
-    model, matrix = _reserve_model()
-    with caplog.at_level(logging.WARNING):
-        _add(model, matrix, _START - timedelta(hours=1))
-    # 3 kWh at 2 kW → the first two slots, not the whole horizon.
-    assert _constrained_slots(model) == [0, 1]
-    assert "abgelaufen" in caplog.text
-
-
-def test_missing_reserve_deadline_fails_loud():
-    model, matrix = _reserve_model()
-    with pytest.raises(ValueError, match="Deadline"):
-        _add(model, matrix, None)
-
-
-def test_unparsable_reserve_deadline_fails_loud():
-    from optimizer.milp import _add_virtual_reserve_refill
-
-    model, matrix = _reserve_model()
-    primary = {
-        "_virtual_reserve_refill_kwh": 1.0,
-        "_virtual_reserve_refill_deadline_utc": "not-a-time",
-        "max_charge_power_kw": 2.0,
-    }
-    with pytest.raises(ValueError, match="ISO"):
-        _add_virtual_reserve_refill(model, matrix, primary)
 
 
 # --- Observability: only a store needs the outdoor temperature ------------------------------

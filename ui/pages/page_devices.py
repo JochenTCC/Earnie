@@ -234,26 +234,12 @@ def _render_appliance(appliance: dict, matrix: list) -> None:
     _render_recommendation(appliance, matrix, power_kw, runtime_h)
 
 
-def _render_reserve_refill_caption(entry: dict, state: str) -> None:
-    from datetime import datetime, timezone
-
-    from runtime_store.powerstation_reserves import (
-        REFILL_DEADLINE_H,
-        refill_deadline_utc,
-    )
-
-    deadline = refill_deadline_utc(entry)
-    if state in ("empty", "charging") and deadline is not None:
-        remaining_h = (deadline - datetime.now(timezone.utc)).total_seconds() / 3600.0
+def _render_reserve_refill_caption(state: str) -> None:
+    if state in ("empty", "charging"):
         st.caption(
-            f"Nachladen bis **{deadline.astimezone().strftime('%d.%m. %H:%M')}** "
-            f"(max. {REFILL_DEADLINE_H:.0f} h, preisoptimal"
-            + (
-                f", noch ca. {format_decimal(max(0.0, remaining_h), 1)} h"
-                if remaining_h > 0
-                else ", Frist erreicht"
-            )
-            + ")."
+            "Nachladen preisoptimal vor dem nächsten Zeitraum, in dem sich die Reserve lohnt "
+            "(Strom aus der Batterie billiger als aus dem Netz). Ohne solchen Zeitraum im "
+            "Planungshorizont wird nicht nachgeladen."
         )
 
 
@@ -308,7 +294,7 @@ def _render_reserve_appliance(appliance: dict) -> None:
         f"Powerstation: `{ps_id}` · Ziel: **{format_decimal(target)} kWh** · "
         f"Vorrat: **{format_decimal(stored)} kWh** · Status: **{state}**"
     )
-    _render_reserve_refill_caption(entry, state)
+    _render_reserve_refill_caption(state)
     st.caption(
         "Trigger (ODER): digitales `consumer.<id>.sens_consumer_active` "
         "(Gerät läuft), Leistungs-Schwelle auf `sens_power_act`, "

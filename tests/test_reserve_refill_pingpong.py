@@ -4,10 +4,13 @@ Live pattern (2026-11-03, maintainer's plant): floor 12.3 % (min_soc 5 % + 1.1 k
 reserves). In Automatik the plant covered a 2.3 kW SwimSpa from the battery, fell to 9 %,
 and the next cycle refilled from the grid; at a reading of 12 % the MILP forced a 0.21 kW
 charge every slot to restore 12.3 %.
+
+Since Reserve P2 the floor applies only where the reserve pays; these tests hold it with a
+persisted fill basis (stored reserve bought at 25 ct, prices 45 ct).
 """
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -38,16 +41,22 @@ def _battery() -> dict:
     }
 
 
+_FLOOR_KEY = "_virtual_reserve_floor_soc"
+_BASIS_AT = datetime(2026, 11, 3, 8, 0, tzinfo=timezone.utc)
+
+
 def _reserves() -> list[dict]:
+    basis = {"fill_basis_price": 25.0, "fill_basis_at": _BASIS_AT.isoformat()}
     return [
-        {"backing": "virtual", "protected_kwh": 1.0, "asap_charge_kwh": 0.0},
-        {"backing": "virtual", "protected_kwh": 0.1, "asap_charge_kwh": 0.0},
+        {"backing": "virtual", "protected_kwh": 1.0, "asap_charge_kwh": 0.0, **basis},
+        {"backing": "virtual", "protected_kwh": 0.1, "asap_charge_kwh": 0.0, **basis},
     ]
 
 
-def test_floor_without_soc_is_the_raised_min_soc() -> None:
+def test_floor_without_soc_is_the_reserve_floor() -> None:
     battery = prepare_battery_params_for_reserves(_battery(), _reserves())
-    assert battery["min_soc"] == pytest.approx(_FLOOR)
+    assert battery[_FLOOR_KEY] == pytest.approx(_FLOOR)
+    assert battery["min_soc"] == pytest.approx(5.0)
 
 
 @pytest.mark.parametrize(
@@ -61,31 +70,32 @@ def test_floor_without_soc_is_the_raised_min_soc() -> None:
 )
 def test_floor_relaxed_only_within_one_reading_step(soc: float, expected_min_soc: float) -> None:
     battery = prepare_battery_params_for_reserves(_battery(), _reserves(), current_soc=soc)
-    assert battery["min_soc"] == pytest.approx(expected_min_soc)
+    assert battery[_FLOOR_KEY] == pytest.approx(expected_min_soc)
 
 
 def test_relaxation_never_goes_below_the_configured_min_soc() -> None:
     small = [{"backing": "virtual", "protected_kwh": 0.03, "asap_charge_kwh": 0.0}]  # +0.2 %
     battery = prepare_battery_params_for_reserves(_battery(), small, current_soc=4.6)
-    assert battery["min_soc"] == pytest.approx(5.2)
+    assert battery[_FLOOR_KEY] == pytest.approx(5.2)
 
 
 def test_without_virtual_floor_nothing_changes() -> None:
     battery = _battery()
     assert relax_reserve_floor_for_soc_reading(battery, 4.5) == battery
-    assert reserve_floor_discharge_cap_kw(battery, 50.0, dt_h=0.25) is None
+    assert reserve_floor_discharge_cap_kw(battery, 50.0, dt_h=0.25, matrix=_flat_matrix()) is None
 
 
 def test_list_params_relax_the_primary_only() -> None:
     other = {**_battery(), "id": "second", "min_soc": 20.0}
     out = prepare_battery_params_for_reserves([_battery(), other], _reserves(), current_soc=12.0)
-    assert out[0]["min_soc"] == pytest.approx(12.0)
+    assert out[0][_FLOOR_KEY] == pytest.approx(12.0)
+    assert _FLOOR_KEY not in out[1]
     assert out[1]["min_soc"] == pytest.approx(20.0)
 
 
 def test_discharge_cap_is_the_energy_above_the_floor_per_slot() -> None:
     battery = prepare_battery_params_for_reserves(_battery(), _reserves(), current_soc=13.0)
-    cap = reserve_floor_discharge_cap_kw(battery, 13.0, dt_h=0.25)
+    cap = reserve_floor_discharge_cap_kw(battery, 13.0, dt_h=0.25, matrix=_flat_matrix())
     expected = (13.0 - _FLOOR) / 100.0 * _CAP_KWH * _ETA / 0.25
     assert cap == pytest.approx(expected)
     assert cap == pytest.approx(0.376, abs=1e-3)
@@ -93,16 +103,18 @@ def test_discharge_cap_is_the_energy_above_the_floor_per_slot() -> None:
 
 def test_discharge_cap_is_zero_at_a_relaxed_floor_and_large_far_above() -> None:
     at_floor = prepare_battery_params_for_reserves(_battery(), _reserves(), current_soc=12.0)
-    assert reserve_floor_discharge_cap_kw(at_floor, 12.0, dt_h=0.25) == pytest.approx(0.0)
+    assert reserve_floor_discharge_cap_kw(
+        at_floor, 12.0, dt_h=0.25, matrix=_flat_matrix()
+    ) == pytest.approx(0.0)
     high = prepare_battery_params_for_reserves(_battery(), _reserves(), current_soc=50.0)
-    assert reserve_floor_discharge_cap_kw(high, 50.0, dt_h=0.25) > 5.0
+    assert reserve_floor_discharge_cap_kw(high, 50.0, dt_h=0.25, matrix=_flat_matrix()) > 5.0
 
 
 def test_discharge_cap_fails_loud_without_efficiency() -> None:
     battery = prepare_battery_params_for_reserves(_battery(), _reserves())
     del battery["efficiency"]
     with pytest.raises(ValueError, match="efficiency"):
-        reserve_floor_discharge_cap_kw(battery, 13.0, dt_h=0.25)
+        reserve_floor_discharge_cap_kw(battery, 13.0, dt_h=0.25, matrix=_flat_matrix())
 
 
 @pytest.mark.parametrize(

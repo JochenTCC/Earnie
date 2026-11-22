@@ -664,7 +664,7 @@ Waschmaschine, Trockner usw. sind **`generic`-Verbraucher** in `house_profiles.j
 
 **Dauerlast:** `duration_h` ≥ 24 bei `runs_per_week` 7 (z. B. Server, Dev-PC) ist kein verschiebbarer Lauf. Der Szenario-Explorer bucht einen solchen Verbraucher in jedem Zeitslot mit `nominal_power_kw` als feste Last (Jahresverbrauch wie in der Referenz); im Live-Betrieb bleibt er ein manueller Verbraucher (Reserve/Powerstation wie konfiguriert).
 
-**Reserve-Release:** Beim Start eines angeschlossenen Geräts gibt Earnie die virtuelle Energiereserve frei. Als Start gilt: digital aktiv **oder** Leistung ≥ Schwelle **oder** UI-Button. Im Nachlauf bucht Earnie den Restvorrat ab und lädt danach preisoptimal binnen 24 h nach. Austausch-ID: `consumer.{hk_id}.sens_consumer_active`; Loxone-Default-VO/Merker `Earnie_Verbraucher_<Slug>_Aktiv` in `VO_Earnie_Consumer.xml`.
+**Reserve-Release:** Beim Start eines angeschlossenen Geräts gibt Earnie die virtuelle Energiereserve frei. Als Start gilt: digital aktiv **oder** Leistung ≥ Schwelle **oder** UI-Button. Im Nachlauf bucht Earnie den Restvorrat ab und lädt danach preisoptimal vor dem nächsten Zeitraum nach, in dem sich die Reserve lohnt ([Batterie & PV](batterie-pv.md)). Austausch-ID: `consumer.{hk_id}.sens_consumer_active`; Loxone-Default-VO/Merker `Earnie_Verbraucher_<Slug>_Aktiv` in `VO_Earnie_Consumer.xml`.
 
 ## Baseline in der UI
 

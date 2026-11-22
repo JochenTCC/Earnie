@@ -30,8 +30,6 @@ from optimizer.milp_horizon_extras import (  # noqa: F401  (re-exported)
     _add_soc_equality_constraint,
     _add_sunrise_soc_min_constraint,
     _add_terminal_soc_constraint,
-    _add_virtual_reserve_asap_charge,
-    _add_virtual_reserve_deadline_charge,
     _terminal_soc_energy_kwh,
 )
 from optimizer.milp_horizon_types import (  # noqa: F401  (re-exported)
@@ -728,6 +726,38 @@ def _add_self_consumption_coupling(
     prob += p_discharge + p_grid_buy == deficit
 
 
+def _apply_reserve_price_floor(
+    matrix: list[dict[str, Any]],
+    horizon: int,
+    grid_vars: _GridBatteryVars,
+    current_soc: float,
+    current_soc_by_id: dict[str, float] | None,
+    *,
+    dt_h: float,
+) -> tuple[list[float], float] | None:
+    """Raise the primary battery's energy bound in the slots where the reserve pays (Reserve P2).
+
+    Returns the lower bound per slot (kWh, end of slot) and the primary battery's start energy,
+    or ``None`` without a virtual reserve.
+    A floor the battery cannot reach from its start energy is lowered to what it can reach
+    (``reachable_floor_kwh``). A start below the base ``min_soc`` is led back by
+    ``add_soc_recovery_constraints`` with these per-slot bounds.
+    """
+    from .reserve_price_floor import reachable_floor_kwh, reserve_price_floor
+
+    primary_id = grid_vars.ess_ids[0]
+    bat = grid_vars.battery_params_by_id[primary_id]
+    plan = reserve_price_floor(bat, matrix, horizon=horizon, dt_h=dt_h)
+    if plan is None:
+        return None
+    e_init = _initial_energy_by_ess(grid_vars, current_soc, current_soc_by_id)[primary_id]
+    floors = reachable_floor_kwh(plan, bat, e_init=e_init, dt_h=dt_h)
+    for e_var, floor in zip(grid_vars.e_batt_by_ess[primary_id], floors):
+        if floor > float(e_var.lowBound) + 1e-9:
+            e_var.lowBound = min(floor, float(e_var.upBound))
+    return [float(v.lowBound) for v in grid_vars.e_batt_by_ess[primary_id]], e_init
+
+
 def _build_milp_model(
     matrix: list[dict[str, Any]],
     horizon: int,
@@ -765,6 +795,9 @@ def _build_milp_model(
         remaining_by_consumer,
         ev_milp_params_by_id,
         consumer_continue_on,
+    )
+    reserve_floor = _apply_reserve_price_floor(
+        matrix, horizon, grid_vars, current_soc, current_soc_by_id, dt_h=dt_h
     )
     relaxed_soc_bounds = _add_power_balance_and_soc_dynamics(
         prob,
@@ -804,6 +837,8 @@ def _build_milp_model(
         battery_params_by_id=dict(grid_vars.battery_params_by_id),
         p_pv_curtail=list(grid_vars.p_pv_curtail),
         relaxed_soc_bounds_percent=relaxed_soc_bounds or None,
+        reserve_floor_kwh=reserve_floor[0] if reserve_floor else None,
+        reserve_start_kwh=reserve_floor[1] if reserve_floor else None,
         plant_start_energy_kwh=sum(
             _initial_energy_by_ess(grid_vars, current_soc, current_soc_by_id).values()
         ),

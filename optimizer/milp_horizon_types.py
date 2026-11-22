@@ -35,6 +35,9 @@ class MilpHorizonModel:
     relaxed_soc_bounds_percent: dict[str, tuple[float, float]] | None = None
     # Energy [kWh] stored in all house batteries at the plan start (``plant_soc_view``).
     plant_start_energy_kwh: float | None = None
+    # Primary battery: energy lower bound per slot with the virtual reserve (Reserve P2).
+    reserve_floor_kwh: list[float] | None = None
+    reserve_start_kwh: float | None = None
     # Live: store plan per heat pump with a store (HeatControl P3 charge target).
     live_store_plans: dict[str, Any] | None = None
     # Live: (StoreLevelModel, StoreLevelVars) per heat pump with a store (HeatControl P4).

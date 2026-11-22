@@ -8,17 +8,18 @@ Now the energy may stay where it starts and return when the prices suit. Until i
 inside the limits it only moves towards them (below ``min_soc`` no discharge, above ``max_soc``
 no charge), and once inside it stays inside.
 
-The virtual reserve of a powerstation is the exception: it raises ``min_soc`` to a floor above
-the configured value, and a SoC between the two means the reserve was used and has to be
-refilled at once (``powerstation_reserve``). That floor stays hard; only a SoC below the
-configured ``min_soc`` is led back.
+The virtual reserve of a powerstation raises the lower bound only in the slots where it pays
+(Reserve P2, ``reserve_price_floor``); those bounds are per slot. A start between the configured
+``min_soc`` and the reserve floor needs no recovery: the floor is only due in paying slots and
+is capped to what the battery can reach. A start below ``min_soc`` is led back to each slot's
+own bound.
 """
 from __future__ import annotations
 
 import pulp
 
 from .milp_horizon_types import _GridBatteryVars
-from .powerstation_reserve import VIRTUAL_RESERVE_BASE_MIN_SOC_KEY
+from .reserve_price_floor import BASE_MIN_SOC_KEY as VIRTUAL_RESERVE_BASE_MIN_SOC_KEY
 
 _ENERGY_TOLERANCE_KWH = 1e-9
 
@@ -30,7 +31,7 @@ def _add_one_sided_recovery(
     locked_power: list,
     *,
     e_start: float,
-    e_limit: float,
+    e_limits: list[float],
     below: bool,
 ) -> None:
     """Relax the limit to the start energy and lock the power that leads away from it.
@@ -45,6 +46,7 @@ def _add_one_sided_recovery(
         for t in range(len(energy))
     ]
     for t, e_var in enumerate(energy):
+        e_limit = e_limits[t]
         if below:
             e_var.lowBound = e_start
             prob += (
@@ -88,24 +90,25 @@ def add_soc_recovery_constraints(
         energy = grid_vars.e_batt_by_ess[ess_id]
         if not energy:
             continue
-        e_min, e_max = float(energy[0].lowBound), float(energy[0].upBound)
+        lows = [float(e.lowBound) for e in energy]
+        highs = [float(e.upBound) for e in energy]
+        e_max = max(highs)
+        # Per-slot lower bounds (virtual reserve floor): recovery is about the configured
+        # min_soc only; the floor is capped to what the battery can reach from the start.
+        base_min_soc = params.get(VIRTUAL_RESERVE_BASE_MIN_SOC_KEY)
+        e_min = (
+            float(base_min_soc) / 100.0 * capacity if base_min_soc is not None else min(lows)
+        )
         e_start = float(e_init_by_ess[ess_id])
         slug = ess_id.replace("-", "_")
         if e_start < e_min - _ENERGY_TOLERANCE_KWH:
-            base_min_soc = params.get(VIRTUAL_RESERVE_BASE_MIN_SOC_KEY)
-            if (
-                base_min_soc is not None
-                and e_start >= float(base_min_soc) / 100.0 * capacity - _ENERGY_TOLERANCE_KWH
-            ):
-                # Used virtual reserve: the floor stays hard, slot 0 refills it.
-                continue
             _add_one_sided_recovery(
                 prob,
                 slug,
                 energy,
                 grid_vars.p_discharge_by_ess[ess_id],
                 e_start=e_start,
-                e_limit=e_min,
+                e_limits=lows,
                 below=True,
             )
         elif e_start > e_max + _ENERGY_TOLERANCE_KWH:
@@ -115,7 +118,7 @@ def add_soc_recovery_constraints(
                 energy,
                 grid_vars.p_charge_by_ess[ess_id],
                 e_start=e_start,
-                e_limit=e_max,
+                e_limits=highs,
                 below=False,
             )
         else:

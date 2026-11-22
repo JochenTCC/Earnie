@@ -16,12 +16,20 @@ from runtime_store.powerstation_reserves import (
     STATE_DISCHARGING,
     STATE_EMPTY,
     STATE_STANDBY,
+    clear_fill_basis,
     clear_refill_opened,
     ensure_refill_opened,
     get_or_init_state,
     load_reserve_states,
-    refill_deadline_utc,
     save_reserve_states,
+)
+
+from .reserve_price_floor import (
+    BASE_MIN_SOC_KEY,
+    BASIS_AT_KEY,
+    BASIS_PRICE_KEY,
+    FLOOR_SOC_KEY,
+    RESERVE_KWH_KEY,
 )
 
 logger = logging.getLogger(__name__)
@@ -150,7 +158,6 @@ def collect_active_reserves(
             for a in group
             if str(a.get("id") or "").strip()
         ]
-        deadline = refill_deadline_utc(entry)
         active.append(
             {
                 "powerstation_id": ps_id,
@@ -166,7 +173,8 @@ def collect_active_reserves(
                 "asap_charge_kwh": asap_charge_kwh_from_state(entry),
                 "refill_kwh": asap_charge_kwh_from_state(entry),
                 "refill_opened_at": entry.get("refill_opened_at"),
-                "refill_deadline_utc": deadline.isoformat() if deadline else None,
+                "fill_basis_price": entry.get("fill_basis_price"),
+                "fill_basis_at": entry.get("fill_basis_at"),
                 "max_charge_power_kw": float(
                     ps.get("battery_max_charge_power_kw")
                     or ps.get("max_charge_power_kw")
@@ -196,51 +204,55 @@ def virtual_asap_charge_kwh(reserves: list[dict[str, Any]]) -> float:
     )
 
 
-def virtual_refill_deadline_iso(reserves: list[dict[str, Any]]) -> str | None:
-    """Earliest refill deadline among virtual reserves that still need energy."""
-    earliest: str | None = None
+def virtual_reserve_kwh(reserves: list[dict[str, Any]]) -> float:
+    """kWh the virtual reserves need in the battery where they pay (Reserve P2).
+
+    Protected plus still missing energy: the target of every reserve that is not released.
+    """
+    return virtual_protected_kwh(reserves) + virtual_asap_charge_kwh(reserves)
+
+
+def virtual_fill_basis(reserves: list[dict[str, Any]]) -> tuple[float, str] | None:
+    """Cheapest persisted fill basis (price, UTC timestamp) among the virtual reserves."""
+    best: tuple[float, str] | None = None
     for reserve in reserves:
         if reserve.get("backing") != BACKING_VIRTUAL:
             continue
-        if float(reserve.get("refill_kwh") or 0.0) <= 1e-9:
+        price = reserve.get("fill_basis_price")
+        if price is None:
             continue
-        stamp = str(reserve.get("refill_deadline_utc") or "").strip()
+        stamp = reserve.get("fill_basis_at")
         if not stamp:
-            continue
-        if earliest is None or stamp < earliest:
-            earliest = stamp
-    return earliest
+            raise ValueError(
+                f"Reserve {reserve.get('powerstation_id')}: fill_basis_price ohne fill_basis_at."
+            )
+        if best is None or float(price) < best[0]:
+            best = (float(price), str(stamp))
+    return best
 
 
 def apply_virtual_reserve_floor(
     battery_params: dict | list[dict],
     *,
-    protected_kwh: float,
-    asap_charge_kwh: float = 0.0,
-    refill_deadline_utc: str | None = None,
+    reserve_kwh: float,
+    fill_basis: tuple[float, str] | None = None,
 ) -> dict | list[dict]:
-    """Raise primary house ESS min_soc so protected kWh cannot serve other loads."""
+    """Mark the primary house ESS with the virtual reserve (price-aware floor, Reserve P2).
+
+    ``min_soc`` stays the configured value. The MILP raises the energy bound to
+    ``_virtual_reserve_floor_soc`` only in the slots where the reserve pays
+    (``optimizer.reserve_price_floor``).
+    """
     if isinstance(battery_params, list):
         if not battery_params:
             return battery_params
         out = [dict(b) for b in battery_params]
-        if protected_kwh > 1e-9:
-            _raise_min_soc(out[0], protected_kwh)
-        if asap_charge_kwh > 1e-9:
-            # refill_kwh: cost-optimal fill with deadline (2.7.p); alias kept for tests.
-            out[0]["_virtual_reserve_refill_kwh"] = float(asap_charge_kwh)
-            out[0]["_virtual_reserve_asap_kwh"] = float(asap_charge_kwh)
-            if refill_deadline_utc:
-                out[0]["_virtual_reserve_refill_deadline_utc"] = str(refill_deadline_utc)
+        if reserve_kwh > 1e-9:
+            _set_reserve_floor(out[0], reserve_kwh, fill_basis)
         return out
     out = dict(battery_params)
-    if protected_kwh > 1e-9:
-        _raise_min_soc(out, protected_kwh)
-    if asap_charge_kwh > 1e-9:
-        out["_virtual_reserve_refill_kwh"] = float(asap_charge_kwh)
-        out["_virtual_reserve_asap_kwh"] = float(asap_charge_kwh)
-        if refill_deadline_utc:
-            out["_virtual_reserve_refill_deadline_utc"] = str(refill_deadline_utc)
+    if reserve_kwh > 1e-9:
+        _set_reserve_floor(out, reserve_kwh, fill_basis)
     return out
 
 
@@ -250,16 +262,15 @@ def prepare_battery_params_for_reserves(
     *,
     current_soc: float | None = None,
 ) -> dict | list[dict]:
-    """Apply virtual floor + refill-deadline metadata for the live/MILP call.
+    """Apply the virtual reserve and its fill basis for the live/MILP call.
 
     With ``current_soc`` the floor also honours the SoC reading resolution
     (``relax_reserve_floor_for_soc_reading``).
     """
     out = apply_virtual_reserve_floor(
         battery_params,
-        protected_kwh=virtual_protected_kwh(reserves),
-        asap_charge_kwh=virtual_asap_charge_kwh(reserves),
-        refill_deadline_utc=virtual_refill_deadline_iso(reserves),
+        reserve_kwh=virtual_reserve_kwh(reserves),
+        fill_basis=virtual_fill_basis(reserves),
     )
     if current_soc is None:
         return out
@@ -270,15 +281,11 @@ def prepare_battery_params_for_reserves(
 # "below" at 12 % although the gap (0.3 % of the capacity) is reading noise.
 SOC_READING_RESOLUTION_PCT = 1.0
 
-_FLOOR_SOC_KEY = "_virtual_reserve_floor_soc"
-_BASE_MIN_SOC_KEY = "_virtual_reserve_base_min_soc"
+_FLOOR_SOC_KEY = FLOOR_SOC_KEY
+_BASE_MIN_SOC_KEY = BASE_MIN_SOC_KEY
 # Read by the MILP: the configured min_soc below the virtual reserve floor.
 VIRTUAL_RESERVE_BASE_MIN_SOC_KEY = _BASE_MIN_SOC_KEY
 _FLOOR_RELAXED_KEY = "_virtual_reserve_floor_relaxed_to"
-
-
-def _min_soc_key(bat: dict) -> str:
-    return "min_soc" if ("min_soc" in bat or "max_soc" in bat) else "battery_min_soc"
 
 
 def _primary(battery_params: dict | list[dict]) -> dict | None:
@@ -293,10 +300,10 @@ def relax_reserve_floor_for_soc_reading(
 ) -> dict | list[dict]:
     """Lower the virtual-reserve floor to ``current_soc`` when it is within one reading step.
 
-    Without this, a reading of 12 % under a 12.3 % floor makes the MILP restore the floor in
-    slot 0 with a low-power forced charge every cycle (reserve-refill ping-pong). Only the
-    virtual part of the floor is relaxed, never below the configured ``min_soc``; a SoC more
-    than one step below the floor still has to be refilled.
+    Without this, a reading of 12 % under a 12.3 % floor makes the MILP restore the floor with
+    a low-power forced charge every cycle (reserve-refill ping-pong). It lowers the floor of the
+    slots where the reserve pays, never below the configured ``min_soc``; a SoC more than one
+    step below the floor still has to be refilled before the next paying slot.
     """
     out = [dict(b) for b in battery_params] if isinstance(battery_params, list) else dict(battery_params)
     bat = _primary(out)
@@ -307,7 +314,7 @@ def relax_reserve_floor_for_soc_reading(
     soc = float(current_soc)
     if not (floor - SOC_READING_RESOLUTION_PCT - 1e-9 <= soc < floor) or soc < base:
         return out
-    bat[_min_soc_key(bat)] = soc
+    bat[_FLOOR_SOC_KEY] = soc
     bat[_FLOOR_RELAXED_KEY] = soc
     logger.info(
         "Virtual reserve floor %.2f %% relaxed to SoC reading %.1f %% (within %.0f %% resolution)",
@@ -323,14 +330,18 @@ def reserve_floor_discharge_cap_kw(
     current_soc: float,
     *,
     dt_h: float,
+    matrix: list[dict[str, Any]],
 ) -> float | None:
-    """Highest Automatik discharge power that keeps the virtual reserve for one slot.
+    """Highest Automatik discharge power that keeps the virtual reserve for the current slot.
 
     In Automatik the plant follows its own rule down to its own minimum SoC, so a large flex
     load can drain the virtual reserve within one slot, and the next cycle refills it from the
-    grid. Capping the written discharge limit at the energy above the floor (AC side, through
-    the path efficiency) prevents that. ``None`` without a virtual reserve floor.
+    grid. Capping the written discharge limit at the energy above the floor of the current slot
+    (AC side, through the path efficiency) prevents that. ``None`` without a virtual reserve or
+    when the reserve is not held in the current slot (Reserve P2: no floor, no cap).
     """
+    from .reserve_price_floor import reserve_price_floor
+
     bat = _primary(battery_params)
     if bat is None or _FLOOR_SOC_KEY not in bat:
         return None
@@ -338,25 +349,30 @@ def reserve_floor_discharge_cap_kw(
         raise ValueError(f"reserve_floor_discharge_cap_kw: dt_h must be > 0, got {dt_h}")
     if "efficiency" not in bat:
         raise ValueError("reserve_floor_discharge_cap_kw: battery params without efficiency")
+    plan = reserve_price_floor(bat, matrix, horizon=len(matrix), dt_h=dt_h)
+    if plan is None or not plan.held_now:
+        return None
     capacity = float(bat["battery_capacity_kwh"])
-    floor = float(bat[_min_soc_key(bat)])
-    above_kwh = max(0.0, float(current_soc) - floor) / 100.0 * capacity
+    above_kwh = max(0.0, float(current_soc) / 100.0 * capacity - plan.floor_kwh[0])
     return above_kwh * float(bat["efficiency"]) / float(dt_h)
 
 
-def _raise_min_soc(bat: dict, protected_kwh: float) -> None:
+def _set_reserve_floor(
+    bat: dict, reserve_kwh: float, fill_basis: tuple[float, str] | None
+) -> None:
     capacity = float(bat.get("battery_capacity_kwh") or 0.0)
     if capacity <= 1e-9:
         return
     min_soc = float(bat.get("min_soc", bat.get("battery_min_soc") or 0.0) or 0.0)
     max_soc = float(bat.get("max_soc", bat.get("battery_max_soc") or 100.0) or 100.0)
     base_energy = (min_soc / 100.0) * capacity
-    new_energy = base_energy + float(protected_kwh)
-    new_soc = min(max_soc - 0.01, (new_energy / capacity) * 100.0)
-    floor = max(min_soc, new_soc)
-    bat[_min_soc_key(bat)] = floor
-    bat[_FLOOR_SOC_KEY] = floor
+    new_soc = min(max_soc - 0.01, ((base_energy + float(reserve_kwh)) / capacity) * 100.0)
+    bat[RESERVE_KWH_KEY] = float(reserve_kwh)
+    bat[_FLOOR_SOC_KEY] = max(min_soc, new_soc)
     bat[_BASE_MIN_SOC_KEY] = min_soc
+    if fill_basis is not None:
+        bat[BASIS_PRICE_KEY] = float(fill_basis[0])
+        bat[BASIS_AT_KEY] = str(fill_basis[1])
 
 
 def physical_reserves(reserves: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -386,6 +402,7 @@ def advance_reserve_after_slot(
             entry["stored_kwh"] = 0.0
             entry["trigger_active"] = False
             entry["refill_opened_at"] = None
+            clear_fill_basis(entry)
             ensure_refill_opened(entry)
         else:
             entry["state"] = STATE_DISCHARGING

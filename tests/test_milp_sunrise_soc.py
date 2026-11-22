@@ -1,7 +1,7 @@
 """Tests für SOC_min-Randbedingung am Sonnenaufgang-Slot."""
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import pulp
@@ -225,7 +225,8 @@ def test_milp_recovers_when_soc_below_min_before_sunrise():
 def test_milp_feasible_with_virtual_asap_and_sunrise_pv_only():
     """Prod 2026-10-06: ASAP carve-out + PV-only → Infeasible → empty EV setpoints.
 
-    Virtual reserve ASAP needs grid ``p_charge`` before sunrise; PV-only must yield.
+    The virtual reserve needs grid ``p_charge`` before sunrise; PV-only must yield. Since
+    Reserve P2 the reserve is due where it pays: a cheap first slot makes it pay from slot 1.
     """
     from optimizer.milp import milp_optimizer
     from optimizer.powerstation_reserve import prepare_battery_params_for_reserves
@@ -243,7 +244,7 @@ def test_milp_feasible_with_virtual_asap_and_sunrise_pv_only():
                 "slot_datetime": dt,
                 "expected_p_pv": 0.0 if i < sunrise_idx else 1.5,
                 "expected_p_act": 0.5,
-                "k_act": 34.0,
+                "k_act": 20.0 if i == 0 else 34.0,
                 "k_push_act": 20.0,
                 "expected_flex_kw": {},
             }
@@ -259,15 +260,11 @@ def test_milp_feasible_with_virtual_asap_and_sunrise_pv_only():
         "efficiency": 0.94,
         "control": "full",
     }
-    # The refill deadline (2.7.p) lies before sunrise, as the ASAP charge of the prod case.
-    refill_deadline = (start + timedelta(hours=1)).astimezone(timezone.utc).isoformat()
     reserves = [
         {
             "backing": "virtual",
             "protected_kwh": 0.0,
             "asap_charge_kwh": 1.0,
-            "refill_kwh": 1.0,
-            "refill_deadline_utc": refill_deadline,
             "state": "empty",
             "stored_kwh": 0.0,
             "target_kwh": 1.0,
@@ -276,15 +273,13 @@ def test_milp_feasible_with_virtual_asap_and_sunrise_pv_only():
             "backing": "virtual",
             "protected_kwh": 0.0,
             "asap_charge_kwh": 0.1,
-            "refill_kwh": 0.1,
-            "refill_deadline_utc": refill_deadline,
             "state": "empty",
             "stored_kwh": 0.0,
             "target_kwh": 0.1,
         },
     ]
     battery = prepare_battery_params_for_reserves(battery, reserves)
-    assert float(battery.get("_virtual_reserve_asap_kwh") or 0.0) > 1.0
+    assert float(battery.get("_virtual_reserve_kwh") or 0.0) > 1.0
 
     consumer = {
         "id": "e_auto",

@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 import logging
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Any
 
 from runtime_store.persist_paths import runtime_path
@@ -17,8 +17,6 @@ STATE_EMPTY = "empty"
 STATE_CHARGING = "charging"
 STATE_STANDBY = "standby"
 STATE_DISCHARGING = "discharging"
-
-REFILL_DEADLINE_H = 24.0
 
 _VALID_STATES = frozenset(
     {STATE_EMPTY, STATE_CHARGING, STATE_STANDBY, STATE_DISCHARGING}
@@ -130,11 +128,21 @@ def clear_refill_opened(entry: dict[str, Any]) -> None:
     entry["refill_opened_at"] = None
 
 
-def refill_deadline_utc(entry: dict[str, Any]) -> datetime | None:
-    opened = _parse_iso(entry.get("refill_opened_at"))
-    if opened is None:
-        return None
-    return opened + timedelta(hours=REFILL_DEADLINE_H)
+def set_fill_basis(entry: dict[str, Any], *, price: float, at: datetime) -> None:
+    """Fill basis of the stored reserve (Reserve P2): import price and time it was bought.
+
+    Energy already in the battery at a plan start counts as filled at this price, so a re-plan
+    inside an expensive phase keeps the floor (the matrix has no past prices).
+    """
+    if at.tzinfo is None:
+        raise ValueError(f"set_fill_basis: timestamp without time zone ({at!r}).")
+    entry["fill_basis_price"] = float(price)
+    entry["fill_basis_at"] = at.astimezone(timezone.utc).isoformat()
+
+
+def clear_fill_basis(entry: dict[str, Any]) -> None:
+    entry["fill_basis_price"] = None
+    entry["fill_basis_at"] = None
 
 
 def get_or_init_state(
@@ -185,10 +193,12 @@ def set_trigger(powerstation_id: str, *, active: bool) -> dict[str, Any]:
     if active and entry["state"] in (STATE_STANDBY, STATE_CHARGING, STATE_EMPTY):
         entry["state"] = STATE_DISCHARGING
         clear_refill_opened(entry)
+        clear_fill_basis(entry)
     elif not active and entry["state"] == STATE_DISCHARGING:
         entry["state"] = STATE_EMPTY
         entry["stored_kwh"] = 0.0
         entry["refill_opened_at"] = None
+        clear_fill_basis(entry)
         ensure_refill_opened(entry)
     save_reserve_states(states)
     return entry

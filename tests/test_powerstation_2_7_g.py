@@ -384,7 +384,8 @@ def test_advice_vs_reserve_appliance_split():
     assert reserve[0]["mode"] == MODE_RESERVE
 
 
-def test_virtual_floor_raises_min_soc():
+def test_virtual_floor_marks_the_reserve_and_keeps_min_soc():
+    """Reserve P2: the floor is per slot (MILP); min_soc stays the configured value."""
     params = {
         "id": "home",
         "battery_capacity_kwh": 10.0,
@@ -395,17 +396,12 @@ def test_virtual_floor_raises_min_soc():
         "max_power_kw": 5.0,
         "efficiency": 0.95,
     }
-    out = apply_virtual_reserve_floor(
-        params,
-        protected_kwh=2.0,
-        asap_charge_kwh=1.0,
-        refill_deadline_utc="2026-10-08T12:00:00+00:00",
-    )
-    # 10% of 10 kWh = 1 kWh base; +2 → 3 kWh → 30%
-    assert out["min_soc"] == pytest.approx(30.0)
-    assert out["_virtual_reserve_asap_kwh"] == pytest.approx(1.0)
-    assert out["_virtual_reserve_refill_kwh"] == pytest.approx(1.0)
-    assert out["_virtual_reserve_refill_deadline_utc"] == "2026-10-08T12:00:00+00:00"
+    out = apply_virtual_reserve_floor(params, reserve_kwh=3.0)
+    # 10% of 10 kWh = 1 kWh base; +3 → 4 kWh → 40%
+    assert out["min_soc"] == pytest.approx(10.0)
+    assert out["_virtual_reserve_floor_soc"] == pytest.approx(40.0)
+    assert out["_virtual_reserve_base_min_soc"] == pytest.approx(10.0)
+    assert out["_virtual_reserve_kwh"] == pytest.approx(3.0)
 
 
 def test_protected_kwh_standby_vs_discharging():

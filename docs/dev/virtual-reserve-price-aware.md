@@ -1,8 +1,8 @@
 # Virtual reserve: hold it only when it pays, release it promptly
 
 Status: draft, 2026-11-22. P1 (prompt release) implemented 2026-11-22, live check
-open; P4 (idle drain) implemented 2026-11-22, not yet configured live; P2–P3 not
-implemented. Backlog: epic **Reserve**
+open; P4 (idle drain) implemented 2026-11-22, not yet configured live; P2 (price-aware
+floor) implemented 2026-11-22, live check open; P3 not implemented. Backlog: epic **Reserve**
 (`backlog/Backlog.md`).
 
 ## Problem
@@ -109,6 +109,58 @@ Consequences:
 Alternative considered: model the appliance run as an expected load with a probability
 per slot and let the objective value the reserve. More general, but it needs a start
 time distribution per appliance. Not for the first version.
+
+Implemented (2026-11-22), decisions by the maintainer the same day:
+
+- **Rule** (`optimizer/reserve_price_floor.py::reserve_price_floor`): slot `t` pays when
+  `price[t] > min over fill sources of (fill / eta_rt + hold)`. Prices are the matrix's
+  `k_act`. Fill sources are the slots `s < t` of the horizon and the persisted fill basis.
+- **`eta_roundtrip` = `efficiency²`**: the MILP applies `efficiency` once per direction
+  (`p_charge · eff`, `p_discharge / eff`).
+- **Hold cost** per kWh of reserve: `fill / efficiency · idle_drain_hold_kwh(hold_h) / R`,
+  i.e. the drain over the hold time, bought again through the charge path and spread over
+  the reserve `R`. Hold time from a horizon slot `s`: `(t − s) · dt`; from the basis: the
+  time since the basis timestamp up to the start of slot `t`. Without a drain it is 0.
+- **Energy already stored (option A).** The matrix has no past prices, so with horizon
+  slots alone every re-plan inside an expensive phase would see only expensive slots
+  before `t` and drop the floor. The reserve state keeps a fill basis per virtual reserve
+  (`fill_basis_price`, `fill_basis_at` in `runtime_store/powerstation_reserves.json`; no
+  pack JSON change). After each live plan (`powerstation_live.update_reserve_fill_basis`,
+  called from `main.py`): if the floor is held at the end of slot 0, the fill price and
+  time behind the first paying slot become the basis; otherwise the basis is cleared
+  (cheap phase). A trigger (`set_trigger`) and an emptied reserve clear it too. The
+  cheapest basis among the virtual reserves reaches the MILP as
+  `_virtual_reserve_basis_price` / `_virtual_reserve_basis_at`.
+- **Slot 0** has no slot before it and pays only through the basis.
+- **Where the floor binds.** `e_batt[k]` is the energy at the end of slot `k`. It carries
+  the reserve when slot `k` or slot `k + 1` pays, so the reserve is there during the whole
+  paying slot (start and end). Elsewhere the bound is the base `min_soc`.
+- **Reserve size** `R` = protected + still missing kWh of all virtual reserves that are not
+  released (the target). `min_soc` stays the configured value; the floor SoC sits in
+  `_virtual_reserve_floor_soc`, the reserve in `_virtual_reserve_kwh`.
+- **Reachability.** A floor above `e_init + (k + 1) · (max_charge · eff − idle_drain) · dt`
+  is lowered to that value (never below the base), with a warning: the reserve is built as
+  fast as possible and the plan stays feasible (as the refill shortfall rule of
+  2026-11-18). PV and grid limits are not in this estimate.
+- **Refill.** `_add_virtual_reserve_deadline_charge`, `REFILL_DEADLINE_H` and
+  `refill_deadline_utc` are gone. The energy bound replaces the charge-sum constraint: the
+  reserve counts as built when the energy is there, whatever its source.
+- **SoC recovery** (`milp_soc_recovery`) uses the configured base `min_soc` to decide
+  whether a battery starts below its limits and leads it back to each slot's own bound. A
+  start between base and floor needs no recovery.
+- **Reading resolution.** `relax_reserve_floor_for_soc_reading` lowers the floor SoC of
+  the paying slots to a reading at most one step below it.
+- **Automatik cap** (`reserve_floor_discharge_cap_kw`, now with the matrix): the energy
+  above the end-of-slot-0 floor; `None` when the reserve is not held in slot 0.
+- **Sunrise anchor.** PV-only charging through sunrise is skipped when a paying slot up to
+  the sunrise slot needs more energy than the start energy minus the drain.
+- **UI** (Manuelle Geräte): the caption no longer shows a deadline; it says that the reserve
+  is refilled before the next slot where it pays.
+
+Open after P2: the regression replay of 2026-11-21 (forced charge slots per day, 22 then);
+the reserve state's `stored_kwh` is still advanced by charge attribution
+(`advance_virtual_reserves_from_plan`), independent of whether the plan held the floor —
+it only drives the state shown in the UI and the release bookkeeping.
 
 ### 3. Tolerance at the floor (Reserve P3)
 

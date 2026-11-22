@@ -85,46 +85,6 @@ HEAT_STORAGE_LEVELS_KEY = "heat_storage_levels"
 HEAT_FORCED_CHARGE_KEY = "heat_forced_charge"
 
 
-def _add_virtual_reserve_refill(
-    model: MilpHorizonModel, matrix: list[dict[str, Any]], primary: dict
-) -> None:
-    """Deadline-bound virtual-reserve refill charge constraint (no-op without refill)."""
-    refill_kwh = float(
-        primary.get("_virtual_reserve_refill_kwh")
-        or primary.get("_virtual_reserve_asap_kwh")
-        or 0.0
-    )
-    if refill_kwh <= 1e-9:
-        return
-    from datetime import datetime, timezone
-
-    from .milp_horizon import _add_virtual_reserve_deadline_charge
-
-    deadline_raw = primary.get("_virtual_reserve_refill_deadline_utc")
-    deadline = None
-    if deadline_raw:
-        try:
-            deadline = datetime.fromisoformat(str(deadline_raw).replace("Z", "+00:00"))
-        except ValueError as exc:
-            raise ValueError(
-                "Virtuelle Reserve: Nachlade-Deadline ist kein ISO-Zeitstempel "
-                f"({deadline_raw!r})."
-            ) from exc
-        if deadline.tzinfo is None:
-            deadline = deadline.replace(tzinfo=timezone.utc)
-    _add_virtual_reserve_deadline_charge(
-        model,
-        matrix=matrix,
-        refill_kwh=refill_kwh,
-        max_charge_kw=float(
-            primary.get("max_charge_power_kw", primary.get("max_power_kw") or 0.0)
-            or 0.0
-        ),
-        efficiency=float(primary.get("efficiency") or 1.0),
-        deadline=deadline,
-    )
-
-
 def _base_level_start(
     model: MilpHorizonModel,
     current_soc: float,
@@ -240,8 +200,6 @@ def _build_milp_model_with_objective(
         inverter_params=inv,
         pv_systems=pvs,
     )
-    primary = _primary_battery_params(battery_params)
-    _add_virtual_reserve_refill(model, matrix, primary)
     _add_milp_objective(
         model,
         matrix,
@@ -305,6 +263,33 @@ def _add_flex_side_constraints(
     }
 
 
+def _reserve_build_before(model: MilpHorizonModel, sunrise_index: int) -> float:
+    """kWh the reserve floor (Reserve P2) needs above the start energy up to ``sunrise_index``.
+
+    Positive: the reserve has to be built (or held against the idle drain) before sunrise, so
+    the PV-only anchor would make the plan infeasible.
+    """
+    floors = model.reserve_floor_kwh
+    if not floors or model.reserve_start_kwh is None:
+        return 0.0
+    last = min(int(sunrise_index), len(floors) - 1)
+    if last < 0:
+        return 0.0
+    # The idle drain lowers the start energy slot by slot (Reserve P4).
+    params = model.battery_params_by_id[model.ess_ids[0]]
+    base_kwh = bat.idle_drain_floor_soc(params) / 100.0 * float(params["battery_capacity_kwh"])
+    drain_kwh = bat.idle_drain_kw(params) * model.dt_h
+    start = float(model.reserve_start_kwh)
+    return max(
+        (
+            floors[k] - (start - drain_kwh * (k + 1))
+            for k in range(last + 1)
+            if floors[k] > base_kwh + 1e-9
+        ),
+        default=0.0,
+    )
+
+
 def _add_soc_anchor_constraints(
     model: MilpHorizonModel,
     matrix: list[dict[str, Any]],
@@ -338,11 +323,7 @@ def _add_soc_anchor_constraints(
         # Floor already via e_batt lowBound; do not force == SOC_min (residual dump).
         min_soc = float(soc_params["min_soc"])
         below_min = float(current_soc) < min_soc - 1e-9
-        refill_kwh = float(
-            battery_params.get("_virtual_reserve_refill_kwh")
-            or battery_params.get("_virtual_reserve_asap_kwh")
-            or 0.0
-        )
+        reserve_build_kwh = _reserve_build_before(model, sunrise_soc_min_index)
         if below_min:
             # Plant already below SOC_min: PV-only would block grid recovery before
             # sunrise and make the whole MILP Infeasible (empty EV/flex plan).
@@ -354,15 +335,15 @@ def _add_soc_anchor_constraints(
                     float(current_soc),
                     min_soc,
                 )
-        elif refill_kwh > 1e-9:
-            # Virtual reserve refill may need grid-side p_charge before sunrise;
+        elif reserve_build_kwh > 1e-9:
+            # Building the virtual reserve may need grid-side p_charge before sunrise;
             # PV-only would make that hard constraint Infeasible → Automatik fallback.
             if verbose:
                 logger.warning(
-                    "MILP SOC-Anker Sonnenaufgang: Slot %d — virtual reserve refill "
-                    "%.3f kWh pending; skip PV-only so grid can fill carve-out",
+                    "MILP SOC-Anker Sonnenaufgang: Slot %d — virtual reserve floor needs "
+                    "%.3f kWh more before it; skip PV-only so grid can build the reserve",
                     sunrise_soc_min_index,
-                    refill_kwh,
+                    reserve_build_kwh,
                 )
         else:
             _add_pv_only_charge_through_sunrise(model, matrix, sunrise_soc_min_index)

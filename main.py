@@ -714,6 +714,7 @@ def _main_cycle(
             physical_charge_setpoints_kw,
             planned_powerstation_loxone_sent,
             sync_triggers_from_telemetry,
+            update_reserve_fill_basis,
             write_cycle_powerstation_setpoints,
         )
         from optimizer.powerstation_standby import (
@@ -833,7 +834,14 @@ def _main_cycle(
 
         # Automatik must not drain the virtual reserve within the slot (refill ping-pong).
         automatik_discharge_cap = reserve_floor_discharge_cap_kw(
-            battery_params, float(current_soc), dt_h=DEFAULT_DT_H
+            battery_params,
+            float(current_soc),
+            dt_h=DEFAULT_DT_H,
+            matrix=optimization_matrix,
+        )
+        # Reserve P2: keep the fill price of a held reserve for the next re-plan.
+        update_reserve_fill_basis(
+            battery_params, optimization_matrix, active_reserves, dt_h=DEFAULT_DT_H
         )
         if automatik_discharge_cap is not None and mode == 0:
             logger.info(

@@ -737,3 +737,56 @@ def load_standby_packs(
         appliances=list(by_id.values()),
         telemetry=telemetry,
     )
+
+
+def update_reserve_fill_basis(
+    battery_params: dict | list[dict],
+    matrix: list[dict[str, Any]],
+    reserves: list[dict[str, Any]],
+    *,
+    dt_h: float,
+) -> None:
+    """Persist or clear the fill basis of the virtual reserves after a live plan (Reserve P2).
+
+    The reserve is held now (floor at the end of slot 0): the fill price that justifies the
+    first paying slot becomes the basis, so the next re-plan inside the expensive phase still
+    sees the reserve as cheaply filled. Not held now (cheap phase, released or no reserve): the
+    basis is cleared.
+    """
+    from optimizer.reserve_price_floor import reserve_price_floor
+    from runtime_store.powerstation_reserves import (
+        clear_fill_basis,
+        save_reserve_states,
+        set_fill_basis,
+    )
+
+    virtual_ids = [
+        str(r["powerstation_id"]) for r in reserves if r.get("backing") == BACKING_VIRTUAL
+    ]
+    if not virtual_ids:
+        return
+    primary = battery_params[0] if isinstance(battery_params, list) else battery_params
+    plan = reserve_price_floor(primary, matrix, horizon=len(matrix), dt_h=dt_h) if primary else None
+    basis: tuple[float, datetime] | None = None
+    if plan is not None and plan.held_now:
+        first = plan.first_paying_slot()
+        price, at = plan.fill_price[first], plan.fill_at[first]
+        if price is None or at is None:
+            raise ValueError(
+                f"Virtuelle Reserve: Slot {first} lohnt sich ohne Füllpreis/-zeitpunkt."
+            )
+        basis = (float(price), at)
+    states = load_reserve_states()
+    for ps_id in virtual_ids:
+        entry = states.get(ps_id)
+        if entry is None:
+            continue
+        if basis is None:
+            clear_fill_basis(entry)
+        else:
+            set_fill_basis(entry, price=basis[0], at=basis[1])
+    save_reserve_states(states)
+    if basis is not None:
+        logger.info(
+            "Virtuelle Reserve gehalten: Füllbasis %.3f (%s)", basis[0], basis[1].isoformat()
+        )
