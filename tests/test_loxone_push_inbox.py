@@ -1,6 +1,7 @@
 """Pilot (spike/vo-push-pilot): Virtual Output push inbox + telemetry endpoint."""
 from __future__ import annotations
 
+import threading
 import urllib.error
 import urllib.request
 from datetime import datetime, timedelta, timezone
@@ -321,6 +322,39 @@ def test_read_push_counter_fresh_and_stale() -> None:
     assert inbox.read_push_counter(eid, now=now) is None
     inbox.record_push(eid, "0", now=now)
     assert inbox.read_push_counter(eid, now=now) == pytest.approx(0.0)
+
+
+def test_clear_inbox_waits_for_flush_in_flight(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Regression: a timer flush that already took its snapshot must not rewrite the
+    file after ``clear_inbox`` deleted it (made ``test_read_push_counter_fresh_and_stale``
+    flaky under xdist load)."""
+    entered = threading.Event()
+    release = threading.Event()
+    written = threading.Event()
+    original_write = inbox._write_inbox
+
+    def _slow_write(rows, path=None):
+        entered.set()
+        assert release.wait(5)
+        original_write(rows, path)
+        written.set()
+
+    monkeypatch.setattr(inbox, "_write_inbox", _slow_write)
+    eid = "sens_pv_energy"
+    now = _now()
+    inbox.record_push(eid, "24120.12", now=now)
+    assert entered.wait(5), "timer flush did not start"
+
+    clearer = threading.Thread(target=inbox.clear_inbox, daemon=True)
+    clearer.start()
+    clearer.join(timeout=0.5)  # unfixed code: clear finishes here, before the write
+    release.set()
+    assert written.wait(5), "timer flush did not finish"
+    clearer.join(timeout=5)
+    assert not clearer.is_alive()
+
+    assert inbox.load_inbox() == {}
+    assert inbox.read_push_counter(eid, now=now) is None
 
 
 def test_read_push_ready_by_time_numeric_and_text() -> None:

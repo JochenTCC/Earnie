@@ -2,6 +2,10 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Push inbox: clear no longer races a flush in flight (2026-11-23)
+
+- [x] **Bugfix — `test_read_push_counter_fresh_and_stale` flaky in the full suite** *(found 2026-11-22; fixed 2026-11-23)*: the test failed in 2 of 5 full xdist runs and passed alone. Cause in `runtime_store/ehal_push_inbox.py`: the debounced timer flush takes its snapshot under `_lock` and writes the file outside it; `clear_inbox()` (and `reset_memory_for_tests()`) only took `_lock`, so a flush already in flight wrote the cleared rows back after the file was deleted, and the next read (empty memory → disk) returned the old value. Under load the window widened. Fix: both now hold `_flush_lock` first (same lock order as `flush_inbox_now`), so they wait for a write in flight. No production code calls `clear_inbox` today, so only tests were affected. Regression test `test_clear_inbox_waits_for_flush_in_flight` blocks the flush write and fails on the old code. Five consecutive full runs green on 2026-11-23 (7986 passed each).
+
 ### UI coverage tests and dead UI code removal (2026-11-23)
 
 - [x] **UI coverage: every UI function runs in at least one test** `[test]` *(done 2026-11-22, `d73fe0e2`)*: a full-suite coverage run over `ui/` and `app.py` found about 240 UI functions no test executed. 359 new tests (unit tests in `tests/test_ui_cov_*.py`, AppTests in `tests/apptest/*_cov_apptest.py` with scripts `tests/apptest/scripts/run_cov_*.py`) now run and assert them: app shell and banners, devices and consumer analysis, Szenario-Explorer results, cockpit/charts/EHAL test tools, house configuration and setup forms. UI line coverage rose from 81 % to 91 %. The tests found the PV tab bug below.

@@ -172,9 +172,14 @@ def flush_inbox_now() -> None:
 
 
 def clear_inbox() -> None:
-    """Delete all stored pushes (pilot button)."""
+    """Delete all stored pushes (pilot button).
+
+    Holds ``_flush_lock`` first (same order as ``flush_inbox_now``): a timer flush that
+    already took its snapshot finishes its write before the file is deleted, instead of
+    writing the cleared rows back afterwards.
+    """
     global _dirty, _dirty_path, _last_flush_mono
-    with _lock:
+    with _flush_lock, _lock:
         _cancel_flush_timer_unlocked()
         _dirty = False
         _dirty_path = None
@@ -191,9 +196,12 @@ def clear_inbox() -> None:
 
 
 def reset_memory_for_tests() -> None:
-    """Clear in-process cache and pending flush state (unit tests)."""
+    """Clear in-process cache and pending flush state (unit tests).
+
+    Waits for a flush in flight (``_flush_lock``) so it cannot write after the reset.
+    """
     global _dirty, _dirty_path, _last_flush_mono
-    with _lock:
+    with _flush_lock, _lock:
         _cancel_flush_timer_unlocked()
         _dirty = False
         _dirty_path = None
