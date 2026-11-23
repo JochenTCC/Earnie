@@ -195,6 +195,7 @@ def test_carrier_yaml_setpoint_skip_message_only_for_converted_units(monkeypatch
     assert "{{ hub_value is none }}" in text
 
     monkeypatch.setattr("integrations.ha_carrier_yaml.ehal_base_unit", lambda _id: None)
+    monkeypatch.setattr("integrations.ha_carrier_automations.ehal_base_unit", lambda _id: None)
     text = _build()
     assert "setpoint skipped" not in text
     assert "published value is not numeric" not in text

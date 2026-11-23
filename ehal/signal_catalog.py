@@ -220,6 +220,163 @@ def _consumer_role_id(consumer_type: str) -> str:
     return "consumer"
 
 
+def _add_kind_entries(
+    add,
+    *,
+    component_kind: ComponentKind,
+    entity_id: str,
+    kinds: tuple[str, ...],
+    consumer_type: str,
+    bindings: dict[str, Any],
+    required: set[str],
+) -> None:
+    for kind in kinds:
+        add(
+            _entry(
+                component_kind=component_kind,
+                entity_id=entity_id,
+                kind=kind,
+                consumer_type=consumer_type,
+                bindings=bindings,
+                required=required,
+            )
+        )
+
+
+def _entity_id_of(item: Any) -> str:
+    """Stripped ``id`` of a component dict; empty for non-dicts or a missing id."""
+    if not isinstance(item, dict):
+        return ""
+    return str(item.get("id") or "").strip()
+
+
+def _add_plant_entries(house: dict, add) -> None:
+    plant = house.get("plant") if isinstance(house.get("plant"), dict) else {}
+    _add_kind_entries(
+        add,
+        component_kind="plant",
+        entity_id="plant",
+        kinds=_plant_kinds(),
+        consumer_type="",
+        bindings=_bindings_of(plant),
+        required=set(required_binding_keys(component_kind="plant")),
+    )
+
+
+def _add_battery_entries(components: dict, add) -> None:
+    from ehal.required_signals import grid_tied_house_battery_ids
+
+    grid_tied = grid_tied_house_battery_ids(
+        components.get("batteries"), components.get("inverters")
+    )
+    for battery in components.get("batteries") or []:
+        bid = _entity_id_of(battery)
+        if not bid:
+            continue
+        required = set(
+            required_binding_keys(
+                component_kind="battery",
+                entity_id=bid,
+                control=control_from_battery_params(battery),
+                grid_tied_house=bid in grid_tied,
+            )
+        )
+        _add_kind_entries(
+            add,
+            component_kind="battery",
+            entity_id=bid,
+            kinds=_role_kinds("ess"),
+            consumer_type="",
+            bindings=_bindings_of(battery),
+            required=required,
+        )
+
+
+def _add_inverter_entries(components: dict, add) -> None:
+    from ehal.required_signals import inverter_has_attached_pv
+
+    pv_systems = list(components.get("pv_systems") or [])
+    for inverter in components.get("inverters") or []:
+        iid = _entity_id_of(inverter)
+        if not iid:
+            continue
+        control = str(inverter.get("control") or DEFAULT_INVERTER_CONTROL).strip()
+        required = set(
+            required_binding_keys(
+                component_kind="inverter",
+                entity_id=iid,
+                control=control,
+                has_attached_pv=inverter_has_attached_pv(iid, pv_systems),
+            )
+        )
+        _add_kind_entries(
+            add,
+            component_kind="inverter",
+            entity_id=iid,
+            kinds=_role_kinds("inverter"),
+            consumer_type="",
+            bindings=_bindings_of(inverter),
+            required=required,
+        )
+
+
+def _add_pv_entries(components: dict, add) -> None:
+    for pv in components.get("pv_systems") or []:
+        pid = _entity_id_of(pv)
+        if not pid:
+            continue
+        _add_kind_entries(
+            add,
+            component_kind="pv_system",
+            entity_id=pid,
+            kinds=_role_kinds("pv"),
+            consumer_type="",
+            bindings=_bindings_of(pv),
+            required=set(required_binding_keys(component_kind="pv_system", entity_id=pid)),
+        )
+
+
+def _add_profile_consumer_entries(profile: dict, add) -> None:
+    for consumer in profile.get("consumers") or []:
+        cid = _entity_id_of(consumer)
+        if not cid:
+            continue
+        ctype = str(consumer.get("type") or "").strip()
+        required = set(
+            required_binding_keys(
+                component_kind="consumer",
+                entity_id=cid,
+                consumer_type=ctype,
+            )
+        )
+        bindings = _bindings_of(consumer)
+        kinds = _consumer_kinds(consumer, ctype)
+        if ctype == "ev" and _ev_charger_is_wallbox(consumer):
+            # The charger side is the wallbox's (``evcs.<Wallbox>.*``), listed below.
+            kinds = tuple(k for k in kinds if k not in EVCS_KINDS)
+        _add_kind_entries(
+            add,
+            component_kind="consumer",
+            entity_id=cid,
+            kinds=kinds,
+            consumer_type=ctype,
+            bindings=bindings,
+            required=required,
+        )
+
+
+def _add_consumer_entries(house: dict, components: dict, add) -> None:
+    profiles = house.get("profiles") or {}
+    profile_iter = (
+        profiles.values() if isinstance(profiles, dict) else profiles
+    )
+    for profile in profile_iter:
+        if not isinstance(profile, dict):
+            continue
+        _add_profile_consumer_entries(profile, add)
+        _add_rod_entries(profile, components, add)
+
+
 def iter_catalog_entries(house: dict, components: dict) -> list[CatalogEntry]:
     """All role signals for configured plant / batteries / inverters / PV / consumers."""
     out: list[CatalogEntry] = []
@@ -235,146 +392,11 @@ def iter_catalog_entries(house: dict, components: dict) -> list[CatalogEntry]:
         seen.add(ident)
         out.append(entry)
 
-    plant = house.get("plant") if isinstance(house.get("plant"), dict) else {}
-    plant_bindings = _bindings_of(plant)
-    plant_required = set(required_binding_keys(component_kind="plant"))
-    for kind in _plant_kinds():
-        _add(
-            _entry(
-                component_kind="plant",
-                entity_id="plant",
-                kind=kind,
-                consumer_type="",
-                bindings=plant_bindings,
-                required=plant_required,
-            )
-        )
-
-    from ehal.required_signals import grid_tied_house_battery_ids
-
-    grid_tied = grid_tied_house_battery_ids(
-        components.get("batteries"), components.get("inverters")
-    )
-    for battery in components.get("batteries") or []:
-        if not isinstance(battery, dict):
-            continue
-        bid = str(battery.get("id") or "").strip()
-        if not bid:
-            continue
-        control = control_from_battery_params(battery)
-        required = set(
-            required_binding_keys(
-                component_kind="battery",
-                entity_id=bid,
-                control=control,
-                grid_tied_house=bid in grid_tied,
-            )
-        )
-        bindings = _bindings_of(battery)
-        for kind in _role_kinds("ess"):
-            _add(
-                _entry(
-                    component_kind="battery",
-                    entity_id=bid,
-                    kind=kind,
-                    consumer_type="",
-                    bindings=bindings,
-                    required=required,
-                )
-            )
-
-    pv_systems = list(components.get("pv_systems") or [])
-    from ehal.required_signals import inverter_has_attached_pv
-
-    for inverter in components.get("inverters") or []:
-        if not isinstance(inverter, dict):
-            continue
-        iid = str(inverter.get("id") or "").strip()
-        if not iid:
-            continue
-        control = str(inverter.get("control") or DEFAULT_INVERTER_CONTROL).strip()
-        required = set(
-            required_binding_keys(
-                component_kind="inverter",
-                entity_id=iid,
-                control=control,
-                has_attached_pv=inverter_has_attached_pv(iid, pv_systems),
-            )
-        )
-        bindings = _bindings_of(inverter)
-        for kind in _role_kinds("inverter"):
-            _add(
-                _entry(
-                    component_kind="inverter",
-                    entity_id=iid,
-                    kind=kind,
-                    consumer_type="",
-                    bindings=bindings,
-                    required=required,
-                )
-            )
-
-    for pv in components.get("pv_systems") or []:
-        if not isinstance(pv, dict):
-            continue
-        pid = str(pv.get("id") or "").strip()
-        if not pid:
-            continue
-        required = set(
-            required_binding_keys(component_kind="pv_system", entity_id=pid)
-        )
-        bindings = _bindings_of(pv)
-        for kind in _role_kinds("pv"):
-            _add(
-                _entry(
-                    component_kind="pv_system",
-                    entity_id=pid,
-                    kind=kind,
-                    consumer_type="",
-                    bindings=bindings,
-                    required=required,
-                )
-            )
-
-    profiles = house.get("profiles") or {}
-    profile_iter = (
-        profiles.values() if isinstance(profiles, dict) else profiles
-    )
-    for profile in profile_iter:
-        if not isinstance(profile, dict):
-            continue
-        for consumer in profile.get("consumers") or []:
-            if not isinstance(consumer, dict):
-                continue
-            cid = str(consumer.get("id") or "").strip()
-            if not cid:
-                continue
-            ctype = str(consumer.get("type") or "").strip()
-            required = set(
-                required_binding_keys(
-                    component_kind="consumer",
-                    entity_id=cid,
-                    consumer_type=ctype,
-                )
-            )
-            bindings = _bindings_of(consumer)
-            kinds = _consumer_kinds(consumer, ctype)
-            if ctype == "ev" and _ev_charger_is_wallbox(consumer):
-                # The charger side is the wallbox's (``evcs.<Wallbox>.*``), listed below.
-                kinds = tuple(k for k in kinds if k not in EVCS_KINDS)
-            for kind in kinds:
-                _add(
-                    _entry(
-                        component_kind="consumer",
-                        entity_id=cid,
-                        kind=kind,
-                        consumer_type=ctype,
-                        bindings=bindings,
-                        required=required,
-                    )
-                )
-        _add_rod_entries(profile, components, _add)
-
+    _add_plant_entries(house, _add)
+    _add_battery_entries(components, _add)
+    _add_inverter_entries(components, _add)
+    _add_pv_entries(components, _add)
+    _add_consumer_entries(house, components, _add)
     _add_wallbox_entries(house, components, _add)
     return out
 
@@ -488,6 +510,121 @@ def _set_rod_activation(consumer: dict, key: str, activated: bool) -> dict:
     return out
 
 
+def _toggle_binding(bindings: dict[str, Any], key: str, activated: bool) -> None:
+    if activated:
+        bindings.setdefault(key, "")
+    else:
+        bindings.pop(key, None)
+
+
+def _set_plant_activation(house_out: dict, key: str, activated: bool) -> None:
+    plant = dict(house_out.get("plant") or {})
+    bindings = dict(plant.get("ehal_bindings") or {})
+    _toggle_binding(bindings, key, activated)
+    plant["ehal_bindings"] = bindings
+    house_out["plant"] = plant
+
+
+def _consumer_with_activation(
+    consumer: dict, entity_id: str, key: str, activated: bool, consumer_type: str
+) -> dict:
+    """The consumer with ``key`` (any spelling of its kind) added or removed."""
+    c = dict(consumer)
+    bindings = dict(c.get("ehal_bindings") or {})
+    ctype = str(c.get("type") or consumer_type or "").strip()
+    peers = _consumer_key_spellings(entity_id, field_kind(key), ctype)
+    if activated:
+        # Already stored under another spelling: keep that one, add none.
+        if not any(peer in bindings for peer in (key, *peers)):
+            bindings[key] = ""
+    else:
+        for peer in (key, *peers):
+            bindings.pop(peer, None)
+    c["ehal_bindings"] = bindings
+    return c
+
+
+def _profile_consumers_with_activation(
+    profile: dict, entity_id: str, key: str, activated: bool, consumer_type: str
+) -> list:
+    from house_config.heating_rod_bindings import rod_kennung
+
+    consumers = []
+    for consumer in profile.get("consumers") or []:
+        if not isinstance(consumer, dict):
+            consumers.append(consumer)
+        elif (
+            consumer.get("type") == "thermal_annual"
+            and rod_kennung(str(consumer.get("id") or "").strip()) == entity_id
+        ):
+            consumers.append(_set_rod_activation(consumer, key, activated))
+        elif str(consumer.get("id") or "").strip() != entity_id:
+            consumers.append(consumer)
+        else:
+            consumers.append(
+                _consumer_with_activation(consumer, entity_id, key, activated, consumer_type)
+            )
+    return consumers
+
+
+def _set_consumer_activation(
+    house_out: dict, entity_id: str, key: str, activated: bool, consumer_type: str
+) -> None:
+    profiles = house_out.get("profiles")
+    if not isinstance(profiles, dict):
+        return
+    new_profiles: dict[str, Any] = {}
+    for pname, profile in profiles.items():
+        if not isinstance(profile, dict):
+            new_profiles[pname] = profile
+            continue
+        consumers = _profile_consumers_with_activation(
+            profile, entity_id, key, activated, consumer_type
+        )
+        new_profiles[pname] = {**profile, "consumers": consumers}
+    house_out["profiles"] = new_profiles
+
+
+def _row_with_activation(item: dict, component_kind: str, key: str, activated: bool) -> dict:
+    row = dict(item)
+    bindings = dict(row.get("ehal_bindings") or {})
+    if component_kind == "wallbox":
+        # A wallbox stores a kind bare or qualified: one kind, one key.
+        same_kind = [k for k in bindings if field_kind(str(k)) == field_kind(key)]
+        if activated and not same_kind:
+            bindings[key] = ""
+        elif not activated:
+            for peer in same_kind:
+                bindings.pop(peer)
+    else:
+        _toggle_binding(bindings, key, activated)
+    row["ehal_bindings"] = bindings
+    return row
+
+
+_COMPONENT_LIST_KEYS: dict[str, str] = {
+    "battery": "batteries",
+    "inverter": "inverters",
+    "pv_system": "pv_systems",
+    "wallbox": "wallboxes",
+}
+
+
+def _set_component_activation(
+    comp_out: dict, component_kind: str, entity_id: str, key: str, activated: bool
+) -> None:
+    list_key = _COMPONENT_LIST_KEYS.get(component_kind)
+    if not list_key:
+        raise ValueError(f"unsupported component_kind {component_kind!r}")
+    items = []
+    for item in comp_out.get(list_key) or []:
+        if not isinstance(item, dict) or _entity_id_of(item) != entity_id:
+            items.append(item)
+            continue
+        items.append(_row_with_activation(item, component_kind, key, activated))
+    comp_out[list_key] = items
+
+
 def set_binding_activation(
     house: dict,
     components: dict,
@@ -510,91 +647,11 @@ def set_binding_activation(
     comp_out = dict(components) if isinstance(components, dict) else {}
 
     if component_kind == "plant":
-        plant = dict(house_out.get("plant") or {})
-        bindings = dict(plant.get("ehal_bindings") or {})
-        if activated:
-            bindings.setdefault(key, "")
-        else:
-            bindings.pop(key, None)
-        plant["ehal_bindings"] = bindings
-        house_out["plant"] = plant
-        return house_out, comp_out
-
-    if component_kind == "consumer":
-        profiles = house_out.get("profiles")
-        if isinstance(profiles, dict):
-            new_profiles: dict[str, Any] = {}
-            for pname, profile in profiles.items():
-                if not isinstance(profile, dict):
-                    new_profiles[pname] = profile
-                    continue
-                consumers = []
-                for consumer in profile.get("consumers") or []:
-                    if not isinstance(consumer, dict):
-                        consumers.append(consumer)
-                        continue
-                    from house_config.heating_rod_bindings import rod_kennung
-
-                    if (
-                        consumer.get("type") == "thermal_annual"
-                        and rod_kennung(str(consumer.get("id") or "").strip()) == entity_id
-                    ):
-                        consumers.append(_set_rod_activation(consumer, key, activated))
-                        continue
-                    if str(consumer.get("id") or "").strip() != entity_id:
-                        consumers.append(consumer)
-                        continue
-                    c = dict(consumer)
-                    bindings = dict(c.get("ehal_bindings") or {})
-                    ctype = str(c.get("type") or consumer_type or "").strip()
-                    peers = _consumer_key_spellings(entity_id, field_kind(key), ctype)
-                    if activated:
-                        # Already stored under another spelling: keep that one, add none.
-                        if not any(peer in bindings for peer in (key, *peers)):
-                            bindings[key] = ""
-                    else:
-                        for peer in (key, *peers):
-                            bindings.pop(peer, None)
-                    c["ehal_bindings"] = bindings
-                    consumers.append(c)
-                new_profiles[pname] = {**profile, "consumers": consumers}
-            house_out["profiles"] = new_profiles
-        return house_out, comp_out
-
-    list_key = {
-        "battery": "batteries",
-        "inverter": "inverters",
-        "pv_system": "pv_systems",
-        "wallbox": "wallboxes",
-    }.get(component_kind)
-    if not list_key:
-        raise ValueError(f"unsupported component_kind {component_kind!r}")
-    items = []
-    for item in comp_out.get(list_key) or []:
-        if not isinstance(item, dict):
-            items.append(item)
-            continue
-        if str(item.get("id") or "").strip() != entity_id:
-            items.append(item)
-            continue
-        row = dict(item)
-        bindings = dict(row.get("ehal_bindings") or {})
-        if component_kind == "wallbox":
-            # A wallbox stores a kind bare or qualified: one kind, one key.
-            same_kind = [k for k in bindings if field_kind(str(k)) == field_kind(key)]
-            if activated and not same_kind:
-                bindings[key] = ""
-            elif not activated:
-                for peer in same_kind:
-                    bindings.pop(peer)
-        elif activated:
-            bindings.setdefault(key, "")
-        else:
-            bindings.pop(key, None)
-        row["ehal_bindings"] = bindings
-        items.append(row)
-    comp_out[list_key] = items
-    _ = consumer_type
+        _set_plant_activation(house_out, key, activated)
+    elif component_kind == "consumer":
+        _set_consumer_activation(house_out, entity_id, key, activated, consumer_type)
+    else:
+        _set_component_activation(comp_out, component_kind, entity_id, key, activated)
     return house_out, comp_out
 
 

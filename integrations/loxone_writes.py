@@ -1,8 +1,13 @@
-"""Loxone write helpers: setpoints, ESS, flexible consumer outputs."""
+"""Loxone write helpers: setpoints, ESS, flexible consumer outputs.
+
+Import facade: the ESS C1 setpoint math lives in ``integrations.loxone_ess_setpoints``
+and the flexible consumer output values in ``integrations.loxone_flex_outputs``; both
+are re-exported here. Publishing (``_publish_setpoint_traced``) and the send paths stay
+in this module so patches on ``integrations.loxone_writes.<name>`` keep working.
+"""
 from __future__ import annotations
 
 import logging
-import math
 from datetime import datetime
 from typing import Optional
 
@@ -15,10 +20,39 @@ from settings.ehal_marker_resolve import (
     marker_set_sg_ready_state,
     marker_set_store_target,
 )
-from settings.ev_power import ev_nominal_power_conversion, kw_to_ampere
-from settings.flexible_consumers import runtime_consumer_id
+from settings.ev_power import ev_nominal_power_conversion, kw_to_ampere  # noqa: F401
+from settings.flexible_consumers import runtime_consumer_id  # noqa: F401
 
 logger = logging.getLogger(__name__)
+
+from integrations.loxone_ess_setpoints import (  # noqa: E402,F401  (re-exports)
+    TARGET_SOC_POWER_SHARE,
+    TARGET_SOC_REPORT_STEP_PCT,
+    _OMIT_EXPORT_CAP,
+    _battery_max_powers_kw,
+    _ess_battery_params,
+    _ess_c1_exchange_field,
+    _export_cap_marker_and_value,
+    ess_c1_kind_values,
+    ess_target_soc_buffer_percent,
+    ess_target_soc_percent,
+    map_ess_setpoints,
+)
+from integrations.loxone_flex_outputs import (  # noqa: E402,F401  (re-exports)
+    _EVCS_MODE_VALUES,
+    _append_evcs_mode_writes,
+    _effective_consumer_power_kw,
+    _enable_output_values,
+    _evcs_current_output_values,
+    _flexible_consumer_output_values,
+    _immediate_skip_output_values,
+    _sg_ready_state_output_values,
+    _skip_flexible_consumer_output,
+    _store_target_output_values,
+    flex_consumer_enable_value,
+    flex_consumer_power_setpoint_kw,
+    flex_consumer_setpoint_amps,
+)
 
 
 def resolve_consumer_nominal_power_kw(consumer: dict) -> float:
@@ -65,378 +99,6 @@ def _publish_setpoint_traced(
         written_at=written_at,
     )
 
-
-def map_ess_setpoints(
-    mode: int,
-    target_power_kw: float,
-    max_charge_power_kw: float,
-    max_discharge_power_kw: float | None = None,
-    *,
-    automatik_discharge_cap_kw: float | None = None,
-) -> tuple[float | None, float, float, int]:
-    """Design C1: (active_power_kw|None, charge_limit_kw, discharge_limit_kw, mode_hint).
-
-    ``active_power_kw`` uses EHAL sign (+discharge, −charge). ``None`` means Automatik /
-    Entladesperre without a forced Equals setpoint. Limits are true caps (kW magnitudes).
-    ``mode_hint`` is for Loxone/HA (Huawei Steuerbefehl); OpenEMS ignores it.
-    Battery-only: export caps travel on ``set_grid_export_power_limit`` (2.7.a).
-
-    ``max_discharge_power_kw`` defaults to ``max_charge_power_kw`` for legacy single-max
-    callers (pre-2.7.j). ``automatik_discharge_cap_kw`` caps the discharge limit in
-    Automatik only (virtual reserve floor, ``reserve_floor_discharge_cap_kw``).
-    """
-    max_charge = max(0.0, abs(float(max_charge_power_kw)))
-    if max_discharge_power_kw is None:
-        max_discharge = max_charge
-    else:
-        max_discharge = max(0.0, abs(float(max_discharge_power_kw)))
-    target = max(0.0, abs(float(target_power_kw)))
-    if mode == 1:  # MODE_ZWANGS_LADEN
-        return -target, max_charge, 0.0, 1
-    if mode == 2:  # MODE_ENTLADESPERRE
-        return None, max_charge, 0.0, 1
-    if mode == 3:  # MODE_ZWANGS_ENTLADEN
-        return target, 0.0, max_discharge, 2
-    if automatik_discharge_cap_kw is not None:
-        max_discharge = min(max_discharge, max(0.0, float(automatik_discharge_cap_kw)))
-    return None, max_charge, max_discharge, 0
-
-
-# Inverters such as the Huawei LUNA report SoC in whole percent and end a forced
-# charge/discharge when that reported value reaches the target. A target with decimals
-# can stop the slot up to one step early, so forced modes get a buffer beyond the plan's
-# slot-end SoC: one reporting step plus a share of the SoC change the slot plans at the
-# target power (faster slots overshoot the reporting step more before the stop). The
-# active power setpoint still bounds the energy of the slot; the next cycle re-plans.
-TARGET_SOC_REPORT_STEP_PCT = 1.0
-TARGET_SOC_POWER_SHARE = 0.25
-
-
-def ess_target_soc_buffer_percent(
-    mode: int,
-    target_power_kw: float,
-    battery_capacity_kwh: float,
-    *,
-    dt_h: float,
-) -> float:
-    """SoC buffer (%) beyond the planned slot-end SoC for forced charge/discharge.
-
-    0 for Automatik and hold (Entladesperre): hold sends the current SoC as target
-    and must not charge or discharge past it.
-    """
-    if mode not in (1, 3):  # MODE_ZWANGS_LADEN, MODE_ZWANGS_ENTLADEN
-        return 0.0
-    power = abs(float(target_power_kw))
-    if power <= 0.0:
-        return 0.0
-    capacity = float(battery_capacity_kwh)
-    if capacity <= 0.0:
-        raise ValueError(
-            f"set_ess_target_soc: battery capacity {capacity} kWh, buffer needs a capacity > 0"
-        )
-    slot_soc_change_pct = power * float(dt_h) / capacity * 100.0
-    return TARGET_SOC_REPORT_STEP_PCT + TARGET_SOC_POWER_SHARE * slot_soc_change_pct
-
-
-def ess_target_soc_percent(
-    target_soc: float,
-    *,
-    mode: int,
-    target_power_kw: float,
-    battery_params: dict,
-) -> float:
-    """Target SoC for ``set_ess_target_soc`` in % (0-100, one decimal).
-
-    The optimizer's value per mode: hold (Entladesperre) = current SoC, forced
-    charge/discharge = planned SoC at slot end, Automatik = 99. Forced modes move it
-    by ``ess_target_soc_buffer_percent`` (down for discharge, up for charge), never
-    past the battery's ``min_soc`` / ``max_soc``. Only written when the battery maps
-    ``set_ess_target_soc``.
-    """
-    from optimizer.slot_duration import DEFAULT_DT_H
-
-    value = float(target_soc)
-    if math.isnan(value):
-        raise ValueError("set_ess_target_soc: target SoC is NaN")
-    if mode in (1, 3) and abs(float(target_power_kw)) > 0.0:
-        buffer = ess_target_soc_buffer_percent(
-            mode,
-            target_power_kw,
-            float(battery_params["battery_capacity_kwh"]),
-            dt_h=DEFAULT_DT_H,
-        )
-        # The clamp only limits the buffer; it never moves the plan's own value back.
-        if mode == 3:
-            value = min(value, max(float(battery_params["min_soc"]), value - buffer))
-        else:
-            value = max(value, min(float(battery_params["max_soc"]), value + buffer))
-    return round(min(100.0, max(0.0, value)), 1)
-
-
-def flex_consumer_enable_value(
-    consumer: dict,
-    consumer_powers: dict[str, float],
-    charging_contexts: dict[str, dict],
-) -> int | None:
-    """Freigabe 0/1 für einen flexiblen Verbraucher (None wenn kein enable Merker)."""
-    if not marker_flex_enable(consumer):
-        return None
-
-    cid = consumer["id"]
-    power_kw = _effective_consumer_power_kw(consumer, consumer_powers, charging_contexts, cid)
-    return 1 if power_kw > 1e-3 else 0
-
-
-def _effective_consumer_power_kw(
-    consumer: dict,
-    consumer_powers: dict[str, float],
-    charging_contexts: dict[str, dict],
-    cid: str,
-) -> float:
-    power_kw = max(0.0, float(consumer_powers.get(cid, 0.0) or 0.0))
-    ctx = charging_contexts.get(cid)
-    if ctx is not None and not ctx.get("active", True):
-        return 0.0
-    if ctx is not None and ctx.get("anticipated") and not ctx.get("plugged_in"):
-        return 0.0
-    return power_kw
-
-
-def flex_consumer_power_setpoint_kw(
-    consumer: dict,
-    consumer_powers: dict[str, float],
-    charging_contexts: dict[str, dict],
-    consumer_pv_follow: dict[str, int] | None = None,
-) -> float | None:
-    """kW-Sollwert aus MILP (None wenn kein set_evcs_max_current / power_setpoint)."""
-    from optimizer.consumer_power import loxone_control_outputs
-
-    if not marker_set_evcs_max_current(consumer):
-        return None
-
-    cid = consumer["id"]
-    planned_kw = _effective_consumer_power_kw(consumer, consumer_powers, charging_contexts, cid)
-    pv_follow = int((consumer_pv_follow or {}).get(cid, 0) or 0)
-    setpoint_kw, _ = loxone_control_outputs(consumer, planned_kw, pv_follow)
-    return setpoint_kw
-
-
-def flex_consumer_setpoint_amps(
-    consumer: dict,
-    consumer_powers: dict[str, float],
-    charging_contexts: dict[str, dict],
-    consumer_pv_follow: dict[str, int] | None = None,
-) -> float | None:
-    """set_evcs_max_current (A) from planned kW; None wenn kein Current-Merker."""
-    setpoint_kw = flex_consumer_power_setpoint_kw(
-        consumer, consumer_powers, charging_contexts, consumer_pv_follow
-    )
-    if setpoint_kw is None:
-        return None
-    voltage_v, phases = ev_nominal_power_conversion(consumer)
-    return round(kw_to_ampere(setpoint_kw, voltage_v=voltage_v, phases=phases), 3)
-
-
-def _skip_flexible_consumer_output(
-    consumer: dict,
-    charging_contexts: dict[str, dict],
-) -> bool:
-    ctx = charging_contexts.get(consumer["id"]) or {}
-    return bool(ctx.get("skip_loxone_output"))
-
-
-_EVCS_MODE_VALUES: dict[str, float] = {"off": 0.0, "pv": 1.0, "now": 2.0}
-
-
-def _append_evcs_mode_writes(
-    values: dict[str, float],
-    consumer: dict,
-    *,
-    mode: str | None,
-) -> None:
-    """Write the canonical ``set_evcs_mode`` Merker (off=0, pv=1, now=2)."""
-    mode_name = marker_set_evcs_mode(consumer)
-    if not mode_name:
-        return
-    values[mode_name] = _EVCS_MODE_VALUES.get(str(mode or "").strip().lower(), 0.0)
-
-
-def _immediate_skip_output_values(consumer: dict) -> dict[str, float]:
-    values: dict[str, float] = {}
-    _append_evcs_mode_writes(values, consumer, mode="now")
-    if values:
-        logger.info(
-            "Flex consumer %s -> Sofort laden: set_evcs_mode=now "
-            "(kein Lade-Sollstrom von Earnie).",
-            consumer["name"],
-        )
-    else:
-        logger.info(
-            "Flex consumer %s -> keine Steuerung (Sofort laden aktiv, Loxone regelt).",
-            consumer["name"],
-        )
-    return values
-
-
-def _evcs_current_output_values(
-    consumer: dict,
-    consumer_powers: dict[str, float],
-    charging_contexts: dict[str, dict],
-    consumer_pv_follow: dict[str, int] | None,
-    current_name: str,
-) -> dict[str, float]:
-    from optimizer.consumer_power import loxone_control_outputs, set_evcs_mode_for_plan
-
-    amps = flex_consumer_setpoint_amps(
-        consumer, consumer_powers, charging_contexts, consumer_pv_follow
-    )
-    if amps is None:
-        return {}
-    values = {str(current_name): float(amps)}
-    cid = consumer["id"]
-    planned_kw = _effective_consumer_power_kw(
-        consumer, consumer_powers, charging_contexts, cid
-    )
-    plan_pv = int((consumer_pv_follow or {}).get(cid, 0) or 0)
-    _, pv_out = loxone_control_outputs(consumer, planned_kw, plan_pv)
-    mode = set_evcs_mode_for_plan(
-        pv_follow=int(pv_out),
-        immediate=False,
-        charging=float(amps) > 1e-6,
-    )
-    _append_evcs_mode_writes(values, consumer, mode=mode)
-    setpoint_kw = flex_consumer_power_setpoint_kw(
-        consumer, consumer_powers, charging_contexts, consumer_pv_follow
-    )
-    logger.info(
-        "Flex consumer %s -> Soll=%.2f A (%.2f kW), mode=%s "
-        "(geplant %.2f kW, Loxone: %s)",
-        consumer["name"],
-        amps,
-        setpoint_kw or 0.0,
-        mode,
-        max(0.0, float(consumer_powers.get(cid, 0.0) or 0.0)),
-        current_name,
-    )
-    return values
-
-
-def _enable_output_values(
-    consumer: dict,
-    consumer_powers: dict[str, float],
-    charging_contexts: dict[str, dict],
-    enable_name: str,
-) -> dict[str, float]:
-    enabled = flex_consumer_enable_value(consumer, consumer_powers, charging_contexts)
-    if enabled is None:
-        return {}
-    power_kw = max(0.0, float(consumer_powers.get(consumer["id"], 0.0) or 0.0))
-    logger.info(
-        "Flex consumer %s -> Freigabe=%s (optimiert %.2f kW, Loxone: %s)",
-        consumer["name"],
-        enabled,
-        power_kw,
-        enable_name,
-    )
-    return {str(enable_name): float(enabled)}
-
-
-def _sg_ready_state_output_values(
-    consumer: dict,
-    consumer_powers: dict[str, float],
-    charging_contexts: dict[str, dict],
-    *,
-    forced: bool = False,
-) -> dict[str, float]:
-    """Heat pump operating state (HeatControl P2): 3 where the plan runs it, else 2.
-
-    ``forced`` (HeatControl P5): the plan runs it on a negative price or on surplus that
-    would be curtailed, the state is 4. Sent next to ``set_enable`` when the key is mapped;
-    it never replaces it.
-    """
-    from ehal.heat_fields import sg_ready_state_for_plan
-
-    state_name = marker_set_sg_ready_state(consumer)
-    if not state_name:
-        return {}
-    power_kw = _effective_consumer_power_kw(
-        consumer, consumer_powers, charging_contexts, consumer["id"]
-    )
-    state = sg_ready_state_for_plan(power_kw > 1e-3, forced=forced)
-    logger.info(
-        "Flex consumer %s -> SG-Ready-Zustand=%s (optimiert %.2f kW, Loxone: %s)",
-        consumer["name"],
-        state,
-        power_kw,
-        state_name,
-    )
-    return {str(state_name): float(state)}
-
-
-def _store_target_output_values(
-    consumer: dict,
-    heat_storage_targets: dict[str, float] | None,
-) -> dict[str, float]:
-    """Store charge target (HeatControl P3): the plan's target, 0 = no target.
-
-    ``None``: no plan was made in this call (e.g. the watchdog's snapshot); nothing is
-    written then. A heat pump without a computed target gets 0 (no target).
-    """
-    if heat_storage_targets is None:
-        return {}
-    name = marker_set_store_target(consumer)
-    if not name:
-        return {}
-    value = float(heat_storage_targets.get(str(consumer["id"]), 0.0) or 0.0)
-    logger.info(
-        "Flex consumer %s -> Speicher-Ladeziel=%.1f °C (0 = kein Ziel, Loxone: %s)",
-        consumer["name"],
-        value,
-        name,
-    )
-    return {str(name): value}
-
-
-def _flexible_consumer_output_values(
-    consumer: dict,
-    consumer_powers: dict[str, float],
-    charging_contexts: dict[str, dict],
-    consumer_pv_follow: dict[str, int] | None = None,
-    heat_storage_targets: dict[str, float] | None = None,
-    heat_forced_charge: frozenset[str] | None = None,
-) -> dict[str, float]:
-    """Berechnet Loxone-Merker → Wert für einen flexiblen Verbraucher (ohne HTTP)."""
-    if _skip_flexible_consumer_output(consumer, charging_contexts):
-        return _immediate_skip_output_values(consumer)
-
-    current_name = marker_set_evcs_max_current(consumer)
-    enable_name = marker_flex_enable(consumer)
-    if current_name:
-        return _evcs_current_output_values(
-            consumer,
-            consumer_powers,
-            charging_contexts,
-            consumer_pv_follow,
-            current_name,
-        )
-
-    values: dict[str, float] = {}
-    if enable_name:
-        values.update(
-            _enable_output_values(
-                consumer, consumer_powers, charging_contexts, enable_name
-            )
-        )
-    values.update(
-        _sg_ready_state_output_values(
-            consumer,
-            consumer_powers,
-            charging_contexts,
-            forced=str(consumer["id"]) in (heat_forced_charge or ()),
-        )
-    )
-    values.update(_store_target_output_values(consumer, heat_storage_targets))
-    return values
 
 
 def _publish_flexible_consumer_outputs(
@@ -518,129 +180,6 @@ def _write_flexible_consumer_output(
     return records
 
 
-_OMIT_EXPORT_CAP = object()
-
-
-def _battery_max_powers_kw(battery_params: dict) -> tuple[float, float]:
-    """(max charge kW, max discharge kW) from battery params.
-
-    An explicit value wins, also 0 (charge/discharge disabled or derated to 0 by the
-    live limits). ``max_power_kw`` is only the shared cap when a direction is not set.
-    A battery without any max power raises: publishing 0/0 would block the battery.
-    """
-    shared = battery_params.get("max_power_kw")
-
-    def _pick(key: str) -> float:
-        value = battery_params.get(key)
-        if value is None:
-            value = shared
-        if value is None:
-            raise ValueError(
-                f"ESS C1: battery {battery_params.get('id') or '?'!s} has no {key} "
-                "and no max_power_kw — refusing to publish a power limit"
-            )
-        return float(value)
-
-    return _pick("max_charge_power_kw"), _pick("max_discharge_power_kw")
-
-
-def _ess_battery_params(battery_params: dict | None, source) -> dict:
-    """Battery params for the ESS C1 setpoints.
-
-    ``battery_params`` are the effective params the plan used (live ``get_ess_max_*``
-    applied, ``settings.ess_limits_resolve``). ``None`` means no telemetry is at hand
-    (startup safe push, watchdog rebuild without ``loxone_sent``): the house config
-    limits are used, and the log says so.
-    """
-    if battery_params is not None:
-        return battery_params
-    logger.info("ESS C1: Grenzen aus der Hauskonfiguration (keine Live-Limits übergeben)")
-    return source.get_battery_params()
-
-
-def ess_c1_kind_values(
-    mode: int,
-    target_power_kw: float,
-    target_soc: float,
-    battery_params: dict,
-    *,
-    automatik_discharge_cap_kw: float | None = None,
-) -> tuple[tuple[str, float | None], ...]:
-    """ESS C1 setpoints (kind, value) Earnie sends for this battery control level.
-
-    Single source for the live send path (``send_huawei_modbus_states``) and the
-    ``loxone_sent`` ledger (``build_sent_loxone_snapshot``), so both stay identical:
-
-    - ``read_only``: no ESS setpoint at all (empty tuple).
-    - ``limits_only``: forced charge/discharge (modes 1/3) fall back to Automatik
-      (mode 0, power 0) and no active power setpoint is forced (``None``); the target
-      SoC is computed for the reduced mode.
-    - ``full``: the optimizer mode as mapped by ``map_ess_setpoints``.
-
-    ``None`` as value means "no forced setpoint" (callers send 0 on a wired active
-    power binding and skip the other kinds).
-    """
-    from house_config.battery_control import (
-        BATTERY_CONTROL_LIMITS_ONLY,
-        BATTERY_CONTROL_READ_ONLY,
-        control_from_battery_params,
-    )
-
-    control = control_from_battery_params(battery_params)
-    if control == BATTERY_CONTROL_READ_ONLY:
-        return ()
-
-    max_charge, max_discharge = _battery_max_powers_kw(battery_params)
-    if control == BATTERY_CONTROL_LIMITS_ONLY and mode in (1, 3):
-        mode = 0
-        target_power_kw = 0.0
-    active_kw, charge_kw, discharge_kw, control_cmd = map_ess_setpoints(
-        mode,
-        target_power_kw,
-        max_charge,
-        max_discharge,
-        automatik_discharge_cap_kw=automatik_discharge_cap_kw,
-    )
-    if control == BATTERY_CONTROL_LIMITS_ONLY:
-        active_kw = None
-    target_soc_pct = ess_target_soc_percent(
-        target_soc,
-        mode=mode,
-        target_power_kw=target_power_kw,
-        battery_params=battery_params,
-    )
-    return (
-        ("set_ess_active_power", active_kw),
-        ("set_ess_charge_power_limit", charge_kw),
-        ("set_ess_discharge_power_limit", discharge_kw),
-        ("set_ess_mode", float(control_cmd)),
-        ("set_ess_target_soc", target_soc_pct),
-    )
-
-
-def _export_cap_marker_and_value(
-    export_cap_kw: float | None | object,
-) -> tuple[str, float] | None:
-    """Plant export-limit marker name and setpoint [kW]; None when no marker is bound."""
-    from house_config.ehal_bindings import resolve_plant_binding
-    from optimizer.export_power_limit import export_limit_setpoint_kw
-    from optimizer.live_export_limit import (
-        live_unconstrained_export_kw,
-        load_house_doc,
-    )
-
-    export_marker = resolve_plant_binding(
-        load_house_doc(), "set_grid_export_power_limit"
-    )
-    if not export_marker:
-        return None
-    cap = None if export_cap_kw is None else float(export_cap_kw)  # type: ignore[arg-type]
-    value = float(
-        export_limit_setpoint_kw(cap, unconstrained_kw=live_unconstrained_export_kw())
-    )
-    return str(export_marker), value
-
-
 def build_sent_loxone_snapshot(
     mode: int,
     target_power_kw: float,
@@ -701,30 +240,6 @@ def build_sent_loxone_snapshot(
         )
 
     return snapshot
-
-
-def _ess_c1_exchange_field(
-    kind: str,
-    cfg_name: str,
-    io_to_field: dict[str, str],
-    *,
-    has_batteries: bool,
-) -> str:
-    """Resolve plant ESS Merker / activation name → publish EHAL id (Q8)."""
-    from ehal.ess_fields import ess_field
-    from integrations.ehal_debug_mapping import resolve_loxone_write_field
-    from integrations.loxone_adapter import primary_ess_id_for_plant_read
-
-    name = str(cfg_name or "").strip()
-    if not name:
-        return ""
-    if has_batteries:
-        bid = primary_ess_id_for_plant_read()
-        return ess_field(bid, kind) if bid else ""
-    field = str(io_to_field.get(name) or "").strip()
-    if field:
-        return field
-    return str(resolve_loxone_write_field(name, io_to_field) or "").strip()
 
 
 def send_huawei_modbus_states(
