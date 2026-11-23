@@ -46,7 +46,7 @@ A bugfix can be guarded in two ways. Keep both; do not collapse them.
 | Kind | Where | When to use |
 |---|---|---|
 | **A — Pytest regression** | Public `tests/test_*_regression.py` (or a focused module) | Small, scrubbed / synthetic inputs; runs every commit. Prefer for logic bugs that do not need full customer matrices, and for bugs that are **not visible in the compared metrics** (below). |
-| **B — Golden case** | Public `tests/regression/cases/` (`REG-O-` / `REG-S-`) or private `Earnie-regression-private` (`REG-<issue>-<slug>`) | Behaviour lock across releases; customer data → **private only**. Runs before release (`run_regression`), not per commit. |
+| **B — Golden case** | Public `tests/regression/cases/` (`REG-O-` / `REG-S-`) or private `Earnie-regression-private` (`REG-<issue>-<slug>`, own plant `REG-O-<slug>`) | Behaviour lock across releases; customer data → **private only**. Runs before release (`run_regression`), not per commit. |
 
 **A golden only guards what §7 compares:** hard invariants (SoC limits, energy balance, EV deadline, export limit, unavailable functions) and metrics (total cost, grid import / export, self-sufficiency, battery cycles, per-consumer energy). A bug that only shows up elsewhere (heat-store temperature curve, UI value, live write) passes a golden unchanged — use **A** for it.
 
@@ -121,7 +121,8 @@ Existing `tests/fixtures/prod_dumps/<id>/` cases are migrated into this format i
 ## 6. Case IDs and issue references
 
 - Schema: `REG-<issue-number>-<slug>` for issue-driven cases, `REG-S-<slug>` for synthetic ones, `REG-O-<slug>` for own data.
-- **Issue number is mandatory** for private customer cases: `--intake` rejects IDs that do not match `REG-<number>-<slug>`. A report without an issue (mail, Streamlit Kontakt) first gets a public issue from the maintainer — symptom + version only.
+- **Issue number is mandatory** for private customer cases: `--intake` rejects IDs that match neither `REG-<number>-<slug>` nor `REG-O-<slug>`. A report without an issue (mail, Streamlit Kontakt) first gets a public issue from the maintainer — symptom + version only.
+- **Own plant without an issue** (decided 2026-11-23): a replay of the maintainer's own dump is taken in with `--intake … --id REG-O-<slug> --private`; `case.yaml` then says `source: own`. Customer data never gets `REG-O-`.
 - A **public issue** only says: *"Reproduced in private case REG-142"*. No customer name, no addresses, no load profiles, no data.
 - **Public issue / public Earnie tree:** case IDs and scrubbed pytest fixtures only.
 - **Private repo:** raw customer recorder data with `source: customer`, `anonymized: false`.

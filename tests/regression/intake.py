@@ -16,18 +16,28 @@ from tests.regression.loader import resolve_private_cases_dir
 from tests.regression.schema import validate_case_meta
 
 CUSTOMER_CASE_ID_RE = re.compile(r"^REG-\d+-[a-z0-9-]+$")
+# Maintainer's own plant (decided 2026-11-23): private, no issue needed.
+OWN_CASE_ID_RE = re.compile(r"^REG-O-[a-z0-9-]+$")
 
 
 class IntakeError(ValueError):
     """Fail-loud intake error (bad ZIP, missing recorder, bad ID, …)."""
 
 
+def case_source_for_id(case_id: str) -> str:
+    """``customer`` for ``REG-<issue>-<slug>``, ``own`` for ``REG-O-<slug>``; else fail."""
+    if CUSTOMER_CASE_ID_RE.match(case_id):
+        return "customer"
+    if OWN_CASE_ID_RE.match(case_id):
+        return "own"
+    raise IntakeError(
+        f"case id {case_id!r} must match REG-<issue>-<slug> "
+        f"(e.g. REG-142-eauto-deadline) or REG-O-<slug> for the maintainer's own plant"
+    )
+
+
 def validate_customer_case_id(case_id: str) -> None:
-    if not CUSTOMER_CASE_ID_RE.match(case_id):
-        raise IntakeError(
-            f"case id {case_id!r} must match REG-<issue>-<slug> "
-            f"(e.g. REG-142-eauto-deadline)"
-        )
+    case_source_for_id(case_id)
 
 
 def intake_debug_dump(
@@ -166,7 +176,7 @@ def _build_case_yaml(
         "id": case_id,
         "title": resolved_title,
         "level": "L1",
-        "source": "customer",
+        "source": case_source_for_id(case_id),
         "anonymized": False,
         "app_version": str(manifest.get("app_version") or ""),
         "recorder": recorder_sel,

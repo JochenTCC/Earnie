@@ -209,19 +209,42 @@ def test_intake_requires_selector(tmp_path):
         )
 
 
-def test_intake_rejects_bad_id(tmp_path):
+@pytest.mark.parametrize("case_id", ["REG-S-synthetic", "REG-x", "REG-O-", "REG-O-Upper"])
+def test_intake_rejects_bad_id(tmp_path, case_id):
     zip_path = _make_dump_zip(tmp_path)
     cases = tmp_path / "cases"
     cases.mkdir()
     with pytest.raises(IntakeError, match="REG-<issue>"):
         intake_debug_dump(
             zip_path,
-            case_id="REG-O-own",
+            case_id=case_id,
             seed_anchor=SEED,
             cycle_index=None,
             private=True,
             private_cases_dir=cases,
         )
+
+
+def test_intake_accepts_own_plant_id(tmp_path):
+    """REG-O-<slug> (maintainer's own plant, no issue) is a private case with source own."""
+    zip_path = _make_dump_zip(tmp_path)
+    cases = tmp_path / "cases"
+    cases.mkdir()
+    case_dir = intake_debug_dump(
+        zip_path,
+        case_id="REG-O-reserve-price-floor",
+        seed_anchor=SEED,
+        cycle_index=None,
+        private=True,
+        private_cases_dir=cases,
+    )
+    assert case_dir == cases / "REG-O-reserve-price-floor"
+    with (case_dir / "case.yaml").open(encoding="utf-8") as handle:
+        meta = yaml.safe_load(handle)
+    assert meta["source"] == "own"
+    assert meta["anonymized"] is False
+    assert "issue" not in meta
+    load_case(case_dir, require_expected=False)
 
 
 def test_intake_fails_without_recorder(tmp_path):

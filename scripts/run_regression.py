@@ -131,7 +131,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--id",
         dest="intake_id",
         default=None,
-        help="Case id for --intake (REG-<issue>-<slug>).",
+        help="Case id for --intake (REG-<issue>-<slug>, or REG-O-<slug> for the maintainer's own plant).",
     )
     parser.add_argument(
         "--private",
@@ -307,7 +307,7 @@ def _run_intake(args: argparse.Namespace) -> int:
     from tests.regression.intake import IntakeError, intake_debug_dump
 
     if not args.intake_id:
-        print("--intake requires --id REG-<issue>-<slug>", file=sys.stderr)
+        print("--intake requires --id REG-<issue>-<slug> or REG-O-<slug>", file=sys.stderr)
         return 2
     try:
         case_dir = intake_debug_dump(
