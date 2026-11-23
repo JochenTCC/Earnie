@@ -281,24 +281,7 @@ def add_store_level(
     """
     if not book:
         return StoreLevelVars(levels={}, slack={})
-    if book != list(range(book[0], book[-1] + 1)):
-        raise ValueError(f"Speicher {name}: Buchungsslots müssen lückenlos aufsteigen.")
-    if book[-1] >= len(store.drain_kwh):
-        raise ValueError(
-            f"Speicher {name}: Wärmeentnahme reicht nicht bis Slot {book[-1]} "
-            f"(nur {len(store.drain_kwh)} Slots)."
-        )
-    if store.segments and generator_kwh_at is None:
-        raise ValueError(f"Speicher {name}: Segmente brauchen den Strom des Erzeugers je Slot.")
-    if generator_kwh_at is not None and not store.segments:
-        raise ValueError(f"Speicher {name}: Strom des Erzeugers ohne Segmente übergeben.")
-    if store.segments and book[-1] >= len(store.segments[0].cop):
-        raise ValueError(
-            f"Speicher {name}: COP der Segmente reicht nicht bis Slot {book[-1]} "
-            f"(nur {len(store.segments[0].cop)} Slots)."
-        )
-    if store.charge_limit_kwh and generator_on_at is None:
-        raise ValueError(f"Speicher {name}: Ladegrenze braucht die Ein-Variable des Erzeugers.")
+    _check_store_book(name, store, book, generator_kwh_at, generator_on_at)
     fill: list[Any] = _start_fill(store)
     segment_charge: dict[int, list[Any]] = {}
     leak = store.leak_per_slot
@@ -330,39 +313,107 @@ def add_store_level(
         above = pulp.LpVariable(f"{name}_above_{slot}", lowBound=0.0)
         model.prob += next_level >= lower - below, f"{name}_floor_{slot}"
         model.prob += next_level <= upper + above, f"{name}_cap_{slot}"
-        if (
-            slot < len(store.charge_limit_kwh)
-            and store.charge_limit_kwh[slot] < store.capacity_kwh - 1e-9
-        ):
-            limit = float(store.charge_limit_kwh[slot])
-            # Generator on → the level ends at or below the limit; off → the band's upper end.
-            model.prob += (
-                next_level <= upper - (upper - limit) * generator_on_at(slot) + above,
-                f"{name}_charge_limit_{slot}",
-            )
+        _add_charge_limit(model, name, store, slot, next_level, upper, above, generator_on_at)
         penalty += STORE_SLACK_PENALTY_CENT_PER_KWH * (below + above)
         levels[slot] = next_level
         slack[slot] = (below, above)
         level = next_level
         if store.segments:
-            # Heat that is not the generator's: rods, collector heat (a negative drain, less
-            # what is spilled) and the leak toward the reference.
-            drain = float(store.drain_kwh[slot])
-            leak_in = leak * float(store.leak_ref_kwh)
-            free_heat = other_heat + max(0.0, -drain) + max(0.0, leak_in) - spill
-            removal = max(0.0, drain) + max(0.0, -leak_in)
+            free_heat, removal = _segment_free_and_removal(store, slot, other_heat, spill)
             fill = _add_segment_fill(
                 model, name, store, slot, fill, charge_heat, removal, free_heat, above + over
             )
-    terminal_slack = None
-    if store.terminal_min_kwh is not None:
-        terminal_slack = pulp.LpVariable(f"{name}_terminal_below", lowBound=0.0)
-        model.prob += (
-            level >= float(store.terminal_min_kwh) - terminal_slack,
-            f"{name}_terminal",
-        )
+    terminal_slack = _add_terminal_level(model, name, store, level)
+    if terminal_slack is not None:
         penalty += STORE_SLACK_PENALTY_CENT_PER_KWH * terminal_slack
     model.prob.objective += penalty
     return StoreLevelVars(
         levels=levels, slack=slack, terminal_slack=terminal_slack, segment_charge=segment_charge
     )
+
+
+def _check_store_book(
+    name: str,
+    store: StoreLevelModel,
+    book: list[int],
+    generator_kwh_at: Callable[[int], Any] | None,
+    generator_on_at: Callable[[int], Any] | None,
+) -> None:
+    """Fail loud on a book or inputs the level cannot be built from."""
+    if book != list(range(book[0], book[-1] + 1)):
+        raise ValueError(f"Speicher {name}: Buchungsslots müssen lückenlos aufsteigen.")
+    if book[-1] >= len(store.drain_kwh):
+        raise ValueError(
+            f"Speicher {name}: Wärmeentnahme reicht nicht bis Slot {book[-1]} "
+            f"(nur {len(store.drain_kwh)} Slots)."
+        )
+    _check_generator_inputs(name, store, book, generator_kwh_at, generator_on_at)
+
+
+def _check_generator_inputs(
+    name: str,
+    store: StoreLevelModel,
+    book: list[int],
+    generator_kwh_at: Callable[[int], Any] | None,
+    generator_on_at: Callable[[int], Any] | None,
+) -> None:
+    """Segments need the generator's electricity, a charge limit its on-variable."""
+    if store.segments and generator_kwh_at is None:
+        raise ValueError(f"Speicher {name}: Segmente brauchen den Strom des Erzeugers je Slot.")
+    if generator_kwh_at is not None and not store.segments:
+        raise ValueError(f"Speicher {name}: Strom des Erzeugers ohne Segmente übergeben.")
+    if store.segments and book[-1] >= len(store.segments[0].cop):
+        raise ValueError(
+            f"Speicher {name}: COP der Segmente reicht nicht bis Slot {book[-1]} "
+            f"(nur {len(store.segments[0].cop)} Slots)."
+        )
+    if store.charge_limit_kwh and generator_on_at is None:
+        raise ValueError(f"Speicher {name}: Ladegrenze braucht die Ein-Variable des Erzeugers.")
+
+
+def _add_charge_limit(
+    model: Any,
+    name: str,
+    store: StoreLevelModel,
+    slot: int,
+    next_level: Any,
+    upper: float,
+    above: Any,
+    generator_on_at: Callable[[int], Any] | None,
+) -> None:
+    """Generator on → the level ends at or below the slot's charge limit; off → band top."""
+    limits = store.charge_limit_kwh
+    if slot >= len(limits) or limits[slot] >= store.capacity_kwh - 1e-9:
+        return
+    limit = float(store.charge_limit_kwh[slot])
+    model.prob += (
+        next_level <= upper - (upper - limit) * generator_on_at(slot) + above,
+        f"{name}_charge_limit_{slot}",
+    )
+
+
+def _segment_free_and_removal(
+    store: StoreLevelModel, slot: int, other_heat: Any, spill: Any
+) -> tuple[Any, float]:
+    """(free heat, removal) of a slot for the segment fill.
+
+    Heat that is not the generator's: rods, collector heat (a negative drain, less what is
+    spilled) and the leak toward the reference.
+    """
+    drain = float(store.drain_kwh[slot])
+    leak_in = store.leak_per_slot * float(store.leak_ref_kwh)
+    free_heat = other_heat + max(0.0, -drain) + max(0.0, leak_in) - spill
+    removal = max(0.0, drain) + max(0.0, -leak_in)
+    return free_heat, removal
+
+
+def _add_terminal_level(model: Any, name: str, store: StoreLevelModel, level: Any) -> Any | None:
+    """Optional ``x[end] ≥ terminal_min`` with its slack variable (None without a terminal)."""
+    if store.terminal_min_kwh is None:
+        return None
+    terminal_slack = pulp.LpVariable(f"{name}_terminal_below", lowBound=0.0)
+    model.prob += (
+        level >= float(store.terminal_min_kwh) - terminal_slack,
+        f"{name}_terminal",
+    )
+    return terminal_slack
