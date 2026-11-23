@@ -1,0 +1,15 @@
+id: REG-S-heating-rod-fuel
+title: Heating rod beside a gas boiler is planned in Live on a surplus day
+level: L1
+source: synthetic
+anonymized: true
+app_version: "2.8.0-dev"
+recorder:
+  root: fixtures/heating_rod_fuel_recorder
+  seed_anchor: "2026-02-28T12:00:00"
+# Live-only path: optimizer.thermal_flex_context.live_rod_heat_cap_kwh beside a fuel source
+# (gas, 500 l store measured at 45 C, 3 kW rod; 37 kWh PV on the first calendar day). The cap is
+# the store's room plus its draw until midnight (12.19 kWh); the rod runs at 3 kW in slot 0.
+# Red before 25284137 ("heating rod beside fuel planned in Live"): the cap subtracted the
+# boiler's normal operation, gave 0 kWh and the rod was never planned (no rod in slot 0,
+# cost -1.60 instead of -2.97 EUR).
