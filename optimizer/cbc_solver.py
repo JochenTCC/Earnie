@@ -368,83 +368,114 @@ def solve_with_strict_fallback(
     find a solution either.
     """
     backend = resolve_milp_solver()
-    label = "HiGHS" if backend == "highs" else "CBC"
     record: dict[str, Any] = {"backend": backend}
 
     if _is_strict_cbc_mode():
-        t0 = time.perf_counter()
-        prob.solve(_build_solver_cmd(backend=backend, msg=msg, strict=True))
-        status = pulp.LpStatus[prob.status]
-        record.update(
-            stage="strict_unlimited",
-            strict_elapsed_sec=round(time.perf_counter() - t0, 3),
-            final_status=status,
-            objective=_objective_value(prob),
-        )
-        _append_solve_record(record)
-        return status
+        return _solve_strict_unlimited(prob, backend, msg, record)
 
     strict_limit = resolve_cbc_strict_time_limit_sec()
     gap_rel = resolve_cbc_gap_rel()
 
     if strict_limit > 0:
-        t0 = time.perf_counter()
-        prob.solve(
-            _build_solver_cmd(
-                backend=backend,
-                msg=msg,
-                strict=True,
-                time_limit=strict_limit,
-            )
+        status = _solve_strict_stage(
+            prob, backend, msg, record, strict_limit=strict_limit, gap_rel=gap_rel
         )
-        elapsed = time.perf_counter() - t0
-        limit_hit = stopped_at_limit(prob)
-        status = STRICT_STATUS_TIME_LIMIT if limit_hit else pulp.LpStatus[prob.status]
-        gap_at_limit = incumbent_gap(prob, backend) if limit_hit else None
-        keep_incumbent = gap_at_limit is not None and gap_at_limit <= gap_rel
-        record.update(
-            strict_limit_sec=strict_limit,
-            strict_elapsed_sec=round(elapsed, 3),
-            strict_status=status,
-            strict_time_limit_hit=limit_hit,
-        )
-        if limit_hit:
-            record["strict_incumbent_gap"] = (
-                None if gap_at_limit is None else round(gap_at_limit, 5)
-            )
-        if status == STATUS_INFEASIBLE:
-            # Proven: a wider gap cannot make the model feasible, a second solve only costs time.
-            record.update(stage="strict", final_status=status, objective=None)
-            _append_solve_record(record)
+        if status is not None:
             return status
-        maybe_record_strict_timing(
-            strict_limit_sec=strict_limit,
-            strict_elapsed_sec=elapsed,
-            strict_status=status,
-            gap_rel=gap_rel,
-            time_limit_hit=limit_hit,
-            incumbent_gap=gap_at_limit,
-            incumbent_kept=keep_incumbent,
-        )
-        if status == "Optimal":
-            record.update(stage="strict", final_status=status, objective=_objective_value(prob))
-            _append_solve_record(record)
-            return status
-        if keep_incumbent:
-            final_status = pulp.LpStatus[prob.status]
-            record.update(
-                stage=STAGE_STRICT_INCUMBENT,
-                final_status=final_status,
-                objective=_objective_value(prob),
-            )
-            _append_solve_record(record)
-            return final_status
         if verbose:
+            label = "HiGHS" if backend == "highs" else "CBC"
             print(
-                f"{label} strict ({strict_limit:.1f} s) Status {status} "
+                f"{label} strict ({strict_limit:.1f} s) Status {record['strict_status']} "
                 f"→ Fallback gapRel={gap_rel * 100:.1f}%"
             )
+    return _solve_gap_stage(prob, backend, msg, record, gap_rel=gap_rel)
 
+
+def _solve_strict_unlimited(
+    prob: pulp.LpProblem, backend: str, msg: bool, record: dict[str, Any]
+) -> str:
+    """``EARNIE_CBC_STRICT=1``: one strict solve without a time limit (benchmarks)."""
+    t0 = time.perf_counter()
+    prob.solve(_build_solver_cmd(backend=backend, msg=msg, strict=True))
+    status = pulp.LpStatus[prob.status]
+    record.update(
+        stage="strict_unlimited",
+        strict_elapsed_sec=round(time.perf_counter() - t0, 3),
+        final_status=status,
+        objective=_objective_value(prob),
+    )
+    _append_solve_record(record)
+    return status
+
+
+def _solve_strict_stage(
+    prob: pulp.LpProblem,
+    backend: str,
+    msg: bool,
+    record: dict[str, Any],
+    *,
+    strict_limit: float,
+    gap_rel: float,
+) -> str | None:
+    """Strict stage with time limit; the final status, or ``None`` when the gap stage must run."""
+    t0 = time.perf_counter()
+    prob.solve(
+        _build_solver_cmd(
+            backend=backend,
+            msg=msg,
+            strict=True,
+            time_limit=strict_limit,
+        )
+    )
+    elapsed = time.perf_counter() - t0
+    limit_hit = stopped_at_limit(prob)
+    status = STRICT_STATUS_TIME_LIMIT if limit_hit else pulp.LpStatus[prob.status]
+    gap_at_limit = incumbent_gap(prob, backend) if limit_hit else None
+    keep_incumbent = gap_at_limit is not None and gap_at_limit <= gap_rel
+    record.update(
+        strict_limit_sec=strict_limit,
+        strict_elapsed_sec=round(elapsed, 3),
+        strict_status=status,
+        strict_time_limit_hit=limit_hit,
+    )
+    if limit_hit:
+        record["strict_incumbent_gap"] = (
+            None if gap_at_limit is None else round(gap_at_limit, 5)
+        )
+    if status == STATUS_INFEASIBLE:
+        # Proven: a wider gap cannot make the model feasible, a second solve only costs time.
+        record.update(stage="strict", final_status=status, objective=None)
+        _append_solve_record(record)
+        return status
+    maybe_record_strict_timing(
+        strict_limit_sec=strict_limit,
+        strict_elapsed_sec=elapsed,
+        strict_status=status,
+        gap_rel=gap_rel,
+        time_limit_hit=limit_hit,
+        incumbent_gap=gap_at_limit,
+        incumbent_kept=keep_incumbent,
+    )
+    if status == "Optimal":
+        record.update(stage="strict", final_status=status, objective=_objective_value(prob))
+        _append_solve_record(record)
+        return status
+    if keep_incumbent:
+        final_status = pulp.LpStatus[prob.status]
+        record.update(
+            stage=STAGE_STRICT_INCUMBENT,
+            final_status=final_status,
+            objective=_objective_value(prob),
+        )
+        _append_solve_record(record)
+        return final_status
+    return None
+
+
+def _solve_gap_stage(
+    prob: pulp.LpProblem, backend: str, msg: bool, record: dict[str, Any], *, gap_rel: float
+) -> str:
+    """Gap stage: solve with ``gapRel`` up to ``GAP_STAGE_TIME_LIMIT_SEC``."""
     t0 = time.perf_counter()
     prob.solve(
         _build_solver_cmd(
