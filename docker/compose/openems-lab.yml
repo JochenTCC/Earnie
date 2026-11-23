@@ -1,4 +1,4 @@
-# OpenEMS lab stack (2.4.b) — Earnie + OpenEMS Edge/UI (Separate Works / AGPL shield)
+# OpenEMS lab stack (2.4.b) — Earnie + OpenEMS Edge/UI (Separate Works / copyleft shield: OpenEMS Edge EPL-2.0, UI AGPL-3.0)
 #
 # Earnie talks to OpenEMS over REST only (port 8084). No OpenEMS libs in the Earnie image.
 #

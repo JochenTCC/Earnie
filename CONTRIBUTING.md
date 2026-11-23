@@ -65,7 +65,7 @@ Southbound-Anbindungen laufen über den **Earnie Hardware Access Layer (EHAL)** 
 - Nur **übersetzen**: Hub-Kanäle/Entities → dieselben EHAL-Strukturen; keine Hub-Typen im Optimizer/MILP-Kern.
 - **Vorzeichen und Einheiten** im Adapter normalisieren (`+` = Netzbezug, Leistung in **W**, EVCS-Setpoint in **A**).
 - **Capability-Flags** melden; bei fehlgeschlagenen Writes degradieren (loggen, Nutzerhinweis, Write-Error-Telemetry) — siehe Spec.
-- Anbindung nur über **Netzwerk-API** (REST/WS/HTTP); keine Hub-Quelltexte oder Libraries in Earnie-Repos (Separate Works, z. B. OpenEMS/AGPL).
+- Anbindung nur über **Netzwerk-API** (REST/WS/HTTP); keine Hub-Quelltexte oder Libraries in Earnie-Repos (Separate Works, z. B. OpenEMS: Edge EPL-2.0, UI AGPL-3.0).
 - Setpoints = **Grenzen/Fahrpläne**; Echtzeitregelung bleibt im Subsystem.
 - Umschaltung **nur über Config** (`ehal.backend` + Hub-Block) — Core/MILP unverändert. Nachweis: `tests/test_ehal_contract_backends.py` (`2.4.h`).
 

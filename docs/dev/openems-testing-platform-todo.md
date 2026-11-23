@@ -4,7 +4,7 @@
 **Purpose:** Local lab stack for the OpenEMS EHAL prototype (backlog history: **2.4.b**).  
 **Strategic source:** `Earnie-Projekt/Entwicklungsplan/Entwicklungs-Plan-Earnie-cons.md` §2.2, §2.5 Phase 2, §2.6; backlog `2.4.b`.  
 **EHAL wire contract (frozen):** [`docs/referenz/ehal.md`](../referenz/ehal.md) — schemas in `share/ehal/`, Python package `ehal`. Adapters must emit/consume only that contract.  
-**Goal:** Run `openems-edge` so Earnie can talk **network API only** (REST/WS) — Separate Works / AGPL shield. No OpenEMS source or libraries in Earnie repos.  
+**Goal:** Run `openems-edge` so Earnie can talk **network API only** (REST/WS) — Separate Works / copyleft shield (OpenEMS Edge EPL-2.0, UI AGPL-3.0). No OpenEMS source or libraries in Earnie repos.  
 **Host IP:** `192.168.178.34` (Pi lab; on a Dev-PC use that machine’s LAN IP / `localhost`)
 
 **Combined Compose + Earnie ↔ OpenEMS setup (step-by-step):** [`openems-lab-setup.md`](openems-lab-setup.md) — use this when `earnie-openems-lab` + Edge + UI are already up but not configured for communication.  
