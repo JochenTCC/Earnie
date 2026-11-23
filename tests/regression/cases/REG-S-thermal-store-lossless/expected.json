@@ -1,0 +1,69 @@
+{
+  "engine": {
+    "earnie_version": "2.8.0-dev.39",
+    "solver": "highs",
+    "solver_mode": "strict",
+    "highspy": "1.15.1",
+    "EARNIE_CBC_STRICT": "1"
+  },
+  "tolerances": {
+    "default_pct": 0.05,
+    "per_metric_pct": {}
+  },
+  "invariants": [],
+  "metrics": {
+    "status_optimal": 1,
+    "n_slots": 288,
+    "cost_euro": 13.947674999999998,
+    "import_kwh": 80.6675,
+    "export_kwh": 0.0,
+    "battery_throughput_kwh": 3.285,
+    "plausibility_failures": 0.0,
+    "peak_import_kw": 6.17,
+    "capacity_charge_eur": 0.0,
+    "consumer_kwh_wp": 42.43,
+    "consumer_price_ct_wp": 17.848550553853403
+  },
+  "plan": {
+    "plan_hash": null,
+    "diff_slots": null
+  },
+  "baseline": {
+    "git_sha": "bd132e85eb38abe39996af9b36d62c0a3837b106",
+    "recorded_at": "2026-11-23T14:24:45Z",
+    "source": "update-golden"
+  },
+  "inputs": {
+    "files": {
+      "fixtures/backtesting_scenarios.json": "bb7bc335ef4482ee",
+      "fixtures/components.json": "ec06eec9361e36e3",
+      "fixtures/config.json": "baa554596553a69b",
+      "fixtures/cons_data.csv": "865c6c59585a3c10",
+      "fixtures/cons_data.meta.json": "518b553dbff2d5c2",
+      "fixtures/flex_consumers.json": "21be86172fc50e43",
+      "fixtures/grid_fees.json": "ea40bffb4f3bdde2",
+      "fixtures/house_profiles.json": "dd9368ad788c1d11",
+      "fixtures/open_meteo/47.4000_9.7000_2025-01-01_2025-12-31_Europe-Vienna_18.0_0.0.json": "9df19bcfd549e1dd",
+      "fixtures/open_meteo/47.4000_9.7000_2025-01-01_2025-12-31_Europe-Vienna_none.json": "cced3026b26261c3",
+      "fixtures/open_meteo/47.4000_9.7000_2026-01-01_2026-10-17_Europe-Vienna_18.0_28.0.json": "ca48f2482e363ea4",
+      "fixtures/open_meteo/47.4000_9.7000_2026-01-01_2026-10-17_Europe-Vienna_25.0_0.0.json": "de72d4d6af53b6fa",
+      "fixtures/open_meteo/47.4040_9.7430_2026-01-01_2026-10-17_Europe-Vienna_18.0_28.0.json": "ba5564dba8d71740",
+      "fixtures/prices.csv": "57885d9ae16e27b0",
+      "fixtures/tariffs.json": "3fcafb70b778b8cd",
+      "fixtures/user_grid_fees.json": "81b1eec23572ebf3",
+      "case.inputs": "3937ad9208932d00"
+    },
+    "series": {
+      "pv_kw": "a8c6e40abeaad22e",
+      "baseload_kw": "a7e1e4e05aa91e9e",
+      "k_act": "3e439aa8fe712748",
+      "k_push_act": "fb7cf1c56a67bd18"
+    },
+    "sums": {
+      "n_slots": 288.0,
+      "pv_kwh": 32.45,
+      "baseload_kwh": 5.832,
+      "k_act_mean": 18.7
+    }
+  }
+}
