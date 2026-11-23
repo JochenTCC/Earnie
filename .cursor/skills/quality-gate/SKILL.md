@@ -85,15 +85,17 @@ Limits (from project Python structure rules):
 
 | KPI | Target | Hard limit |
 |-----|--------|------------|
-| Function body LOC (no blanks/comments; docstrings excluded) | ≤ 40 | Split before feature work if **> 60** |
+| Function body LOC (no blanks/comments; docstrings excluded) | ≤ 60 | **80** |
 | Core packages (`optimizer/`, `data/`, `runtime_store/`, plus `house_config/`, `settings/`, `simulation/`, `ehal/`, `integrations/`) | ≤ 300 file LOC | **600** |
 | UI (`ui/`) | ≤ 400 file LOC | **600** |
 
-**Do not defer mega-file splits.** Files over the hard limit, and functions **> 60** LOC in those packages, are in-gate work. Do not copy 2.4.r’s “deferred mega-file splits” (`optimizer/simulation.py`, `simulation/engine.py`, `integrations/loxone_*.py`, `house_config/planning_flex_bridge.py`, or later equivalents).
+**Function limits (decided 2026-11-23, maintainer):** 60 is the target, 80 the hard limit (was 40 / 60). Linear Streamlit form renders, normalizers and payload builders between 61 and 80 read better in one piece; the real signal for a split is complexity (cyclomatic ≤ 10, nesting ≤ 3, below). Exempt: the MILP constraint blocks `_create_grid_battery_vars` and `_add_slot_power_balance_and_soc` in `optimizer/milp_horizon.py`.
+
+**Do not defer mega-file splits.** Files over the hard limit, and functions **> 80** LOC in those packages, are in-gate work. Do not copy 2.4.r’s “deferred mega-file splits” (`optimizer/simulation.py`, `simulation/engine.py`, `integrations/loxone_*.py`, `house_config/planning_flex_bridge.py`, or later equivalents).
 
 How to split:
 
-1. Measure (count code LOC, not blank/comment-only lines). List every file over 600 and every function > 60 in core/UI.
+1. Measure (count code LOC, not blank/comment-only lines). List every file over 600 and every function > 80 in core/UI (and functions over complexity 10).
 2. Split in bounded steps: **≤ 3 files per step**, public import facades unchanged where callers rely on them (same pattern as `config.py` → `settings/config_loaders.py`).
 3. Ask only about **order / API surface** if a split would change call sites across many packages — not whether to skip the split.
 4. Re-run pytest (`-m scripts.run_pytest`) for the touched packages after each step.
