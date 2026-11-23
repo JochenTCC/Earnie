@@ -8,7 +8,9 @@ automations, and a watchdog that also writes ``plant.ha_fail_safe_values``.
 
 Import facade: shared helpers live in ``integrations.ha_carrier_common``, the Jinja unit
 blocks in ``integrations.ha_carrier_jinja`` and the automations in
-``integrations.ha_carrier_automations``; all are re-exported here.
+``integrations.ha_carrier_automations``; all are re-exported here. Patch a moved name in the
+sibling that uses it, a patch on this module reaches only code that still lives here
+(see ``.cursor/rules/import-facades.mdc``).
 """
 from __future__ import annotations
 

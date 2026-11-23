@@ -2,6 +2,8 @@
 
 Import facade: basics live in ``thermal_flex_base``, the MILP constraints in
 ``thermal_flex_milp`` / ``thermal_flex_store``; this module keeps the context resolution.
+A patch on this module reaches only code that still lives here: patch a moved name in the
+sibling that uses it (see ``.cursor/rules/import-facades.mdc``).
 """
 from __future__ import annotations
 

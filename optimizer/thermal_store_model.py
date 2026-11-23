@@ -383,13 +383,12 @@ def _add_charge_limit(
 ) -> None:
     """Generator on → the level ends at or below the slot's charge limit; off → band top."""
     limits = store.charge_limit_kwh
-    if slot >= len(limits) or limits[slot] >= store.capacity_kwh - 1e-9:
-        return
-    limit = float(store.charge_limit_kwh[slot])
-    model.prob += (
-        next_level <= upper - (upper - limit) * generator_on_at(slot) + above,
-        f"{name}_charge_limit_{slot}",
-    )
+    if slot < len(limits) and limits[slot] < store.capacity_kwh - 1e-9:
+        limit = float(limits[slot])
+        model.prob += (
+            next_level <= upper - (upper - limit) * generator_on_at(slot) + above,
+            f"{name}_charge_limit_{slot}",
+        )
 
 
 def _segment_free_and_removal(

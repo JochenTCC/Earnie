@@ -2,6 +2,8 @@
 
 Import facade: the RC primitives live in ``thermal_house_rc``, the hour loop and climate rows
 in ``thermal_house_sim``; this module keeps the memoized year simulation and its calibration.
+A patch on this module reaches only code that still lives here: patch a moved name in the
+sibling that uses it (see ``.cursor/rules/import-facades.mdc``).
 """
 from __future__ import annotations
 

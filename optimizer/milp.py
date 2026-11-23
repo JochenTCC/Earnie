@@ -1,4 +1,10 @@
-"""MILP-Optimierung für Batterie und flexible Verbraucher."""
+"""MILP-Optimierung für Batterie und flexible Verbraucher.
+
+Import facade: model build and solve live in ``optimizer.milp_model`` and are re-exported
+here. ``_solve_milp_to_model`` and ``_try_trivial_milp_skip`` stay patch points on this
+module; patch any other moved name in ``optimizer.milp_model``
+(see ``.cursor/rules/import-facades.mdc``).
+"""
 from __future__ import annotations
 
 import logging

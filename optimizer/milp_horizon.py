@@ -1,4 +1,9 @@
-"""MILP-Horizontmodell: Variablen, Energiebilanz, SOC-Randbedingungen, Zielfunktion."""
+"""MILP-Horizontmodell: Variablen, Energiebilanz, SOC-Randbedingungen, Zielfunktion.
+
+Import facade: plant battery helpers live in ``optimizer.milp_plant`` and the control-slot
+constraints in ``optimizer.milp_control_slot``; both are re-exported here. Patch a moved name
+in the sibling that uses it (see ``.cursor/rules/import-facades.mdc``).
+"""
 from __future__ import annotations
 
 import logging

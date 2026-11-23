@@ -33,75 +33,9 @@ from ui.chart_slot_axis import (
     _optional_float,
 )
 from ui.chart_trace_segments import (
-    _EXPORT_PRICE_COLUMN,
-    _hour_prices_from_df,
-    _hourly_price_hover_labels,
-    _hourly_price_hv_xy,
     _segment_connected_line_xy,
     _trace_segments,
 )
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 def _soc_split_points(

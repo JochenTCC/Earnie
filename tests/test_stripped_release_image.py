@@ -19,6 +19,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 # Leaf modules only imported by scripts and tests.
 DEV_TOOL_FILES = (
     "runtime_store/recorder_replay.py",
+    "runtime_store/recorder_replay_env.py",
+    "runtime_store/recorder_replay_inputs.py",
     "scripts/run_regression.py",
     "scripts/run_regression_r0_study.py",
     "scripts/replay_debug_dump.py",

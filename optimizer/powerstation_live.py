@@ -1,4 +1,10 @@
-"""Live-cycle hooks for 2.7.g powerstation reserves and 2.7.h standby-backup."""
+"""Live-cycle hooks for 2.7.g powerstation reserves and 2.7.h standby-backup.
+
+Import facade: the setpoint writers live in ``optimizer.powerstation_writes`` and are
+re-exported here. They look up only ``_planning_powerstations`` and ``_resolve_marker``
+through this module; patch any other moved name in ``optimizer.powerstation_writes``
+(see ``.cursor/rules/import-facades.mdc``).
+"""
 from __future__ import annotations
 
 import logging

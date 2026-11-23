@@ -1,0 +1,28 @@
+---
+description: Splitting a module into siblings behind an import facade — keep patches, names and state intact
+globs: "**/*.py"
+alwaysApply: false
+---
+
+# Import facades (module splits)
+
+A split keeps the old module as an **import facade**: it re-exports every name that callers and tests used. The quality-gate KPI splits (2.8) and later refactors follow this.
+
+## Patches do not follow a moved name
+
+`monkeypatch.setattr("pkg.facade.name", ...)` / `mock.patch` replaces the attribute **on the facade only**. Code that moved to a sibling looks the name up in the sibling's globals (or holds a copy from `from x import name`), so the patch is a **silent no-op** and a test that asserts "not called" passes for the wrong reason.
+
+- Patch a moved name in the **sibling that uses it**.
+- Keep a function in the facade when tests patch it **and** its callers stay there.
+- If the facade has to remain the patch point, look the name up late (``from pkg import facade; facade.name`` inside the function, or the `thermal_live_ref.live` / `ehal_live_ref.live` helpers) — and say so in the facade docstring, listing which names are patch points.
+- State the patch points in the facade docstring; do not write "patches keep working" without naming the names.
+
+## When you split
+
+1. Compare old and new by AST (every top-level def, class and assignment, docstrings stripped); only the intended rewrites may differ.
+2. Re-export every public **and private** name that is imported anywhere (`grep` callers incl. `tests/`, `scripts/`, `ui/`, `main.py`); mark re-exports `# noqa: F401  (re-exported)`.
+3. Keep the old **logger name** in moved code (`logging.getLogger("old.module")`): log filters and `caplog` tests key on it.
+4. Never define a mutable cache or registry twice; mutate the one object (`.clear()`, item assignment), do not reassign it in the sibling.
+5. Import each new module cold in a fresh interpreter (`python -I -c "import config; import <module>"`).
+6. Dev-only modules (replay, regression tools): list the new siblings in `.dockerignore` and `DEV_TOOL_FILES` of `tests/test_stripped_release_image.py`.
+7. A split changes nothing in behavior: an incidental fix needs its own test and a line in the commit message.

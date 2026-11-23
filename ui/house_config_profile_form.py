@@ -1,7 +1,6 @@
 """Hausprofil-Tab im Hauskonfigurator."""
 from __future__ import annotations
 
-import logging
 import os
 
 import streamlit as st
@@ -42,7 +41,6 @@ from ui.auto_persist import auto_persist
 from ui.form_layout import (
     WIDE_LABEL_RATIOS,
     form_group,
-    labeled_checkbox,
     labeled_number_input,
     labeled_selectbox,
     labeled_text_input,

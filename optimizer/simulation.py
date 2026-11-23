@@ -1,4 +1,10 @@
-"""Horizont-Simulation (optimiert, Baseline) und Kostenberechnung."""
+"""Horizont-Simulation (optimiert, Baseline) und Kostenberechnung.
+
+Import facade: the slot loop lives in ``optimizer.sim_horizon_run`` and is re-exported here.
+The MILP callers (``milp_optimizer``, ``milp_horizon_schedule``, ``simulate_horizon`` ...) stay
+patch points on this module; patch any other moved name in ``optimizer.sim_horizon_run``
+(see ``.cursor/rules/import-facades.mdc``).
+"""
 from __future__ import annotations
 
 import logging

@@ -51,6 +51,8 @@ debug-dumps/
 # Dev-only offline replay / regression tools (only scripts and tests import them).
 # Keep runtime_store/push_read_replay.py: the live push inbox uses its capture.
 runtime_store/recorder_replay.py
+runtime_store/recorder_replay_env.py
+runtime_store/recorder_replay_inputs.py
 scripts/run_regression.py
 scripts/run_regression_r0_study.py
 scripts/replay_debug_dump.py

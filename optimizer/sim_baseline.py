@@ -1,4 +1,8 @@
-"""Baseline and matched-baseline horizon simulation."""
+"""Baseline and matched-baseline horizon simulation.
+
+Import facade: the L1 / L2 reference flex lives in ``optimizer.sim_reference_flex`` and is
+re-exported here; patch a moved name there (see ``.cursor/rules/import-facades.mdc``).
+"""
 from __future__ import annotations
 
 import logging

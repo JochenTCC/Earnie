@@ -2,6 +2,11 @@
 
 No MILP store-T SoC: physics stay outside the solver; callers get forced hours and
 scalar kWh bounds only.
+
+Import facade: the level model and the observability snapshots live in
+``thermal_live_level`` / ``thermal_live_observability`` and are re-exported here. The
+observability code looks its inputs up through this module; patch other moved names in the
+sibling that uses them (see ``.cursor/rules/import-facades.mdc``).
 """
 from __future__ import annotations
 
@@ -25,7 +30,6 @@ from optimizer.thermal_live_cop import (
     LiveEfficiency,
     resolve_live_efficiency,
 )
-from optimizer.thermal_store_model import StoreLevelModel, StoreSegment  # noqa: F401
 from optimizer.thermal_live_solar import (  # noqa: F401  (re-exported)
     SOLAR_SOURCE_ARCHIVE_FALLBACK,
     SOLAR_SOURCE_FORECAST,
@@ -228,6 +232,7 @@ def resolve_heat_storage_readings(
         used_measured_eq=used_eq,
         used_measured_low=low is not None,
     )
+
 
 def plan_live_store_horizon(
     *,
@@ -499,6 +504,8 @@ def _build_live_store_plan(
         house_doc=None,
         baseload_kw_by_hour=baseload_kw_by_hour,
     )
+
+
 def live_house_plan_for_matrix(
     source: dict,
     house_profile: dict,

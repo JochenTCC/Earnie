@@ -3,7 +3,9 @@
 Import facade: the ESS C1 setpoint math lives in ``integrations.loxone_ess_setpoints``
 and the flexible consumer output values in ``integrations.loxone_flex_outputs``; both
 are re-exported here. Publishing (``_publish_setpoint_traced``) and the send paths stay
-in this module so patches on ``integrations.loxone_writes.<name>`` keep working.
+in this module, so patches on ``integrations.loxone_writes.<name>`` reach them. A name that
+moved to a sibling is looked up there: patch it in the sibling (see
+``.cursor/rules/import-facades.mdc``).
 """
 from __future__ import annotations
 
