@@ -267,6 +267,7 @@ def _run_one_case_payload(payload: dict[str, Any]) -> dict[str, Any]:
         out_path.write_text(
             json.dumps(expected, indent=2, ensure_ascii=False) + "\n",
             encoding="utf-8",
+            newline="\n",  # LF on every OS, like the repository (.gitattributes)
         )
         return {
             "case_id": case.id,
@@ -370,6 +371,7 @@ def _backfill_baselines(cases: list[Any]) -> int:
         expected_path.write_text(
             json.dumps(updated, indent=2, ensure_ascii=False) + "\n",
             encoding="utf-8",
+            newline="\n",  # LF on every OS, like the repository (.gitattributes)
         )
         print(f"{case.id}: baseline {baseline['git_sha'][:8]} ({baseline['recorded_at']})")
     return 0

@@ -2,6 +2,11 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Regression goldens written with LF (2026-11-23)
+
+- [x] **Bugfix — `--update-golden` and `--backfill-baseline` wrote `expected.json` with CRLF on Windows** *(found 2026-11-23 when locking `REG-S-import-cap` and the thermal store twins; fixed 2026-11-23)*: `scripts/run_regression.py` wrote the goldens with `write_text` without `newline`, so Windows translated `\n` to CRLF. Git stored LF (`.gitattributes`), but the work tree kept CRLF until a fresh checkout, against the LF rule for every repo. Both writers now pass `newline="\n"`.
+  - **Tests:** `tests/test_regression_golden_line_endings.py` (update-golden and backfill path, both red on the old code).
+
 ### Heat store: a loss of 0 no longer becomes the default (2026-11-23)
 
 - [x] **Bugfix — `heat_storage.heat_loss_kw_per_k: 0` silently became 0.02 kW/K** *(found 2026-11-23 while building the loss-free twin of the regression case `REG-S-thermal-store-losses`, 2.8.0-dev; fixed 2026-11-23)*: `normalize_heat_storage` (`optimizer/thermal_coupled.py`) read the loss with `value or default`, so 0 (allowed by the schema, minimum 0) took the 0.02 default. A loss-free store was planned and simulated with losses in the year model, the SE store level and Live. Now only a missing value (`None`, empty) takes the default.
