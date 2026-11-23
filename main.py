@@ -850,6 +850,23 @@ def _main_cycle(
                 "Automatik discharge limit capped at %.2f kW (virtual reserve floor)",
                 automatik_discharge_cap,
             )
+        # Import cap: Automatik follows the plan's partial discharge instead of the whole deficit.
+        import_cap_discharge = optimizer.import_cap_discharge_cap_kw(
+            milp_plan or {},
+            optimization_matrix[0],
+            sum(consumer_powers.values()),
+            primary_battery,
+        )
+        if import_cap_discharge is not None and mode == 0:
+            logger.info(
+                "Automatik discharge limit capped at %.2f kW (import cap plan)",
+                import_cap_discharge,
+            )
+            automatik_discharge_cap = (
+                import_cap_discharge
+                if automatik_discharge_cap is None
+                else min(automatik_discharge_cap, import_cap_discharge)
+            )
         reserve_charges = physical_charge_setpoints_kw(active_reserves)
         standby_sources, standby_charges = live_source_and_charge(standby_plans, slot=0)
         # Hard clamp to effective pack max (HK ∩ live) — never write above resolve.

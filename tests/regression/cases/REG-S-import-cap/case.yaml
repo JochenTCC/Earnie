@@ -1,0 +1,30 @@
+id: REG-S-import-cap
+title: Import cap in winter - the battery follows the plan's partial discharge
+level: L2
+source: synthetic
+anonymized: true
+app_version: "2.8.0-dev"
+window:
+  start: "2026-01-14"
+  end: "2026-01-14"
+inputs:
+  kind: backtesting_fixtures
+  scenario_id: fixture_5kwh_fixed
+  initial_soc: 50.0
+  # Capacity charge on the monthly 15-min peak; the cap needs it in the grid area.
+  grid_fee_base_cent_kwh: 5.0
+  grid_capacity_charges:
+    - id: lp
+      basis: monthly_peak_15min
+      min_kw: 2.0
+      bands:
+        - up_to_kw: null
+          cent_per_kw_month: 300
+  # Heat pump house (synthetic winter week in cons_data.csv); limit 2.5 - 0.3 = 2.2 kW.
+  scenario_settings:
+    house_profile_id: test_home
+    import_cap_kw: 2.5
+    import_cap_margin_kw: 0.3
+# Red before the bugfix "import cap: a planned partial discharge is executed as Automatik":
+# Automatik covered the whole deficit, the battery was empty after three slots and later slots
+# went over the limit without a cause (import_cap_slots_over_without_cause > 0).

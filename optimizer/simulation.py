@@ -6,6 +6,7 @@ from contextlib import contextmanager
 from dataclasses import replace
 
 import config
+from . import battery as bat
 from .cbc_events import (
     begin_cbc_event_collection,
     cbc_event_collection_active,
@@ -168,6 +169,9 @@ def _simulate_single_hour_optimizer(
         target_power,
         consumer_powers,
         consumer_pv_follow,
+        automatik_discharge_cap_kw=bat.import_cap_discharge_cap_kw(
+            plan, row, sum(consumer_powers.values()), battery_params
+        ),
     )
     mark = first_slot_mark(plan, import_caps) if import_caps is not None else None
     if mark is not None:

@@ -51,6 +51,7 @@ from .battery import (
     MODE_ZWANGS_LADEN,
     apply_soc_change as _apply_soc_change,
     battery_plan_kw_from_control,
+    import_cap_discharge_cap_kw,
     steuerbefehl_for_mode,
 )
 from .milp import milp_optimizer
@@ -99,6 +100,7 @@ __all__ = [
     "MODE_ZWANGS_ENTLADEN",
     "MODE_ZWANGS_LADEN",
     "battery_plan_kw_from_control",
+    "import_cap_discharge_cap_kw",
     "build_applied_targets_detail",
     "build_baseline_targets_detail",
     "build_energy_comparison_detail",

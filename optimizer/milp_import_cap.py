@@ -43,3 +43,4 @@ def add_import_cap_constraints(model: MilpHorizonModel, caps: ImportCaps) -> Non
         penalty += SLACK_PENALTY_CENT_PER_KWH * model.dt_h * slack_var
     model.prob.objective += penalty
     model.import_cap_slack = slack
+    model.import_cap_limits = list(caps.limits_kw[: model.horizon])

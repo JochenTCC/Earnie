@@ -149,6 +149,22 @@ def test_peak_import_and_consumer_energy():
     assert "capacity_charge_eur" not in metrics
 
 
+def test_slots_over_the_import_limit_without_a_cause():
+    frame = _frame([0.55, 0.77, 0.77, 0.4]).assign(
+        import_cap_limit=[2.2, 2.2, 2.2, None],
+        import_cap_cause=[None, None, "battery_energy", None],
+    )
+    metrics = l2_runner.metrics_from_l2_frame(frame, None)
+    # 2.2 kW on the limit, 3.08 kW without a cause, 3.08 kW with one, 1.6 kW without a limit.
+    assert metrics["import_cap_slots_over_without_cause"] == 1.0
+
+
+def test_no_import_limit_no_overshoot_metric():
+    assert "import_cap_slots_over_without_cause" not in l2_runner.metrics_from_l2_frame(
+        _frame([0.5]), None
+    )
+
+
 def test_missing_consumer_column_fails_loud():
     with pytest.raises(ValueError, match="no column 'rod_kw'"):
         l2_runner.metrics_from_l2_frame(_frame([0.5]), None, consumers=("rod",))

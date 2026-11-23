@@ -100,8 +100,14 @@ def battery_plan_kw_from_control(
     p_con: float,
     total_flex_power: float,
     max_power_kw: float,
+    *,
+    automatik_discharge_cap_kw: float | None = None,
 ) -> float:
-    """Batterieplan für run_state – abgeleitet aus Steuermodus (Huawei-Logik vereinfacht)."""
+    """Batterieplan für run_state – abgeleitet aus Steuermodus (Huawei-Logik vereinfacht).
+
+    ``automatik_discharge_cap_kw`` limits the discharge in Automatik (import cap, the plan's
+    partial discharge); the inverter gets the same value as its discharge limit.
+    """
     net_pv_surplus = p_pv - p_con - total_flex_power
     if mode == MODE_ZWANGS_LADEN:
         return round(clamp_power(target_power_kw, max_power_kw), 3)
@@ -111,7 +117,10 @@ def battery_plan_kw_from_control(
         if net_pv_surplus > power_threshold_kw(max_power_kw):
             return round(clamp_power(net_pv_surplus, max_power_kw), 3)
         return 0.0
-    return round(clamp_power(net_pv_surplus, max_power_kw), 3)
+    action = clamp_power(net_pv_surplus, max_power_kw)
+    if automatik_discharge_cap_kw is not None:
+        action = max(action, -max(0.0, float(automatik_discharge_cap_kw)))
+    return round(action, 3)
 
 
 def automatik_discharge_kw(net_pv_surplus: float, max_power_kw: float) -> float:
@@ -415,9 +424,62 @@ def derive_control_from_milp_plan(
             round(current_soc, 1),
         )
 
+    if mode == MODE_ZWANGS_LADEN:
+        target_power = _charge_within_import_cap(
+            target_power, milp_plan, ess_plan, -net_pv_surplus
+        )
     return _apply_control_overrides(
         control, ac_connection, (mode, target_power, target_soc), current_soc
     )
+
+
+def _planned_import_kw(milp_plan: dict) -> float | None:
+    """Import the plan allows in this slot: its limit plus its slack; ``None`` without a limit.
+
+    Only a plan solved with the limit (``import_cap_mode: optimize``) carries it; observe mode
+    executes a plan without.
+    """
+    limit = milp_plan.get("import_cap_limit_kw")
+    if limit is None:
+        return None
+    return float(limit) + max(0.0, float(milp_plan.get("import_cap_slack_kw") or 0.0))
+
+
+def _charge_within_import_cap(
+    target_power: float, milp_plan: dict, ess_plan: dict, deficit_kw: float
+) -> float:
+    """Forced charge chasing the plan's SoC: no more than the limit leaves, never below the plan."""
+    allowed = _planned_import_kw(milp_plan)
+    if allowed is None:
+        return target_power
+    headroom = allowed - deficit_kw
+    planned = max(0.0, float(ess_plan.get("p_charge") or 0.0))
+    return round(min(target_power, max(planned, headroom)), 3)
+
+
+def import_cap_discharge_cap_kw(
+    milp_plan: dict,
+    matrix_row: dict,
+    total_flex_power: float,
+    battery_params: dict,
+) -> float | None:
+    """Discharge limit for Automatik in a slot with an import limit; ``None`` without one.
+
+    Under a limit the plan spreads the battery over the slots; Automatik alone would cover the
+    whole deficit and empty the battery early. The limit is the plan's discharge, raised to what
+    keeps the import at the plan's level when the load is above the forecast.
+    """
+    allowed = _planned_import_kw(milp_plan)
+    if allowed is None:
+        return None
+    ess_plan = _ess_plan_for_battery(milp_plan, battery_params)
+    planned = max(0.0, float(ess_plan.get("p_discharge") or 0.0))
+    deficit = (
+        effective_p_act(matrix_row, battery_params)
+        + total_flex_power
+        - float(matrix_row["expected_p_pv"])
+    )
+    return round(max(planned, deficit - allowed), 3)
 
 
 def _apply_control_overrides(

@@ -273,10 +273,13 @@ def test_plan_output_has_the_slack_only_with_a_cap():
         import_caps=_caps(rows, 2.0),
     )
     assert with_cap[1]["milp_plan"]["import_cap_slack_kw"] == pytest.approx(6.0, abs=1e-3)
+    # The limit travels with the slack: the control follows the plan's partial discharge.
+    assert with_cap[1]["milp_plan"]["import_cap_limit_kw"] == pytest.approx(2.0)
     without = milp_horizon_schedule(
         rows, 100.0, battery_params=battery, k_push=5.0, consumers=[], consumer_remaining_kwh={},
     )
     assert "import_cap_slack_kw" not in without[1]["milp_plan"]
+    assert "import_cap_limit_kw" not in without[1]["milp_plan"]
 
 
 def test_optimizer_returns_the_slack_of_the_first_slot():

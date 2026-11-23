@@ -36,6 +36,8 @@ def _extract_milp_plan_at(model: MilpHorizonModel, hour_index: int) -> dict[str,
     cap_slack = getattr(model, "import_cap_slack", None)
     if cap_slack and cap_slack[hour_index] is not None:
         plan["import_cap_slack_kw"] = _var_value_at(cap_slack, hour_index)
+        # Limit of the slot: Automatik follows the plan's partial discharge (bat.import_cap_*).
+        plan["import_cap_limit_kw"] = float(model.import_cap_limits[hour_index])
     ess_ids = getattr(model, "ess_ids", None) or []
     charge_by = getattr(model, "p_charge_by_ess", None) or {}
     discharge_by = getattr(model, "p_discharge_by_ess", None) or {}

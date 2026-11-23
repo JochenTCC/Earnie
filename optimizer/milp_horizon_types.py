@@ -30,6 +30,7 @@ class MilpHorizonModel:
     battery_params_by_id: dict[str, dict] | None = None
     p_pv_curtail: list | None = None
     import_cap_slack: list | None = None  # per slot; None without a limit there
+    import_cap_limits: list[float | None] | None = None  # kW per slot, same slots as the slack
     hp_store_slack: dict[str, list] | None = None  # SE heat pump band: (below, above) per book slot
     # Batteries that start outside their SoC limits: (lowest, highest) SoC in % of their plan.
     relaxed_soc_bounds_percent: dict[str, tuple[float, float]] | None = None

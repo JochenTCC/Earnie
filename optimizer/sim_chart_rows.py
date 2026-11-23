@@ -17,6 +17,8 @@ COL_VERBRAUCH_PROGNOSE = "Verbrauch-Prognose (kW)"
 COL_BATTERIE_AKTION = "Geplante Batterie-Aktion (kW)"
 COL_NETZBEZUG = "Netzbezug (kW)"
 COL_SOC = "Simulierter SoC (%)"
+# Automatik discharge limit of the slot (import cap); popped by ``finalize_chart_row_energy``.
+AUTOMATIK_DISCHARGE_CAP_KEY = "_automatik_discharge_cap_kw"
 
 
 def ess_soc_column_name(label: str) -> str:
@@ -133,14 +135,26 @@ def _chart_row_from_controls(
     target_power: float,
     consumer_powers: dict[str, float],
     consumer_pv_follow: dict[str, int],
+    *,
+    automatik_discharge_cap_kw: float | None = None,
 ) -> tuple[float, dict, int, float]:
-    """Baut Chart-Zeile aus Modus/Flex-Leistungen (gemeinsam für MPC und commit-K)."""
+    """Baut Chart-Zeile aus Modus/Flex-Leistungen (gemeinsam für MPC und commit-K).
+
+    ``automatik_discharge_cap_kw`` (import cap): kept on the row for
+    ``finalize_chart_row_energy``, which recomputes the action after the flex cap.
+    """
     pv = row["expected_p_pv"]
     con = bat.effective_p_act(row, battery_params)
     total_flex_power = sum(consumer_powers.values())
     max_power = battery_params["max_power_kw"]
     batt_action = bat.battery_plan_kw_from_control(
-        mode, target_power, pv, con, total_flex_power, max_power
+        mode,
+        target_power,
+        pv,
+        con,
+        total_flex_power,
+        max_power,
+        automatik_discharge_cap_kw=automatik_discharge_cap_kw,
     )
     action_text = bat.steuerbefehl_for_mode(mode, target_power)
     old_soc = sim_soc
@@ -166,6 +180,8 @@ def _chart_row_from_controls(
         consumer_powers=consumer_powers,
         consumer_pv_follow=consumer_pv_follow,
     )
+    if automatik_discharge_cap_kw is not None:
+        chart_row[AUTOMATIK_DISCHARGE_CAP_KEY] = float(automatik_discharge_cap_kw)
     return sim_soc, chart_row, mode, target_power
 
 
@@ -260,6 +276,9 @@ def _chart_row_from_schedule_slot(
         target_power,
         consumer_powers,
         consumer_pv_follow,
+        automatik_discharge_cap_kw=bat.import_cap_discharge_cap_kw(
+            slot["milp_plan"], row, total_flex, battery_params
+        ),
     )
     if SLOT_LIMIT_KEY in slot:
         result[1][SLOT_LIMIT_KEY] = slot[SLOT_LIMIT_KEY]
@@ -315,8 +334,10 @@ def finalize_chart_row_energy(
     con = float(chart_row[COL_VERBRAUCH_PROGNOSE])
     total_flex = flexible_consumer_power_kw(chart_row)
     max_power = battery_params["max_power_kw"]
+    # Import cap: the limit of the slot; a flex-capped load only needs less.
+    cap = chart_row.pop(AUTOMATIK_DISCHARGE_CAP_KEY, None)
     batt_action = bat.battery_plan_kw_from_control(
-        mode, target_power, pv, con, total_flex, max_power
+        mode, target_power, pv, con, total_flex, max_power, automatik_discharge_cap_kw=cap
     )
     new_soc, batt_action = bat.apply_soc_change(
         old_soc,

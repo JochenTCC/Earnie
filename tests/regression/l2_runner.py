@@ -273,7 +273,26 @@ def metrics_from_l2_frame(
                 f"(consumer {consumer_id!r} not planned?)"
             )
         metrics[f"consumer_kwh_{consumer_id}"] = float(df[column].fillna(0).sum()) * _DT_H
+    if "import_cap_limit" in df.columns:
+        metrics["import_cap_slots_over_without_cause"] = _slots_over_without_cause(df)
     return metrics
+
+
+# Booked import above the slot's limit by more than this counts as over (kW; rounding of rows).
+_CAP_OVER_TOLERANCE_KW = 0.02
+
+
+def _slots_over_without_cause(df: pd.DataFrame) -> float:
+    """Slots whose booked import exceeds the import limit although the plan names no cause.
+
+    The plan sets ``import_cap_cause`` wherever it goes over the limit; a booked slot over it
+    without a cause means the control did not follow the plan.
+    """
+    limit = pd.to_numeric(df["import_cap_limit"], errors="raise")
+    import_kw = df["import_kwh"].fillna(0) / _DT_H
+    cause = df["import_cap_cause"] if "import_cap_cause" in df.columns else pd.Series(None, index=df.index)
+    over = limit.notna() & (import_kw > limit + _CAP_OVER_TOLERANCE_KW) & cause.isna()
+    return float(over.sum())
 
 
 def _peak_import_kw(df: pd.DataFrame) -> float:
