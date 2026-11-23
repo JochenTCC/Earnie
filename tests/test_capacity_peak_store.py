@@ -127,3 +127,46 @@ def test_a_store_failure_does_not_stop_the_cycle(monkeypatch, caplog, tmp_path: 
     with caplog.at_level(logging.WARNING, logger="main"):
         assert main_module._finalize_previous_interval() is broken
     assert "not recorded" in caplog.text
+
+
+def _utc_host(monkeypatch):
+    """A container with TZ=UTC for a plant in Europe/Vienna: naive host times are UTC."""
+    from datetime import timezone
+
+    import config
+
+    monkeypatch.setattr(
+        store, "_host_aware", lambda moment: moment.replace(tzinfo=timezone.utc)
+    )
+    monkeypatch.setattr(config, "get_planning_timezone", lambda: "Europe/Vienna")
+
+
+def test_the_month_follows_the_planning_timezone_not_the_host_clock(tmp_path: Path, monkeypatch):
+    """Host 2026-11-30 23:15 UTC is 2026-12-01 00:15 in Vienna: the operator bills it to December."""
+    _utc_host(monkeypatch)
+    path = tmp_path / "peaks.json"
+    peak = store.record_closed_interval(_closed(START + timedelta(minutes=15), 7.0), path=str(path))
+    assert (peak.month, peak.peak_slot) == ("2026-12", "2026-12-01T00:15:00")
+    assert store.month_peak("2026-11", path=str(path)) is None
+    assert store.planning_month("2026-11-30T23:15:00") == "2026-12"
+
+
+def test_main_reads_the_month_before_in_the_planning_timezone(tmp_path: Path, monkeypatch):
+    """The cap check compares with the peak of the slot's billing month (planning timezone)."""
+    _utc_host(monkeypatch)
+    seen = []
+    monkeypatch.setattr(store, "month_peak", lambda month, **_: seen.append(month))
+    monkeypatch.setattr(store, "record_closed_interval", lambda closed, **_: None)
+    monkeypatch.setattr(main_module.config, "get_resolved_runtime_settings", lambda: {})
+    main_module._record_month_peak(_closed(START + timedelta(minutes=15), 7.0))
+    assert seen == ["2026-12"]
+
+
+def test_monitor_and_scenario_check_take_today_from_the_planning_timezone(monkeypatch):
+    """At 23:30 UTC on 30 November it is already 1 December in Vienna (Monitor month, cap check)."""
+    from datetime import timezone
+
+    _utc_host(monkeypatch)
+    now = store.planning_now(datetime(2026, 11, 30, 23, 30, tzinfo=timezone.utc))
+    assert now == datetime(2026, 12, 1, 0, 30)
+    assert store.planning_now(datetime(2026, 11, 30, 23, 30)).date().isoformat() == "2026-12-01"

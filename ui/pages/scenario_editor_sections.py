@@ -1,10 +1,9 @@
 """Scenario editor tab sections (identity, entities, persist)."""
 from __future__ import annotations
 
-from datetime import date
-
 import streamlit as st
 
+from runtime_store.capacity_peak_store import planning_now
 from runtime_store.shadow.errors import ConfigReadOnlyError
 from ui.auto_persist import SHADOW_READONLY_CAPTION
 from ui.flash import flash
@@ -365,7 +364,7 @@ def _render_scenario_import_cap(ctx: dict, picks: dict) -> tuple[str, ...]:
         return ()
     try:
         cap = parse_import_cap({IMPORT_CAP_KEY: cap_kw, IMPORT_CAP_MARGIN_KEY: margin_kw})
-        check = check_import_cap(cap, _import_cap_grid_fee(picks), date.today())
+        check = check_import_cap(cap, _import_cap_grid_fee(picks), planning_now().date())
     except (ValueError, EdibertLoadError) as exc:
         st.error(str(exc))
         return (str(exc),)

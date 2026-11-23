@@ -1,7 +1,8 @@
 """Monitor block "Leistungspreis" (max-power tariff P6b): month peak, cap, amount, plan warning.
 
 Shown only when the Live scenario has an import cap or the grid area has a capacity charge in the
-current month. The month is the host clock's, as the peak store keeps it. A month without a stored
+current month. The month is the planning timezone's, as the peak store keeps it and the grid
+operator bills. A month without a stored
 peak is unknown, never 0. The warning comes from ``runtime/import_cap_report.json``, which the
 optimizer service writes each cycle (P6a, ``optimizer.import_cap_report``).
 
@@ -484,7 +485,12 @@ def load_capacity_panel(now: datetime | None = None) -> CapacityPanel | None:
     """The block for the current Live configuration; ``None`` during onboarding or without both."""
     import config
     from runtime_store import import_cap_report_store
-    from runtime_store.capacity_peak_store import month_peak, observe_baseline_path, observe_path
+    from runtime_store.capacity_peak_store import (
+        month_peak,
+        observe_baseline_path,
+        observe_path,
+        planning_now,
+    )
 
     if config.is_runtime_params_deferred():
         return None
@@ -492,7 +498,7 @@ def load_capacity_panel(now: datetime | None = None) -> CapacityPanel | None:
     baseline_file = observe_baseline_path()
     return build_capacity_panel(
         config.get_resolved_runtime_settings(),
-        now or datetime.now(),
+        planning_now(now),
         read_peak=month_peak,
         report=import_cap_report_store.load(),
         read_observe_peak=lambda month: month_peak(month, path=observe_file),

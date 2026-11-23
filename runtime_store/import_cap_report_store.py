@@ -87,8 +87,10 @@ def save_plan_report(report: dict[str, Any] | None, *, path: str | None = None) 
 
 
 def _slot(value: Any) -> datetime:
-    moment = datetime.fromisoformat(str(value))
-    return moment.replace(tzinfo=None) if moment.tzinfo else moment
+    """A measured slot in planning-local time, like the plan's slots (see ``planning_slot``)."""
+    from runtime_store.capacity_peak_store import planning_slot
+
+    return planning_slot(value)
 
 
 def _iso(moment: datetime) -> str:
@@ -212,9 +214,12 @@ def record_observed(
         None if measured_kw is None or delta is None else max(0.0, float(measured_kw) + float(delta))
     )
     before = capacity_peak_store.month_peak(month, path=peak_file)
-    capacity_peak_store.record_slot(slot, hypothetical, OBSERVE_PEAK_SOURCE, path=peak_file)
+    # Pass the measured time on unconverted: both stores convert it to planning time themselves.
     capacity_peak_store.record_slot(
-        slot,
+        interval_start, hypothetical, OBSERVE_PEAK_SOURCE, path=peak_file
+    )
+    capacity_peak_store.record_slot(
+        interval_start,
         None if hypothetical is None else float(measured_kw),
         OBSERVE_BASELINE_SOURCE,
         path=baseline_file,
@@ -236,7 +241,7 @@ def record_observed(
     if hypothetical is None:
         return None
     return record_measured(
-        slot,
+        interval_start,
         hypothetical,
         params=params,
         peak_before_kw=None if before is None else before.peak_kw,

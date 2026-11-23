@@ -354,3 +354,25 @@ def test_an_inverter_ac_limit_below_the_battery_power_is_battery_power():
     for slot in report["slots"]:
         assert slot["cause"] == icr.CAUSE_BATTERY_POWER
         assert icr.CAUSE_BASE_LOAD not in slot["causes"]
+
+
+def test_a_measured_slot_on_a_utc_host_meets_the_plan_in_the_planning_timezone(
+    tmp_path: Path, capped, monkeypatch
+):
+    """Container with TZ=UTC, plant in Vienna: host 17:00 UTC is the plan's 18:00 slot."""
+    from datetime import timezone
+
+    import config
+    from runtime_store import capacity_peak_store
+
+    monkeypatch.setattr(
+        capacity_peak_store, "_host_aware", lambda moment: moment.replace(tzinfo=timezone.utc)
+    )
+    monkeypatch.setattr(config, "get_planning_timezone", lambda: "Europe/Vienna")
+    path = str(tmp_path / "report.json")
+    store.save_plan_report(_plan(SLOT), path=path)
+    host_slot = (SLOT - timedelta(hours=1)).isoformat()
+    event = store.record_measured(host_slot, 5.6, params=capped, peak_before_kw=None, path=path)
+    assert event["slot"] == "2027-03-02T18:00"
+    assert event["cause"] == icr.CAUSE_FORECAST
+    assert list(store.load(path)["measured"]) == ["2027-03"]

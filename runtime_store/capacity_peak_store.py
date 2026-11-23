@@ -1,6 +1,7 @@
 """Live month peak of grid import for the capacity charge (max-power tariff P5).
 
-One entry per calendar month in the house's local time (the host clock, as the sampler uses it):
+One entry per calendar month in the planning timezone (``config.get_planning_timezone()``, as the
+grid operator bills), not the host clock the sampler uses; slots are stored as planning-local time:
 the highest quarter-hour import, its slot and source, and how much of the month was measured.
 A month without an entry is unknown, never 0. The value is Earnie's own measurement and can be
 lower than the meter's (window offset, clock, missing quarter hours).
@@ -19,6 +20,7 @@ import os
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from optimizer.schedule import QUARTER_HOUR_MINUTES
 from runtime_store.file_metadata import stamp_payload, strip_metadata
@@ -78,8 +80,38 @@ def _save(path: str, months: dict[str, Any]) -> None:
 
 
 def _slot(value: Any) -> datetime:
+    """A slot already stored in planning-local time."""
     moment = datetime.fromisoformat(str(value))
     return moment.replace(tzinfo=None) if moment.tzinfo else moment
+
+
+def _host_aware(moment: datetime) -> datetime:
+    """Naive values are host-local, like ``datetime.now()`` in the sampler."""
+    return moment.astimezone()
+
+
+def planning_slot(value: Any) -> datetime:
+    """A measured time (naive: host clock; aware: as given) as planning-local naive time.
+
+    A container with ``TZ=UTC`` for a plant in Europe/Vienna would otherwise book the first one
+    or two hours of a month to the month before, unlike the grid operator's bill.
+    """
+    import config
+
+    moment = value if isinstance(value, datetime) else datetime.fromisoformat(str(value))
+    if moment.tzinfo is None:
+        moment = _host_aware(moment)
+    return moment.astimezone(ZoneInfo(config.get_planning_timezone())).replace(tzinfo=None)
+
+
+def planning_month(value: Any) -> str:
+    """Billing month (``YYYY-MM``) of a measured time, see ``planning_slot``."""
+    return f"{planning_slot(value):%Y-%m}"
+
+
+def planning_now(now: datetime | None = None) -> datetime:
+    """Planning-local naive time of ``now`` (naive host time or aware; default the clock)."""
+    return planning_slot(now if now is not None else datetime.now().astimezone())
 
 
 def _iso(moment: datetime) -> str:
@@ -139,7 +171,7 @@ def record_slot(
     through here with ``path=observe_path()``.
     """
     target = _path(path)
-    slot = _slot(interval_start)
+    slot = planning_slot(interval_start)
     month = slot.strftime("%Y-%m")
     months = _load(target)
     entry = months.get(month)

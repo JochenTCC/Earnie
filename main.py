@@ -130,8 +130,9 @@ def _record_month_peak(closed: dict) -> None:
     from runtime_store import capacity_peak_store, import_cap_report_store
 
     try:
-        slot = datetime.fromisoformat(str(closed["interval_start"]))
-        before = capacity_peak_store.month_peak(f"{slot:%Y-%m}")
+        before = capacity_peak_store.month_peak(
+            capacity_peak_store.planning_month(closed["interval_start"])
+        )
         capacity_peak_store.record_closed_interval(closed)
     except Exception as exc:  # noqa: BLE001 — the cycle must still plan and write
         logger.warning("capacity_peak_store: %s not recorded: %s", closed.get("interval_start"), exc)
