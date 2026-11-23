@@ -122,7 +122,7 @@ Die Zahlen sind Platzhalter. Die Sätze sind netto; Earnie rechnet die USt des B
 **Ein zuverlässiger Plan, keine Garantie.** Earnie plant jede Viertelstunde so, dass der Bezug unter der Grenze bleibt. Die gemessene Spitze kann trotzdem höher liegen:
 
 - **Keine Regelung innerhalb der Viertelstunde.** Earnie plant einmal je Viertelstunde. Schaltet jemand Herd, Wasserkocher oder Waschmaschine ein, steigt der Bezug, und Earnie reagiert erst mit dem nächsten Plan.
-- **Lastprognose.** Der Plan rechnet mit einer geschätzten Grundlast. Die Marge, vorbelegt mit 0,3 kW, fängt den üblichen Fehler ab, nicht jeden. Der Wert ist vorläufig, bis ein Vergleich mit den Viertelstundenwerten des Netzbetreibers vorliegt.
+- **Lastprognose und Messung.** Der Plan rechnet mit einer geschätzten Grundlast, und Earnie misst den Bezug selbst, nicht mit dem Zähler des Netzbetreibers. Die Marge, vorbelegt mit 0,7 kW, fängt den üblichen Fehler beider ab, nicht jeden. Der Wert stammt aus einem Vergleich mit den Viertelstundenwerten des Netzbetreibers über knapp zwei Wochen an einer Anlage. Wer schon eine Grenze mit 0,3 kW gespeichert hat, behält diesen Wert und sollte ihn anheben.
 - **Plan hält die Grenze nicht.** Reichen Batterie und Verschieben nicht, etwa bei hoher Grundlast, leerer Batterie oder einem Verbraucher, der sein Ziel erreichen muss, nennt der Monitor die Viertelstunden und die Ursache.
 - **Ohne Plan keine Grenze.** Im Automatikbetrieb und in Fenstern ohne Optimierung gilt die Grenze nicht; Protokoll und Monitor vermerken das.
 - **Einmal überschritten.** Liegt die Spitze des Monats schon über der Grenze, plant Earnie bis zu dieser Spitze, weil sie ohnehin bezahlt wird.

@@ -50,7 +50,7 @@ def _add_capacity_charge(**overrides) -> None:
 def test_without_a_cap_nothing_is_stored():
     at = _session()
     assert at.number_input(key=_CAP).value is None
-    assert at.number_input(key=_MARGIN).value == 0.3
+    assert at.number_input(key=_MARGIN).value == 0.7
     assert at.number_input(key=_MARGIN).disabled
     assert "import_cap_kw" not in _stored()
     assert "import_cap_margin_kw" not in _stored()
@@ -61,7 +61,7 @@ def test_cap_is_stored_with_the_proposed_margin_and_survives_a_new_session():
     at.number_input(key=_CAP).set_value(5.0).run()
     assert not at.exception
     assert _stored()["import_cap_kw"] == 5.0
-    assert _stored()["import_cap_margin_kw"] == 0.3
+    assert _stored()["import_cap_margin_kw"] == 0.7
     again = _session()
     assert again.number_input(key=_CAP).value == 5.0
     assert not again.number_input(key=_MARGIN).disabled
@@ -91,7 +91,7 @@ def test_margin_not_below_the_cap_is_refused_and_not_stored():
     at.number_input(key=_MARGIN).set_value(5.0).run()
     assert not at.exception
     assert any("kleiner als" in item.value for item in at.error)
-    assert _stored()["import_cap_margin_kw"] == 0.3
+    assert _stored()["import_cap_margin_kw"] == 0.7
 
 
 def test_cap_without_house_profile_is_refused_and_not_stored():

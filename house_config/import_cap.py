@@ -16,7 +16,10 @@ from typing import Any
 
 IMPORT_CAP_KEY = "import_cap_kw"
 IMPORT_CAP_MARGIN_KEY = "import_cap_margin_kw"
-MARGIN_PROPOSAL_KW = 0.3  # placeholder until the field test of the max-power plan (P5) sets it
+# From the field test (P5c, 2026-11-23): forecast error ~0.4 kW and measurement error ~0.5 kW at P95
+# where the cap binds, combined as independent (~0.65 kW), rounded up. Lower to ~0.5 kW once the
+# grid import is interpolated on the quarter-hour boundaries (backlog: boundary interpolation).
+MARGIN_PROPOSAL_KW = 0.7
 IMPORT_CAP_MODE_KEY = "import_cap_mode"
 MODE_OBSERVE = "observe"
 MODE_OPTIMIZE = "optimize"
