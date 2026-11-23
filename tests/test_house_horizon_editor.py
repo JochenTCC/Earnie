@@ -33,6 +33,12 @@ def test_axis_runs_clockwise_from_north_and_is_labelled_like_the_pv_fields():
     assert labels["W"] == "90°"
 
 
+@pytest.mark.parametrize("azimuth", [180.0, -180.0, 180.0 + 1e-12, -(180.0 - 1e-12), 22.5 * 8])
+def test_north_label_tolerates_float_noise(azimuth):
+    # Sonar S1244: an azimuth computed to just off ±180° is still north, not "-180°" / "180°".
+    assert editor.azimuth_label(azimuth) == "±180°"
+
+
 def test_mid_latitude_is_active_from_north_east_to_north_west():
     active = editor.active_directions(_paths(47.4))
     assert _labels(active) == list(editor.DIRECTION_LABELS[2:15])

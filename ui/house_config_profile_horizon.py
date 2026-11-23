@@ -6,6 +6,7 @@ a horizon gets no field at all.
 """
 from __future__ import annotations
 
+import math
 from datetime import date
 
 import streamlit as st
@@ -79,7 +80,7 @@ def compass_deg(azimuth_deg: float) -> float:
 
 def azimuth_label(azimuth_deg: float) -> str:
     """Azimuth as for the PV fields (0° = south, east negative); north is both ends."""
-    if abs(azimuth_deg) == 180.0:
+    if math.isclose(abs(azimuth_deg), 180.0):
         return "±180°"
     return f"{azimuth_deg:g}°".replace(".", ",")
 
