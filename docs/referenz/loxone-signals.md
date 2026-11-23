@@ -83,7 +83,7 @@ Der Loxone-Import übernimmt die Zählerblöcke, die am Energy Flow Monitor hän
 2. Den Zähler dem **Energy Flow Monitor** zuordnen (Netz / PV / Batterie / Verbraucher).
 3. Rest-/Differenzknoten nicht als eigenen Flex-Verbraucher verwenden. Der Import überspringt typische Restbezeichnungen.
 
-Leistungs-Merker (`Earnie_Netzleistung`, `Earnie_PV_Leistung`, …) **können** aus dem EFM stammen. Earnie bevorzugt im Binding die EFM-Bezeichnung, sofern vorhanden.
+Leistungs-Merker (`Earnie_Netzleistung`, `Earnie_WR_Leistung_PV`, …) **können** aus dem EFM stammen. Earnie bevorzugt im Binding die EFM-Bezeichnung, sofern vorhanden.
 
 **EV-Fertig-bis-Zeit.** Der Loxone-Import bindet **AlarmClock**-Blöcke an `get_evcs_ready_by_time` der EV-Entität, die bereits Zähler-/Leistungs-Bindings hat (gleiche Konvention wie bei der Zählerbezeichnung). Optionaler Analog-VO: `/ehal/telemetry/ev.<id>.get_evcs_ready_by_time/<v>` (numerischer nächster Eintrag; die Inbox akzeptiert auch kurzen Text im Tna-Stil). Gebundene FertigUm-Felder nutzen immer die Push-Inbox.
 
@@ -262,7 +262,9 @@ Alle konfigurierten Signale lassen sich so prüfen:
 
 | Entität / Bereich                                                      | Speicherort                                   | Typische EHAL-Felder / Rollen                                                                                                                             |
 | ------------------------------------------------------------------------ | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Anlage (PV, Netz, Hauslast, Außentemp., Abwesenheit; ESS-Leistung/Sollwerte über die primäre Batterie)   | `house_profiles.json` → `plant.ehal_bindings` | `sens_pv_production_active`, `sens_ess_power`, `sens_grid_power_active`, `sens_temperature_outside`, `sens_absent_mode`, `sens_power_consumers` (SoC: `batteries[].ehal_bindings` → `ess.{slug}.sens_ess_soc`) |
+| Anlage (Netz, Hauslast, Außentemp., Abwesenheit; ESS-Leistung/Sollwerte über die primäre Batterie)   | `house_profiles.json` → `plant.ehal_bindings` | `sens_ess_power`, `sens_grid_power_active`, `sens_temperature_outside`, `sens_absent_mode`, `sens_power_consumers` (SoC: `batteries[].ehal_bindings` → `ess.{slug}.sens_ess_soc`) |
+| Wechselrichter (PV-Leistung, AC-Leistung, Grenzen)                       | `components.json` → `inverters[].ehal_bindings` | `inv.{id}.sens_inv_power_pv` (Pflicht, sobald PV am Wechselrichter hängt; Vorlage `Earnie_WR_Leistung_PV`), `inv.{id}.sens_inv_power_ac`. Die PV-Leistung der Anlage leitet Earnie daraus ab; ein Anlagen-Feld dafür gibt es nicht mehr |
+| PV-Feld (optional)                                                       | `components.json` → `pv_systems[].ehal_bindings` | `pv.{id}.sens_pv_production_active` (DC-Leistung je PV-Feld; ersetzt einen fehlenden Wert am Wechselrichter nur, wenn alle Felder daran gemappt sind) |
 | Request Optimize (ad hoc)                                               | Loxone-VO → Daemon-HTTP                       | `Earnie_Request_Optimize` auf Port `system.ehal_http_port` (Standard **8541**)                                                                            |
 | Wärmepumpe / Flex / Thermik                                             | `consumers[].ehal_bindings`                   | `consumer|heatpump|pool.{slug}.sens_power_act`, `….set_enable` (Legacy `flex.*` nur noch lesen)                                                         |
 | EV (`ev`)                                                                | `consumers[].ehal_bindings`                   | `sens_evcs_*`, `get_evcs_*`, `set_evcs_*`                                                                                                                  |
@@ -272,12 +274,11 @@ Bearbeitet wird in der Oberfläche **ausschließlich** unter **Daemon Control �
 
 ## Kernsignale (`plant.ehal_bindings`)
 
-Default-Namen. Netz-/PV-/Batterie-**Leistung** bevorzugt über die EFM-Zählerbezeichnung.
+Default-Namen. Netz- und Batterie-**Leistung** bevorzugt über die EFM-Zählerbezeichnung. Die PV-Leistung kommt je Wechselrichter (`inv.{id}.sens_inv_power_pv`, siehe Tabelle oben), nicht über `plant.ehal_bindings`.
 
 | EHAL-Feld                        | Richtung  | Default-Name                                   | Wert / Einheit                                                                          |
 | ---------------------------------- | --------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------ |
 | `ess.{slug}.sens_ess_soc`         | Lesen     | `Earnie_Batterie_SoC` / `Earnie_Batterie_<Slug>_SoC` | Batterie-SoC, % (Entity-bezogen; nicht anlagenweit)                                  |
-| `sens_pv_production_active`       | Lesen     | `Earnie_PV_Leistung` (oder EFM-Erzeugung)        | PV-Leistung, kW                                                                             |
 | `sens_ess_power`                  | Lesen     | `Earnie_Batterie_Leistung` (oder EFM-Speicher)   | Batterie kW; **+ Entladen**, − Laden (wie EHAL, keine Invertierung)                         |
 | `sens_grid_power_active`          | Lesen     | `Earnie_Netzleistung` (oder EFM-Netz)            | Netz: + Bezug, kW                                                                           |
 | `get_grid_export_power_limit`     | Lesen     | `Earnie_Netz_Einspeisegrenze_In` (optional)      | Maximale Exportgrenze aus Loxone, kW (EHAL: W)                                      |

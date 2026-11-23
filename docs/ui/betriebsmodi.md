@@ -120,7 +120,7 @@ Die Parameter für PV, Batterie und Einspeisung kommen über Entitäts-IDs aus d
 | Panel | Verhalten |
 |-------|-----------|
 | Charts 1 & 2 | Leistung, SoC und Preis; kumulierte Kosten und Verbrauch (Ist und Prognose getrennt) |
-| Sankey | Liegt **zwischen Navigation und Chart 2**. Zeigt die Anlagenleistungen (PV, Netz, Batterie) über das aktive EHAL-Backend; Flex-Knoten und EV-SoC-Label gibt es derzeit nur mit Loxone (siehe [Charts](charts.md#energiefluss-live-sankey)) |
+| Sankey | Liegt **zwischen Navigation und Chart 2**. Zeigt die Anlagenleistungen (PV, Netz, Batterie) über das aktive EHAL-Backend; Flex-Knoten gibt es derzeit nur mit Loxone, das EV-SoC-Label mit Loxone und Home Assistant (siehe [Charts](charts.md#energiefluss-live-sankey)) |
 | Simulations-Tabelle | Rohdaten des sichtbaren Fensters; orange = fehlende Log-Einträge |
 | Energievergleich | Expander: Baseline gegen Optimierung |
 | Countdown / Optimierungs-Takt | immer sichtbar |

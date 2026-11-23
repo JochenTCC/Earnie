@@ -91,7 +91,7 @@ Fehlende Felder bekommen die Standardwerte aus `house_profiles.schema.json`. Ein
 
 <a id="heizwaerme-und-gewinne"></a>
 
-### Heizwärme und Gewinne (SUSI P2)
+### Heizwärme und Gewinne
 
 **Jahres-Heizwärme = HWB × Bruttogrundfläche.** Der HWB im Energieausweis bezieht sich auf die Bruttogrundfläche (BGF), nicht auf die Wohnfläche. Ohne `gross_floor_area_m2` rechnet Earnie wie SUSI mit BGF = Wohnfläche × 1,25. Die Wärmekapazität des Hauses (Bauweise) rechnet weiter mit der Wohnfläche. Ohne genauen HWB gilt der Wert der Gebäudeklasse, ebenfalls je m² BGF.
 

@@ -35,19 +35,21 @@ Lehnt der Miniserver die Zugangsdaten ab (HTTP **401** oder **403**), zeigt die 
 - **Schreiben (Loud):** Sollwerte erscheinen in `status.json` unter qualifizierten EHAL-IDs. Der Miniserver liest sie per Virtual Input.
 - **Import / Struktur:** `GET http://{LOXONE_IP}/data/LoxAPP3.json` liefert die sichtbaren Control-Namen. Earnie nutzt sie für den Loxone-Import (Greenfield inkl. EFM-Zähler) und für die Presence-Probe auf EHAL-Com. Live-Telemetrie und Sollwerte laufen nicht über diese Datei.
 
-Aktivierte Signale stehen als Schlüssel in `plant.ehal_bindings`, `consumers[].ehal_bindings` bzw. `batteries[].ehal_bindings`. Die Werte zu den Schlüsseln bleiben leer, der Schlüssel dient nur als Aktivierungsflag. Die verbindliche Signalliste und den Match-Status zeigt die Seite **EHAL-Com → Signalliste**. Details: [Loxone-Signale](../referenz/loxone-signals.md).
+Aktivierte Signale stehen als Schlüssel in `plant.ehal_bindings` und `consumers[].ehal_bindings` (Hausprofil) sowie in `batteries[]`, `inverters[]`, `wallboxes[]` und `pv_systems[].ehal_bindings` (`components.json`). Die Werte zu den Schlüsseln bleiben leer, der Schlüssel dient nur als Aktivierungsflag. Die verbindliche Signalliste und den Match-Status zeigt die Seite **EHAL-Com → Signalliste**. Details: [Loxone-Signale](../referenz/loxone-signals.md).
 
 ## Was Earnie liest
 
 | Bereich              | Konfiguration                                | Zweck                                             |
 | -------------------- | -------------------------------------------- | ------------------------------------------------- |
-| Anlage (Plant)       | `plant.ehal_bindings`                        | Netz-/PV-Leistungen, Außentemperatur              |
+| Anlage (Plant)       | `plant.ehal_bindings`                        | Netzleistung, Außentemperatur, Abwesenheit        |
+| Wechselrichter       | `inverters[].ehal_bindings` (`inv.{id}.*`)   | PV-Leistung je Wechselrichter, AC-Leistung        |
+| PV-Felder (optional) | `pv_systems[].ehal_bindings` (`pv.{id}.*`)   | PV-Leistung je PV-Feld                            |
 | Speicher (ESS)       | `batteries[].ehal_bindings` (`ess.{slug}.*`) | SOC, ESS-Leistung, Grenzen und Sollwerte          |
 | Steuer-Rückmeldung   | dieselben Soll-/Ist-Bindings (Live-Lesen)    | Prüfen, ob Schreiben ankommt                      |
 | Flexible Verbraucher | `consumers[].ehal_bindings`                  | Live-Leistung / Freigaben für `cons_data`         |
 | E-Auto-Status        | EVCS-Felder in `ehal_bindings` / Ladeplan    | Anschluss, Rest-SOC, Fertig-um, max. Ladeleistung |
 
-Die PV-Energie je Intervall ergibt sich aus dem Integral über `sens_pv_production_active`.
+Ein Anlagen-Feld für die PV-Leistung gibt es nicht mehr. Earnie leitet die PV-Leistung der Anlage aus den netzgekoppelten Wechselrichtern ab: Σ(`inv.{id}.sens_inv_power_pv` · Wirkungsgrad), Vorlage `Earnie_WR_Leistung_PV`. Jeder Wechselrichter mit angeschlossenen PV-Feldern braucht dieses Signal (siehe [Batterie & PV](../konfiguration/batterie-pv.md)). Die PV-Energie je Intervall ergibt sich aus dem Integral über diese abgeleitete Leistung.
 
 ## Was Earnie schreibt
 
@@ -84,7 +86,7 @@ P_cons = P_PV + P_Grid + P_Bat
 
 | Größe    | EHAL-Feld (Wire-ID)                 | `+`       | `−`         |
 | -------- | ----------------------------------- | --------- | ----------- |
-| `P_PV`   | `sens_pv_production_active`         | Erzeugung | – (≥ 0)     |
+| `P_PV`   | abgeleitet aus `inv.{id}.sens_inv_power_pv` | Erzeugung | – (≥ 0)     |
 | `P_Grid` | `grid.meter.sens_grid_power_active` | Bezug     | Einspeisung |
 | `P_Bat`  | `ess.{id}.sens_ess_power`           | Entladen  | Laden       |
 | `P_cons` | `sens_power_consumers`              | Verbrauch | – (≥ 0)     |

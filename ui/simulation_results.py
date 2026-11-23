@@ -179,6 +179,12 @@ def render_applied_targets(savings: dict) -> None:
         )
 
 
+SIMULATION_DETAILS_HELP = (
+    "Slots wie im Chart: **Produktiv-Log** (15 min, grauer Bereich) und "
+    "**MILP** (15-min-Soll-Slots ab Jetzt, neutraler und grüner Bereich). "
+    "**Orange** = kein Log-Eintrag (Werte leer, kein Hold-Forward)."
+)
+
 _TABLE_MISSING_ROW_COLOR = "background-color: #ffe0b2;"
 _SLOT_QUALITY_LABELS = {
     SLOT_PRESENT: "Produktiv-Log",
@@ -390,11 +396,7 @@ def render_simulation_details(
     with st.expander(title):
         if gap_notice:
             st.warning(gap_notice)
-        st.markdown(
-            "Slots wie im Chart: **Produktiv-Log** (15 min, grauer Bereich) und "
-            "**MILP** (laufende Stunde ab x:15 in 15-min-Soll-Slots, sonst 1 h ab voller Stunde). "
-            "**Orange** = kein Log-Eintrag (Werte leer, kein Hold-Forward)."
-        )
+        st.markdown(SIMULATION_DETAILS_HELP)
         _render_simulation_table(df, slot_qualities)
 
 

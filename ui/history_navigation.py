@@ -117,7 +117,8 @@ def s2_zone_help_text(*, include_soc_plausibility: bool = False) -> str:
             "Kalender-Icon für Datum (nur mit Log-Daten)"
         )
     base = (
-        "Hintergrund: grau = Vergangenheit · neutral = aktuelle Stunde · "
+        "Hintergrund: grau = Vergangenheit · "
+        "neutral = Plan ab Jetzt mit veröffentlichten Preisen · "
         "grün = extrapolierte Preise · "
         f"{nav_hint}\n\n"
         "**Soll/Ist-Icons** (nur grauer Log-Bereich): "

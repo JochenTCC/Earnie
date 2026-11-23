@@ -379,7 +379,7 @@ Fields map to known OpenEMS Edge channels (semantic reference). Channel architec
 | EHAL field                      | OpenEMS (prototype)                                                                                                                         |
 | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | `sens_grid_power_active`        | `_sum/GridActivePower` (OpenEMS: `+` = buy-from-grid, `−` = sell-to-grid; same sign as EHAL, role `openems` block `sign: 1`)                |
-| `sens_pv_production_active`     | `_sum/ProductionActivePower`                                                                                                                |
+| plant AC PV (derived, no field) | `_sum/ProductionActivePower` (already AC); used only when `inv.*.sens_inv_power_pv` does not cover every grid-tied inverter with PV (`integrations/ehal_live_pv.py`) |
 | `ess.{id}.sens_ess_soc`         | `ess0/Soc` / `_sum/EssSoc` (primary; not on plant telemetry doc)                                                                              |
 | `sens_ess_power`                | ESS ActivePower (OpenEMS sign; already EHAL-aligned)                                                                                        |
 | `sens_evcs_active_power`        | EVCS / EVSE active power channels                                                                                                           |
