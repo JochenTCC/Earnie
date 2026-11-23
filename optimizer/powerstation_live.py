@@ -801,12 +801,12 @@ def update_reserve_fill_basis(
 ) -> None:
     """Persist or clear the fill basis of the virtual reserves after a live plan (Reserve P2).
 
-    The reserve is held now (floor at the end of slot 0): the fill price that justifies the
-    first paying slot becomes the basis, so the next re-plan inside the expensive phase still
-    sees the reserve as cheaply filled. Not held now (cheap phase, released or no reserve): the
-    basis is cleared.
+    Some slot of the horizon pays and its fill source is the persisted basis or slot 0: that fill
+    price becomes the basis, so the next re-plan inside the expensive phase still sees the
+    reserve as cheaply filled. No slot pays (cheap phase, released or no reserve) or the fill
+    source lies ahead: the basis is cleared.
     """
-    from optimizer.reserve_price_floor import reserve_price_floor
+    from optimizer.reserve_price_floor import reserve_price_floor, slot_start
     from runtime_store.powerstation_reserves import (
         clear_fill_basis,
         save_reserve_states,
@@ -821,14 +821,19 @@ def update_reserve_fill_basis(
     primary = battery_params[0] if isinstance(battery_params, list) else battery_params
     plan = reserve_price_floor(primary, matrix, horizon=len(matrix), dt_h=dt_h) if primary else None
     basis: tuple[float, datetime] | None = None
-    if plan is not None and plan.held_now:
-        first = plan.first_paying_slot()
+    first = plan.first_paying_slot() if plan is not None else None
+    if plan is not None and first is not None:
         price, at = plan.fill_price[first], plan.fill_at[first]
         if price is None or at is None:
             raise ValueError(
                 f"Virtuelle Reserve: Slot {first} lohnt sich ohne Füllpreis/-zeitpunkt."
             )
-        basis = (float(price), at)
+        # Keep the basis while any slot of the horizon pays, not only while the floor is held
+        # at the end of slot 0: slot 0 pays only through the basis, so with prices that rise
+        # gradually slot 1 never pays from slot 0 and a held-now rule never sets it. A fill
+        # source in the future is energy not bought yet: no basis from it.
+        if at <= slot_start(matrix, 0):
+            basis = (float(price), at)
     states = load_reserve_states()
     for ps_id in virtual_ids:
         entry = states.get(ps_id)
