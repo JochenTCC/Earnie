@@ -23,6 +23,7 @@ INPUT_KEYS = frozenset({
     "force_negative_price",
     "scenario_settings",
     "house_profile_patch",
+    "heating_system_patch",
 })
 
 # Settings a case may add to its scenario on top of the ones the scenario already has.
@@ -32,10 +33,11 @@ EXTRA_SCENARIO_SETTINGS = frozenset({
     "import_cap_margin_kw",
 })
 
-EXTRA_METRIC_KEYS = frozenset({"consumer_kwh"})
+EXTRA_METRIC_KEYS = frozenset({"consumer_kwh", "consumer_price_ct"})
 
 SCENARIOS_ENV = "EARNIE_BACKTESTING_SCENARIOS_PATH"
 HOUSE_PROFILES_ENV = "EARNIE_HOUSE_PROFILES_PATH"
+COMPONENTS_ENV = "EARNIE_COMPONENTS_PATH"
 
 
 def case_inputs(meta: dict[str, Any], case_id: str) -> dict[str, Any]:
@@ -61,8 +63,13 @@ def scenario_id(inputs: dict[str, Any]) -> str:
     return str(inputs.get("scenario_id") or DEFAULT_SCENARIO_ID)
 
 
-def consumer_metric_ids(meta: dict[str, Any], case_id: str) -> tuple[str, ...]:
-    """Consumer IDs whose energy the case reports (``extra_metrics.consumer_kwh``)."""
+def consumer_metric_ids(
+    meta: dict[str, Any], case_id: str, key: str = "consumer_kwh"
+) -> tuple[str, ...]:
+    """Consumer IDs listed under ``extra_metrics.<key>``: ``consumer_kwh`` (energy) or
+    ``consumer_price_ct`` (energy-weighted import price)."""
+    if key not in EXTRA_METRIC_KEYS:
+        raise ValueError(f"unknown extra_metrics key {key!r}")
     extra = meta.get("extra_metrics")
     if extra is None:
         return ()
@@ -74,28 +81,34 @@ def consumer_metric_ids(meta: dict[str, Any], case_id: str) -> tuple[str, ...]:
             f"case {case_id}: unknown extra_metrics keys {unknown}; "
             f"allowed: {sorted(EXTRA_METRIC_KEYS)}"
         )
-    ids = extra.get("consumer_kwh") or []
+    ids = extra.get(key) or []
     if not isinstance(ids, list) or not all(isinstance(i, str) and i for i in ids):
-        raise TypeError(f"case {case_id}: extra_metrics.consumer_kwh must be a list of IDs")
+        raise TypeError(f"case {case_id}: extra_metrics.{key} must be a list of IDs")
     return tuple(ids)
 
 
 def write_case_config(
     inputs: dict[str, Any], work_dir: Path, *, fixtures_root: Path, case_id: str
 ) -> dict[str, Path]:
-    """Patched fixture files for ``scenario_settings`` / ``house_profile_patch``.
+    """Patched fixture files for ``scenario_settings`` / ``house_profile_patch`` /
+    ``heating_system_patch``.
 
     Returns env var → path of each file written; empty without overrides.
     """
+    paths: dict[str, Path] = {}
+    system_patch = inputs.get("heating_system_patch")
+    if system_patch is not None:
+        paths[COMPONENTS_ENV] = _write_heating_system_patch(
+            system_patch, work_dir, fixtures_root=fixtures_root, case_id=case_id
+        )
     settings_patch = inputs.get("scenario_settings")
     profile_patch = inputs.get("house_profile_patch")
     if settings_patch is None and profile_patch is None:
-        return {}
+        return paths
     sid = scenario_id(inputs)
     scenarios_doc = _read_json(fixtures_root / "backtesting_scenarios.json")
     entry = _scenario_entry(scenarios_doc, sid, case_id)
     settings = entry.setdefault("settings", {})
-    paths: dict[str, Path] = {}
     if settings_patch is not None:
         if not isinstance(settings_patch, dict):
             raise TypeError(f"case {case_id}: scenario_settings must be a mapping")
@@ -132,6 +145,29 @@ def write_case_config(
         _write_json(path, profiles_doc)
         paths[HOUSE_PROFILES_ENV] = path
     return paths
+
+
+def _write_heating_system_patch(
+    system_patch: Any, work_dir: Path, *, fixtures_root: Path, case_id: str
+) -> Path:
+    """``components.json`` with heating systems patched by id (``{system id: patch}``)."""
+    if not isinstance(system_patch, dict) or not system_patch:
+        raise TypeError(f"case {case_id}: heating_system_patch must be a non-empty mapping")
+    doc = _read_json(fixtures_root / "components.json")
+    systems = doc.get("heating_systems") or []
+    for system_id, patch in system_patch.items():
+        if not isinstance(patch, dict):
+            raise TypeError(f"case {case_id}: heating_system_patch.{system_id} must be a mapping")
+        index = next(
+            (i for i, s in enumerate(systems) if isinstance(s, dict) and s.get("id") == system_id),
+            None,
+        )
+        if index is None:
+            raise ValueError(f"case {case_id}: heating system {system_id!r} not in the fixture")
+        systems[index] = deep_merge(systems[index], patch)
+    path = work_dir / "components.json"
+    _write_json(path, doc)
+    return path
 
 
 def deep_merge(base: dict[str, Any], patch: dict[str, Any]) -> dict[str, Any]:

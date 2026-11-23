@@ -1,0 +1,39 @@
+id: REG-S-thermal-store-lossless
+title: Loss-free twin of REG-S-thermal-store-losses (heat_loss_kw_per_k 0)
+level: L2
+source: synthetic
+anonymized: true
+app_version: "2.8.0-dev"
+window:
+  start: "2026-01-13"
+  end: "2026-01-14"
+inputs:
+  kind: backtesting_fixtures
+  scenario_id: fixture_5kwh_fixed
+  initial_soc: 50.0
+  # Spot tariff on the synthetic prices (12-15 ct sawtooth, 28 ct at 18:00): it pays to charge
+  # the store ahead of the evening peak.
+  import_tariff:
+    id: spot
+    type: spot_hourly
+    settlement_fee_cent_kwh: 1.5
+    markup_percent: 0.0
+    prices_include_vat: false
+    vat_percent: 20.0
+  scenario_settings:
+    house_profile_id: test_home
+  # Same 500 l store as REG-S-thermal-store-losses, without losses. Before the bugfix of
+  # 2026-11-23 a loss of 0 silently became the 0.02 default.
+  heating_system_patch:
+    heating_test_home:
+      heat_storage:
+        volume_liters: 500
+        heat_loss_kw_per_k: 0.0
+        setpoint_c: 45.0
+        tolerance_c: 5.0
+extra_metrics:
+  consumer_kwh: [wp]
+  consumer_price_ct: [wp]
+# Reference for the shorter look-ahead: the loss-free store charges ahead of the 18:00 peak and
+# the heat pump stays off in it (smoke 2026-11-23: 17.85 ct/kWh). Red before the zero-loss
+# bugfix: it ran with 0.02 kW/K and matched the lossy case.

@@ -37,11 +37,12 @@ def normalize_heat_storage(raw: dict | None) -> dict | None:
     boost = float(raw.get("boost_k", heat_storage_default("boost_k")) or 0.0)
     if boost < 0.0:
         raise ValueError(f"heat_storage.boost_k darf nicht negativ sein (ist {boost:g} K).")
+    # 0 is a valid loss (loss-free store); only a missing value takes the default.
+    loss_raw = raw.get("heat_loss_kw_per_k")
+    loss = loss_default if loss_raw in (None, "") else float(loss_raw)
     return {
         "volume_liters": volume,
-        "heat_loss_kw_per_k": max(
-            0.0, float(raw.get("heat_loss_kw_per_k", loss_default) or loss_default)
-        ),
+        "heat_loss_kw_per_k": max(0.0, loss),
         "setpoint_c": float(raw.get("setpoint_c", heat_storage_default("setpoint_c"))),
         "tolerance_c": max(0.1, float(raw.get("tolerance_c", tol_default) or tol_default)),
         # HeatControl P2: on levels 0 and 1 a charge (enable 1 / state 3) ends at

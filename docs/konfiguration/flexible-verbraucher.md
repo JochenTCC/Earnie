@@ -386,7 +386,7 @@ Jedes Fenster beginnt mit dem Pegel, mit dem das vorige endete; das erste Fenste
 | Feld | Bedeutung |
 | ---- | --------- |
 | `heat_storage.volume_liters` | Speichervolumen; `≤ 0` oder fehlend = bisheriges Modell ohne Speicher |
-| `heat_storage.heat_loss_kw_per_k` | Speicherverlust gegen die Umgebung |
+| `heat_storage.heat_loss_kw_per_k` | Speicherverlust gegen die Umgebung; fehlt er, gilt 0,02 kW/K. 0 = verlustfreier Speicher |
 | `heat_storage.setpoint_c` / `tolerance_c` | Normaler Sollwert der Regelung und Untergrenze (`setpoint − tolerance`); Obergrenze im Normalbetrieb = Sollwert, absolute Obergrenze (Solarthermie) = 95 °C |
 | `heat_storage.boost_k` | Fester Boost in K: um so viel hebt die Regelung das Soll an, wenn Earnie die Wärmepumpe freigibt (Freigabe 1 bzw. SG-Ready-Zustand 3). Earnie lädt auf Vorrat bis `setpoint + boost`. Vorgabe 0 = nur bis zum Sollwert |
 

@@ -31,6 +31,19 @@ def test_normalize_heat_storage_disabled_when_volume_zero():
     assert not heat_storage_enabled({"volume_liters": 0})
 
 
+def test_normalize_heat_storage_keeps_a_loss_free_store():
+    # Bugfix (2026-11-23): 0 is a valid loss (schema minimum 0); it became the 0.02 default.
+    assert normalize_heat_storage(_storage(heat_loss_kw_per_k=0))["heat_loss_kw_per_k"] == 0.0
+    assert normalize_heat_storage(_storage(heat_loss_kw_per_k=0.0))["heat_loss_kw_per_k"] == 0.0
+
+
+def test_normalize_heat_storage_default_loss_only_when_missing():
+    raw = _storage()
+    del raw["heat_loss_kw_per_k"]
+    assert normalize_heat_storage(raw)["heat_loss_kw_per_k"] == 0.02
+    assert normalize_heat_storage(_storage(heat_loss_kw_per_k=None))["heat_loss_kw_per_k"] == 0.02
+
+
 def test_step_solar_raises_store_temp():
     band = ThermalBand(45.0, 5.0)
     capacity = capacity_kwh_per_k_from_volume(800.0)

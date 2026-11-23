@@ -33,6 +33,7 @@ _ENV_KEYS = (
     "EARNIE_BACKTESTING_SCENARIOS_PATH",
     "EARNIE_TARIFFS_PATH",
     "EARNIE_HOUSE_PROFILES_PATH",
+    "EARNIE_COMPONENTS_PATH",
     "EARNIE_OFFLINE",
 )
 
@@ -173,6 +174,7 @@ def run_l2(case: RegressionCase) -> dict[str, Any]:
 
     inputs = case_inputs(case.meta, case.id)
     consumers = consumer_metric_ids(case.meta, case.id)
+    priced = consumer_metric_ids(case.meta, case.id, "consumer_price_ct")
     with tempfile.TemporaryDirectory() as tmp:
         work_dir = Path(tmp)
         overrides = write_case_config(
@@ -182,7 +184,8 @@ def run_l2(case: RegressionCase) -> dict[str, Any]:
             df, plausibility, scenario = _simulate(inputs, start, end, work_dir)
             assert_pv_day_shape(df, case_id=case.id)
             metrics = metrics_from_l2_frame(
-                df, plausibility, scenario=scenario, consumers=consumers
+                df, plausibility, scenario=scenario, consumers=consumers,
+                priced_consumers=priced,
             )
     metrics["inputs"] = l2_input_fingerprint(
         fixtures_root=FIXTURES_ROOT,
@@ -233,13 +236,15 @@ def metrics_from_l2_frame(
     *,
     scenario: dict | None = None,
     consumers: tuple[str, ...] = (),
+    priced_consumers: tuple[str, ...] = (),
 ) -> dict[str, Any]:
     """Compared L2 metrics. The compare reads only the keys a golden lists, so a metric added
     here leaves older goldens untouched.
 
     ``scenario``: the resolved params of the run; adds ``capacity_charge_eur`` (0 without a
     capacity charge in the grid area). ``consumers``: IDs whose energy becomes
-    ``consumer_kwh_<id>``; a missing result column raises.
+    ``consumer_kwh_<id>``; ``priced_consumers``: IDs whose energy-weighted import price
+    (``k_act``, ct/kWh) becomes ``consumer_price_ct_<id>``. A missing result column raises.
     """
     import_kwh = float(df["import_kwh"].fillna(0).sum()) if "import_kwh" in df else 0.0
     export_kwh = float(df["export_kwh"].fillna(0).sum()) if "export_kwh" in df else 0.0
@@ -273,9 +278,32 @@ def metrics_from_l2_frame(
                 f"(consumer {consumer_id!r} not planned?)"
             )
         metrics[f"consumer_kwh_{consumer_id}"] = float(df[column].fillna(0).sum()) * _DT_H
+    for consumer_id in priced_consumers:
+        metrics[f"consumer_price_ct_{consumer_id}"] = _consumer_price_ct(df, consumer_id)
     if "import_cap_limit" in df.columns:
         metrics["import_cap_slots_over_without_cause"] = _slots_over_without_cause(df)
     return metrics
+
+
+def _consumer_price_ct(df: pd.DataFrame, consumer_id: str) -> float:
+    """Import price (``k_act``, ct/kWh) weighted by the consumer's energy per slot.
+
+    Shows when a consumer runs: a store that can hold its heat longer moves the run into cheaper
+    slots. A consumer without energy in the window raises (no price to weigh).
+    """
+    column = f"{consumer_id}_kw"
+    for needed in (column, "k_act"):
+        if needed not in df.columns:
+            raise ValueError(
+                f"extra_metrics.consumer_price_ct: no column {needed!r} in the L2 result"
+            )
+    energy = df[column].fillna(0).clip(lower=0.0)
+    total = float(energy.sum())
+    if total <= 0.0:
+        raise ValueError(
+            f"extra_metrics.consumer_price_ct: consumer {consumer_id!r} has no energy in the window"
+        )
+    return float((energy * pd.to_numeric(df["k_act"], errors="raise")).sum()) / total
 
 
 # Booked import above the slot's limit by more than this counts as over (kW; rounding of rows).

@@ -11,6 +11,7 @@ import pytest
 from tests.fixtures.backtesting_fixtures import FIXTURES_ROOT
 from tests.regression import l2_runner
 from tests.regression.l2_case_inputs import (
+    COMPONENTS_ENV,
     HOUSE_PROFILES_ENV,
     SCENARIOS_ENV,
     case_inputs,
@@ -58,6 +59,8 @@ def test_consumer_metric_ids():
         consumer_metric_ids({"extra_metrics": {"rod": ["x"]}}, "c")
     with pytest.raises(TypeError):
         consumer_metric_ids({"extra_metrics": {"consumer_kwh": "wp"}}, "c")
+    priced = {"extra_metrics": {"consumer_kwh": ["wp"], "consumer_price_ct": ["wp", "rod"]}}
+    assert consumer_metric_ids(priced, "c", "consumer_price_ct") == ("wp", "rod")
 
 
 # --- patched fixture files --------------------------------------------------------
@@ -122,6 +125,27 @@ def test_house_profile_patch_merges_into_the_scenario_profile(tmp_path):
     assert profile["thermal"]["building_class"] == 3  # merged, not replaced
 
 
+def test_heating_system_patch_merges_into_the_catalog_entry(tmp_path):
+    store = {"volume_liters": 500, "heat_loss_kw_per_k": 0.0}
+    paths = write_case_config(
+        {"heating_system_patch": {"heating_test_home": {"heat_storage": store}}},
+        tmp_path, fixtures_root=FIXTURES_ROOT, case_id="c",
+    )
+    assert set(paths) == {COMPONENTS_ENV}
+    doc = json.loads(paths[COMPONENTS_ENV].read_text(encoding="utf-8"))
+    system = next(s for s in doc["heating_systems"] if s["id"] == "heating_test_home")
+    assert system["heat_storage"] == store
+    assert system["heating_power_kw"] == 10.5  # merged, not replaced
+
+
+def test_heating_system_patch_unknown_system_fails_loud(tmp_path):
+    with pytest.raises(ValueError, match="heating system 'nope' not in the fixture"):
+        write_case_config(
+            {"heating_system_patch": {"nope": {"heating_power_kw": 1}}},
+            tmp_path, fixtures_root=FIXTURES_ROOT, case_id="c",
+        )
+
+
 def test_deep_merge_does_not_touch_the_base():
     base = {"a": {"b": 1, "c": [1]}}
     out = deep_merge(base, {"a": {"b": 2}, "d": 4})
@@ -163,6 +187,19 @@ def test_no_import_limit_no_overshoot_metric():
     assert "import_cap_slots_over_without_cause" not in l2_runner.metrics_from_l2_frame(
         _frame([0.5]), None
     )
+
+
+def test_consumer_price_is_weighted_by_its_energy():
+    frame = _frame([0.5, 1.5, 1.0], wp_kw=[2.0, 0.0, 6.0]).assign(k_act=[10.0, 40.0, 30.0])
+    metrics = l2_runner.metrics_from_l2_frame(frame, None, priced_consumers=("wp",))
+    # (2 * 10 + 6 * 30) / 8 = 25 ct; the 40 ct slot has no heat pump energy.
+    assert metrics["consumer_price_ct_wp"] == pytest.approx(25.0)
+
+
+def test_consumer_price_without_energy_fails_loud():
+    frame = _frame([0.5], wp_kw=[0.0]).assign(k_act=[10.0])
+    with pytest.raises(ValueError, match="has no energy in the window"):
+        l2_runner.metrics_from_l2_frame(frame, None, priced_consumers=("wp",))
 
 
 def test_missing_consumer_column_fails_loud():

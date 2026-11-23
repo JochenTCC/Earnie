@@ -1,0 +1,40 @@
+id: REG-S-thermal-store-losses
+title: Heat pump store with losses - shorter look-ahead than its loss-free twin
+level: L2
+source: synthetic
+anonymized: true
+app_version: "2.8.0-dev"
+window:
+  start: "2026-01-13"
+  end: "2026-01-14"
+inputs:
+  kind: backtesting_fixtures
+  scenario_id: fixture_5kwh_fixed
+  initial_soc: 50.0
+  # Spot tariff on the synthetic prices (12-15 ct sawtooth, 28 ct at 18:00): it pays to charge
+  # the store ahead of the evening peak.
+  import_tariff:
+    id: spot
+    type: spot_hourly
+    settlement_fee_cent_kwh: 1.5
+    markup_percent: 0.0
+    prices_include_vat: false
+    vat_percent: 20.0
+  scenario_settings:
+    house_profile_id: test_home
+  # 500 l store, 0.02 kW/K (the code default). Twin: REG-S-thermal-store-lossless, same inputs
+  # with 0 kW/K.
+  heating_system_patch:
+    heating_test_home:
+      heat_storage:
+        volume_liters: 500
+        heat_loss_kw_per_k: 0.02
+        setpoint_c: 45.0
+        tolerance_c: 5.0
+extra_metrics:
+  consumer_kwh: [wp]
+  consumer_price_ct: [wp]
+# HeatControl P4: the leaky store cannot hold heat from the cheap hours until the peak, so the
+# heat pump also runs at 18:00 and its weighted price lies above the twin's (smoke 2026-11-23:
+# 18.79 vs 17.85 ct/kWh). Its energy is higher too: the year model holds the store loss, and the
+# base load of test_home shrinks by the same amount (annual_kwh minus the heat pump).

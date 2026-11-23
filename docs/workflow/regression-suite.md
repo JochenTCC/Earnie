@@ -101,6 +101,7 @@ window: {start: "2026-06-26T18:00", end: "2026-06-27T10:00"}   # L2 / L1 context
 | `initial_soc` | Start SoC of the window |
 | `scenario_settings` | Patched into that scenario's settings: keys it already has, plus `house_profile_id`, `import_cap_kw`, `import_cap_margin_kw`. Unknown keys fail loud |
 | `house_profile_patch` | Deep-merged into the scenario's house profile (needs a `house_profile_id`) |
+| `heating_system_patch` | `{<heating system id>: patch}`, deep-merged into that entry of the fixture `components.json` (e.g. a `heat_storage`); unknown IDs fail loud |
 | `import_tariff` | Inline import tariff spec |
 | `grid_fee_base_cent_kwh` | Flat grid area for the case (`netznutzung`) |
 | `grid_capacity_charges` | Capacity charges of that flat grid area (needs `grid_fee_base_cent_kwh`) |
@@ -108,7 +109,7 @@ window: {start: "2026-06-26T18:00", end: "2026-06-27T10:00"}   # L2 / L1 context
 
 Scenario and profile patches are written as copies of the fixture files into the run's temp folder, so the normal scenario resolution validates them. The fixture's `cons_data.csv` covers only a few June days (2026-06-23 to 2026-06-29); a window outside them fails with `MissingConsumptionDataError`. A case with a house profile also needs the profile site's climate under `tests/fixtures/backtesting/open_meteo/` (record once, §8).
 
-**Extra L2 metrics:** every L2 run reports `peak_import_kw` (highest 15-minute import) and `capacity_charge_eur` (gross, 0 without a capacity charge). `extra_metrics: {consumer_kwh: [<id>, …]}` in `case.yaml` adds `consumer_kwh_<id>` from the result column `<id>_kw` (missing column → error). A run with an import cap also reports `import_cap_slots_over_without_cause`: booked slots more than 0.02 kW over their limit although the plan names no cause (the control did not follow the plan). The compare reads only the metrics a golden lists, so new metrics leave older goldens valid.
+**Extra L2 metrics:** every L2 run reports `peak_import_kw` (highest 15-minute import) and `capacity_charge_eur` (gross, 0 without a capacity charge). `extra_metrics: {consumer_kwh: [<id>, …]}` in `case.yaml` adds `consumer_kwh_<id>` from the result column `<id>_kw` (missing column → error). `consumer_price_ct: [<id>, …]` adds `consumer_price_ct_<id>`, the import price `k_act` weighted by the consumer's energy per slot (ct/kWh; shows when it runs; no energy in the window → error). A run with an import cap also reports `import_cap_slots_over_without_cause`: booked slots more than 0.02 kW over their limit although the plan names no cause (the control did not follow the plan). The compare reads only the metrics a golden lists, so new metrics leave older goldens valid.
 
 `expected.json` holds the result tiers of §7 plus the engine fingerprint used for the golden (Earnie version, CBC/solver version), and optionally:
 
