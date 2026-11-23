@@ -8,6 +8,9 @@ SOURCES = frozenset({"synthetic", "own", "customer"})
 DEFAULT_METRIC_TOLERANCE_PCT = 0.05
 
 _CASE_REQUIRED = ("id", "title", "level", "source", "anonymized")
+# L1 ``climate:``: ``shared`` (default) reads tests/regression/fixtures/open_meteo/, ``case`` only
+# the case's own ``climate/open_meteo/`` (private cases keep the site's climate private).
+L1_CLIMATE_SOURCES = frozenset({"shared", "case"})
 _EXPECTED_REQUIRED = ("engine", "tolerances", "invariants", "metrics")
 
 
@@ -60,6 +63,12 @@ def _require_recorder_select(meta: dict[str, Any], case_dir_name: str) -> None:
     if recorder.get("seed_anchor") is None and recorder.get("cycle_index") is None:
         raise ValueError(
             f"L1 case {case_dir_name} needs recorder.seed_anchor or cycle_index"
+        )
+    climate = meta.get("climate", "shared")
+    if climate not in L1_CLIMATE_SOURCES:
+        raise ValueError(
+            f"L1 case {case_dir_name} climate {climate!r} invalid; "
+            f"expected one of {sorted(L1_CLIMATE_SOURCES)}"
         )
 
 

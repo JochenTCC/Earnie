@@ -1,12 +1,17 @@
 """L1 cycle replay via recorder_replay (strict HiGHS)."""
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
 from runtime_store.cycle_recorder import read_segment_cycles
 from runtime_store.recorder_replay import ReplayResult, replay_recorded_cycle
-from tests.regression.climate_fixture import L1_CLIMATE_FIXTURE_DIR, frozen_climate_fixture
+from tests.regression.climate_fixture import (
+    L1_CLIMATE_FIXTURE_DIR,
+    RECORD_ENV,
+    frozen_climate_fixture,
+)
 from tests.regression.fingerprint import l1_input_fingerprint
 from tests.regression.loader import RegressionCase, resolve_recorder_root
 
@@ -39,7 +44,7 @@ def select_cycle_entry(case: RegressionCase) -> tuple[dict[str, Any], Path]:
 def run_l1(case: RegressionCase) -> dict[str, Any]:
     entry, recorder_root = select_cycle_entry(case)
     # The thermal flex context reads Open-Meteo climate the cycle does not record.
-    with frozen_climate_fixture(L1_CLIMATE_FIXTURE_DIR) as climate_files:
+    with frozen_climate_fixture(l1_climate_dir(case)) as climate_files:
         result = replay_recorded_cycle(
             entry,
             recorder_root=recorder_root,
@@ -51,6 +56,27 @@ def run_l1(case: RegressionCase) -> dict[str, Any]:
         entry=entry, recorder_root=recorder_root, climate_files=climate_files
     )
     return metrics
+
+
+def l1_climate_dir(case: RegressionCase) -> Path:
+    """Frozen climate of an L1 case: shared (default) or the case's own ``climate/open_meteo/``.
+
+    ``climate: case`` reads only the case folder (a private case keeps its site's climate in the
+    private repo); a missing folder fails loud unless climate is being recorded.
+    """
+    source = case.meta.get("climate", "shared")
+    if source == "shared":
+        return L1_CLIMATE_FIXTURE_DIR
+    if source != "case":
+        raise ValueError(f"case {case.id}: climate {source!r} invalid")
+    folder = case.case_dir / "climate" / "open_meteo"
+    if not folder.is_dir():
+        if os.environ.get(RECORD_ENV) != "1":
+            raise FileNotFoundError(
+                f"case {case.id}: climate: case needs {folder} (record it once with {RECORD_ENV}=1)"
+            )
+        folder.mkdir(parents=True)
+    return folder
 
 
 def metrics_from_replay(result: ReplayResult) -> dict[str, Any]:
