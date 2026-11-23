@@ -42,7 +42,7 @@ All accepted by the maintainer on 2026-11-07, as recommended. D4 and D6 go beyon
 | D4 | How is overshoot penalized? | Per-slot slack **plus** one overshoot variable per month, `S_m >= s[t]`. | This goes beyond the backlog text. Linear slack alone treats one slot at +4 kW like four slots at +1 kW, but the bill counts only the height. |
 | D5 | Cap below the minimum billing power? | The form refuses to save it. At runtime, if the grid area changed later: visible warning, cap used as entered. | Follows the backlog: tell the user, never raise it silently. |
 | D6 | L4 check before or after the solve? | After the solve: `s[t] > 0` names the slots exactly, then a simple power and energy check names the cause. | This differs from the backlog's "before the solve". A check before the solve would duplicate the flex and inverter rules and could disagree with the plan. |
-| D7 | Margin value? | Required once a cap is set, form proposes 0.3 kW. The value is a placeholder until P6 measures it. | No hidden default (`no-implicit-fallbacks.mdc`). |
+| D7 | Margin value? | Required once a cap is set, form proposes 0.7 kW (since 2026-11-23, from the field test; 0.3 kW placeholder before). | No hidden default (`no-implicit-fallbacks.mdc`). |
 | D8 | Peak source in Live? | Earnie's own 15-minute import log only. A meter sensor as source comes later. | It works on every backend with `grid_kw`; a new EHAL field adds binding work and is not needed for the first version. |
 | D9 | Hourly profiles? | Do not pull the 15-minute import into 2.8. Measure the effect in P1 and label the SE peak with its resolution. | That item touches many consumers and pack files. |
 
@@ -175,7 +175,7 @@ Planned:
 - Measure the real window: store the time of both counter reads and divide by the elapsed time, or interpolate to the quarter-hour boundaries, instead of the fixed 0.25 h. The value records its source and window.
 - Clock: Earnie measures on its own host clock and does not try to follow the meter (see **Meter timing** below). Show a warning when the host clock is not synchronised, if the platform can tell.
 - **Field test before the margin is set:** two weeks of the maintainer's meter. Keep the 30 s samples for that time and compare with the quarter-hour export from the operator's portal: peak difference per month, typical and worst error per quarter hour, and the shift of Earnie's window that fits best. The data stays private, only the method and the rounded error go into this repo.
-- New `runtime_store/capacity_peak_store.py`: persisted per calendar month, local time of the house: peak, its slot, first logged slot, quarter hours missing. Survives restarts; a month change starts a new entry.
+- New `runtime_store/capacity_peak_store.py`: persisted per calendar month, local time of the house (the planning timezone since 2026-11-23, see **Month in the planning timezone** under P6): peak, its slot, first logged slot, quarter hours missing. Survives restarts; a month change starts a new entry.
 - Unknown is never 0: after an install or a gap the state says "gemessen seit …" or "n Viertelstunden fehlen", and the UI shows it. This value is measured, but it can be lower than the meter's.
 - `main.py`: build caps before `milp_optimizer`; record cap and peak in `cycle_recorder` like `record_export_limits`; `recorder_replay` reads them.
 - Automatik fallback and `_trivial_optimizer_result` hold no cap, so both report it.
@@ -183,6 +183,8 @@ Planned:
 - **Tests:** peak over a month change and restart, gaps, import against net inside one quarter hour, replay with cap, HouseSim run on HA.
 
 ### P6: Warning and display (L4)
+
+**Month in the planning timezone (2026-11-23, maintainer).** The sampler measures on the host clock, the plan and the grid operator count in the house's timezone. `capacity_peak_store.planning_slot` converts a measured quarter hour (naive = host clock) to planning-local time; the peak store, the measured and observed cap check (`import_cap_report_store`), `main.py`'s month lookup, the Monitor block and the scenario editor's cap check use it. Before, a container with `TZ=UTC` for a plant in Europe/Vienna booked the first one or two hours of a month to the month before, and measured slots missed the plan's slot of the same quarter hour. Existing entries were written on the host clock; on a host that already runs in the house's timezone nothing changes. Not handled: the repeated hour when summer time ends (a slot not after the last stored is ignored, as before).
 
 Split on 2026-11-11 (maintainer) into **P6a** report, **P6b** Monitor page and **P6c** SE and testbed, built before the field test; only the margin's proposal waits for it. Decisions of that day:
 
@@ -197,7 +199,7 @@ Split on 2026-11-11 (maintainer) into **P6a** report, **P6b** Monitor page and *
 - **Not covered:** an SoC pinned by an equality (SE SA₁ carry-in) is not read as a reserve. "None detected" stays possible and is reported as such.
 - **Tests:** `tests/test_import_cap_report.py` (each cause, inverter limit, report in the plan, trivial and Automatik, cycle record, store, measured check, Live hooks).
 
-**P6b built 2026-11-11.** `ui/capacity_charge_panel.py` puts a "Leistungspreis" block on the Monitor page (`ui/pages/page_cockpit.py`, under the absent-mode notice; since 2026-11-12 below Chart 2 in the "Earnie-Effekt" section), only when the resolved Live scenario has a cap or the grid area a capacity charge in the current month (host clock, as the peak store keeps months).
+**P6b built 2026-11-11.** `ui/capacity_charge_panel.py` puts a "Leistungspreis" block on the Monitor page (`ui/pages/page_cockpit.py`, under the absent-mode notice; since 2026-11-12 below Chart 2 in the "Earnie-Effekt" section), only when the resolved Live scenario has a cap or the grid area a capacity charge in the current month (planning timezone since 2026-11-23, as the peak store keeps months; host clock before).
 
 - Figures: month peak from `capacity_peak_store.month_peak` with measured-since, peak slot and missing quarter hours; billed power = max(peak, charge minimum); amount so far and the next kW (`capacity_charge_eur(billed + 1) − capacity_charge_eur(billed)`), both gross with the import tariff's VAT as in `simulation/capacity_charge.py`. A month without entry shows "unbekannt" and the minimum amount ("mind. …"), never 0, and no next-kW price.
 - Cap: cap, margin and the planning limit `max(cap, peak) − margin`; a peak above the cap is named.
