@@ -13,7 +13,7 @@ re-timed keeps its logged timing for that day, and the reason is returned with i
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
@@ -250,93 +250,138 @@ def retime_flex_day(
         raise ValueError(f"savings ledger flex: the shape builder runs on {DEFAULT_DT_H} h slots, got {dt_h}")
     rows = list(slot_rows)
     n = len(rows)
-    counted = [i for i, row in enumerate(rows) if row["counted"]]
-    per_slot: list[dict[str, float]] = [{} for _ in range(n)]
-    timing: dict[str, str] = {}
-    reasons: dict[str, str] = {}
-    delivered: dict[str, float] = {}
-    fuel_eur = [0.0] * n
-    fuel_kwh = 0.0
-
-    def keep_logged(cid: str, label: str, reason: str | None = None) -> None:
-        for i, kw in enumerate(_logged_kw(rows, cid, dt_h)):
-            per_slot[i][cid] = kw
-        timing[cid] = label
-        if reason is not None:
-            reasons[cid] = reason
-
+    acc = _RetimeDay(
+        rows=rows,
+        dt_h=dt_h,
+        counted=[i for i, row in enumerate(rows) if row["counted"]],
+        per_slot=[{} for _ in range(n)],
+        fuel_eur=[0.0] * n,
+    )
     configured: set[str] = set()
     for consumer in consumers:
         cid = str(consumer["id"])
         configured.add(cid)
-        if cid not in windows:
-            raise ValueError(f"savings ledger flex: no windows for consumer '{cid}'")
-        profile = profiles_kw.get(cid) if profiles_kw is not None else None
-        if profile is not None and len(profile) != n:
-            raise ValueError(
-                f"savings ledger flex: profile of '{cid}' has {len(profile)} values for {n} slot rows"
-            )
-        energy = sum(float(rows[i].get("flex_delivered_kwh", {}).get(cid, 0.0)) for i in counted)
-        delivered[cid] = energy
-        has_meter = any(cid in (rows[i].get("flex_delivered_kwh") or {}) for i in counted)
-        if not has_meter:
-            keep_logged(cid, TIMING_LOGGED_NO_METER)
-            continue
-        if energy <= _ENERGY_EPSILON_KWH:
-            keep_logged(cid, TIMING_NO_ENERGY)
-            continue
-        if _is_ev_consumer(consumer):
-            eligible = _ev_plugged_slots(rows, counted, cid)
-            if eligible is None:
-                keep_logged(cid, TIMING_LOGGED_NO_PLUG_STATE)
-                continue
-            _, max_kw = power_limits_kw(consumer)
-            if energy > len(eligible) * max_kw * dt_h + _ENERGY_EPSILON_KWH:
-                keep_logged(cid, TIMING_LOGGED, REASON_EXCEEDS_ELIGIBLE)
-                continue
-            # one unit at plug-in: the builder caps it at nominal and carries the rest forward
-            shape = [1.0 if i == eligible[0] else 0.0 for i in range(n)]
-            shaped = build_shaped_flex_kw_per_slot(n, [consumer], {cid: energy}, {cid: shape}, {cid: eligible})
-            for i in range(n):
-                per_slot[i][cid] = shaped.per_slot[i][cid]
-            timing[cid] = TIMING_PLUG_IN
-            continue
-        if is_heating_rod_consumer(consumer) and not consumer["parent_heat_electric"]:
-            credit = consumer.get("fuel_credit_cent_per_kwh")
-            if credit is None:
-                keep_logged(cid, TIMING_LOGGED, REASON_NO_FUEL_PRICE)
-                continue
-            efficiency = float(consumer["parent_heat_efficiency"])
-            for i in range(n):
-                per_slot[i][cid] = 0.0
-                rod_kwh = float((rows[i].get("flex_delivered_kwh") or {}).get(cid, 0.0)) if rows[i]["counted"] else 0.0
-                fuel_eur[i] += rod_kwh * float(credit) / 100.0
-                fuel_kwh += rod_kwh / efficiency
-            timing[cid] = TIMING_FUEL
-            continue
-        if profiles_kw is None:
-            keep_logged(cid, TIMING_LOGGED, REASON_PROFILE_ERROR)
-            continue
-        reference = _reference_shape(n, counted, profile, windows[cid])
-        if reference is None:
-            keep_logged(cid, TIMING_LOGGED, REASON_NO_SHAPE_NO_WINDOW)
-            continue
-        label, eligible, shape = reference
-        _, max_kw = power_limits_kw(consumer)
-        if energy > len(eligible) * max_kw * dt_h + _ENERGY_EPSILON_KWH:
-            keep_logged(cid, TIMING_LOGGED, REASON_EXCEEDS_ELIGIBLE)
-            continue
-        shaped = build_shaped_flex_kw_per_slot(n, [consumer], {cid: energy}, {cid: shape}, {cid: eligible})
-        if shaped.no_shape_ids:
-            raise AssertionError(f"savings ledger flex: '{cid}' reached the builder without a shape")
-        for i in range(n):
-            per_slot[i][cid] = shaped.per_slot[i][cid]
-        timing[cid] = label
+        _retime_consumer(acc, consumer, cid, profiles_kw, windows)
 
     extra = sorted(
-        {cid for i in counted for cid in (rows[i].get("flex_delivered_kwh") or {})} - configured
+        {cid for i in acc.counted for cid in (rows[i].get("flex_delivered_kwh") or {})} - configured
     )
     for cid in extra:
-        delivered[cid] = sum(float(rows[i]["flex_delivered_kwh"].get(cid, 0.0)) for i in counted)
-        keep_logged(cid, TIMING_LOGGED, REASON_NOT_CONFIGURED)
-    return FlexRetiming(per_slot, timing, reasons, delivered, fuel_eur, fuel_kwh)
+        acc.delivered[cid] = sum(float(rows[i]["flex_delivered_kwh"].get(cid, 0.0)) for i in acc.counted)
+        acc.keep_logged(cid, TIMING_LOGGED, REASON_NOT_CONFIGURED)
+    return FlexRetiming(acc.per_slot, acc.timing, acc.reasons, acc.delivered, acc.fuel_eur, acc.fuel_kwh)
+
+
+@dataclass
+class _RetimeDay:
+    """Mutable result of ``retime_flex_day`` while the consumers are placed one by one."""
+
+    rows: list[dict[str, Any]]
+    dt_h: float
+    counted: list[int]
+    per_slot: list[dict[str, float]]
+    fuel_eur: list[float]
+    fuel_kwh: float = 0.0
+    timing: dict[str, str] = field(default_factory=dict)
+    reasons: dict[str, str] = field(default_factory=dict)
+    delivered: dict[str, float] = field(default_factory=dict)
+
+    def keep_logged(self, cid: str, label: str, reason: str | None = None) -> None:
+        for i, kw in enumerate(_logged_kw(self.rows, cid, self.dt_h)):
+            self.per_slot[i][cid] = kw
+        self.timing[cid] = label
+        if reason is not None:
+            self.reasons[cid] = reason
+
+    def place(self, cid: str, per_slot_kw: list[dict[str, float]], label: str) -> None:
+        for i in range(len(self.rows)):
+            self.per_slot[i][cid] = per_slot_kw[i][cid]
+        self.timing[cid] = label
+
+
+def _retime_consumer(
+    acc: _RetimeDay,
+    consumer: dict,
+    cid: str,
+    profiles_kw: dict[str, list[float]] | None,
+    windows: dict[str, ConsumerWindows],
+) -> None:
+    """Place one configured consumer (order of the cases: ``retime_flex_day``)."""
+    rows, counted, n = acc.rows, acc.counted, len(acc.rows)
+    if cid not in windows:
+        raise ValueError(f"savings ledger flex: no windows for consumer '{cid}'")
+    profile = profiles_kw.get(cid) if profiles_kw is not None else None
+    if profile is not None and len(profile) != n:
+        raise ValueError(
+            f"savings ledger flex: profile of '{cid}' has {len(profile)} values for {n} slot rows"
+        )
+    energy = sum(float(rows[i].get("flex_delivered_kwh", {}).get(cid, 0.0)) for i in counted)
+    acc.delivered[cid] = energy
+    has_meter = any(cid in (rows[i].get("flex_delivered_kwh") or {}) for i in counted)
+    if not has_meter:
+        acc.keep_logged(cid, TIMING_LOGGED_NO_METER)
+    elif energy <= _ENERGY_EPSILON_KWH:
+        acc.keep_logged(cid, TIMING_NO_ENERGY)
+    elif _is_ev_consumer(consumer):
+        _retime_ev(acc, consumer, cid, energy)
+    elif is_heating_rod_consumer(consumer) and not consumer["parent_heat_electric"]:
+        _retime_rod_on_fuel(acc, consumer, cid)
+    elif profiles_kw is None:
+        acc.keep_logged(cid, TIMING_LOGGED, REASON_PROFILE_ERROR)
+    else:
+        _retime_shaped(acc, consumer, cid, energy, _reference_shape(n, counted, profile, windows[cid]))
+
+
+def _exceeds_eligible(consumer: dict, energy: float, eligible: list[int], dt_h: float) -> bool:
+    _, max_kw = power_limits_kw(consumer)
+    return energy > len(eligible) * max_kw * dt_h + _ENERGY_EPSILON_KWH
+
+
+def _retime_ev(acc: _RetimeDay, consumer: dict, cid: str, energy: float) -> None:
+    eligible = _ev_plugged_slots(acc.rows, acc.counted, cid)
+    if eligible is None:
+        acc.keep_logged(cid, TIMING_LOGGED_NO_PLUG_STATE)
+        return
+    if _exceeds_eligible(consumer, energy, eligible, acc.dt_h):
+        acc.keep_logged(cid, TIMING_LOGGED, REASON_EXCEEDS_ELIGIBLE)
+        return
+    n = len(acc.rows)
+    # one unit at plug-in: the builder caps it at nominal and carries the rest forward
+    shape = [1.0 if i == eligible[0] else 0.0 for i in range(n)]
+    shaped = build_shaped_flex_kw_per_slot(n, [consumer], {cid: energy}, {cid: shape}, {cid: eligible})
+    acc.place(cid, shaped.per_slot, TIMING_PLUG_IN)
+
+
+def _retime_rod_on_fuel(acc: _RetimeDay, consumer: dict, cid: str) -> None:
+    credit = consumer.get("fuel_credit_cent_per_kwh")
+    if credit is None:
+        acc.keep_logged(cid, TIMING_LOGGED, REASON_NO_FUEL_PRICE)
+        return
+    efficiency = float(consumer["parent_heat_efficiency"])
+    for i, row in enumerate(acc.rows):
+        acc.per_slot[i][cid] = 0.0
+        rod_kwh = float((row.get("flex_delivered_kwh") or {}).get(cid, 0.0)) if row["counted"] else 0.0
+        acc.fuel_eur[i] += rod_kwh * float(credit) / 100.0
+        acc.fuel_kwh += rod_kwh / efficiency
+    acc.timing[cid] = TIMING_FUEL
+
+
+def _retime_shaped(
+    acc: _RetimeDay,
+    consumer: dict,
+    cid: str,
+    energy: float,
+    reference: tuple[str, list[int], list[float]] | None,
+) -> None:
+    if reference is None:
+        acc.keep_logged(cid, TIMING_LOGGED, REASON_NO_SHAPE_NO_WINDOW)
+        return
+    label, eligible, shape = reference
+    if _exceeds_eligible(consumer, energy, eligible, acc.dt_h):
+        acc.keep_logged(cid, TIMING_LOGGED, REASON_EXCEEDS_ELIGIBLE)
+        return
+    n = len(acc.rows)
+    shaped = build_shaped_flex_kw_per_slot(n, [consumer], {cid: energy}, {cid: shape}, {cid: eligible})
+    if shaped.no_shape_ids:
+        raise AssertionError(f"savings ledger flex: '{cid}' reached the builder without a shape")
+    acc.place(cid, shaped.per_slot, label)

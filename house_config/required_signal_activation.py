@@ -219,90 +219,105 @@ def pack_missing_required(
     components: dict[str, Any] | None,
 ) -> bool:
     """True when any configured component still lacks a required activation key."""
-    if isinstance(house, dict):
-        plant = house.get("plant")
-        if isinstance(plant, dict):
-            keys = required_binding_keys(component_kind="plant")
-            if missing_required_keys(plant.get("ehal_bindings"), keys):
-                return True
-            # Retired plant PV key still present → migration/activation needed.
-            bindings = plant.get("ehal_bindings")
-            if isinstance(bindings, dict) and "sens_pv_production_active" in bindings:
-                return True
-        profiles = house.get("profiles") or {}
-        items = profiles.values() if isinstance(profiles, dict) else profiles
-        for profile in items or []:
-            if not isinstance(profile, dict):
-                continue
-            for consumer in profile.get("consumers") or []:
-                if not isinstance(consumer, dict):
-                    continue
-                cid = str(consumer.get("id") or "").strip()
-                ctype = str(consumer.get("type") or "").strip()
-                if not cid or _is_dm6_ev(consumer):
-                    continue
-                keys = required_binding_keys(
-                    component_kind="consumer",
-                    entity_id=cid,
-                    consumer_type=ctype,
-                )
-                if keys and missing_required_keys(consumer.get("ehal_bindings"), keys):
-                    return True
+    if isinstance(house, dict) and _house_missing_required(house):
+        return True
     if isinstance(components, dict):
-        for wallbox in components.get("wallboxes") or []:
-            wid = str(wallbox.get("id") or "").strip() if isinstance(wallbox, dict) else ""
-            if wid and _wallbox_missing_required(wallbox.get("ehal_bindings"), wid):
-                return True
-        pv_systems = list(components.get("pv_systems") or [])
-        grid_tied = grid_tied_house_battery_ids(
-            components.get("batteries"), components.get("inverters")
-        )
-        for battery in components.get("batteries") or []:
-            if not isinstance(battery, dict):
-                continue
-            bid = str(battery.get("id") or "").strip()
-            if not bid:
-                continue
-            control = control_from_battery_params(battery)
-            keys = required_binding_keys(
-                component_kind="battery",
-                entity_id=bid,
-                control=control,
-                grid_tied_house=bid in grid_tied,
-            )
-            if missing_required_keys(battery.get("ehal_bindings"), keys):
-                return True
-        for inverter in components.get("inverters") or []:
-            if not isinstance(inverter, dict):
-                continue
-            iid = str(inverter.get("id") or "").strip()
-            if not iid:
-                continue
-            control = str(
-                inverter.get("control") or DEFAULT_INVERTER_CONTROL
-            ).strip().lower()
-            has_pv = inverter_has_attached_pv(iid, pv_systems)
-            keys = required_binding_keys(
-                component_kind="inverter",
-                entity_id=iid,
-                control=control,
-                has_attached_pv=has_pv,
-            )
-            if missing_required_keys(inverter.get("ehal_bindings"), keys):
-                return True
-        for pv in pv_systems:
-            if not isinstance(pv, dict):
-                continue
-            pid = str(pv.get("id") or "").strip()
-            if not pid:
-                continue
-            bindings = pv.get("ehal_bindings")
-            if not isinstance(bindings, dict):
-                continue
-            # Empty optional per-PV production leftovers need stripping.
-            from ehal.pv_fields import pv_field
+        return _components_missing_required(components)
+    return False
 
-            key = pv_field(pid, "sens_pv_production_active")
-            if key in bindings and not str(bindings.get(key) or "").strip():
+
+def _house_missing_required(house: dict[str, Any]) -> bool:
+    plant = house.get("plant")
+    if isinstance(plant, dict):
+        keys = required_binding_keys(component_kind="plant")
+        if missing_required_keys(plant.get("ehal_bindings"), keys):
+            return True
+        # Retired plant PV key still present → migration/activation needed.
+        bindings = plant.get("ehal_bindings")
+        if isinstance(bindings, dict) and "sens_pv_production_active" in bindings:
+            return True
+    profiles = house.get("profiles") or {}
+    items = profiles.values() if isinstance(profiles, dict) else profiles
+    for profile in items or []:
+        if not isinstance(profile, dict):
+            continue
+        for consumer in profile.get("consumers") or []:
+            if isinstance(consumer, dict) and _consumer_missing_required(consumer):
                 return True
     return False
+
+
+def _consumer_missing_required(consumer: dict[str, Any]) -> bool:
+    cid = str(consumer.get("id") or "").strip()
+    ctype = str(consumer.get("type") or "").strip()
+    if not cid or _is_dm6_ev(consumer):
+        return False
+    keys = required_binding_keys(
+        component_kind="consumer",
+        entity_id=cid,
+        consumer_type=ctype,
+    )
+    return bool(keys and missing_required_keys(consumer.get("ehal_bindings"), keys))
+
+
+def _components_missing_required(components: dict[str, Any]) -> bool:
+    for wallbox in components.get("wallboxes") or []:
+        wid = str(wallbox.get("id") or "").strip() if isinstance(wallbox, dict) else ""
+        if wid and _wallbox_missing_required(wallbox.get("ehal_bindings"), wid):
+            return True
+    pv_systems = list(components.get("pv_systems") or [])
+    grid_tied = grid_tied_house_battery_ids(
+        components.get("batteries"), components.get("inverters")
+    )
+    for battery in components.get("batteries") or []:
+        if isinstance(battery, dict) and _battery_missing_required(battery, grid_tied):
+            return True
+    for inverter in components.get("inverters") or []:
+        if isinstance(inverter, dict) and _inverter_missing_required(inverter, pv_systems):
+            return True
+    return any(isinstance(pv, dict) and _pv_has_empty_production_key(pv) for pv in pv_systems)
+
+
+def _battery_missing_required(battery: dict[str, Any], grid_tied: Any) -> bool:
+    bid = str(battery.get("id") or "").strip()
+    if not bid:
+        return False
+    control = control_from_battery_params(battery)
+    keys = required_binding_keys(
+        component_kind="battery",
+        entity_id=bid,
+        control=control,
+        grid_tied_house=bid in grid_tied,
+    )
+    return bool(missing_required_keys(battery.get("ehal_bindings"), keys))
+
+
+def _inverter_missing_required(inverter: dict[str, Any], pv_systems: list[Any]) -> bool:
+    iid = str(inverter.get("id") or "").strip()
+    if not iid:
+        return False
+    control = str(
+        inverter.get("control") or DEFAULT_INVERTER_CONTROL
+    ).strip().lower()
+    has_pv = inverter_has_attached_pv(iid, pv_systems)
+    keys = required_binding_keys(
+        component_kind="inverter",
+        entity_id=iid,
+        control=control,
+        has_attached_pv=has_pv,
+    )
+    return bool(missing_required_keys(inverter.get("ehal_bindings"), keys))
+
+
+def _pv_has_empty_production_key(pv: dict[str, Any]) -> bool:
+    """Empty optional per-PV production leftovers need stripping."""
+    pid = str(pv.get("id") or "").strip()
+    if not pid:
+        return False
+    bindings = pv.get("ehal_bindings")
+    if not isinstance(bindings, dict):
+        return False
+    from ehal.pv_fields import pv_field
+
+    key = pv_field(pid, "sens_pv_production_active")
+    return bool(key in bindings and not str(bindings.get(key) or "").strip())

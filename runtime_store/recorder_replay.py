@@ -7,47 +7,56 @@ limit uses the recorded planning window. EHAL telemetry is not read.
 """
 from __future__ import annotations
 
-import json
 import logging
 import os
 import tempfile
 import time
-from contextlib import contextmanager
 from dataclasses import dataclass, field
-from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal
+
+# Re-exported: callers and tests import these from ``runtime_store.recorder_replay``.
+from runtime_store.recorder_replay_env import (  # noqa: F401
+    _ARCHIVE_TO_ENV,
+    _ENV_CLEAR_SUFFIXES,
+    _FLAG_NAMES,
+    _activate_env,
+    _best_effort_rmtree,
+    _coerce_matrix_datetimes,
+    _drop_removed_empty_overlay,
+    _entry_is_flagged,
+    _entry_slot_count,
+    _migrate_snapshot_config,
+    _rebind_consumer_state_path,
+    _restore_env,
+    _segment_paths_for_root,
+    _write_start_state_files,
+    load_config_snapshot,
+    materialize_config_snapshot,
+    restore_matrix_from_entry,
+)
+from runtime_store.recorder_replay_inputs import (  # noqa: F401
+    _aware_local,
+    _battery_params_from_config,
+    _battery_params_with_recorded_ess_limits,
+    _battery_params_with_recorded_reserves,
+    _filter_batteries_with_soc,
+    _inverter_params_from_config,
+    _normalize_slot,
+    _pv_systems_from_config,
+    _recorded_ev_limit_soc,
+    _recorded_export_limits,
+    _recorded_import_cap_observe,
+    _recorded_import_caps,
+    _recorded_planning_moment,
+    _recorded_sunrise_soc_min_index,
+    _recorded_thermal_readings,
+    _require_push_price_cent,
+)
 
 logger = logging.getLogger(__name__)
 
 SolverMode = Literal["production", "strict"]
-
-_ARCHIVE_TO_ENV: dict[str, str] = {
-    "inputs/config.json": "config/config.json",
-    "inputs/components.json": "config/components.json",
-    "inputs/tariffs.json": "config/tariffs.json",
-    "inputs/user_tariffs.json": "config/user_tariffs.json",
-    "inputs/grid_fees.json": "config/grid_fees.json",
-    "inputs/user_grid_fees.json": "config/user_grid_fees.json",
-    "inputs/house_profiles.json": "config/house_profiles.json",
-    "inputs/backtesting_scenarios.json": "config/backtesting_scenarios.json",
-    "inputs/deviation_rules.json": "config/deviation_rules.json",
-    "inputs/local_settings.json": "runtime/local_settings.json",
-    "inputs/price_model_coefficients.json": "runtime/price_model_coefficients.json",
-    "inputs/cons_data.csv": "runtime/cons_data.csv",
-}
-
-_ENV_CLEAR_SUFFIXES = (
-    "CONFIG_PATH",
-    "COMPONENTS_PATH",
-    "DEVIATION_RULES_PATH",
-    "GRID_FEES_PATH",
-    "HOUSE_PROFILES_PATH",
-    "LOCAL_SETTINGS_PATH",
-    "RUNTIME_PATH",
-    "TARIFFS_PATH",
-    "BACKTESTING_SCENARIOS_PATH",
-)
 
 
 @dataclass
@@ -77,110 +86,6 @@ class ReplayResult:
     def time_limit_hit(self) -> bool:
         """True when a solve of the replay stopped at a time limit (plan depends on CPU speed)."""
         return any(solve_hit_time_limit(rec) for rec in self.solver)
-
-
-def load_config_snapshot(recorder_root: Path | str, config_hash: str) -> dict[str, Any]:
-    """Load ``configs/{config_hash}.json`` or raise."""
-    root = Path(recorder_root)
-    path = root / "configs" / f"{config_hash}.json"
-    if not path.is_file():
-        hint = ""
-        if (root / "configs.pack.json").is_file():
-            hint = (
-                "; the snapshots are still packed: "
-                f"python -m runtime_store.recorder_config_pack {root}"
-            )
-        raise FileNotFoundError(
-            f"recorder config snapshot missing: {path} "
-            f"(config_hash={config_hash!r}){hint}"
-        )
-    with path.open(encoding="utf-8") as handle:
-        payload = json.load(handle)
-    if not isinstance(payload, dict) or "files" not in payload:
-        raise ValueError(f"invalid config snapshot shape: {path}")
-    return payload
-
-
-def _drop_removed_empty_overlay(content: str) -> str:
-    """Recordings made before ``flexible_consumers`` was removed carry ``[]``; a filled block is an error."""
-    doc = json.loads(content)
-    if not isinstance(doc, dict) or "flexible_consumers" not in doc:
-        return content
-    if doc["flexible_consumers"]:
-        raise ValueError(
-            "recorded config.json uses the removed 'flexible_consumers' overlay; "
-            "replay needs a recording made after consumers moved to the house profile."
-        )
-    del doc["flexible_consumers"]
-    return json.dumps(doc, indent=2, ensure_ascii=False) + "\n"
-
-
-def materialize_config_snapshot(
-    snapshot: dict[str, Any],
-    dest_env: Path | str,
-) -> Path:
-    """Write snapshot ``files`` into an Earnie env tree (config/ + runtime/)."""
-    env_root = Path(dest_env)
-    files = snapshot.get("files")
-    if not isinstance(files, dict) or not files:
-        raise ValueError("config snapshot has no files")
-    written = 0
-    for archive_name, content in files.items():
-        rel = _ARCHIVE_TO_ENV.get(str(archive_name).replace("\\", "/"))
-        if rel is None:
-            raise ValueError(
-                f"unsupported snapshot archive name {archive_name!r}; "
-                f"known: {sorted(_ARCHIVE_TO_ENV)}"
-            )
-        if not isinstance(content, str):
-            raise TypeError(
-                f"snapshot file {archive_name!r} must be text, got {type(content)!r}"
-            )
-        if rel == "config/config.json":
-            content = _drop_removed_empty_overlay(content)
-        target = env_root / rel
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(content, encoding="utf-8")
-        written += 1
-    if written == 0:
-        raise ValueError("config snapshot wrote zero files")
-    (env_root / "runtime").mkdir(parents=True, exist_ok=True)
-    _migrate_snapshot_config(env_root / "config")
-    return env_root
-
-
-def _migrate_snapshot_config(config_dir: Path) -> None:
-    """Archived configs may predate the current data model / tariff format: migrate in memory.
-
-    Same registry steps as the wizard from the recorded data model on, without answers; a
-    snapshot that needs an answer or hits a blocker stops the replay with the reason (never
-    guessed). Steps of the recorded model itself are skipped: the config ran when recorded.
-    """
-    from runtime_store.migration.runner import migrate_config_dir_unattended
-
-    written = migrate_config_dir_unattended(
-        config_dir, label="recorder config snapshot", model_bump_only=True
-    )
-    if written:
-        logger.debug("replay: migrated snapshot config files %s", ", ".join(written))
-
-
-def restore_matrix_from_entry(entry: dict[str, Any]) -> list[dict[str, Any]]:
-    """Columnar matrix → row dicts with ``datetime`` slot times."""
-    from runtime_store.cycle_recorder import columnar_to_matrix
-
-    columnar = entry.get("optimization_matrix")
-    if not isinstance(columnar, dict):
-        raise ValueError("entry missing optimization_matrix columnar payload")
-    n_rows = int(columnar.get("n_rows") or 0)
-    if n_rows <= 0:
-        raise ValueError("entry optimization_matrix has n_rows <= 0")
-    matrix = columnar_to_matrix(columnar)
-    if len(matrix) != n_rows:
-        raise ValueError(
-            f"matrix restore length mismatch: got {len(matrix)}, expected {n_rows}"
-        )
-    return _coerce_matrix_datetimes(matrix)
 
 
 def list_full_horizon_cycles(
@@ -308,97 +213,6 @@ def _solve_prepared_entry(
     return result
 
 
-def _recorded_planning_moment(entry: dict[str, Any]) -> datetime:
-    """The instant ``planning_now()`` returned in the live cycle.
-
-    An early-start cycle begins a few seconds before its quarter-hour tick and
-    plans for it: ``planning_now() = max(real now, tick)``. The recorded
-    ``timestamp`` is the real clock, ``planning_window.start`` is that tick
-    (a late or out-of-band cycle has a start before its timestamp). Freezing at
-    the timestamp put 23:59:57 on the previous day and 08:59:53 in the hour
-    before the plan, so day/hour-bound consumer state differed from live.
-    """
-    recorded = datetime.fromisoformat(str(entry.get("timestamp") or ""))
-    window = entry.get("planning_window")
-    if not isinstance(window, dict) or not window.get("start"):
-        raise ValueError("entry missing planning_window.start")
-    start = datetime.fromisoformat(str(window["start"]))
-    # Naive values are system-local, like the recorder's ``datetime.now()`` stamp.
-    return max(_aware_local(recorded), _aware_local(start))
-
-
-def _aware_local(moment: datetime) -> datetime:
-    return moment.astimezone() if moment.tzinfo is None else moment
-
-
-@contextmanager
-def _recorded_ev_limit_soc(entry: dict[str, Any], config_module: Any):
-    """Serve the recorded ``get_evcs_limit_soc`` for the EV markers during replay.
-
-    Fails loud when the marker is actually read but the entry has no recorded
-    value (cycles recorded before ``ev_limit_soc_percent`` existed). Cycles that
-    never read it replay as before.
-    """
-    from integrations import ehal_live
-    from settings.ehal_marker_resolve import marker_get_evcs_limit_soc
-
-    recorded = (entry.get("start_state") or {}).get("ev_limit_soc_percent") or {}
-    cid_by_marker: dict[str, str] = {}
-    for consumer in config_module.get_flexible_consumers(optimizer_only=True) or []:
-        marker = marker_get_evcs_limit_soc(consumer)
-        if marker:
-            cid_by_marker[marker] = str(consumer["id"])
-
-    original = ehal_live.read_generic_value
-
-    def _read(address: str):
-        cid = cid_by_marker.get(address)
-        if cid is None:
-            return original(address)
-        if cid not in recorded:
-            raise ValueError(
-                f"entry has no recorded start_state.ev_limit_soc_percent for "
-                f"consumer {cid!r} (marker {address!r}); cycle was recorded by an "
-                f"older version and cannot be replayed offline"
-            )
-        return float(recorded[cid])
-
-    ehal_live.read_generic_value = _read
-    try:
-        yield
-    finally:
-        ehal_live.read_generic_value = original
-
-
-@contextmanager
-def _recorded_thermal_readings(entry: dict[str, Any]):
-    """Serve the recorded ``fetch_thermal_readings`` per consumer during replay.
-
-    Fails loud when a consumer's readings are actually fetched but the entry has
-    none (cycles recorded before ``thermal_readings`` existed).
-    """
-    from integrations import ehal_live
-
-    recorded = (entry.get("start_state") or {}).get("thermal_readings") or {}
-    original = ehal_live.fetch_thermal_readings
-
-    def _fetch(consumer: dict, **_kwargs):
-        cid = str(consumer.get("id"))
-        if cid not in recorded:
-            raise ValueError(
-                f"entry has no recorded start_state.thermal_readings for consumer "
-                f"{cid!r}; cycle was recorded by an older version and cannot be "
-                f"replayed offline"
-            )
-        return dict(recorded[cid])
-
-    ehal_live.fetch_thermal_readings = _fetch
-    try:
-        yield
-    finally:
-        ehal_live.fetch_thermal_readings = original
-
-
 @dataclass
 class _PreparedReplay:
     prepared: list[dict[str, Any]]
@@ -489,16 +303,6 @@ def _prepare_replay_inputs(entry: dict[str, Any], config_module: Any) -> _Prepar
     )
 
 
-def _require_push_price_cent(config_module: Any) -> float:
-    raw = config_module.get_push_price_cent()
-    if raw is None:
-        raise ValueError(
-            "get_push_price_cent() returned None; snapshot export tariff / "
-            "push price must be configured for offline replay"
-        )
-    return float(raw)
-
-
 def _apply_recorded_standby_relief(ctx: _PreparedReplay) -> None:
     """Relieve house load the way the live cycle does after ``begin_cycle``.
 
@@ -522,41 +326,6 @@ def _apply_recorded_standby_relief(ctx: _PreparedReplay) -> None:
     if not plans:
         return
     ctx.prepared = apply_standby_load_relief(ctx.prepared, plans)
-
-
-def _recorded_sunrise_soc_min_index(entry: dict[str, Any]) -> int | None:
-    """Index of the live PV-only charge limit, or None when the cycle had none.
-
-    Seed / historical fixtures omit ``sunrise_anchor``; those replays keep the
-    previous unconstrained charge path. A live window that records the anchor
-    without ``slot_datetimes`` fails loud.
-    """
-    window = entry.get("planning_window")
-    if not isinstance(window, dict):
-        raise ValueError("entry missing planning_window")
-    anchor_raw = window.get("sunrise_anchor")
-    if not anchor_raw:
-        return None
-    slots = window.get("slot_datetimes")
-    if not isinstance(slots, list) or not slots:
-        raise ValueError(
-            "planning_window has sunrise_anchor but no slot_datetimes; "
-            "replay cannot apply the live PV-only charge limit"
-        )
-    anchor = _normalize_slot(anchor_raw)
-    try:
-        return [_normalize_slot(raw) for raw in slots].index(anchor)
-    except ValueError as exc:
-        raise ValueError(
-            f"sunrise anchor {anchor.isoformat()} is not in the recorded planning window"
-        ) from exc
-
-
-def _normalize_slot(raw: Any) -> datetime:
-    from optimizer.slot_duration import normalize_quarter_hour_slot
-
-    moment = raw if isinstance(raw, datetime) else datetime.fromisoformat(str(raw))
-    return normalize_quarter_hour_slot(moment)
 
 
 def _run_milp_replay(
@@ -727,160 +496,6 @@ def _replay_from_optimizer_fallback(
     )
 
 
-def _battery_params_from_config(config_module: Any) -> dict | list[dict]:
-    get_list = getattr(config_module, "get_battery_params_list", None)
-    if callable(get_list):
-        batteries = get_list()
-        if batteries:
-            return batteries
-    return config_module.get_battery_params()
-
-
-def _battery_params_with_recorded_reserves(
-    battery_params: dict | list[dict],
-    start_state: dict[str, Any],
-) -> dict | list[dict]:
-    """Apply the reserves the live cycle planned with (virtual refill carve-out).
-
-    Cycles recorded before ``active_reserves`` existed keep plain config params. The SoC
-    reading tolerance at the floor follows from the replayed SoC inside the MILP (Reserve P3).
-    """
-    if "active_reserves" not in start_state:
-        return battery_params
-    reserves = start_state["active_reserves"]
-    if not isinstance(reserves, list):
-        raise TypeError("start_state.active_reserves must be a list when present")
-    from optimizer.powerstation_live import apply_reserves_to_battery_params
-
-    return apply_reserves_to_battery_params(battery_params, reserves)
-
-
-def _battery_params_with_recorded_ess_limits(
-    battery_params: dict | list[dict],
-    start_state: dict[str, Any],
-) -> dict | list[dict]:
-    """Apply the effective SOC / power limits the live cycle planned with.
-
-    Live tightens the HK limits with ``get_ess_*`` telemetry. Cycles recorded
-    before ``ess_limits`` existed keep plain config params.
-    """
-    if "ess_limits" not in start_state:
-        return battery_params
-    recorded = start_state["ess_limits"]
-    if not isinstance(recorded, dict):
-        raise TypeError("start_state.ess_limits must be a dict when present")
-
-    def _apply(bat: dict) -> dict:
-        ess_id = str(bat.get("id") or "")
-        if ess_id not in recorded:
-            raise ValueError(
-                f"start_state.ess_limits has no entry for ESS {ess_id!r}; "
-                f"recorded: {sorted(recorded)}"
-            )
-        return {**bat, **{k: float(v) for k, v in recorded[ess_id].items()}}
-
-    if isinstance(battery_params, list):
-        return [_apply(bat) for bat in battery_params]
-    return _apply(battery_params)
-
-
-def _filter_batteries_with_soc(
-    battery_params: dict | list[dict],
-    soc_by_id: dict[str, float] | None,
-    start_state: dict[str, Any],
-) -> dict | list[dict]:
-    """Drop multi-ESS batteries without an own SoC, as the live cycle does.
-
-    Only for cycles that recorded ``ess_limits`` (same version as the live
-    filter); older cycles replay as before.
-    """
-    if "ess_limits" not in start_state:
-        return battery_params
-    from integrations.ehal_live_soc import filter_planning_batteries_with_soc
-
-    return filter_planning_batteries_with_soc(battery_params, soc_by_id)
-
-
-def _recorded_export_limits(start_state: dict[str, Any]) -> dict[str, float | None]:
-    """Export ceilings of the live cycle (HK + inbound telemetry limit).
-
-    Cycles recorded before ``export_limits`` existed replay without them, as before.
-    """
-    if "export_limits" not in start_state:
-        return {"hk_max_export_kw": None, "inbound_export_limit_kw": None}
-    recorded = start_state["export_limits"]
-    if not isinstance(recorded, dict):
-        raise TypeError("start_state.export_limits must be a dict when present")
-
-    def _kw(key: str) -> float | None:
-        if key not in recorded:
-            raise ValueError(f"start_state.export_limits missing {key!r}")
-        value = recorded[key]
-        return None if value is None else float(value)
-
-    return {
-        "hk_max_export_kw": _kw("hk_max_export_kw"),
-        "inbound_export_limit_kw": _kw("inbound_export_limit_kw"),
-    }
-
-
-def _recorded_import_caps(start_state: dict[str, Any]) -> Any:
-    """Import limits of the live cycle, exactly as planned (max-power tariff P5b).
-
-    Cycles recorded before ``import_caps`` existed replay without them, as before.
-    """
-    from optimizer.import_power_limit import ImportCaps
-
-    if "import_caps" not in start_state:
-        return None
-    recorded = start_state["import_caps"]
-    if not isinstance(recorded, dict):
-        raise TypeError("start_state.import_caps must be a dict when present")
-    for key in ("limits_kw", "months"):
-        if key not in recorded:
-            raise ValueError(f"start_state.import_caps missing {key!r}")
-    limits, months = recorded["limits_kw"], recorded["months"]
-    if limits is None and months is None:
-        return None
-    if not isinstance(limits, list) or not isinstance(months, list) or len(limits) != len(months):
-        raise ValueError("start_state.import_caps: limits_kw and months must be lists of one length")
-    return ImportCaps(
-        tuple(None if value is None else float(value) for value in limits),
-        tuple(None if value is None else str(value) for value in months),
-    )
-
-
-def _recorded_import_cap_observe(start_state: dict[str, Any]) -> bool:
-    """Whether the live cycle ran the cap in observe mode (P6d).
-
-    ``mode`` is recorded since P6d; a cycle recorded before had only ``optimize``, so a record
-    with limits and no ``mode`` replays as planned under the cap.
-    """
-    from house_config.import_cap import IMPORT_CAP_MODES, MODE_OBSERVE
-
-    recorded = start_state.get("import_caps")
-    if not isinstance(recorded, dict) or "mode" not in recorded:
-        return False
-    mode = recorded["mode"]
-    if mode is not None and mode not in IMPORT_CAP_MODES:
-        raise ValueError(f"start_state.import_caps: unknown mode {mode!r}")
-    return mode == MODE_OBSERVE
-
-
-def _inverter_params_from_config(config_module: Any) -> list[dict] | None:
-    get_list = getattr(config_module, "get_planning_inverters", None)
-    if callable(get_list):
-        return list(get_list() or [])
-    return None
-
-
-def _pv_systems_from_config(config_module: Any) -> list[dict] | None:
-    get_list = getattr(config_module, "get_planning_pv_systems", None)
-    if callable(get_list):
-        return list(get_list() or [])
-    return None
-
-
 def _stage_from_events(events: list[dict[str, Any]], solver_mode: SolverMode) -> str:
     if solver_mode == "strict":
         return "strict_only"
@@ -888,121 +503,6 @@ def _stage_from_events(events: list[dict[str, Any]], solver_mode: SolverMode) ->
         if event.get("event") == "strict_fallback":
             return "fallback"
     return "strict"
-
-
-def _coerce_matrix_datetimes(matrix: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    for row in matrix:
-        raw = row.get("slot_datetime")
-        # Keep the recorded offset: the live matrix is tz-aware and so are the
-        # recorded deadlines it is compared with (open_charging_deadlines).
-        if isinstance(raw, datetime):
-            slot = raw
-        elif isinstance(raw, str):
-            slot = datetime.fromisoformat(raw)
-        else:
-            raise TypeError(
-                f"slot_datetime must be str or datetime, got {type(raw)!r}"
-            )
-        row["slot_datetime"] = slot
-        row["hour"] = int(slot.hour)
-        row["date"] = slot.date()
-    return matrix
-
-
-def _write_start_state_files(env_root: Path, start_state: dict[str, Any]) -> None:
-    runtime = env_root / "runtime"
-    runtime.mkdir(parents=True, exist_ok=True)
-    mapping = (
-        ("flexible_consumers_state", "flexible_consumers_state.json"),
-        ("pv_counter_state", "pv_counter_state.json"),
-        ("run_state", "optimizer_run_state.json"),
-    )
-    for key, filename in mapping:
-        payload = start_state.get(key)
-        if payload is None:
-            continue
-        path = runtime / filename
-        path.write_text(
-            json.dumps(payload, ensure_ascii=False, default=str),
-            encoding="utf-8",
-        )
-
-
-def _rebind_consumer_state_path() -> None:
-    """Point an already-imported optimizer at the env activated for this replay.
-
-    ``CONSUMER_STATE_FILE`` is captured when ``optimizer`` is first imported.
-    Replay deletes that temp env afterwards, so the next cycle in the same
-    process would load a missing file and drop the recorded delivered kWh.
-    """
-    import sys
-
-    optimizer = sys.modules.get("optimizer")
-    if optimizer is None or not hasattr(optimizer, "CONSUMER_STATE_FILE"):
-        return
-    from runtime_store.persist_paths import consumer_state_file
-
-    optimizer.CONSUMER_STATE_FILE = consumer_state_file()
-
-
-def _activate_env(env_root: Path) -> dict[str, str | None]:
-    previous = {"EARNIE_ENV_PATH": os.environ.get("EARNIE_ENV_PATH")}
-    for suffix in _ENV_CLEAR_SUFFIXES:
-        key = f"EARNIE_{suffix}"
-        previous[key] = os.environ.get(key)
-        os.environ.pop(key, None)
-    os.environ["EARNIE_ENV_PATH"] = str(env_root)
-    os.environ["EARNIE_OFFLINE"] = "1"
-    return previous
-
-
-def _restore_env(previous: dict[str, str | None]) -> None:
-    for key, value in previous.items():
-        if value is None:
-            os.environ.pop(key, None)
-        else:
-            os.environ[key] = value
-
-
-def _segment_paths_for_root(root: Path) -> list[Path]:
-    from runtime_store import cycle_recorder
-
-    previous = os.environ.get("EARNIE_RUNTIME_PATH")
-    try:
-        # Segments live under recorder_root directly when passed as study dir,
-        # or under runtime/recorder when root is an env runtime/recorder path.
-        direct = sorted(root.glob("cycles_*.jsonl.gz"))
-        if direct:
-            return direct
-        if any(root.glob("cycles_*.jsonl.xz")):
-            raise FileNotFoundError(
-                f"recorder segments under {root} are still xz-packed: "
-                f"python -m runtime_store.recorder_config_pack {root}"
-            )
-        os.environ["EARNIE_RUNTIME_PATH"] = str(root.parent)
-        return cycle_recorder.list_segment_paths()
-    finally:
-        if previous is None:
-            os.environ.pop("EARNIE_RUNTIME_PATH", None)
-        else:
-            os.environ["EARNIE_RUNTIME_PATH"] = previous
-
-
-def _entry_slot_count(entry: dict[str, Any]) -> int:
-    columnar = entry.get("optimization_matrix") or {}
-    try:
-        return int(columnar.get("n_rows") or 0)
-    except (TypeError, ValueError):
-        return 0
-
-
-# ``outage`` is the name cycles recorded before 2026-11-09 use for ``out_of_band``.
-_FLAG_NAMES = ("override", "out_of_band", "outage", "manual_intervention")
-
-
-def _entry_is_flagged(entry: dict[str, Any]) -> bool:
-    flags = ((entry.get("outputs") or {}).get("flags")) or {}
-    return any(bool(flags.get(name)) for name in _FLAG_NAMES)
 
 
 def solve_hit_time_limit(record: dict[str, Any]) -> bool:
@@ -1023,12 +523,3 @@ def recorded_time_limit_hit(entry: dict[str, Any]) -> bool | None:
     if solver is None:
         return None
     return any(solve_hit_time_limit(rec) for rec in solver)
-
-
-def _best_effort_rmtree(path: Path) -> None:
-    import shutil
-
-    try:
-        shutil.rmtree(path, ignore_errors=True)
-    except OSError as exc:
-        logger.debug("replay temp cleanup failed: %s", exc)
