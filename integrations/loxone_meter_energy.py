@@ -327,9 +327,15 @@ def _overlay_flex_counters(
         end_read = flex_end.get(consumer_id)
         if not isinstance(open_read, dict) or not isinstance(end_read, dict):
             continue
+        if counter_readings_too_coarse(*_channel_readings(open_read, end_read)):
+            _note_coarse_counter(out, f"flex:{fid}")
+            continue
         bipolar = bool((cfg.get(fid) or {}).get("bidirectional"))
         delta = channel_delta_kwh(open_read, end_read, bipolar=bipolar)
         if delta is None:
+            continue
+        if _channel_jump_implausible(open_read, end_read, dt_h=dt_h):
+            _note_implausible_counter(out, f"flex:{fid}", open_read, end_read)
             continue
         flex_kw[fid] = round(delta / dt_h, 3)
         flex_energy[fid] = round(delta, 4)
@@ -339,6 +345,121 @@ def _overlay_flex_counters(
         out["flex_energy_kwh"] = flex_energy
     sources = out.setdefault("ist_power_source", {})
     sources["flex"] = flex_sources
+
+
+# A counter whose readings only show 0.1 kWh steps or coarser (Loxone PV meter: whole kWh)
+# misstates a quarter hour by >= 0.4 kW: one slot gets the whole step, its neighbours 0.
+COUNTER_MAX_STEP_KWH = 0.01
+_warned_coarse_channels: set[str] = set()
+
+
+def _reading_step_kwh(value: float) -> float:
+    """Finest decimal step the reading shows (1, 0.1, 0.01, 0.001 or finer)."""
+    for digits in range(4):
+        scaled = float(value) * 10**digits
+        # Fixed tolerance in step units: float noise only, also on large totals.
+        if abs(scaled - round(scaled)) < 1e-3:
+            return 10.0**-digits
+    return 10.0**-4
+
+
+def counter_readings_too_coarse(*values: float | None) -> bool:
+    """True when every reading shows only steps above ``COUNTER_MAX_STEP_KWH``.
+
+    One reading with finer decimals proves the counter resolves finely. A fine counter
+    lands on two round readings in a row only by chance (about 1 in 10 000 slots); that
+    slot then keeps the sample mean.
+    """
+    present = [float(v) for v in values if v is not None]
+    if not present:
+        return False
+    return min(_reading_step_kwh(v) for v in present) > COUNTER_MAX_STEP_KWH + 1e-12
+
+
+def _channel_readings(*reads: dict[str, float] | None) -> list[float | None]:
+    values: list[float | None] = []
+    for read in reads:
+        if isinstance(read, dict):
+            values.extend(read.get(key) for key in ("total", "total_neg"))
+    return values
+
+
+def _note_coarse_counter(out: dict[str, Any], channel: str) -> None:
+    out.setdefault("coarse_counters", []).append(channel)
+    if channel in _warned_coarse_channels:
+        return
+    _warned_coarse_channels.add(channel)
+    logger.warning(
+        "Zählerenergie %s: Zählerstand kommt nur in Schritten > %.2f kWh — zu grob für "
+        "Viertelstunden, Slot-Ist bleibt beim Leistungs-Mittelwert. Bitte handeln: "
+        "den Zählerstand mit 3 Nachkommastellen senden (Loxone: Virtual-Output-Befehl "
+        "<v.3> statt <v>; Home Assistant: Sensor in kWh mit Wh-Auflösung).",
+        channel,
+        COUNTER_MAX_STEP_KWH,
+    )
+
+
+def coarse_channel_label(channel: str, consumers: list[dict[str, Any]] | None = None) -> str:
+    """User-facing name + EHAL id of a ``coarse_counters`` channel."""
+    from ehal.qualified_ids import qualified_plant_id
+
+    if channel == CHANNEL_PV:
+        return f"PV-Zähler (`{FIELD_PV_ENERGY}`)"
+    if channel == CHANNEL_GRID:
+        return (
+            f"Netzzähler (`{qualified_plant_id(FIELD_GRID_IMPORT)}` / "
+            f"`{qualified_plant_id(FIELD_GRID_EXPORT)}`)"
+        )
+    if channel.startswith("flex:"):
+        cid = channel.split(":", 1)[1]
+        for consumer in consumers or []:
+            if isinstance(consumer, dict) and str(consumer.get("id") or "") == cid:
+                name = str(consumer.get("name") or cid)
+                return f"Zähler {name} (`{_consumer_total_id(consumer)}`)"
+        return f"Zähler Verbraucher {cid}"
+    return channel
+
+
+# No house draws or feeds this much; a counter step above it in one window is a rescale
+# or a replaced meter (Loxone 923.0 -> 9233.11 kWh), not energy.
+COUNTER_MAX_POWER_KW = 250.0
+
+
+def counter_delta_implausible(delta_kwh: float | None, *, dt_h: float) -> bool:
+    """True when ``delta_kwh`` over ``dt_h`` hours means more than ``COUNTER_MAX_POWER_KW``."""
+    if delta_kwh is None or dt_h <= 0:
+        return False
+    return abs(float(delta_kwh)) > COUNTER_MAX_POWER_KW * dt_h
+
+
+def _channel_jump_implausible(
+    start: dict[str, float] | None, end: dict[str, float] | None, *, dt_h: float
+) -> bool:
+    """Each register on its own: a rescale of import and export must not cancel out."""
+    if not isinstance(start, dict) or not isinstance(end, dict):
+        return False
+    return any(
+        counter_delta_implausible(mono_delta_kwh(start.get(key), end.get(key)), dt_h=dt_h)
+        for key in ("total", "total_neg")
+    )
+
+
+def _note_implausible_counter(
+    out: dict[str, Any],
+    channel: str,
+    start: dict[str, float] | None,
+    end: dict[str, float] | None,
+) -> None:
+    out.setdefault("implausible_counters", []).append(channel)
+    logger.warning(
+        "Zählerenergie %s: Zählerstand springt von %s auf %s kWh in einer Viertelstunde "
+        "(mehr als %.0f kW) — Skalierung oder Zähler geändert? Slot-Ist bleibt beim "
+        "Leistungs-Mittelwert.",
+        channel,
+        (start or {}).get("total"),
+        (end or {}).get("total"),
+        COUNTER_MAX_POWER_KW,
+    )
 
 
 def mono_delta_kwh(start: float | None, end: float | None) -> float | None:
@@ -384,7 +505,12 @@ def overlay_counter_on_closed(
     dt_h: float,
     flex_meter_config: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    """Prefer measured ΔkWh → avg kW for pv/grid and flex Meters; others stay mean."""
+    """Prefer measured ΔkWh → avg kW for pv/grid and flex Meters; others stay mean.
+
+    A counter too coarse for a quarter hour (``counter_readings_too_coarse``) keeps the
+    sample mean; its channel is listed in ``coarse_counters``. So does a counter that
+    jumps by more than ``COUNTER_MAX_POWER_KW`` allows (``implausible_counters``).
+    """
     out = dict(closed)
     sources: dict[str, Any] = {
         "pv": "mean",
@@ -399,6 +525,16 @@ def overlay_counter_on_closed(
     pv_delta = channel_delta_kwh(
         open_r.get(CHANNEL_PV), end_r.get(CHANNEL_PV), bipolar=False
     )
+    if pv_delta is not None and counter_readings_too_coarse(
+        *_channel_readings(open_r.get(CHANNEL_PV), end_r.get(CHANNEL_PV))
+    ):
+        _note_coarse_counter(out, CHANNEL_PV)
+        pv_delta = None
+    if pv_delta is not None and _channel_jump_implausible(
+        open_r.get(CHANNEL_PV), end_r.get(CHANNEL_PV), dt_h=dt_h
+    ):
+        _note_implausible_counter(out, CHANNEL_PV, open_r.get(CHANNEL_PV), end_r.get(CHANNEL_PV))
+        pv_delta = None
     if pv_delta is not None:
         out["pv_energy_kwh"] = round(pv_delta, 4)
         out["pv_kw"] = round(pv_delta / dt_h, 3)
@@ -406,6 +542,18 @@ def overlay_counter_on_closed(
     grid_delta = channel_delta_kwh(
         open_r.get(CHANNEL_GRID), end_r.get(CHANNEL_GRID), bipolar=True
     )
+    if grid_delta is not None and counter_readings_too_coarse(
+        *_channel_readings(open_r.get(CHANNEL_GRID), end_r.get(CHANNEL_GRID))
+    ):
+        _note_coarse_counter(out, CHANNEL_GRID)
+        grid_delta = None
+    if grid_delta is not None and _channel_jump_implausible(
+        open_r.get(CHANNEL_GRID), end_r.get(CHANNEL_GRID), dt_h=dt_h
+    ):
+        _note_implausible_counter(
+            out, CHANNEL_GRID, open_r.get(CHANNEL_GRID), end_r.get(CHANNEL_GRID)
+        )
+        grid_delta = None
     if grid_delta is not None:
         out["grid_energy_kwh"] = round(grid_delta, 4)
         out["grid_kw"] = round(grid_delta / dt_h, 3)

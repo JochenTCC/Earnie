@@ -291,6 +291,7 @@ Inverter `control` vs mapping: `full` needs `set_inv_ac_power_limit`; `limits_on
 Top to bottom, the page shows:
 
 1. The path of the active configuration, the Live-Cockpit lock notice (while it applies), and the result of the **live topology check**. A rejected topology appears as the error `Live-Topologie abgelehnt: …`; an unreadable one as a warning.
+   Below it, the warning **Zählerstände zu grob — bitte handeln** when an energy counter (PV, grid or a consumer) reported only steps above 0.01 kWh, e.g. whole kWh, in the last day. Such a counter would put a whole step (1 kWh = 4 kW) into one quarter hour and 0 into the others, so Earnie uses the power mean for that channel instead (see [Charts](charts.md)). The fix: send the counter with 3 decimals — Loxone Virtual Output command `<v.3>` instead of `<v>`; if the value already arrives as `…000`, the counter in Loxone itself counts whole kWh. The warning goes once the counter counts finely again. The optimizer log warns once per channel and start.
 2. **Live-Lesen** (Live Read) and **Live-Schreiben** (Live Write), including the **Schreibtest** expander.
 3. For Home Assistant: **HA Push-Carrier** / **YAML-Paket** download.
 4. **Signalliste** (all backends) — contract table and export.

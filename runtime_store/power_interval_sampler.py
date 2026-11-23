@@ -192,6 +192,50 @@ def _overlay_energy_counters(
     from_counter = _grid_import_from_counter(open_payload, end_readings, closed_at=closed_at)
     if from_counter is not None:
         out.update(from_counter)
+    _record_coarse_counters(state, out, closed_at=closed_at)
+    return out
+
+
+def _record_coarse_counters(
+    state: dict[str, Any],
+    closed: dict[str, Any],
+    *,
+    closed_at: datetime,
+) -> None:
+    """Keep ``{channel: last seen}`` of too-coarse counters for the EHAL-Com warning.
+
+    A channel whose counter is used again (source ``counter``) is dropped at once.
+    """
+    seen = dict(state.get("coarse_counters") or {})
+    sources = closed.get("ist_power_source") or {}
+    for channel in ("pv", "grid"):
+        if sources.get(channel) == "counter":
+            seen.pop(channel, None)
+    for cid, source in (sources.get("flex") or {}).items():
+        if source == "counter":
+            seen.pop(f"flex:{cid}", None)
+    for channel in closed.get("coarse_counters") or []:
+        seen[str(channel)] = _iso(closed_at)
+    state["coarse_counters"] = seen
+
+
+COARSE_COUNTER_MAX_AGE = timedelta(days=1)
+
+
+def coarse_counter_channels(
+    *,
+    state_path: str | None = None,
+    now: datetime | None = None,
+) -> dict[str, str]:
+    """Channels whose counter was too coarse in the last day: ``{channel: last seen}``."""
+    state = _load_state(state_path or _state_path())
+    moment = now or datetime.now()
+    moment = moment.replace(tzinfo=None) if moment.tzinfo else moment
+    out: dict[str, str] = {}
+    for channel, seen_at in (state.get("coarse_counters") or {}).items():
+        seen = _parse_ts(seen_at)
+        if seen is not None and moment - seen <= COARSE_COUNTER_MAX_AGE:
+            out[str(channel)] = str(seen_at)
     return out
 
 
@@ -384,11 +428,19 @@ def _grid_import_from_counter(
     The open read is the first sample in the slot, so the window starts up to one sample
     interval late. ``None`` without both reads, on a counter reset or an implausible window.
     """
-    from integrations.loxone_meter_energy import CHANNEL_GRID, mono_delta_kwh
+    from integrations.loxone_meter_energy import (
+        CHANNEL_GRID,
+        counter_delta_implausible,
+        counter_readings_too_coarse,
+        mono_delta_kwh,
+    )
 
     opened_at = _parse_ts(open_payload.get("open_ts"))
     start = ((open_payload.get("open") or {}).get(CHANNEL_GRID) or {}).get("total")
     end = ((end_readings or {}).get(CHANNEL_GRID) or {}).get("total")
+    if counter_readings_too_coarse(start, end):
+        # Warned once in overlay_counter_on_closed (``coarse_counters``).
+        return None
     delta = mono_delta_kwh(start, end)
     if opened_at is None or delta is None:
         return None
@@ -399,6 +451,9 @@ def _grid_import_from_counter(
             seconds,
             _iso(opened_at),
         )
+        return None
+    if counter_delta_implausible(delta, dt_h=seconds / 3600.0):
+        # Warned in overlay_counter_on_closed (``implausible_counters``).
         return None
     return {
         "grid_import_kw": round(delta / (seconds / 3600.0), 3),

@@ -71,6 +71,10 @@ def render() -> None:
     _render_cockpit_locked_notice()
     _render_live_topology_status()
 
+    from ui.coarse_counter_warning import render_coarse_counter_warning
+
+    render_coarse_counter_warning()
+
     backend = active_ehal_backend()
     st.caption(
         "Zugangsdaten und Backend-Wechsel auf **Smarthome-Backend**. "

@@ -78,11 +78,11 @@ def test_read_plant_energy_readings_from_push(monkeypatch):
 
 def test_overlay_matches_loxone_math_from_ha_readings():
     open_r = {
-        "pv": {"total": 10.0},
+        "pv": {"total": 10.012},
         "grid": {"total": 100.0, "total_neg": 20.0},
     }
     end_r = {
-        "pv": {"total": 10.5},
+        "pv": {"total": 10.512},
         "grid": {"total": 100.25, "total_neg": 20.05},
     }
     closed = {

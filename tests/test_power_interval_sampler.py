@@ -150,11 +150,11 @@ def test_finalize_overlays_counter_delta_when_anchored(tmp_path: Path):
     start = datetime(2026, 9, 14, 14, 0, 0)
     readings = {
         "open": {
-            "pv": {"total": 10.0},
+            "pv": {"total": 10.012},
             "grid": {"total": 100.0, "total_neg": 20.0},
         },
         "close": {
-            "pv": {"total": 10.5},
+            "pv": {"total": 10.512},
             "grid": {"total": 100.25, "total_neg": 20.05},
         },
     }
@@ -349,10 +349,10 @@ def test_finalize_overlays_flex_counter_when_anchored(tmp_path: Path):
     start = datetime(2026, 9, 14, 14, 0, 0)
     readings = {
         "open": {
-            "flex": {"ev": {"total": 10.0}},
+            "flex": {"ev": {"total": 10.012}},
         },
         "close": {
-            "flex": {"ev": {"total": 10.5}},
+            "flex": {"ev": {"total": 10.512}},
         },
     }
     phase = {"n": 0}
@@ -380,3 +380,112 @@ def test_finalize_overlays_flex_counter_when_anchored(tmp_path: Path):
     assert closed["flex_kw"]["merker_only"] == pytest.approx(0.5)
     assert closed["ist_power_source"]["flex"]["ev"] == "counter"
     assert closed["ist_power_source"]["flex"]["merker_only"] == "mean"
+
+
+def test_whole_kwh_pv_counter_keeps_the_mean_and_no_import_counter(tmp_path: Path):
+    """Bug (production 2026-11-23): whole-kWh counters made 4 kW PV spikes in Chart 1."""
+    state = tmp_path / "sampler.json"
+    start = datetime(2026, 11, 23, 17, 45, 0)
+    readings = {
+        "open": {"pv": {"total": 40240.0}, "grid": {"total": 2122.0}},
+        "close": {"pv": {"total": 40241.0}, "grid": {"total": 2123.0}},
+    }
+    phase = {"n": 0}
+
+    def read_energy():
+        phase["n"] += 1
+        return readings["open"] if phase["n"] == 1 else readings["close"]
+
+    for offset in (30, 60, 90):
+        assert sampler.tick(
+            now=start + timedelta(seconds=offset),
+            force=True,
+            state_path=str(state),
+            read_plant=lambda: _plant(pv=0.0, grid=0.6),
+            read_soc=lambda: 50.0,
+            read_flex_chart=lambda: {},
+            read_energy=read_energy,
+        )
+    closed = sampler.finalize_closed_interval(
+        start, state_path=str(state), read_energy=read_energy, now=start + timedelta(minutes=15)
+    )
+    assert closed["pv_kw"] == pytest.approx(0.0)
+    assert closed["ist_power_source"]["pv"] == "mean"
+    assert closed["grid_kw"] == pytest.approx(0.6)
+    assert closed["grid_import_source"] == sampler.GRID_IMPORT_SOURCE_MEAN
+    assert closed["coarse_counters"] == ["pv", "grid"]
+
+
+def _close_slot(state: Path, start: datetime, open_pv: float, close_pv: float) -> dict:
+    phase = {"n": 0}
+
+    def read_energy():
+        phase["n"] += 1
+        return {"pv": {"total": open_pv if phase["n"] == 1 else close_pv}}
+
+    for offset in (30, 60, 90):
+        assert sampler.tick(
+            now=start + timedelta(seconds=offset),
+            force=True,
+            state_path=str(state),
+            read_plant=lambda: _plant(pv=0.3, grid=0.6),
+            read_soc=lambda: 50.0,
+            read_flex_chart=lambda: {},
+            read_energy=read_energy,
+        )
+    return sampler.finalize_closed_interval(
+        start, state_path=str(state), read_energy=read_energy, now=start + timedelta(minutes=15)
+    )
+
+
+def test_coarse_counter_is_kept_for_the_ehal_com_warning_until_it_counts_finely(tmp_path: Path):
+    """The user must learn that a counter is too coarse (EHAL-Com warning), and the
+    warning must go once the counter sends decimals again."""
+    state = tmp_path / "sampler.json"
+    start = datetime(2026, 11, 23, 17, 45, 0)
+    _close_slot(state, start, 40240.0, 40241.0)
+    seen = sampler.coarse_counter_channels(
+        state_path=str(state), now=start + timedelta(minutes=20)
+    )
+    assert seen == {"pv": "2026-11-23T18:00:00"}
+    # Older than a day: no warning any more.
+    assert sampler.coarse_counter_channels(
+        state_path=str(state), now=start + timedelta(days=2)
+    ) == {}
+    # Loxone now sends <v.3>: the next slot uses the counter and the warning goes.
+    later = start + timedelta(minutes=15)
+    closed = _close_slot(state, later, 40241.012, 40241.087)
+    assert closed["ist_power_source"]["pv"] == "counter"
+    assert sampler.coarse_counter_channels(
+        state_path=str(state), now=later + timedelta(minutes=20)
+    ) == {}
+
+
+def test_rescaled_grid_counter_keeps_the_import_mean(tmp_path: Path):
+    """A grid import counter that jumps by a factor (Loxone rescale) must not set the
+    capacity-charge import of the slot."""
+    state = tmp_path / "sampler.json"
+    start = datetime(2026, 11, 23, 22, 45, 0)
+    phase = {"n": 0}
+
+    def read_energy():
+        phase["n"] += 1
+        total = 2129.281 if phase["n"] == 1 else 21292.81
+        return {"grid": {"total": total, "total_neg": 594.318}}
+
+    for offset in (30, 60, 90):
+        assert sampler.tick(
+            now=start + timedelta(seconds=offset),
+            force=True,
+            state_path=str(state),
+            read_plant=lambda: _plant(pv=0.0, grid=0.6),
+            read_soc=lambda: 50.0,
+            read_flex_chart=lambda: {},
+            read_energy=read_energy,
+        )
+    closed = sampler.finalize_closed_interval(
+        start, state_path=str(state), read_energy=read_energy, now=start + timedelta(minutes=15)
+    )
+    assert closed["grid_kw"] == pytest.approx(0.6)
+    assert closed["grid_import_source"] == sampler.GRID_IMPORT_SOURCE_MEAN
+    assert closed["implausible_counters"] == ["grid"]
