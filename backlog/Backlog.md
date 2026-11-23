@@ -19,6 +19,29 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 - **Release plan (decided 2026-11-23, maintainer):** the first pre-release is `2.8.0-beta.1` (no alpha; the dev builds run on the production install). `release/2.8` is cut at the RC / official, not at the beta: until then everything stays on `main`, and work planned for after the beta waits or lives on feature branches. The `version.py` bump is approved only when the tag is due. Edibert: tag `v0.1.16` (editor fixes after `v0.1.15`) and move Earnie's pin in `pyproject.toml` to it before the beta.
   - **Done (2026-11-23):** Edibert `0.1.16` released (`ff820ae`, tag `v0.1.16`, Edibert suite 826 passed); Earnie's pin raised to the `v0.1.16` archive, full suite green against it. Note in `docs/dev/edibert-integration.md`.
+- [ ] **Beta checklist `2.8.0-beta.1`** `[rel]` *(created 2026-11-23; release notes are tracked elsewhere; general steps: [`docs/workflow/release-checklist.md`](../docs/workflow/release-checklist.md))*:
+  - **Prepared on `main`:**
+    - [x] Edibert `v0.1.16` tagged and pinned (`ff820ae`, `9c8fc359`).
+    - [x] Reserve fill basis fix, margin proposal 0.7 kW, month peaks in the planning timezone, `REG-O-` cases.
+    - [x] Quality gate (see "2.8 quality / release hardening" below): coverage 88.9 %, vulture 0, KPI splits, Sonar bug fixed, Opus review of the splits fixed (`a87940cc`), docs review (`ac9f2591`, `0634d889`, `9c583360`).
+  - **Checks before the tag (maintainer):**
+    - [ ] SonarCloud: Quality Gate green after the CI run of the latest `main` (new bug `S1244` fixed); otherwise list new bugs in `Backlog-Bugfixes.md`.
+    - [ ] NAS: dev image with these commits on the production install; live check of Reserve P2 (log line `Virtuelle Reserve gehalten: Füllbasis …`, forced charge slots per day against 22 on 2026-11-21).
+    - [ ] Live scenario on the NAS: raise the saved margin from 0.3 to 0.7 kW (a saved margin is never changed by an update).
+    - [ ] Max-power tariff: observe mode still runs, `import_cap_report.json` is written, no errors in the log.
+  - **Decisions open:**
+    - [ ] Savings ledger `_closed_slot_start` takes the sampler's host-naive time as planning-local (wrong by 1–2 h on a `TZ=UTC` host, the HA add-on case): fix before the beta, or note as known limit.
+    - [ ] Fixture coordinates (47.404 / 9.742) in the public goldens since 2026-10-15: keep or replace.
+  - **Release steps (approvals by the maintainer):**
+    - [ ] Approve the `version.py` bump to `2.8.0-beta.1` (never changed without approval).
+    - [ ] Alpha compose pins (`docker/compose/*-alpha.yml`) set to the image of the version.
+    - [ ] Release notes: draft reviewed and finalized, migration section if the registry gained steps, HA add-on changelog blurb checked.
+    - [ ] Private regression repo clean and pushed; regression green locally right before the tag (`scripts.run_regression`).
+    - [ ] `git status` clean, `main` equals `origin/main`; temporary `docs/dev/doc-review-checklist.md` moved to `docs/dev/done/doc-review-checklist-2.8.0-beta.1.md`.
+    - [ ] Push the annotated tag; Actions run `release`, `addon_smoke` and `addon_lint` green; `promote` waits for approval.
+    - [ ] Test the candidate on the HA dev add-on and on the NAS (checklist step 3), including the feature checks: max-power tariff, reserve, "Mit Earnie gespart".
+    - [ ] Approve `promote`; after it: GitHub pre-release correct, GHCR `:next`, HA pre-release add-on offers the update, `streamlitcloud` reset to the tag, release entry in `Backlog-Erledigt.md`.
+  - **Not for the beta (RC):** doc findings 2, 3, 5, 8 (Bugfixes backlog), four functions slightly over complexity 10 (install radon and measure), repo names in `docs/einrichtung/private-env.md`, then `release/2.8` at RC / official.
 - **Order (updated 2026-11-07, maintainer):** the chapter is cut down to what 2.8 ships; items moved out carry "moved from 2.8 on 2026-11-07" under Version 2.+1. The Edibert phases P1–P8 are done ([Erledigt](Backlog-Erledigt.md)), and the **max-power dependent tariff** stays the target feature.
   - **Dependencies:** **Edibert grid fixed fees** is done and leaves the study's prices as they were; the tariff's invoice line can follow. The study's final figures come before the release. Sharing opens with the 2.8.1 release (**Edibert share consent**, moved to Version 2.8.1 on 2026-11-18). The sponsor button ships only with a public profile.
   - **Note (2026-11-11, cleanup):** **MILP look-ahead past SA₂** (both items) and **Heat pump in the SE: the store does not limit the shift** are done ([Erledigt](Backlog-Erledigt.md)); the Live part of the look-ahead waits for a decision under Version 2.+1 (**MILP look-ahead past SA₂ — Live**). The epic **RuleRef** moved to the head of Version 2.+1 with its remaining study findings. Left for 2.8: max-power tariff, share consent gate, grid catalog upkeep, sponsor button, fuel prices. *(2026-11-18: share consent gate and grid catalog upkeep moved to Version 2.8.1.)*
