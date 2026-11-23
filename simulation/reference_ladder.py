@@ -6,16 +6,14 @@ and flex windows of the optimized run and always book actual prices.
 """
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import NamedTuple
 
 import pandas as pd
 
 from optimizer.charging_schedule import contexts_within_book
 from optimizer.consumer_power import power_limits_kw
-from optimizer.export_power_limit import clip_grid_kw_to_export_cap
 from optimizer.milp_consumer_delivery import consumer_delivery_eligible_indices
 from optimizer.milp_inputs import _resolve_thermal_flex_contexts
 from optimizer.rod_store import ROD_STORE_START_KEY, STORE_BALANCE_CONTEXT_KEY
@@ -48,13 +46,27 @@ from simulation.reference_costs import (
     _empty_reference_series,
     ladder_reference_id,
 )
+from simulation.reference_ladder_prices import (  # noqa: F401  re-exported (import facade)
+    _end_customer_price_series,
+    curtail_negative_export,
+)
+from simulation.reference_ladder_soc import (  # noqa: F401  re-exported (import facade)
+    P_REF_IMPORT_WEIGHTED,
+    P_REF_TIME_MEAN,
+    _reference_buy_price_cent,
+    ladder_reference_fingerprint,
+    ladder_soc_correction,
+    period_end_exclusive,
+    rule_share,
+    soc_at_period_end,
+    soc_correction_eur,
+    soc_kwh_per_percent,
+)
 
 L1_STEUERBEFEHL = "Referenz L1"
 L2_STEUERBEFEHL = "Referenz L2"
 # ``run_simulation``'s default start SoC: every SE run starts there.
 SE_START_SOC_PERCENT = 50.0
-P_REF_IMPORT_WEIGHTED = "import_weighted"
-P_REF_TIME_MEAN = "time_mean"
 _LADDER_LABELS = {
     LADDER_L1: "Wechselrichter-Eigenverbrauch",
     LADDER_L2: "Standard-Regeln",
@@ -212,7 +224,6 @@ def _window_rows(
     rule_params: dict | None,
     rod_store_kwh: dict[str, float],
 ) -> _WindowResult:
-    from optimizer.simulation import _prepare_horizon_state
     from simulation.anchor_step import _build_anchor_window_plan
 
     surplus_rods: list[SurplusRod] = []
@@ -227,28 +238,7 @@ def _window_rows(
             feed_in_settings=feed_in_settings,
             price_resources=None,
         )
-        # The MILP's own preparation: its targets (fixed load credited) and flex windows.
-        setup = _prepare_horizon_state(
-            plan.matrix,
-            sim_soc,
-            _HorizonOptions(
-                k_push=None,
-                verbose=False,
-                commit_hours=1,
-                flex_book_hours=plan.flex_book_hours,
-                flex_book_start=plan.flex_book_start,
-                sunrise_soc_min_index=None,
-                soc_hold_index=None,
-                soc_hold_percent=None,
-            ),
-            battery_params=battery_params,
-            consumer_daily_targets_kwh=plan.meta["consumer_daily_targets_kwh"],
-            charging_contexts=None,
-            filter_contexts=None,
-            matrix_prepared=False,
-            disable_horizon_soc_anchor=True,
-            flexible_consumers=consumers,
-        )
+        setup = _milp_window_setup(plan, sim_soc, battery_params, consumers)
         book = _book_indices(plan)
         planned = [c for c in consumers if not is_heating_rod_consumer(c)]
         shapes = reference_flex_shapes_kw(
@@ -265,42 +255,32 @@ def _window_rows(
             truncated_lock_slots = 0
         else:
             surplus_rods = _surplus_rods(setup, consumers, book)
-            flex = build_rule_based_flex_kw_per_hour(
-                setup.matrix,
-                setup.horizon_limits,
-                eligible,
-                planned,
-                shapes,
-                _end_customer_price_series(
-                    setup.matrix[book[0]]["slot_datetime"],
-                    setup.matrix[book[-1]]["slot_datetime"],
-                    prices_df,
-                    scenario_params,
-                ),
-                rule_params,
-                book_indices=book,
-                battery_params=battery,
-                initial_soc=sim_soc,
+            flex = _rule_based_window_flex(
+                setup,
+                planned=planned,
+                shapes=shapes,
+                eligible=eligible,
+                book=book,
+                prices_df=prices_df,
+                scenario_params=scenario_params,
+                rule_params=rule_params,
+                battery=battery,
+                sim_soc=sim_soc,
                 surplus_rods=surplus_rods,
             )
             steuerbefehl = L2_STEUERBEFEHL
             no_published_block_ids = flex.no_published_block_ids
             truncated_lock_slots = flex.truncated_lock_slots
-        rows: list[dict] = []
-        soc = float(sim_soc)
-        for t in book:
-            flex_kw = {str(c["id"]): 0.0 for c in consumers} | flex.per_slot[t]
-            soc, row = _simulate_single_hour_baseline(
-                setup.matrix[t],
-                soc,
-                battery,
-                flex_kw_override=flex_kw,
-                steuerbefehl=steuerbefehl,
-                consumers=consumers,
-            )
-            if rule_params is not None:
-                curtail_negative_export(row, setup.matrix[t])
-            rows.append(row)
+        soc, rows = _book_window_slots(
+            setup,
+            book,
+            flex,
+            sim_soc=sim_soc,
+            battery=battery,
+            steuerbefehl=steuerbefehl,
+            consumers=consumers,
+            curtail=rule_params is not None,
+        )
     return _WindowResult(
         rows,
         plan.meta,
@@ -312,66 +292,96 @@ def _window_rows(
     )
 
 
-def curtail_negative_export(chart_row: dict, matrix_row: dict) -> None:
-    """L2 limits export to zero while feeding in costs money; L1 does not (spec § 4.6)."""
-    chart_row["Netzbezug (kW)"] = round(
-        clip_grid_kw_to_export_cap(chart_row["Netzbezug (kW)"], k_push_act=matrix_row["k_push_act"]), 2
+def _milp_window_setup(plan, sim_soc: float, battery_params, consumers: list[dict]):
+    """The MILP's own preparation: its targets (fixed load credited) and flex windows."""
+    from optimizer.simulation import _prepare_horizon_state
+
+    return _prepare_horizon_state(
+        plan.matrix,
+        sim_soc,
+        _HorizonOptions(
+            k_push=None,
+            verbose=False,
+            commit_hours=1,
+            flex_book_hours=plan.flex_book_hours,
+            flex_book_start=plan.flex_book_start,
+            sunrise_soc_min_index=None,
+            soc_hold_index=None,
+            soc_hold_percent=None,
+        ),
+        battery_params=battery_params,
+        consumer_daily_targets_kwh=plan.meta["consumer_daily_targets_kwh"],
+        charging_contexts=None,
+        filter_contexts=None,
+        matrix_prepared=False,
+        disable_horizon_soc_anchor=True,
+        flexible_consumers=consumers,
     )
 
 
-def _end_customer_price_series(
-    first_slot: datetime,
-    last_slot: datetime,
+def _rule_based_window_flex(
+    setup,
+    *,
+    planned: list[dict],
+    shapes: dict[str, list[float]],
+    eligible: dict,
+    book: list[int],
     prices_df: pd.DataFrame,
     scenario_params: dict,
-) -> dict[datetime, float]:
-    """End-customer price per slot, from the book's start to the last day published in it.
+    rule_params: dict,
+    battery,
+    sim_soc: float,
+    surplus_rods: list[SurplusRod],
+):
+    """L2: the standard rules move the flex energy inside the book."""
+    return build_rule_based_flex_kw_per_hour(
+        setup.matrix,
+        setup.horizon_limits,
+        eligible,
+        planned,
+        shapes,
+        _end_customer_price_series(
+            setup.matrix[book[0]]["slot_datetime"],
+            setup.matrix[book[-1]]["slot_datetime"],
+            prices_df,
+            scenario_params,
+        ),
+        rule_params,
+        book_indices=book,
+        battery_params=battery,
+        initial_soc=sim_soc,
+        surplus_rods=surplus_rods,
+    )
 
-    ``epex_prices_for_slots`` fills holes of up to ``MAX_PRICE_GAP`` with the previous price;
-    here any slot without a market price raises, since the lock must not rank prices that did
-    not exist. Only the end of the market data cuts the series, and never inside the book
-    (spec § 4.2).
-    """
-    from data.backtesting_prices import (
-        last_day_ahead_calendar_date,
-        matrix_prices_from_context,
-        pricing_kwargs_from_resolved,
-    )
-    from optimizer.sim_baseline import _is_nonexistent_local_slot
-    from optimizer.slot_duration import DEFAULT_DT_H
 
-    stop = datetime.combine(
-        last_day_ahead_calendar_date(last_slot) + timedelta(days=1), datetime.min.time()
-    )
-    step = timedelta(hours=float(DEFAULT_DT_H))
-    slots: list[datetime] = []
-    current = first_slot
-    while current < stop:
-        if not _is_nonexistent_local_slot(current):
-            slots.append(current)
-        current += step
-    index = prices_df.index
-    known = index.tz_localize(None) if index.tz is not None else index
-    stamps = pd.DatetimeIndex(slots)
-    # Quarter-hour slots of an hourly series take the hour's price.
-    has_price = stamps.isin(known) | stamps.floor("h").isin(known)
-    last_priced = int(has_price.nonzero()[0].max()) if has_price.any() else -1
-    gaps = stamps[: last_priced + 1][~has_price[: last_priced + 1]]
-    if len(gaps):
-        raise ValueError(
-            f"Referenz-Regeln: Kein Börsenpreis für {gaps[0]:%Y-%m-%d %H:%M} "
-            f"(die Preissperre braucht Preise bis {stop:%Y-%m-%d %H:%M})."
+def _book_window_slots(
+    setup,
+    book: list[int],
+    flex,
+    *,
+    sim_soc: float,
+    battery,
+    steuerbefehl: str,
+    consumers: list[dict],
+    curtail: bool,
+) -> tuple[float, list[dict]]:
+    """Books the window's slots on the SoC chain; returns the end SoC and the chart rows."""
+    rows: list[dict] = []
+    soc = float(sim_soc)
+    for t in book:
+        flex_kw = {str(c["id"]): 0.0 for c in consumers} | flex.per_slot[t]
+        soc, row = _simulate_single_hour_baseline(
+            setup.matrix[t],
+            soc,
+            battery,
+            flex_kw_override=flex_kw,
+            steuerbefehl=steuerbefehl,
+            consumers=consumers,
         )
-    if last_priced < 0 or slots[last_priced] < last_slot:
-        raise ValueError(
-            f"Referenz-Regeln: Die Börsenpreise enden vor dem letzten gebuchten Slot "
-            f"{last_slot:%Y-%m-%d %H:%M}."
-        )
-    slots = slots[: last_priced + 1]
-    _, end_customer, _ = matrix_prices_from_context(
-        prices_df, slots, None, **pricing_kwargs_from_resolved(scenario_params)
-    )
-    return dict(zip(slots, end_customer))
+        if curtail:
+            curtail_negative_export(row, setup.matrix[t])
+        rows.append(row)
+    return soc, rows
 
 
 def compute_l1_reference_costs(
@@ -506,12 +516,7 @@ def _compute_ladder_step(
     on_progress=None,
 ) -> LadderReferenceResult:
     import config
-    from simulation.engine import (
-        list_simulation_anchors,
-        list_sunrise_step_anchors,
-    )
     from simulation.engine_scenario import (
-        _consumption_kw_columns_from_chart_rows,
         _flexible_consumers_from_scenario,
         _scenario_to_battery_params,
         scenario_standby_power_kw,
@@ -519,30 +524,14 @@ def _compute_ladder_step(
 
     horizon_mode = parse_horizon_mode(horizon_mode)
     cache.load()
-    anchors = (
-        list_sunrise_step_anchors(start, end, cache, scenario_params)
-        if horizon_mode == SUNRISE_WINDOW
-        else list_simulation_anchors(start, end, cache)
-    )
-    if not anchors:
-        raise ValueError(
-            f"Keine historischen Verbrauchsfenster zwischen {start.date()} und {end.date()}."
-        )
+    anchors = _ladder_anchors(start, end, cache, scenario_params, horizon_mode)
     consumers = _flexible_consumers_from_scenario(scenario_params)
     battery_params = _scenario_to_battery_params(scenario_params)
     feed_in_settings = config.get_backtesting_feed_in_settings(runtime_override=scenario_params)
     standby_kw = scenario_standby_power_kw(scenario_params)
     shape_source = _shape_source(cache, scenario_params)
 
-    series = _empty_reference_series()
-    series["sim_soc"] = []
-    series["batt_action_kw"] = []
-    per_consumer: dict[str, list[float]] = {}
-    timestamps: list[datetime] = []
-    plausibility = PlausibilityReport()
-    no_shape_windows: dict[str, int] = {}
-    no_published_block_windows: dict[str, int] = {}
-    truncated_lock_slots = 0
+    acc = _LadderAccumulator(consumers)
     total_hours = len(anchors) * BACKTESTING_STEP_HOURS
     soc = float(initial_soc)
     rod_store_kwh: dict[str, float] = {}
@@ -562,43 +551,95 @@ def _compute_ladder_step(
         )
         soc = window.end_soc
         rod_store_kwh = window.rod_store_kwh
+        acc.add_window(window, standby_kw)
+        if on_progress is not None:
+            on_progress(window_index * BACKTESTING_STEP_HOURS, total_hours)
+    return acc.result(soc)
+
+
+def _ladder_anchors(
+    start: pd.Timestamp,
+    end: pd.Timestamp,
+    cache: HistoricalDataCache,
+    scenario_params: dict,
+    horizon_mode: str,
+) -> list:
+    """The run's anchors, the same as ``run_simulation``; no window raises."""
+    from simulation.engine import (
+        list_simulation_anchors,
+        list_sunrise_step_anchors,
+    )
+
+    anchors = (
+        list_sunrise_step_anchors(start, end, cache, scenario_params)
+        if horizon_mode == SUNRISE_WINDOW
+        else list_simulation_anchors(start, end, cache)
+    )
+    if not anchors:
+        raise ValueError(
+            f"Keine historischen Verbrauchsfenster zwischen {start.date()} und {end.date()}."
+        )
+    return anchors
+
+
+class _LadderAccumulator:
+    """Collects the booked windows of one ladder step into series and counters."""
+
+    def __init__(self, consumers: list[dict]) -> None:
+        self.consumers = consumers
+        self.series = _empty_reference_series()
+        self.series["sim_soc"] = []
+        self.series["batt_action_kw"] = []
+        self.per_consumer: dict[str, list[float]] = {}
+        self.timestamps: list[datetime] = []
+        self.plausibility = PlausibilityReport()
+        self.no_shape_windows: dict[str, int] = {}
+        self.no_published_block_windows: dict[str, int] = {}
+        self.truncated_lock_slots = 0
+
+    def add_window(self, window: _WindowResult, standby_kw: float) -> None:
+        from simulation.engine_scenario import _consumption_kw_columns_from_chart_rows
+
         meta = window.meta
         meta["standby_power_kw"] = standby_kw
         meta["reference_no_shape_consumers"] = window.no_shape_ids
-        plausibility.add(validate_window_consumption(window.rows, meta))
+        self.plausibility.add(validate_window_consumption(window.rows, meta))
         for cid in window.no_shape_ids:
-            no_shape_windows[cid] = no_shape_windows.get(cid, 0) + 1
+            self.no_shape_windows[cid] = self.no_shape_windows.get(cid, 0) + 1
         for cid in window.no_published_block_ids:
-            no_published_block_windows[cid] = no_published_block_windows.get(cid, 0) + 1
-        truncated_lock_slots += window.truncated_lock_slots
+            self.no_published_block_windows[cid] = self.no_published_block_windows.get(cid, 0) + 1
+        self.truncated_lock_slots += window.truncated_lock_slots
         for row in window.rows:
-            _append_ladder_slot(series, row)
-            timestamps.append(row["slot_datetime"])
+            _append_ladder_slot(self.series, row)
+            self.timestamps.append(row["slot_datetime"])
         # Same per-consumer columns as an optimized run, for the SE window view.
-        columns = _consumption_kw_columns_from_chart_rows(window.rows, consumers)
+        columns = _consumption_kw_columns_from_chart_rows(window.rows, self.consumers)
         for name, values in columns.items():
             if name != "consumption_kw":
-                per_consumer.setdefault(name, []).extend(values)
-        if on_progress is not None:
-            on_progress(window_index * BACKTESTING_STEP_HOURS, total_hours)
+                self.per_consumer.setdefault(name, []).extend(values)
 
-    frame = pd.DataFrame(
-        {
-            **{name: series[name] for name in (*_REFERENCE_COST_COLUMNS, "sim_soc", "batt_action_kw")},
-            **per_consumer,
-        },
-        index=pd.DatetimeIndex(timestamps),
-    )
-    frame.index.name = "ts"
-    frame.attrs[RUN_END_SOC_ATTR] = soc
-    return LadderReferenceResult(
-        frame,
-        plausibility,
-        soc,
-        no_shape_windows,
-        no_published_block_windows,
-        truncated_lock_slots,
-    )
+    def result(self, soc: float) -> LadderReferenceResult:
+        series = self.series
+        frame = pd.DataFrame(
+            {
+                **{
+                    name: series[name]
+                    for name in (*_REFERENCE_COST_COLUMNS, "sim_soc", "batt_action_kw")
+                },
+                **self.per_consumer,
+            },
+            index=pd.DatetimeIndex(self.timestamps),
+        )
+        frame.index.name = "ts"
+        frame.attrs[RUN_END_SOC_ATTR] = soc
+        return LadderReferenceResult(
+            frame,
+            self.plausibility,
+            soc,
+            self.no_shape_windows,
+            self.no_published_block_windows,
+            self.truncated_lock_slots,
+        )
 
 
 def _append_ladder_slot(series: dict[str, list[float]], row: dict) -> None:
@@ -619,110 +660,3 @@ def _append_ladder_slot(series: dict[str, list[float]], row: dict) -> None:
     series["k_push_act"].append(float(row[COL_EINSPEISEVERGUETUNG]))
     series["sim_soc"].append(float(row["Simulierter SoC (%)"]))
     series["batt_action_kw"].append(float(row["Geplante Batterie-Aktion (kW)"]))
-
-
-def soc_kwh_per_percent(scenario_params: dict) -> float:
-    """Usable energy of one SoC percent, as the ledger's correction counts it."""
-    from simulation.engine_scenario import _scenario_to_battery_params
-
-    battery = _baseline_battery_params(_scenario_to_battery_params(scenario_params))
-    return float(battery["battery_capacity_kwh"]) * float(battery["efficiency"]) / 100.0
-
-
-def soc_correction_eur(
-    l3_soc: float, step_soc: float, kwh_per_percent: float, p_ref_cent: float
-) -> float:
-    """Positive when L3 ends fuller than the step: the step's cost is that much too low."""
-    return (l3_soc - step_soc) * kwh_per_percent * p_ref_cent / 100.0
-
-
-def rule_share(l0_eur: float, l2_eur: float, l3_eur: float) -> float | None:
-    """Share of the rules in the total saving; ``None`` when Earnie saves nothing against L0."""
-    total_saving = l0_eur - l3_eur
-    return (l0_eur - l2_eur) / total_saving if total_saving > 0 else None
-
-
-def period_end_exclusive(period_end: pd.Timestamp | str) -> pd.Timestamp:
-    return pd.Timestamp(period_end).normalize() + pd.Timedelta(days=1)
-
-
-def soc_at_period_end(frame: pd.DataFrame, end_exclusive: pd.Timestamp) -> float:
-    """SoC where the booked period ends: the next slot's start SoC, else the run's end SoC."""
-    index = pd.DatetimeIndex(frame.index)
-    later = frame.loc[index >= end_exclusive]
-    if not later.empty:
-        return float(later.iloc[0]["sim_soc"])
-    if RUN_END_SOC_ATTR not in frame.attrs:
-        raise ValueError(f"Lauf ohne End-SoC, Periodenende {end_exclusive:%Y-%m-%d} nicht bewertbar.")
-    return float(frame.attrs[RUN_END_SOC_ATTR])
-
-
-def _reference_buy_price_cent(l3_frame: pd.DataFrame, end_exclusive: pd.Timestamp) -> tuple[float, str]:
-    """``p_ref``: L3's import-weighted buy price of the period's last day, as the ledger does.
-
-    A day without import takes the time mean, as an explicit rule (``savings-ledger.md`` § 3).
-    """
-    index = pd.DatetimeIndex(l3_frame.index)
-    day = l3_frame.loc[(index >= end_exclusive - pd.Timedelta(days=1)) & (index < end_exclusive)]
-    if day.empty:
-        raise ValueError(f"Keine gebuchten Slots am letzten Tag vor {end_exclusive:%Y-%m-%d}.")
-    import_kwh = float(day["import_kwh"].sum())
-    if import_kwh > 0.0:
-        return float((day["import_kwh"] * day["k_act"]).sum()) / import_kwh, P_REF_IMPORT_WEIGHTED
-    return float(day["k_act"].mean()), P_REF_TIME_MEAN
-
-
-def ladder_soc_correction(
-    results: dict[str, pd.DataFrame],
-    scenario_id: str,
-    steps: dict[str, str],
-    scenario_params: dict,
-    period_end: pd.Timestamp | str,
-) -> dict:
-    """Value each step's end-of-period SoC difference to L3 (spec § 3.3, ledger formula).
-
-    ``correction_eur`` is positive when L3 ends fuller than the step: the step's cost is
-    that much too low for the comparison. ``results`` are not clipped to the period, since
-    the SoC at the period's end is the start SoC of the slot behind it.
-    """
-    end_exclusive = period_end_exclusive(period_end)
-    kwh_per_percent = soc_kwh_per_percent(scenario_params)
-    l3_frame = results[scenario_id]
-    l3_soc = soc_at_period_end(l3_frame, end_exclusive)
-    p_ref_cent, basis = _reference_buy_price_cent(l3_frame, end_exclusive)
-    block: dict = {
-        "soc_end_percent": l3_soc,
-        "p_ref_cent": p_ref_cent,
-        "p_ref_basis": basis,
-        "steps": {},
-    }
-    for step, ref_id in steps.items():
-        step_soc = soc_at_period_end(results[ref_id], end_exclusive)
-        block["steps"][step] = {
-            "soc_end_percent": step_soc,
-            "correction_eur": soc_correction_eur(l3_soc, step_soc, kwh_per_percent, p_ref_cent),
-        }
-    return block
-
-
-def ladder_reference_fingerprint(scenario_params: dict) -> tuple:
-    """Sharing key of L1 / L2 runs: L0's key plus the house, the battery and the flex consumers.
-
-    L0 ignores storage and flex, so ``reference_fingerprint`` stays as it is; L1 and L2
-    depend on them and may only be shared between identical setups.
-    """
-    from house_config.planning_flex_bridge import reference_fingerprint
-    from simulation.engine_scenario import (
-        _flexible_consumers_from_scenario,
-        _scenario_to_battery_params,
-    )
-
-    def canonical(value) -> str:
-        return json.dumps(value, sort_keys=True, default=str)
-
-    return (
-        reference_fingerprint(scenario_params),
-        canonical(scenario_params.get("_house_profile")),
-        canonical(_scenario_to_battery_params(scenario_params)),
-        canonical(_flexible_consumers_from_scenario(scenario_params)),
-    )

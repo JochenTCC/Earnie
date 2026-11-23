@@ -496,24 +496,13 @@ def run_simulation(
     cache = cache or HistoricalDataCache()
     cache.load()
 
-    if horizon_mode == SUNRISE_WINDOW:
-        anchors = list_sunrise_step_anchors(start, end, cache, scenario_params)
-    else:
-        anchors = list_simulation_anchors(start, end, cache)
-    if not anchors:
-        raise ValueError(
-            f"Keine historischen Verbrauchsfenster zwischen {start.date()} und {end.date()}."
-        )
-
+    anchors = _simulation_run_anchors(start, end, cache, scenario_params, horizon_mode)
     init = _init_simulation_run(anchors, scenario_params, horizon_mode)
     forecast_planner = None
     if plan_forecast is not None:
-        if horizon_mode != SUNRISE_WINDOW:
-            raise ValueError(f"Forecast-Modus erfordert horizon_mode={SUNRISE_WINDOW}.")
-        from simulation.forecast_mode import ForecastPlanner
-
-        forecast_planner = ForecastPlanner(
+        forecast_planner = _build_forecast_planner(
             plan_forecast,
+            horizon_mode=horizon_mode,
             scenario_params=scenario_params,
             cache=cache,
             prices_df=prices_df,
@@ -521,15 +510,7 @@ def run_simulation(
             price_resources=price_resources,
         )
         price_resources = None
-    hours_done = 0
-    sim_soc = initial_soc
-    rod_store_kwh: dict[str, float] = {}
-    hp_store_kwh: dict[str, float] = {}
-    plans_with_import_cap = parse_import_cap(scenario_params) is not None
-    import_peak_by_month: dict[str, float] = {}
 
-    all_chart_rows: list[dict] = []
-    all_timestamps: list[datetime] = []
     plausibility = PlausibilityReport()
     collect_cbc = scenario_id is not None
     if collect_cbc:
@@ -550,26 +531,9 @@ def run_simulation(
         forecast_planner=forecast_planner,
     )
     try:
-        for anchor in anchors:
-            step = _process_anchor_window(
-                cfg, anchor, sim_soc, hours_done, plausibility, rod_store_kwh, import_peak_by_month,
-                hp_store_kwh,
-            )
-            sim_soc = step.sim_soc
-            rod_store_kwh = rod_store_levels_after_window(
-                step.matrix, step.chart_rows, init.flexible_consumers, scenario_params, rod_store_kwh
-            )
-            hp_store_kwh = hp_store_levels_after_window(
-                step.matrix, step.chart_rows, init.flexible_consumers, scenario_params, hp_store_kwh
-            )
-            if plans_with_import_cap:
-                import_peak_by_month = import_peaks_after_window(step.chart_rows, import_peak_by_month)
-            all_chart_rows.extend(step.chart_rows)
-            all_timestamps.extend(row["slot_datetime"] for row in step.matrix)
-
-            hours_done += len(step.chart_rows)
-            if on_progress is not None:
-                on_progress(wall_hours_from_slots(hours_done), init.total_hours)
+        all_chart_rows, all_timestamps, sim_soc = _run_anchor_loop(
+            cfg, anchors, init, initial_soc, plausibility, on_progress
+        )
     finally:
         _reset_simulation_run(init.solver_tokens)
         if collect_cbc:
@@ -580,14 +544,104 @@ def run_simulation(
     df_res = _finalize_simulation_result(
         all_chart_rows, all_timestamps, init.flexible_consumers
     )
+    _attach_run_attrs(df_res, sim_soc, scenario_params)
+    cbc_events = take_cbc_events() if collect_cbc else []
+    return df_res, plausibility, cbc_events
+
+
+def _simulation_run_anchors(
+    start: pd.Timestamp,
+    end: pd.Timestamp,
+    cache: HistoricalDataCache,
+    scenario_params: dict,
+    horizon_mode: str,
+) -> list:
+    """Anker des Laufs je Horizont-Modus; ohne Verbrauchsfenster ein ValueError."""
+    if horizon_mode == SUNRISE_WINDOW:
+        anchors = list_sunrise_step_anchors(start, end, cache, scenario_params)
+    else:
+        anchors = list_simulation_anchors(start, end, cache)
+    if not anchors:
+        raise ValueError(
+            f"Keine historischen Verbrauchsfenster zwischen {start.date()} und {end.date()}."
+        )
+    return anchors
+
+
+def _build_forecast_planner(
+    plan_forecast: tuple[str, ...],
+    *,
+    horizon_mode: str,
+    scenario_params: dict,
+    cache: HistoricalDataCache,
+    prices_df: pd.DataFrame,
+    feed_in_settings,
+    price_resources: BacktestingPriceResources | None,
+):
+    """Forecast-Planer (nur im Sonnenaufgang-Modus)."""
+    if horizon_mode != SUNRISE_WINDOW:
+        raise ValueError(f"Forecast-Modus erfordert horizon_mode={SUNRISE_WINDOW}.")
+    from simulation.forecast_mode import ForecastPlanner
+
+    return ForecastPlanner(
+        plan_forecast,
+        scenario_params=scenario_params,
+        cache=cache,
+        prices_df=prices_df,
+        feed_in_settings=feed_in_settings,
+        price_resources=price_resources,
+    )
+
+
+def _run_anchor_loop(
+    cfg: _AnchorRunConfig,
+    anchors: list,
+    init,
+    initial_soc: float,
+    plausibility: PlausibilityReport,
+    on_progress,
+) -> tuple[list[dict], list[datetime], float]:
+    """Simuliert alle Anker-Fenster nacheinander; SoC und Speicherstände laufen mit."""
+    scenario_params = cfg.scenario_params
+    hours_done = 0
+    sim_soc = initial_soc
+    rod_store_kwh: dict[str, float] = {}
+    hp_store_kwh: dict[str, float] = {}
+    plans_with_import_cap = parse_import_cap(scenario_params) is not None
+    import_peak_by_month: dict[str, float] = {}
+    all_chart_rows: list[dict] = []
+    all_timestamps: list[datetime] = []
+    for anchor in anchors:
+        step = _process_anchor_window(
+            cfg, anchor, sim_soc, hours_done, plausibility, rod_store_kwh, import_peak_by_month,
+            hp_store_kwh,
+        )
+        sim_soc = step.sim_soc
+        rod_store_kwh = rod_store_levels_after_window(
+            step.matrix, step.chart_rows, init.flexible_consumers, scenario_params, rod_store_kwh
+        )
+        hp_store_kwh = hp_store_levels_after_window(
+            step.matrix, step.chart_rows, init.flexible_consumers, scenario_params, hp_store_kwh
+        )
+        if plans_with_import_cap:
+            import_peak_by_month = import_peaks_after_window(step.chart_rows, import_peak_by_month)
+        all_chart_rows.extend(step.chart_rows)
+        all_timestamps.extend(row["slot_datetime"] for row in step.matrix)
+
+        hours_done += len(step.chart_rows)
+        if on_progress is not None:
+            on_progress(wall_hours_from_slots(hours_done), init.total_hours)
+    return all_chart_rows, all_timestamps, sim_soc
+
+
+def _attach_run_attrs(df_res: pd.DataFrame, sim_soc: float, scenario_params: dict) -> None:
+    """End-SoC und Wallbox-Zuordnung als DataFrame-Attribute des Laufs."""
     df_res.attrs[RUN_END_SOC_ATTR] = float(sim_soc)
     ev_lines = scenario_ev_wallbox_lines(scenario_params)
     if ev_lines:
         # D9: which car charged where (multi-EV M4); the same for the whole run.
         df_res.attrs[EV_WALLBOX_ATTR] = ev_lines
         logger.info("Simulation: Wallbox-Zuordnung (D9): %s", "; ".join(ev_lines))
-    cbc_events = take_cbc_events() if collect_cbc else []
-    return df_res, plausibility, cbc_events
 
 
 # Re-Exports für API-Stabilität (from simulation.engine import ...)

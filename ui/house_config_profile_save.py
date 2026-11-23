@@ -329,7 +329,6 @@ def _render_house_profile_save(
         require_saved,
         seed_persisted,
     )
-    from ui.house_config_io import house_profile_write_pending
     from ui.house_config_historical_csv import historical_csv_save_fields
 
     ready = bool(str(label or "").strip()) and location.get("latitude") is not None
@@ -342,30 +341,17 @@ def _render_house_profile_save(
         label=label,
         profile_ids=set(profile_ids),
     )
-    payload = {
-        "id": profile_id,
-        "label": label.strip() or profile_id,
-        "annual_kwh": float(annual_kwh),
-        "absent_mode": bool(absent_mode),
-        "land": location.get("land", "AT"),
-        "region": location.get("region", ""),
-        "latitude": location["latitude"],
-        "longitude": location["longitude"],
-        "default_pv_tilt": location["default_pv_tilt"],
-        "default_pv_azimuth": location["default_pv_azimuth"],
-        **stored_horizon_fields(location),
-        "netznutzung": location["netznutzung"],
-        "consumers": resolved,
-        "total_profile_csv": hist["total_profile_csv"],
-        "pv_profile_csv": hist["pv_profile_csv"],
-        "battery_profile_csv": hist.get("battery_profile_csv", ""),
-        "grid_profile_csv": hist.get("grid_profile_csv", ""),
-        "historical_csv_source": hist["historical_csv_source"],
-        "baseload_distribution": hist.get("baseload_distribution", "equal"),
-        **_balance_signs_payload(hist),
-        **house_heating_payload(heating),
-        **_vat_payload(existing),
-    }
+    payload = _house_profile_payload(
+        profile_id=profile_id,
+        label=label,
+        annual_kwh=annual_kwh,
+        absent_mode=absent_mode,
+        location=location,
+        resolved=resolved,
+        hist=hist,
+        heating=heating,
+        existing=existing,
+    )
 
     if is_new:
         # "— neu —" shows editable defaults; do not create a profile until the user
@@ -399,24 +385,7 @@ def _render_house_profile_save(
     state_key = f"house_profile::{session_scope}::{profile_id}"
     success_caption = "Gespeichert"
     if not is_new and not persisted_state_known(state_key):
-        # First render of this profile in the session: opening the page must not
-        # rewrite the file. Only a file that does not yet hold the normalised form
-        # is written, and that write is named. A dry run that fails leaves the
-        # error to the save below (same message, same place).
-        from house_config.own_grid_fee import stored_own_grid_fee
-
-        try:
-            pending = house_profile_write_pending(
-                {
-                    **payload,
-                    "netznutzung": stored_own_grid_fee(
-                        payload["netznutzung"], profile_id=profile_id
-                    ),
-                }
-            )
-        except ValueError:
-            pending = True
-        if not pending:
+        if not _first_render_write_pending(payload, profile_id):
             seed_persisted(state_key, payload)
             return
         success_caption = "Gespeichert – Datei auf das aktuelle Format gebracht"
@@ -433,6 +402,71 @@ def _render_house_profile_save(
     )
     if wrote and label_changed:
         st.rerun()
+
+
+def _house_profile_payload(
+    *,
+    profile_id: str,
+    label: str,
+    annual_kwh: float,
+    absent_mode: bool,
+    location: dict,
+    resolved: list[dict],
+    hist: dict,
+    heating: dict,
+    existing: dict,
+) -> dict:
+    """The house profile as the auto-save writes it."""
+    return {
+        "id": profile_id,
+        "label": label.strip() or profile_id,
+        "annual_kwh": float(annual_kwh),
+        "absent_mode": bool(absent_mode),
+        "land": location.get("land", "AT"),
+        "region": location.get("region", ""),
+        "latitude": location["latitude"],
+        "longitude": location["longitude"],
+        "default_pv_tilt": location["default_pv_tilt"],
+        "default_pv_azimuth": location["default_pv_azimuth"],
+        **stored_horizon_fields(location),
+        "netznutzung": location["netznutzung"],
+        "consumers": resolved,
+        "total_profile_csv": hist["total_profile_csv"],
+        "pv_profile_csv": hist["pv_profile_csv"],
+        "battery_profile_csv": hist.get("battery_profile_csv", ""),
+        "grid_profile_csv": hist.get("grid_profile_csv", ""),
+        "historical_csv_source": hist["historical_csv_source"],
+        "baseload_distribution": hist.get("baseload_distribution", "equal"),
+        **_balance_signs_payload(hist),
+        **house_heating_payload(heating),
+        **_vat_payload(existing),
+    }
+
+
+def _first_render_write_pending(payload: dict, profile_id: str) -> bool:
+    """Whether the file on disk differs from the normalised form of ``payload``.
+
+    First render of this profile in the session: opening the page must not
+    rewrite the file. Only a file that does not yet hold the normalised form
+    is written, and that write is named. A dry run that fails leaves the
+    error to the save below (same message, same place).
+    """
+    from house_config.own_grid_fee import stored_own_grid_fee
+    from ui.house_config_io import house_profile_write_pending
+
+    try:
+        return bool(
+            house_profile_write_pending(
+                {
+                    **payload,
+                    "netznutzung": stored_own_grid_fee(
+                        payload["netznutzung"], profile_id=profile_id
+                    ),
+                }
+            )
+        )
+    except ValueError:
+        return True
 
 
 def _label_changed(label: str, existing: dict) -> bool:
