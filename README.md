@@ -76,7 +76,7 @@ Details: [Betrieb](docs/einrichtung/betrieb.md)
 
 ### Oberfläche (Weboberfläche über [Streamlit](https://streamlit.io/))
 
-- **Monitor** (mit vollem Optimierungs-Horizont): Energiefluss, SOC-Verlauf der Batterie, Verbraucherverhalten und die Lade-Kontrolle der Batterie durch Earnie. Die Kachel **Mit Earnie gespart** zeigt die gemessene Ersparnis gegenüber einer Anlage ohne Earnie.
+- **Monitor** (mit vollem Optimierungs-Horizont): Energiefluss, SOC-Verlauf der Batterie, Verbraucherverhalten und die Lade-Kontrolle der Batterie durch Earnie. Die Kachel **Mit Earnie gespart** zeigt die berechnete Ersparnis gegenüber einer Anlage ohne Earnie.
 - **Hauskonfigurator / Szenarienkonfigurator:** umfangreiche Konfiguration des Hauses mit allen Verbrauchern für Planung und Szenario-Exploration.
 - **Manuelle Geräte:** Laufzeiten mithilfe von Earnie planen und Empfehlungen annehmen.
 - **Szenario-Explorer:** Szenarien vergleichen (Was-wäre-wenn-Analysen).

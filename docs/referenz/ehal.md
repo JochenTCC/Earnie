@@ -9,8 +9,6 @@
 
 **History (backlog):** `2.4.a` (M1) → `2.4.j` (wire rename) → `2.4.k` (entity mapping) → `2.4.o` (Design C1 `set_ess_active_power`) → `2.7.h` (source select) → `2.7.l` (inverter entity)
 
-**Strategic source:** `Earnie-Projekt/Entwicklungsplan/Entwicklungs-Plan-Earnie-cons.md` v2.4 §2.2, §2.5 Phase 1, §2.6
-
 | Topic | Link |
 | ----- | ---- |
 | Canonical field names | [docs/ui/ehal-com.md](../ui/ehal-com.md) §B / §C |

@@ -23,4 +23,4 @@ Arbeitsnotizen, Entwürfe und abgeschlossene Epics liegen unter [`docs/dev/`](..
 - [OpenEMS-Lab](../einrichtung/openems-lab.md) – Earnie mit OpenEMS Edge/UI; der Kommunikationscheck steht in der Spezifikation.
 - [HA ↔ Loxone Bridge-Generator](../dev/done/ha-loxone-bridge.md) – Prototyp (POC): erzeugt die Brücke für die Delta 3 aus einer Mapping-Datei, Loxone → HA per Webhook.
 
-- Shadow-Betrieb (Prod-Feed-Recorder, Shadow-Client, Dev und Prod parallel auf der NAS): Anleitung und Spezifikation stehen im privaten Repo Earnie-Projekt unter `Betrieb/Shadow-Betrieb.md` und `Betrieb/Shadow-Mode-Spec.md`.
+- Shadow-Betrieb (Prod-Feed-Recorder, Shadow-Client, Dev und Prod parallel auf der NAS): Anleitung und Spezifikation sind interne Dokumente und nicht Teil dieses Repositorys.
