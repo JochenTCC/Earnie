@@ -93,6 +93,23 @@ app_version: 2.6.0                 # version the inputs were recorded with
 window: {start: "2026-06-26T18:00", end: "2026-06-27T10:00"}   # L2 / L1 context
 ```
 
+**L2 inputs** (`inputs:` with `kind: backtesting_fixtures`, `tests/regression/l2_case_inputs.py`; any other key fails loud):
+
+| Key | Effect |
+|---|---|
+| `scenario_id` | Fixture scenario to run (default `fixture_5kwh_fixed`) |
+| `initial_soc` | Start SoC of the window |
+| `scenario_settings` | Patched into that scenario's settings: keys it already has, plus `house_profile_id`, `import_cap_kw`, `import_cap_margin_kw`. Unknown keys fail loud |
+| `house_profile_patch` | Deep-merged into the scenario's house profile (needs a `house_profile_id`) |
+| `import_tariff` | Inline import tariff spec |
+| `grid_fee_base_cent_kwh` | Flat grid area for the case (`netznutzung`) |
+| `grid_capacity_charges` | Capacity charges of that flat grid area (needs `grid_fee_base_cent_kwh`) |
+| `force_negative_price` | One negative price hour in the middle of the window |
+
+Scenario and profile patches are written as copies of the fixture files into the run's temp folder, so the normal scenario resolution validates them. The fixture's `cons_data.csv` covers only a few June days (2026-06-23 to 2026-06-29); a window outside them fails with `MissingConsumptionDataError`. A case with a house profile also needs the profile site's climate under `tests/fixtures/backtesting/open_meteo/` (record once, §8).
+
+**Extra L2 metrics:** every L2 run reports `peak_import_kw` (highest 15-minute import) and `capacity_charge_eur` (gross, 0 without a capacity charge). `extra_metrics: {consumer_kwh: [<id>, …]}` in `case.yaml` adds `consumer_kwh_<id>` from the result column `<id>_kw` (missing column → error). The compare reads only the metrics a golden lists, so new metrics leave older goldens valid.
+
 `expected.json` holds the result tiers of §7 plus the engine fingerprint used for the golden (Earnie version, CBC/solver version), and optionally:
 
 - `baseline` — `{git_sha, recorded_at, source}`: the public commit the golden was recorded from. `source: update-golden` (written by the runner) or `git-log-backfill` (last commit touching `expected.json`, for goldens older than this field; public cases only).
