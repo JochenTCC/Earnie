@@ -49,14 +49,14 @@ Neu zugeordnet werden je Backend folgende Mappings:
 
 | Backend | Mapping                                                              |
 | ------- | -------------------------------------------------------------------- |
-| Loxone  | Merker ↔ EHAL-Felder (`plant` / `batteries[]` / `consumers[].ehal_bindings`; Assistent auf EHAL-Com) |
+| Loxone  | Merker ↔ EHAL-Felder (`plant` / `batteries[]` / `consumers[].ehal_bindings`; Merker-Namen aus den VI/VO-Vorlagen der Signalliste auf EHAL-Com) |
 | HA      | Aktivierte Signale ↔ HA-Entities im YAML-Paket (`ehal_bindings` nur als Aktivierungsschlüssel; optional `sign` / `boolean_invert` in `ehal.ha`) |
 | OpenEMS | REST-Komponenten (`ess0` u. a. in `ehal.openems`; je Wallbox die EVCS-Komponente im Binding `set_evcs_max_current`, z.B. `evcs0/SetChargePowerLimit`) |
 
 ## Weiterlesen
 
 - [Smarthome-Backend](../ui/smarthome-backend.md) – Erkennung und Auswahl
-- [EHAL-Com](../ui/ehal-com.md) – Live-Lesen und -Schreiben, Mapping
+- [EHAL-Com](../ui/ehal-com.md) – Signalliste, Live-Lesen und -Schreiben
 - [Loxone-Anbindung](loxone-anbindung.md)
 - [Home Assistant + evcc](ha-evcc.md)
 - Entwickler-Spec (Englisch): [docs/referenz/ehal.md](../referenz/ehal.md)

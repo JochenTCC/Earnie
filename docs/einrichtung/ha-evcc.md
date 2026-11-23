@@ -31,7 +31,7 @@ Die Komponenten tragen unter `ehal_bindings` nur **Aktivierungsschlüssel** ohne
 3. Auf **Daemon Control → EHAL-Com** die **Signalliste** prüfen. Die Liste zeigt den Signalvertrag: Pflicht, optional, aktiviert und Match-Status. Optionale Signale lassen sich dort zu- und abschalten.
 4. Unter **HA Push-Carrier** das **YAML-Paket** herunterladen. Es enthält `ENTITY_*`-Platzhalter, den periodischen Push, den Heartbeat und den Abruf von `status.json`.
 5. In Home Assistant unter **Entwicklerwerkzeuge → Zustände** die passenden `entity_id`s heraussuchen. Das Paket als Package einbinden und jeden `ENTITY_*`-Platzhalter durch die passende `entity_id` ersetzen (siehe [Mindestsignale](#mindestsignale)). Der Push läuft periodisch (Standard 10 s), nicht nur bei Wertänderung.
-6. Auf EHAL-Com mit **Live-Lesen** und **Live-Schreiben** prüfen, dass Werte ankommen und Sollwerte abgerufen werden. Die Einrichtung ist abgeschlossen, wenn die Signalliste die Pflichtsignale als aktiviert meldet und der Live-Betrieb ohne die Meldung „Kein Zugriff auf EHAL SoC“ läuft.
+6. Auf EHAL-Com mit **Live-Lesen** und **Live-Schreiben** prüfen, dass Werte ankommen und Sollwerte abgerufen werden. Die Einrichtung ist abgeschlossen, wenn die Signalliste die Pflichtsignale als aktiviert meldet und der Live-Betrieb ohne die Warnung „Optimierung wartet auf den EHAL-SoC …“ in `earnie.log` läuft.
 
 Die Werte im Push sind bereits in EHAL-Einheiten (z. B. W, kWh, %). Die Umrechnung aus den HA-Einheiten übernimmt das YAML-Paket.
 

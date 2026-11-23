@@ -29,7 +29,7 @@ Details: [tarife-quellen.md](../referenz/tarife-quellen.md) §4.
 
 ### Netznutzungsentgelte (Arbeitspreis)
 
-Der Arbeitspreis für die Netznutzung steht am Hausprofil unter Standort im Objekt `netznutzung` (Cent/kWh **netto**, ohne USt).
+Der Arbeitspreis für die Netznutzung steht am Hausprofil unter **Netzanschluss & Netzentgelt** im Objekt `netznutzung` (Cent/kWh **netto**, ohne USt).
 
 - Er ist unabhängig vom Lieferantentarif.
 - Earnie addiert ihn **vor** der USt zum Bezugspreis. Das gilt für Live-MILP und SE und für alle Import-Typen.
@@ -69,7 +69,7 @@ Die Katalogwerte stammen aus den Verordnungen für 2026: SNE-V 2018 in der Novel
 
 ### Eigener Arbeitspreis (Benutzer-Netzbereich)
 
-Im Hauskonfigurator (Standort → **Netzbereich (Netznutzung)**) gibt es neben den Katalog-Netzbereichen die Auswahl **Eigener Arbeitspreis**. Earnie speichert den Wert als eigenen Netzbereich `user_<Hausprofil-ID>` in `user_grid_fees.json` (neben `grid_fees.json`) und trägt diese ID als `area_id` im Hausprofil ein.
+Im Hauskonfigurator (**Netzanschluss & Netzentgelt** → **Netzbereich (Netznutzung)**) gibt es neben den Katalog-Netzbereichen die Auswahl **Eigener Arbeitspreis**. Earnie speichert den Wert als eigenen Netzbereich `user_<Hausprofil-ID>` in `user_grid_fees.json` (neben `grid_fees.json`) und trägt diese ID als `area_id` im Hausprofil ein.
 
 - Ein neu angelegter eigener Arbeitspreis gilt für beide Messarten und hat keine Zeitregeln und keine festen Beträge.
 - Das Formular ändert nur den Arbeitspreis. Steht im eigenen Netzbereich in `user_grid_fees.json` mehr, zum Beispiel Zeitregeln oder eine vom Migrations-Assistenten verschobene Grundgebühr, bleibt das beim Speichern erhalten. Eine Zeile unter dem Eingabefeld zeigt es an.
@@ -190,6 +190,8 @@ Die Live-Optimierung löst die `export_tariff_id` des Live-Szenarios auf. Bei Ty
 
 > **Hinweis:** Die Vergütung kann sich ändern (z. B. monatlich). Tarif in `tariffs.json` bzw. die gewählte `export_tariff_id` aktuell halten.
 
+<a id="benutzertarife-usertariffsjson"></a>
+
 ### Benutzertarife (`user_tariffs.json`)
 
 Eigene Tarife entstehen auf der Seite **Konfiguration → Tarife** (Tarif-Editor von [Edibert](https://github.com/JochenTCC/Edibert), eingebettet in Earnie; Beschreibung im [Benutzer-Handbuch](../user-manual/Benutzer-Handbuch-Earnie.md#tarife-benutzertarife)). Sie liegen in `user_tariffs.json` **neben** `tariffs.json` (gleiches Verzeichnis, gleiche Struktur, IDs beginnen mit `user_`). Earnie liest die Datei, wenn sie existiert; fehlt sie, gibt es einfach keine Benutzertarife. Die Datei gehört zum Config-Paket (Export/Import).
@@ -276,7 +278,7 @@ Die Hilfsfunktionen stehen in [data/monthly_float_rates.py](../../data/monthly_f
 
 Rechtliche Abgrenzung OeMAG vs. RefMarkt: [oemag-referenzmarktwert.md](../referenz/oemag-referenzmarktwert.md).
 
-aWATTar-SUNNY-Fixwerte liegen ebenfalls als `monthly_table` vor (z. B. `monthly_sunny`).
+aWATTar-SUNNY-Fixwerte liegen ebenfalls als `monthly_table` vor (z. B. `monthly_sunny_web_recherche`).
 
 ## Fehlende Zukunftspreise (Live)
 

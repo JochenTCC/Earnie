@@ -384,6 +384,8 @@ Alle Zeilen zählen dasselbe: den **gebuchten Hausverbrauch** der jeweiligen Zei
 
 Die Spalte **Speicher-Standby** zeigt den Eigenverbrauch der Hausbatterie (`standby_power_kw`). Er erhöht Bezug und Kosten der optimierten Szenarien und ihrer Referenzen (die den Speicher behalten, nur ohne Optimierung), zählt aber nicht als Hausverbrauch. Die Zeile Historisch (ohne PV und Speicher) hat keinen Standby. Die Spalte **Gesamtverbrauch** ist Jahres Verbrauch plus Speicher-Standby: Bei optimierten Szenarien und Referenzen liegt sie um genau den Standby über Historisch. Der Pool-Filter zählt bei optimierten Szenarien mit seinem nativen Laufzeitfenster als feste Last, so wie in den Referenzen. Dasselbe gilt für eine **Dauerlast**: ein allgemeiner Verbraucher mit einem Lauf von 24 h an jedem Wochentag (z. B. Server, Dev-PC) wird in jedem Zeitslot mit seiner Nennleistung gebucht und nicht vom Optimierer verschoben, auch wenn er live an einer Powerstation hängt (deren Energie kommt ebenfalls aus dem Hausnetz).
 
+<a id="warum-weicht-historisch-beim-jahresverbrauch-ab"></a>
+
 **Warum weicht Historisch beim Jahresverbrauch ab?**
 
 1. **Ist und Modell:** Die Zeile Historisch rechnet mit dem konfigurierten Live-Hausprofil, nicht mit dem gemessenen Zählerstand. Weichen Ist und Modell voneinander ab (unvollständige CSV, anderer Jahresverbrauch, synthetische Profile), unterscheidet sich die Spalte vom tatsächlich gemessenen Jahresverbrauch.

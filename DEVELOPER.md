@@ -47,7 +47,7 @@ The tariff library `edibert` is pinned to a git tag of [`JochenTCC/Edibert`](htt
 
 Since Edibert P3b every slot price (live and SE) comes from Edibert through `data/edibert_slot_prices.py` (pricing reference `_edibert_pricing` from the scenario resolution); Earnie's own engine, the switch `EARNIE_PRICING_ENGINE` and the parity harness are gone. The P3a parity fixture `tests/fixtures/edibert_parity/expected_prices.json` stays as the Edibert golden (`tests/test_edibert_slot_prices.py`).
 
-House-profile timezone is derived from `land` (`AT`/`DE`/`CH` → IANA) in `house_config/geo_timezone.py` — no `timezonefinder`/`h3`. Run tests with `python -m pytest` or `python -m scripts.run_pytest` (thin wrapper used by pre-commit). With `pytest-xdist` (dev extra), `run_pytest` defaults to `-n auto` (multi-CPU); use `-n 0` for sequential debugging.
+House-profile timezone is derived from `land` (`AT`/`DE`/`CH` → IANA) in `house_config/geo_timezone.py` — no `timezonefinder`/`h3`. Run tests with `python -m scripts.run_pytest`, not plain `pytest` (the wrapper is also what the pre-commit hook uses). With `pytest-xdist` (dev extra), `run_pytest` defaults to `-n auto` (multi-CPU); use `-n 0` for sequential debugging. Directory targets and the full suite wait in a machine-wide test queue (`scripts/suite_queue.py`) so parallel runs do not compete for the CPUs; up to three explicit test files run at once without queueing.
 
 ### Dev Container (optional)
 

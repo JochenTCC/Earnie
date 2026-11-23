@@ -275,11 +275,11 @@ Bindings live on `inverters[].ehal_bindings` as entity-scoped `inv.{id}.*` (id =
 
 | Area / meaning | Type | EHAL value name | OpenEMS | evcc | Victron GX | Loxone / Loxone extra |
 | --- | --- | --- | --- | --- | --- | --- |
-| Inverter AC power | Measurement | `inv.{id}.sens_inv_power_ac` | `ess0/ActivePower` / PV-inverter `…/ActivePower` | | TBD | `Earnie_WR_Leistung_AC` *(name TBD)* |
-| Inverter PV input power | Measurement | `inv.{id}.sens_inv_power_pv` | `charger0/ActualPower` | | TBD | `Earnie_WR_Leistung_PV` *(TBD)* |
-| Inverter max AC power (device) | Input value | `inv.{id}.get_inv_max_ac_power` | `ess0/MaxApparentPower` | | | `Earnie_WR_Max_AC` *(TBD)* |
-| Inverter max PV input (device) | Input value | `inv.{id}.get_inv_max_pv_power` | *(optional / absent)* | | | `Earnie_WR_Max_PV` *(TBD)* |
-| Write inverter AC limit | Control value | `inv.{id}.set_inv_ac_power_limit` | PV-inverter `…/ActivePowerLimit` | | | `Earnie_WR_Limit_AC` *(TBD)* |
+| Inverter AC power | Measurement | `inv.{id}.sens_inv_power_ac` | `ess0/ActivePower` / PV-inverter `…/ActivePower` | | TBD | `Earnie_WR_Leistung_AC` |
+| Inverter PV input power | Measurement | `inv.{id}.sens_inv_power_pv` | `charger0/ActualPower` | | TBD | `Earnie_WR_Leistung_PV` |
+| Inverter max AC power (device) | Input value | `inv.{id}.get_inv_max_ac_power` | `ess0/MaxApparentPower` | | | `Earnie_WR_Max_AC` |
+| Inverter max PV input (device) | Input value | `inv.{id}.get_inv_max_pv_power` | *(optional / absent)* | | | `Earnie_WR_Max_PV` |
+| Write inverter AC limit | Control value | `inv.{id}.set_inv_ac_power_limit` | PV-inverter `…/ActivePowerLimit` | | | `Earnie_WR_Limit_AC` |
 | Inverter limit write capability | Capability | `supports_inv_power_limit` | derived adapter capability | derived | | derivable from mapped limit Merker |
 
 Inverter `control` vs mapping: `full` needs `set_inv_ac_power_limit`; `limits_only` / `read_only` need no inverter write. EHAL-Com warns like for ESS. Curtailment write: lower limit only when plant `p_pv_curtail[t0] > 0` (allocated by PV forecast); otherwise write rating to release sticky backends.
@@ -327,7 +327,7 @@ Only `sens_*` and `get_*` (measurements / inputs). The table lists **all** expec
 - **Source:** pushable `sens_*` / `get_*` come from the VO inbox. An empty Merker with a present binding key still reads via the qualified EHAL ID (push-only).
 - **Kein Mapping** means unbound only — not “value is 0”.
 - **Freshness:** a last-known value within 5 minutes counts as **OK** (`Zuletzt bekannt …`). A missing push, or a last-known value older than 5 minutes, shows as **Warnung** in Live-Lesen and in the startup verify — not as a hard error.
-- **Startup:** on `main.py` start, Earnie hydrates `runtime/loxone_push_inbox.json`, starts the VO HTTP listener, and waits for the push link (up to ~40 s when `EARNIE_PILOT_PUSH_TOKEN` is set). It then runs loxone-verify.
+- **Startup:** on `main.py` start, Earnie hydrates `runtime/loxone_push_inbox.json`, starts the VO HTTP listener, and waits for the push link (up to ~40 s when `EARNIE_PUSH_TOKEN` or its alias `EARNIE_PILOT_PUSH_TOKEN` is set). It then runs loxone-verify.
 - **Grid meter:** rows are always `grid.meter.*`, never bare `sens_grid_*` / `get_grid_*`. Storage keys on `plant.ehal_bindings` may stay bare.
 - **ESS:** when EHAL-mappable batteries exist, the rows are only `ess.<id>.*`; bare plant `sens_ess_*` / `get_ess_*` are omitted. Legacy single-ESS plants without entity-scoped batteries still show bare plant ESS rows.
 - **Plant fields that stay bare:** `sens_pv_production_active`, optional `sens_power_consumers`, `sens_temperature_outside`, `sens_absent_mode`, and `sens_pv_energy` (until `pv.*` replaces it).
@@ -400,7 +400,7 @@ After an Auto-Roundtrip, safe setpoints are always written (ESS automatic, EVCS 
 
 Only with backend **Home Assistant**. Under **HA Push-Carrier**, download a YAML package generated from **activated** signals:
 
-- Per read signal: `rest_command` + automation with **periodic** `time_pattern` (interval = `EARNIE_PILOT_PUSH_REPEAT_S`, default **10 s** — not only on state change).
+- Per read signal: `rest_command` + automation with **periodic** `time_pattern` (interval = `EARNIE_PUSH_REPEAT_S`, alias `EARNIE_PILOT_PUSH_REPEAT_S`, default **10 s** — not only on state change).
 - Heartbeat push; REST sensor on Earnie `status.json`; setpoint automations (`status.json` attribute → `number.set_value` on the target entity; re-applied at HA start and every push interval, but only written when the target differs by more than ~1 %, so a restart or a manual change is corrected without a write every 10 s; fields Earnie did not publish are ignored). After a write the automation re-checks the target after 5 s; if it still differs it logs a warning and pushes `hub_write_failed` (value 1) to Earnie. EHAL-Com then shows a yellow *Home Assistant meldet: … nicht angewendet* warning under Live-Schreiben (for 3 push intervals after the last report) and the daemon logs a warning at the next write — „Erfolg“ in Live-Schreiben only means *published*, not *applied*. This feedback does not degrade capabilities (the `write_error` schema is unchanged), including `ha_ess_force` where configured.
 - Placeholders `ENTITY_*` only — replace them in HA with real `entity_id`s.
 - Jinja converts entity units to canonical EHAL units before the push URL is called.

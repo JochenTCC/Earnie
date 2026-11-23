@@ -60,12 +60,14 @@ Details: [Betrieb](docs/einrichtung/betrieb.md)
 - Earnie optimiert Speicher und Verbraucher gemeinsam im 15-Minuten-Takt. Ob Earnie oder die Nutzer:innen die Verbraucher aktivieren, ist wählbar.
 - Dynamische Strompreise (z. B. [aWATTar](https://www.awattar.at/)) und eine Preis-Prognose über die veröffentlichten Preise hinaus fließen in den Plan ein.
 - Die PV-Erzeugungsprognose kommt von [forecast.solar](https://forecast.solar/). Außen- und Klimadaten liefert [Open-Meteo](https://open-meteo.com/); sie dienen den thermischen Modellen und der temperaturabhängigen Grundlast.
+- **Leistungspreis:** Eine optionale Bezugsgrenze je Viertelstunde lässt sich erst beobachten und dann einplanen ([Leistungspreis und Bezugsgrenze](docs/konfiguration/preise.md#leistungspreis-und-bezugsgrenze)).
+- **Eigene Tarife:** Tarife, die nicht im Katalog stehen, entstehen im eingebetteten Tarif-Editor [Edibert](https://github.com/JochenTCC/Edibert).
 
 
 
 ### Verbraucher
 
-- **E-Auto über Wallbox:** Das Smarthome gibt vor, wann das E-Auto voll sein soll; um den Rest kümmert sich Earnie.
+- **E-Auto über Wallbox:** Das Smarthome gibt vor, wann das E-Auto voll sein soll; um den Rest kümmert sich Earnie. Mehrere E-Autos und Wallboxen sind möglich.
 - **Wärmepumpe:** Ein Wärmemodell des Hauses sagt den Wärmebedarf anhand der Wetterdaten voraus. Die Optimierung berücksichtigt diesen Bedarf.
 - **Pool:** Auch hier arbeitet ein Wärmemodell wie bei der Wärmepumpe. Filter lassen sich zusätzlich bedarfsgerecht aktivieren.
 - **Generische Geräte:** Waschmaschine, Trockner, Geschirrspüler und ähnliche Geräte.
@@ -74,11 +76,11 @@ Details: [Betrieb](docs/einrichtung/betrieb.md)
 
 ### Oberfläche (Weboberfläche über [Streamlit](https://streamlit.io/))
 
-- **Monitor** (mit vollem Optimierungs-Horizont): Energiefluss, SOC-Verlauf der Batterie, Verbraucherverhalten und die Lade-Kontrolle der Batterie durch Earnie.
+- **Monitor** (mit vollem Optimierungs-Horizont): Energiefluss, SOC-Verlauf der Batterie, Verbraucherverhalten und die Lade-Kontrolle der Batterie durch Earnie. Die Kachel **Mit Earnie gespart** zeigt die gemessene Ersparnis gegenüber einer Anlage ohne Earnie.
 - **Hauskonfigurator / Szenarienkonfigurator:** umfangreiche Konfiguration des Hauses mit allen Verbrauchern für Planung und Szenario-Exploration.
 - **Manuelle Geräte:** Laufzeiten mithilfe von Earnie planen und Empfehlungen annehmen.
 - **Szenario-Explorer:** Szenarien vergleichen (Was-wäre-wenn-Analysen).
-- **Analyse Verbrauch & Kosten:** Verbrauch, Herkunft und Kosten aus dem Produktiv-Log sowie der Vergleich SwimSpa autonom gegenüber Earnie.
+- **Analyse Verbrauch & Kosten:** Kontostand mit und ohne Earnie für einen wählbaren Zeitraum, dazu Verbrauch, Herkunft und Kosten aus dem Produktiv-Log und der Wärmeinhalt der Speicher.
 
 
 
@@ -137,8 +139,8 @@ Optional: [Greenfield Dev-Stack](docs/einrichtung/greenfield-dev-stack.md) (Erst
 
 ## Roadmap (Kurz)
 
-- **2.7:** Mehrspeicher, Exportbegrenzung, Binding-Komfort; erste Alpha-Qualitätsprüfung (siehe Backlog).
-- **2.8:** Edibert-Tarife, Regression-Gate, Monitor-Charts (siehe Backlog).
+- **2.7** (erschienen): Mehrspeicher, Exportbegrenzung, Binding-Komfort.
+- **2.8:** Tarif-Editor Edibert, Leistungspreis mit Bezugsgrenze, preisbewusste virtuelle Reserve, Ersparnis-Kachel, mehrere Wallboxen, Klimaanlage im Hausmodell (siehe Backlog).
 - **Parameter-Anpassung:** PV- und thermische Parameter passen sich über die Zeit an.
 - **Gekoppelte thermische Modelle:** Haus-, Speicher- und Solar-Modelle werden miteinander gekoppelt.
 - **Smartere Geräte-Empfehlungen:** adaptive Leistung und Laufzeit für Haushaltsgeräte.

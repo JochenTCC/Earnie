@@ -14,7 +14,7 @@ New entries come from terms used in the main user docs (handbook, UI docs).
 | **DSGVO** | GDPR – General Data Protection Regulation (EU) |
 | **EFM** | Energieflussmonitor (Loxone) – Energy Flow Monitor: meter and power statistics for import and mapping |
 | **EHAL** | Earnie Hardware Access Layer – unified interface between the optimizer and the smarthome backend |
-| **EHAL-Com** | Streamlit page **EHAL-Com** (live read/write, mapping) |
+| **EHAL-Com** | Streamlit page **EHAL-Com** (signal list, live read/write) |
 | **EPEX** | European Power Exchange – day-ahead market prices (the basis for many spot tariffs) |
 | **ESS** | Energy Storage System – battery storage (power, SoC, mode) |
 | **EV** | Electric Vehicle |
@@ -39,8 +39,9 @@ New entries come from terms used in the main user docs (handbook, UI docs).
 | **OpenEMS** | Open Energy Management System – lab/industrial backend (`ehal.backend=openems`) |
 | **PV** | Photovoltaic |
 | **RefMarkt** | Referenzmarktwert (E-Control) – reference market value, used for PV feed-in pricing |
+| **QH** | Quarter hour (Viertelstunde) – the 15-minute slot of planning, prices and the capacity charge |
 | **REST** | Representational State Transfer – HTTP API (e.g. the HA EHAL adapter) |
-| **SA₁ / SA₂** | Sunset anchors – bounds of the live planning horizon (sunset to sunset / related segments) |
+| **SA₀ / SA₁ / SA₂** | Sunrise anchors (Sonnenaufgang) – bounds of the Monitor window: the last, next and second-next sunrise (see [Betriebsmodi](../ui/betriebsmodi.md#sonnenaufgang-anker-sa₀-sa₁-sa₂)) |
 | **SaaS** | Software as a Service – commercial cloud use (not permitted without consent under the license) |
 | **SE** | Szenario-Explorer – Scenario Explorer: annual and long-term comparisons and what-if calculations |
 | **SG-Ready** | Smart-Grid-Ready – heat pump enable/tariff signal (in EHAL often via `set_enable`) |
@@ -54,6 +55,6 @@ New entries come from terms used in the main user docs (handbook, UI docs).
 ## Related Pages
 
 - [Loxone Signals](loxone-signals.md) – read/write fields and Merker
-- [EHAL-Com](../ui/ehal-com.md) – connection and mapping
+- [EHAL-Com](../ui/ehal-com.md) – signal list and live read/write
 - [OeMAG & Reference Market Value](oemag-referenzmarktwert.md) – feed-in and market terms
 - [User Manual](../user-manual/Benutzer-Handbuch-Earnie.md) – user-facing starting point

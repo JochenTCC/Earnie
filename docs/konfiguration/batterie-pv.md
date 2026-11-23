@@ -138,7 +138,7 @@ Die Quelle je PV-Feld steht im Laufzustand (`optimizer_run_state.json`, Feld `pv
 
 ### Horizont (Verschattung durch Gelände und Gebäude)
 
-Steht die Sonne hinter einem Berg, einem Nachbarhaus oder einem Baum, erreicht sie das Haus nicht direkt. Earnie kann das einrechnen: Im Hauskonfigurator unter **Standort** den Schalter **Horizont berücksichtigen** einschalten und für 16 Himmelsrichtungen (alle 22,5°) den Höhenwinkel des Horizonts einstellen. Das Diagramm zeigt je Richtung einen Balken, beschriftet mit Himmelsrichtung und Azimut wie bei den PV-Feldern (Süd 0°, Ost -90°, West 90°): den Balken mit der Maus auf die Höhe ziehen oder mit ▲ / ▼ in 1°-Schritten ändern. Richtungen, die die Sonne am Standort nie erreicht, sind grau und bleiben auf 0°.
+Steht die Sonne hinter einem Berg, einem Nachbarhaus oder einem Baum, erreicht sie das Haus nicht direkt. Earnie kann das einrechnen: Im Hauskonfigurator unter **Sonne & Horizont** den Schalter **Horizont berücksichtigen** einschalten und für 16 Himmelsrichtungen (alle 22,5°) den Höhenwinkel des Horizonts einstellen. Das Diagramm zeigt je Richtung einen Balken, beschriftet mit Himmelsrichtung und Azimut wie bei den PV-Feldern (Süd 0°, Ost -90°, West 90°): den Balken mit der Maus auf die Höhe ziehen oder mit ▲ / ▼ in 1°-Schritten ändern. Richtungen, die die Sonne am Standort nie erreicht, sind grau und bleiben auf 0°.
 
 **Messen:** vom Dach oder von der PV-Anlage aus mit der Kompass-App die Richtung und mit der Neigungsmesser-App des Handys den Winkel bis zur Oberkante von Berg, Haus oder Baum anpeilen. 0° heißt freier Horizont. Das Diagramm zeigt hinter den Balken den Horizont als graue Fläche und die Sonnenbahnen am 21. Juni, zur Tagundnachtgleiche und am 21. Dezember. Wo eine Sonnenbahn unter dem Horizont liegt, fehlt an diesem Tag die direkte Sonne.
 
@@ -198,7 +198,7 @@ Die Quellenwahl `ess.{slug}.set_ess_source_select` gibt es nur an physischen `st
 
 Vor dem Live-Betrieb muss die Wurzel der Bilanz klar sein: ein Zähler, ein Tarif und höchstens ein Regler auf diesen Zähler.
 
-1. **Sitzt der Zähler direkt am Hausanschluss?** → `plant.grid_meter.at_house_connection` in `house_profiles.json` (Hauskonfigurator → Profil / Anlage).
+1. **Sitzt der Zähler direkt am Hausanschluss?** → `plant.grid_meter.at_house_connection` in `house_profiles.json` (Hauskonfigurator → **Netzanschluss & Netzentgelt**, Kasten „Anlagenweit“).
 2. **Gibt es nur einen Tarif?** → `plant.grid_meter.single_tariff` (kein zweiter Abrechnungszähler hinter demselben Mapping).
 3. **Regelt ein anderes Gerät selbst auf diesen Zähler?** → Hausbatterie mit `regulates_on: grid` (Eigenverbrauch / Zero-Export) oder `none` (folgt nur den Sollwerten). Fremdregler zählen ebenfalls mit; `control: read_only` heißt nur, dass Earnie nicht schreibt.
 

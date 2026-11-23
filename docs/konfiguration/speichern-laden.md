@@ -40,13 +40,13 @@ Darunter liegt im selben Menü das **Support-Paket** für Support-Anfragen (Konf
 
 Die Dateien gehören zu einem von zwei Versions-Tracks:
 
-- **Earnie-Datenmodell** (`earnie_data_model`, aktuell `5`): Manifest (`earnie_config_pack.json`), `config.json`, `backtesting_scenarios.json`, `components.json`, `house_profiles.json`, `deviation_rules.json`.
+- **Earnie-Datenmodell** (`earnie_data_model`, aktuell `6`): Manifest (`earnie_config_pack.json`), `config.json`, `backtesting_scenarios.json`, `components.json`, `house_profiles.json`, `deviation_rules.json`.
 - **Tarifformat** (`tariff_format`, aktuell `1`, Format des Tarif-Editors Edibert): `tariffs.json`, `user_tariffs.json`, `grid_fees.json`, `user_grid_fees.json`. Diese Dateien tragen nie `earnie_data_model`.
 
 Beim Import prüft Earnie Manifest und jede Datei:
 
-- **Datenmodell `5` und Tarifformat `1`:** Earnie übernimmt die Dateien. Beim Schreiben setzt Earnie `earnie_data_model` in den Earnie-Track-Dateien auf `5`.
-- **Datenmodell `3` oder `4`, Tarifdateien ohne `tariff_format`:** Earnie hebt die Dateien mit derselben Migrationskette wie der [Migrations-Assistent](../einrichtung/betrieb.md#update-und-migration) an. Braucht die Kette eine Antwort (z. B. Netzbereich eines Hausprofils ohne Netzentgelt, USt-Satz eines Benutzertarifs), lehnt Earnie den Import mit Hinweis ab; dann die Dateien zuerst im Assistenten migrieren.
+- **Datenmodell `6` und Tarifformat `1`:** Earnie übernimmt die Dateien. Beim Schreiben setzt Earnie `earnie_data_model` in den Earnie-Track-Dateien auf `6`.
+- **Datenmodell `3` bis `5`, Tarifdateien ohne `tariff_format`:** Earnie hebt die Dateien mit derselben Migrationskette wie der [Migrations-Assistent](../einrichtung/betrieb.md#update-und-migration) an. Braucht die Kette eine Antwort (z. B. Netzbereich eines Hausprofils ohne Netzentgelt, USt-Satz eines Benutzertarifs), lehnt Earnie den Import mit Hinweis ab; dann die Dateien zuerst im Assistenten migrieren.
 - **Ältere oder fehlende Versionen** (`1`, `2`, fehlendes `earnie_data_model`) in Manifest oder Earnie-Track-Datei, oder ein unbekanntes `tariff_format`: Earnie lehnt den Import ab und ändert die Version nicht stillschweigend.
 
 **Hintergrund zu früheren Umstellungen:**

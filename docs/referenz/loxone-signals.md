@@ -149,7 +149,7 @@ Dieselbe Inbox-Regel gilt für **Loxone** (VO-Wiederholung) und **Home Assistant
 
 | Regel | Verhalten |
 | --- | --- |
-| Mindest-Takt | Jedes Lesesignal mindestens alle `EARNIE_PILOT_PUSH_REPEAT_S` Sekunden pushen (Standard **10**). Frischegrenze in der Inbox: typisch 3 × Wiederholintervall. |
+| Mindest-Takt | Jedes Lesesignal mindestens alle `EARNIE_PUSH_REPEAT_S` Sekunden pushen (Alias `EARNIE_PILOT_PUSH_REPEAT_S`) (Standard **10**). Frischegrenze in der Inbox: typisch 3 × Wiederholintervall. |
 | Link / Heartbeat | Solange die Verbindung frisch ist (Heartbeat oder ein anderer nicht-null Analogwert kürzlich angekommen), gilt die Null-Annahme unten. |
 | Verstummt (nur Leistung) | Bleibt ein **Leistungssignal** länger als die Frischegrenze aus und der Link ist frisch, nimmt Earnie **0** an. Status in Live-Lesen: `0 angenommen (verstummt)` (`STATE_ZERO_ASSUMED_SILENT`). Nie gesendet bei frischem Link: `0 angenommen (nie gesendet)`. |
 | Verstummt (alles andere) | Ladestand, Grenzwerte (`get_*`) und Temperaturen werden **nie** als 0 angenommen. Earnie hält den letzten Wert 5 Minuten (`Zuletzt bekannt (gehalten)`), danach gilt `Lesefehler`. Live-Lesen und die Signalliste zeigen dasselbe wie der Lesepfad des Optimierers. |
@@ -381,7 +381,7 @@ Earnie filtert den Wert nicht selbst.
 
 Hinweise:
 
-- Der EV-Verbraucher benötigt außerdem das Feld `min_power_kw`.
+- Das E-Auto braucht außerdem den Ladestrom `min_current_a` und `max_current_a` (siehe [E-Auto und Wallbox](../konfiguration/flexible-verbraucher.md#e-auto-und-wallbox-ladestrom)).
 - Der **EV-Modus** wird ausschließlich über `set_evcs_mode` (`Earnie_EAuto_Modus`) geschrieben. Earnie schreibt weder `pv_follow` noch Sofortbefehl-Merker.
 - **Poolfilter:** Der Hausprofil-Verbraucher `pool_filter` führt seine EHAL-Rollen (u. a. `get_filter_remaining_hours`) unter `ehal_bindings`. Standardpräfix: `Earnie_Pool_*` / `Earnie_Pool_Filter_*` (siehe [ehal-com.md](../ui/ehal-com.md), Abschnitt Pool / SwimSpa).
 

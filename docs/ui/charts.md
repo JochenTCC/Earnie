@@ -102,7 +102,7 @@ PV, Last, Netz, Batterieflüsse und **Flex-Verbraucher** zeigen im grauen Bereic
 Die Hintergrundzonen (Details im **?** der Chart-1-Überschrift):
 
 - **Grau:** Vergangenheit (Log).
-- **Neutral:** laufende Stunde.
+- **Neutral:** Plan ab Jetzt, solange die Preise veröffentlicht sind.
 - **Grün:** extrapolierte Preise bis zum Fensterrand.
 
 Vertikale Marker zeigen **SA₀**, **SA₁** und **SA₂** sowie **Jetzt**, sobald die aktuelle Zeit im sichtbaren Fenster liegt.
@@ -125,17 +125,17 @@ Die Wärmepumpe („Freigabe, aber nicht angesprungen“) bewertet Earnie genaus
 
 **Regelwerk:** `config/deviation_rules.json` (Schema: `deviation_rules.schema.json`). Pflegehinweis: [Spec Soll-Ist §5.3](../dev/done/soll-ist-abweichung.md).
 
-**Aktive Regeln (Stand bei Einführung der Soll/Ist-Icons):**
+**Regeln der Vorlage** (`share/config/deviation_rules.example.json`):
 
 | Regel-ID | Scope | Kategorie |
 |----------|-------|-----------|
 | `swimspa_thermal_band_ok` | swimspa | Warnung |
-| `eauto_pv_follow_missing` | eauto | Fehler |
-| `eauto_should_charge` | eauto | Fehler |
+| `ev_pv_follow_missing` | ev | Fehler |
+| `ev_should_charge` | ev | Fehler |
 | `battery_forced_discharge_missing` | battery | Fehler |
 | `battery_forced_charge_missing` | battery | Fehler |
 | `battery_forced_charge_target_missed` | battery | Warnung |
-| `waermepumpe_enable_no_start` | waermepumpe | Hinweis |
+| `wp_heating_enable_no_start` | wp_heating | Hinweis |
 | `swimspa_filter_should_run_missing` | pool_filter | Fehler |
 | `swimspa_filter_runs_unexpectedly` | pool_filter | Fehler |
 | `swimspa_filter_over_nominal` | pool_filter | Warnung |
@@ -222,12 +222,12 @@ Der Sankey aktualisiert sich etwa alle 10 Sekunden (`STATUS`-Fragment). Die Flex
 | Teil | Quelle im Code | Backends heute |
 |------|----------------|----------------|
 | PV / Netz / Batterie / Hausleistung | `ehal_live.read_live_power_kw()` → aktiver Adapter | **Loxone, Home Assistant, OpenEMS** |
-| Flex-Leistungen (Verbraucherknoten, Grundlast-Aufteilung) | `live_consumption.fetch_live_flex_kw_for_ui` → `loxone_client.resolve_flexible_consumers_live_power` | **nur Loxone** (bei HA/OpenEMS keine Live-Flex-Aufschlüsselung über Merker) |
+| Flex-Leistungen (Verbraucherknoten, Grundlast-Aufteilung) | `live_consumption.fetch_live_flex_kw_for_ui` → `ehal_live.resolve_flexible_consumers_live_power` (Implementierung in `integrations/loxone_live_power.py`) | **nur Loxone** (bei HA/OpenEMS keine Live-Flex-Aufschlüsselung über Merker) |
 | EV-SoC in der Knotenbeschriftung beim Laden | `fetch_loxone_actual_soc_percent` | **nur Loxone** |
 
 Lädt ein E-Auto, zeigt der Flex-Knoten den aktuellen SoC in der Beschriftung, sofern der Loxone-Pfad den SoC liefert.
 
-Sind PV, Netz, Batterie und Haus alle exakt 0 kW, zeichnet Earnie keinen Sankey, sondern eine gelbe Warnung. Bei Loxone und Home Assistant ist die häufigste Ursache ein zu seltener Push: Bleibt ein Leistungswert länger als 3 × Wiederholintervall (Standard 30 s) aus, nimmt Earnie 0 an (Status „0 angenommen (verstummt)“, siehe [Push-Takt](../referenz/loxone-signals.md#push-cadence-sb-neutral)). Den Status je Signal zeigt **EHAL-Com → Live-Lesen**.
+Sind PV, Netz, Batterie und Haus alle exakt 0 kW, zeichnet Earnie keinen Sankey, sondern eine gelbe Warnung. Bei Loxone und Home Assistant ist die häufigste Ursache ein zu seltener Push: Bleibt ein Leistungswert länger als 3 × Wiederholintervall aus (Standard 10 s, also 30 s), nimmt Earnie 0 an (Status „0 angenommen (verstummt)“, siehe [Push-Takt](../referenz/loxone-signals.md#push-cadence-sb-neutral)). Den Status je Signal zeigt **EHAL-Com → Live-Lesen**.
 
 ## Footer
 

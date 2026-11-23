@@ -6,7 +6,7 @@ Die Streamlit-App ordnet ihre Seiten über **`st.navigation`** in Abschnitte. We
 EARNIE_UI_MODES=sunset2sunset,scenario_explorer,live_environment
 ```
 
-Ohne diese Variable stehen in der Entwicklung **Sunset-2-Sunset** (Seite **Monitor**), **Szenario-Explorer** und **Daemon Control** zur Verfügung, optional auch **Preis-Prognose (Dev)**.
+Ohne diese Variable stehen in der Entwicklung **Sunset-2-Sunset** (Seite **Monitor**), **Szenario-Explorer** und **Daemon Control** zur Verfügung, und mit `ui.price_forecast_page_enabled: true` in `config.json` auch **Preis-Prognose (Dev)**.
 
 - **Gültige Keys:** `sunset2sunset`, `scenario_explorer`, `live_environment` und `price_forecast`. Die Aliase `live` und `historical` gibt es nicht.
 - **Entwickler-Schalter ohne eigene Seite:** `device_detection` (Phasen-Log der Geräteerkennung) und `rule_reference` (Vergleich mit Standard-Regeln im Szenario-Explorer, siehe unten). Beide sind standardmäßig aus und nur für die Entwicklung gedacht.
@@ -42,7 +42,7 @@ Unten in der Sidebar liegt der Abschnitt **Info / About** mit folgenden Inhalten
 | Abschnitt | Seiten |
 |-----------|--------|
 | **Live-Cockpit** | Monitor, Manuelle Geräte, Analyse Verbrauch & Kosten (bei `live_environment`), Preis-Prognose (Dev) |
-| **Konfiguration** | Hauskonfigurator, Szenarienkonfigurator, Szenario-Explorer (wenn freigeschaltet) |
+| **Konfiguration** | Hauskonfigurator, Szenarienkonfigurator, Tarife (zusammen mit dem Szenarienkonfigurator), Szenario-Explorer (wenn freigeschaltet) |
 | **Daemon Control** | Smarthome-Backend, EHAL-Com, Optimierer-Dienst |
 
 **Optimierer-Dienst:** Die Seite bietet Start, Stopp und Neustart, das Dienst-Log und den Umschalter **Silent / Loud** (`silent_mode` in `runtime/local_settings.json`). Für den Umschalter ist kein Neustart von `main.py` nötig. Details: [Betrieb](../einrichtung/betrieb.md) · Schreibverhalten: [EHAL-Com](ehal-com.md).
@@ -61,7 +61,7 @@ Chart- und Panel-Details: [Charts & Panels](charts.md).
 
 **Abwesenheitsmodus:** Ist der wirksame Live-Abwesenheitsmodus aktiv, zeigt die Seite unter dem Titel den Hinweis „Abwesenheitsmodus aktiv“, optional mit der Quelle Earnie, Smarthome oder beide. Auslöser ist der Schalter im Hausprofil **oder** das Anlagen-Feld `sens_absent_mode` am aktiven Backend (Loxone-Merker, HA-Entity oder OpenEMS `component/Channel`). Konfiguration: [Flexible Verbraucher](../konfiguration/flexible-verbraucher.md#abwesenheitsmodus-live).
 
-**Leistungspreis:** Hat das Live-Szenario eine **Bezugsgrenze** oder der Netzbereich im laufenden Monat einen **Leistungspreis**, zeigt die Seite unter dem Titel den Abschnitt „Leistungspreis“:
+**Leistungspreis:** Hat das Live-Szenario eine **Bezugsgrenze** oder der Netzbereich im laufenden Monat einen **Leistungspreis**, zeigt die Seite unter Chart 2 (Bereich „Earnie-Effekt“) den Abschnitt „Leistungspreis“:
 
 - **Monatsspitze** (höchste gemessene Viertelstunde des Netzbezugs), **Abgerechnet** (Spitze, mindestens die Mindestleistung des Netzbereichs), **Bisher (brutto)** (Betrag des Monats mit der USt des Bezugstarifs) und **Nächstes kW** (was ein kW mehr Spitze diesen Monat kostet). Darunter stehen Messbeginn, Zeitpunkt der Spitze und fehlende Viertelstunden. Ist im Monat noch keine Viertelstunde gemessen, steht „unbekannt“ statt 0 und beim Betrag der Mindestbetrag. Earnie misst selbst; maßgeblich ist die Abrechnung des Netzbetreibers. Warum die gemessene Spitze trotz Plan über der Grenze liegen kann: [Leistungspreis und Bezugsgrenze](../konfiguration/preise.md#leistungspreis-und-bezugsgrenze).
 - Mit Bezugsgrenze: Grenze, Reserve und bis wohin geplant wird. Liegt die Spitze schon darüber, plant Earnie bis zur Spitze.
@@ -105,10 +105,9 @@ Die Beschriftung lautet z. B. „SA₀→SA₂ (Live)“ am Desktop bzw. „SA�
 | Bereich | Quelle |
 |---------|--------|
 | Vergangenheit (grau) | Produktiv-Log, 15-Min-Slots |
-| Laufende Stunde | Produktiv-Snapshot Stunde 0 (Overlay bereits in `main.py` angewendet; Auflösung ab x:15: 15 min) |
-| Vorausschau (neutral/grün) | Produktiv-Snapshot bis zum Fensterrand SA₁ bzw. SA₂ |
+| Ab Jetzt (neutral: veröffentlichte Preise, grün: extrapolierte Preise) | Produktiv-Snapshot in Viertelstunden bis zum Fensterrand SA₁ bzw. SA₂ (Overlay bereits in `main.py` angewendet) |
 
-Stunde 0 stammt aus dem **Produktiv-Durchlauf** (`main.py` → `live_optimization_debug.json`). Fehlende Log-Slots bleiben **leer** und sind orange markiert; der letzte Wert wird nicht fortgeschrieben.
+Der Plan ab Jetzt stammt aus dem **Produktiv-Durchlauf** (`main.py` → `live_optimization_debug.json`). Fehlende Log-Slots bleiben **leer** und sind orange markiert; der letzte Wert wird nicht fortgeschrieben.
 
 **Wenn `main.py` nicht läuft:** Ist der Snapshot höchstens 1 h alt, zeigt die Seite ihn mit einem Hinweis an. Bei älteren Snapshots ist optional eine **einmalige** UI-Simulation möglich (opt-in, im Normalbetrieb ohne forecast.solar).
 

@@ -134,7 +134,7 @@ Vollständiger Smoke-Test (Build, Start, Bootstrap-Dateien, Worker-Log, UI auf P
 .venv\Scripts\python.exe -m scripts.smoke_greenfield_docker
 ```
 
-> **Hinweis:** `version.py` muss eine gültige SemVer- bzw. Pre-release-Version enthalten (z. B. `2.7.0-dev.61`). Der Image-Build normalisiert die Version (`rewrite_version_file_for_image`).
+> **Hinweis:** `version.py` muss eine gültige SemVer- bzw. Pre-release-Version enthalten (z. B. `2.8.0-dev.39`). Der Image-Build normalisiert die Version (`rewrite_version_file_for_image`).
 
 Komplett neu (Volumes leeren):
 
