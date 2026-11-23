@@ -1,0 +1,27 @@
+id: REG-S-horizon-manual
+title: Manual horizon in winter - a southern ridge shades the low sun
+level: L2
+source: synthetic
+anonymized: true
+app_version: "2.8.0-dev"
+window:
+  start: "2026-01-14"
+  end: "2026-01-14"
+inputs:
+  kind: backtesting_fixtures
+  scenario_id: fixture_5kwh_fixed
+  initial_soc: 50.0
+  scenario_settings:
+    house_profile_id: test_home
+  # SUSI P3a: a 20 degree ridge from south-east to south-west (0 = south, as the PV fields).
+  # The archive bundle removes the direct beam while the sun is below it; the unshaded payloads
+  # with DNI are recorded once under tests/fixtures/backtesting/open_meteo/ (..._hzraw.json).
+  house_profile_patch:
+    horizon_source: manual
+    horizon:
+      - {azimuth_deg: -90.0, elevation_deg: 0.0}
+      - {azimuth_deg: -45.0, elevation_deg: 20.0}
+      - {azimuth_deg: 45.0, elevation_deg: 20.0}
+      - {azimuth_deg: 90.0, elevation_deg: 0.0}
+extra_metrics:
+  consumer_kwh: [wp]
