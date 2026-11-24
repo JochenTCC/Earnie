@@ -324,3 +324,44 @@ def test_without_history_the_cli_fails_and_without_battery_it_runs(env, tmp_path
     monkeypatch.setattr("config.get_battery_params_list", lambda: [])
     assert _run(tmp_path, "--dry-run") == 0
     assert "no house battery" in capsys.readouterr().out
+
+
+@pytest.fixture
+def utc_host(monkeypatch):
+    """HA add-on: the log's naive times are UTC, the plant is in Europe/Vienna."""
+    from datetime import timezone
+
+    from runtime_store import capacity_peak_store
+
+    monkeypatch.setattr(
+        capacity_peak_store, "host_aware", lambda moment: moment.replace(tzinfo=timezone.utc)
+    )
+
+
+def test_since_filter_reads_log_times_as_host_times(env, utc_host, tmp_path):
+    from zoneinfo import ZoneInfo
+
+    log = tmp_path / "optimization_history.jsonl"
+    # 23:10 UTC on 1 November is 00:10 on 2 November in Vienna
+    log.write_text(json.dumps(_entry(datetime(2026, 11, 1, 23, 10, 4))) + "\n", encoding="utf-8")
+    not_before = datetime(2026, 11, 2, tzinfo=ZoneInfo("Europe/Vienna")) - timedelta(minutes=15)
+
+    entries, bad = cli.read_entries([str(log)], not_before, "Europe/Vienna")
+
+    assert bad == []
+    assert len(entries) == 1
+
+
+def test_rebuild_state_keeps_the_prices_of_the_newest_slot_on_a_utc_host(env, utc_host):
+    from zoneinfo import ZoneInfo
+
+    vienna = ZoneInfo("Europe/Vienna")
+    # naive UTC log times: 09:00-09:45 UTC = 10:00-10:45 Vienna
+    entries = [_entry(datetime(2026, 11, 2, 9, minute, 4)) for minute in (0, 15, 30, 45)]
+
+    *_, state, _ = cli.build(
+        entries, datetime(2026, 11, 2, 10, tzinfo=vienna), [dict(BATTERY)], _day_bounds, "Europe/Vienna"
+    )
+
+    assert state is not None
+    assert state.pending_slot["slot_start"] == datetime(2026, 11, 2, 10, 45, tzinfo=vienna).isoformat()

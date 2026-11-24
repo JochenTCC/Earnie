@@ -318,6 +318,29 @@ def test_log_entries_pair_prices_of_the_slot_with_its_closed_interval(monkeypatc
     assert inp.planned_flex_kw == {"wp": 0.8}
 
 
+def test_rebuild_on_a_utc_host_matches_the_live_ledger(monkeypatch):
+    """HA add-on: log and sampler times are naive UTC; the rebuild keys slots like the live hook."""
+    from datetime import timezone
+
+    from runtime_store import capacity_peak_store
+
+    monkeypatch.setattr("config.get_planning_timezone", lambda: "Europe/Vienna")
+    monkeypatch.setattr(
+        capacity_peak_store, "host_aware", lambda moment: moment.replace(tzinfo=timezone.utc)
+    )
+    closed = {**_closed(), "interval_start": "2026-11-01T11:00:00"}
+    entries = [
+        {"written_at": "2026-11-01T11:00:05", "market_price_cent": 31.5, "k_push_act": 7.5},
+        {"written_at": "2026-11-01T11:15:04", "market_price_cent": 99.0, "k_push_act": 1.0, "closed_interval": closed},
+    ]
+
+    (inp,) = store.ledger_inputs_from_entries(entries, "Europe/Vienna", batteries=[BATTERY])
+
+    assert inp.slot_start == datetime(2026, 11, 1, 12, 0, tzinfo=TZ)
+    assert inp.k_act_cent == 31.5
+    assert inp.k_push_cent == 7.5
+
+
 def test_slot_without_own_entry_has_no_price(monkeypatch):
     monkeypatch.setattr("config.get_planning_timezone", lambda: "Europe/Vienna")
     closed = {**_closed(), "interval_start": "2026-11-01T12:00:00"}

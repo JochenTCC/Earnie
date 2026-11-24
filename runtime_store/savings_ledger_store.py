@@ -25,7 +25,6 @@ from data.planning_window import (
 from optimizer.schedule import quarter_hour_slot_start
 from runtime_store.history_chart_rows import (
     _import_price_cent_from_entry,
-    _index_entries_by_slot,
 )
 from runtime_store.persist_paths_base import (
     savings_ledger_file,
@@ -409,6 +408,53 @@ def ledger_input(
     )
 
 
+def host_planning_moment(moment: datetime, timezone_name: str) -> datetime:
+    """A host clock time as planning-local aware time (live hook and rebuild alike).
+
+    Naive times (``datetime.now()``, the sampler's ``interval_start``, the log's
+    ``written_at`` / ``completed_at``) are host-local, not planning-local: on a ``TZ=UTC``
+    host (HA add-on) for a plant in Europe/Vienna they are 1-2 h off otherwise. A rebuild
+    on a machine in another zone than the one that wrote the log stays off by that offset.
+    """
+    # Imported here and called through the module so tests can patch ``host_aware``.
+    from runtime_store import capacity_peak_store
+
+    if moment.tzinfo is None:
+        moment = capacity_peak_store.host_aware(moment)
+    return align_to_planning_timezone(moment, timezone_name)
+
+
+def log_entry_time(entry: dict[str, Any]) -> datetime | None:
+    """``completed_at`` (else ``written_at``, as the history chart reads it); ``None`` without either."""
+    for key in ("completed_at", "written_at"):
+        raw = entry.get(key)
+        if isinstance(raw, datetime):
+            return raw
+        if raw:
+            try:
+                return datetime.fromisoformat(str(raw))
+            except ValueError:
+                continue
+    return None
+
+
+def _entries_by_host_slot(
+    entries: list[dict[str, Any]], timezone_name: str
+) -> dict[datetime, dict[str, Any]]:
+    """Newest log entry per planning slot, entry times read as host clock times."""
+    by_slot: dict[datetime, tuple[datetime, dict[str, Any]]] = {}
+    for entry in entries:
+        raw = log_entry_time(entry)
+        if raw is None:
+            continue
+        moment = host_planning_moment(raw, timezone_name)
+        slot = quarter_hour_slot_start(moment)
+        existing = by_slot.get(slot)
+        if existing is None or moment > existing[0]:
+            by_slot[slot] = (moment, entry)
+    return {slot: entry for slot, (_, entry) in by_slot.items()}
+
+
 def ledger_inputs_from_entries(
     entries: Iterable[dict[str, Any]],
     timezone_name: str,
@@ -419,10 +465,10 @@ def ledger_inputs_from_entries(
     ``ledger_input_from_pending``)."""
     entries = list(entries)
     closed_by = index_closed_intervals_by_start(entries)
-    by_slot = _index_entries_by_slot(entries)
+    by_slot = _entries_by_host_slot(entries, timezone_name)
     inputs: list[LedgerInput] = []
     for naive_start in sorted(closed_by):
-        slot_start = quarter_hour_slot_start(align_to_planning_timezone(naive_start, timezone_name))
+        slot_start = quarter_hour_slot_start(host_planning_moment(naive_start, timezone_name))
         inputs.append(
             ledger_input(
                 slot_start, closed_by[naive_start], by_slot.get(slot_start), batteries=batteries

@@ -37,7 +37,6 @@ from optimizer.schedule import quarter_hour_slot_start  # noqa: E402
 from optimizer.sim_horizon_chart_soc import house_balance_batteries  # noqa: E402
 from runtime_store import savings_ledger as sl  # noqa: E402
 from runtime_store import savings_ledger_store as store  # noqa: E402
-from runtime_store.history_chart_rows import _parse_completed_at  # noqa: E402
 from runtime_store.month_file_rotation import list_rotated_siblings  # noqa: E402
 from runtime_store.optimization_history import HISTORY_FILENAME  # noqa: E402
 from version import __version__  # noqa: E402
@@ -86,6 +85,7 @@ def _slim(entry: dict[str, Any]) -> dict[str, Any]:
 def read_entries(
     paths: list[str],
     not_before: datetime,
+    timezone_name: str,
 ) -> tuple[list[dict[str, Any]], list[str]]:
     """Slim log entries completed at or after ``not_before``; malformed lines are reported."""
     entries: list[dict[str, Any]] = []
@@ -103,8 +103,8 @@ def read_entries(
                 if not isinstance(entry, dict):
                     bad.append(f"{path}:{number}: not an object")
                     continue
-                completed = _parse_completed_at(entry)
-                if completed is None or completed < not_before:
+                raw = store.log_entry_time(entry)
+                if raw is None or store.host_planning_moment(raw, timezone_name) < not_before:
                     continue
                 entries.append(_slim(entry))
     return entries, bad
@@ -151,8 +151,11 @@ def build(
     if state is not None and entries:
         # The newest entry's own slot is not closed yet: keep its prices for the
         # daemon, as its hook does after every cycle.
-        last = max(entries, key=_parse_completed_at)
-        slot = quarter_hour_slot_start(_parse_completed_at(last))
+        def entry_moment(entry: dict[str, Any]) -> datetime:
+            return store.host_planning_moment(store.log_entry_time(entry), timezone_name)
+
+        last = max(entries, key=entry_moment)
+        slot = quarter_hour_slot_start(entry_moment(last))
         state = replace(state, pending_slot=store.pending_slot_from_entry(slot, last))
     return rows, slot_records, state, len(inputs)
 
@@ -267,7 +270,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"No {HISTORY_FILENAME} in {runtime_dir}.", file=sys.stderr)
         return 1
     # The prices of the first slot come from the entry written in it.
-    entries, bad = read_entries(paths, since - timedelta(minutes=15))
+    entries, bad = read_entries(paths, since - timedelta(minutes=15), timezone_name)
     rows, slot_records, state, slots_read = build(entries, since, batteries, day_bounds, timezone_name)
 
     for line in bad:
