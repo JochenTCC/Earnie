@@ -64,9 +64,23 @@ def _ensure_loaded() -> None:
     _loaded_path = path
 
 
+def _planning_moment(moment: datetime, timezone_name: str) -> datetime:
+    """A host clock time as planning-local aware time.
+
+    Naive times (``datetime.now()``, the sampler's ``interval_start``) are host-local, not
+    planning-local: on a ``TZ=UTC`` host (HA add-on) for a plant in Europe/Vienna they are
+    1-2 h off otherwise.
+    """
+    from runtime_store.capacity_peak_store import host_aware
+
+    if moment.tzinfo is None:
+        moment = host_aware(moment)
+    return align_to_planning_timezone(moment, timezone_name)
+
+
 def _closed_slot_start(closed: dict[str, Any], timezone_name: str) -> datetime:
-    naive = datetime.fromisoformat(str(closed["interval_start"]))
-    return quarter_hour_slot_start(align_to_planning_timezone(naive, timezone_name))
+    moment = datetime.fromisoformat(str(closed["interval_start"]))
+    return quarter_hour_slot_start(_planning_moment(moment, timezone_name))
 
 
 def on_cycle(
@@ -256,7 +270,7 @@ def _on_cycle(
                     row["coverage"],
                 )
             _state = advanced
-    moment = align_to_planning_timezone(now or datetime.now(), timezone_name)
+    moment = _planning_moment(now or datetime.now(), timezone_name)
     new_pending = store.pending_slot_from_entry(quarter_hour_slot_start(moment), run_payload)
     if _state is None:
         _pending_without_chain = new_pending

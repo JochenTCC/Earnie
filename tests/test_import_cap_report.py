@@ -366,7 +366,7 @@ def test_a_measured_slot_on_a_utc_host_meets_the_plan_in_the_planning_timezone(
     from runtime_store import capacity_peak_store
 
     monkeypatch.setattr(
-        capacity_peak_store, "_host_aware", lambda moment: moment.replace(tzinfo=timezone.utc)
+        capacity_peak_store, "host_aware", lambda moment: moment.replace(tzinfo=timezone.utc)
     )
     monkeypatch.setattr(config, "get_planning_timezone", lambda: "Europe/Vienna")
     path = str(tmp_path / "report.json")

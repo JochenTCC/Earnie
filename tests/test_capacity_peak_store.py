@@ -136,7 +136,7 @@ def _utc_host(monkeypatch):
     import config
 
     monkeypatch.setattr(
-        store, "_host_aware", lambda moment: moment.replace(tzinfo=timezone.utc)
+        store, "host_aware", lambda moment: moment.replace(tzinfo=timezone.utc)
     )
     monkeypatch.setattr(config, "get_planning_timezone", lambda: "Europe/Vienna")
 

@@ -323,3 +323,50 @@ def test_out_of_band_cycle_only_updates_the_prices(ledger):
 
     state = store.load_state().state
     assert state.slots[-1]["k_act_cent"] == 45.0
+
+
+def test_closed_slot_start_reads_sampler_time_as_host_time_on_a_utc_host(monkeypatch):
+    """HA add-on case: TZ=UTC host, plant in Europe/Vienna; the sampler's naive time is UTC."""
+    from datetime import timezone
+
+    from runtime_store import capacity_peak_store
+
+    monkeypatch.setattr(
+        capacity_peak_store, "host_aware", lambda moment: moment.replace(tzinfo=timezone.utc)
+    )
+
+    slot = hook._closed_slot_start({"interval_start": "2026-11-02T06:30:00"}, "Europe/Vienna")
+
+    assert slot == datetime(2026, 11, 2, 7, 30, tzinfo=TZ)
+    assert slot.utcoffset() == timedelta(hours=1)
+
+
+def test_closed_slot_start_keeps_an_aware_sampler_time():
+    slot = hook._closed_slot_start({"interval_start": "2026-11-02T06:30:00+00:00"}, "Europe/Vienna")
+
+    assert slot == datetime(2026, 11, 2, 7, 30, tzinfo=TZ)
+
+
+def test_utc_host_books_the_same_day_as_a_vienna_host(ledger, monkeypatch):
+    """HA add-on case: clock and sampler run in UTC; slots and prices must still match up."""
+    from datetime import timezone
+
+    from runtime_store import capacity_peak_store
+
+    state_path, _ = ledger
+    monkeypatch.setattr(
+        capacity_peak_store, "host_aware", lambda moment: moment.replace(tzinfo=timezone.utc)
+    )
+
+    # Same cycles as test_cycles_book_slots_and_close_the_day, one hour earlier in UTC.
+    assert _cycle("2026-11-02T05:45:03", _closed("2026-11-02T05:30:00")) is None
+    assert _cycle("2026-11-02T06:00:02", _closed("2026-11-02T05:45:00")) is None
+    row = _cycle("2026-11-02T06:15:04", _closed("2026-11-02T06:00:00"))
+
+    assert row is not None
+    assert row["day_end"] == datetime(2026, 11, 2, 7, 0, tzinfo=TZ).isoformat()
+    assert row["slots_present"] == 1
+    assert row["slots_skipped"] == {sl.SKIP_BEFORE_CHAIN: 94, sl.SKIP_NO_PRICE: 1}
+    saved = json.loads(state_path.read_text(encoding="utf-8"))
+    assert saved["pending_slot"]["slot_start"] == datetime(2026, 11, 2, 7, 15, tzinfo=TZ).isoformat()
+    assert saved["chain_start"] == datetime(2026, 11, 2, 6, 30, tzinfo=TZ).isoformat()

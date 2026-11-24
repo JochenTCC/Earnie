@@ -85,7 +85,7 @@ def _slot(value: Any) -> datetime:
     return moment.replace(tzinfo=None) if moment.tzinfo else moment
 
 
-def _host_aware(moment: datetime) -> datetime:
+def host_aware(moment: datetime) -> datetime:
     """Naive values are host-local, like ``datetime.now()`` in the sampler."""
     return moment.astimezone()
 
@@ -100,7 +100,7 @@ def planning_slot(value: Any) -> datetime:
 
     moment = value if isinstance(value, datetime) else datetime.fromisoformat(str(value))
     if moment.tzinfo is None:
-        moment = _host_aware(moment)
+        moment = host_aware(moment)
     return moment.astimezone(ZoneInfo(config.get_planning_timezone())).replace(tzinfo=None)
 
 
