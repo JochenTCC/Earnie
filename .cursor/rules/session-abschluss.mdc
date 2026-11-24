@@ -8,7 +8,7 @@ alwaysApply: false
 When the user wants to **end session**, **backlog sync**, **commit and push**, or a comparable session wrap-up:
 
 1. Follow skill `.cursor/skills/session-abschluss/SKILL.md` in full
-2. **Phase 1:** Maintain `backlog/Backlog.md` / `backlog/Backlog-Bugfixes.md` / `backlog/Backlog-Erledigt.md` → commit all approved open changes → push
+2. **Phase 1:** Maintain `backlog/Backlog.md` / `backlog/Backlog-Bugfixes.md` / `backlog/Backlog-Erledigt.md` → commit all approved open changes → **code review of every unpushed commit** (`git log @{u}..HEAD`; skipped only for commits an earlier review already covered — name it) → push. Rule "Code review before push" in the ecosystem index (`earnie-workspace/ai/ECOSYSTEM.md`)
 3. **`version.py`:** change only after explicit user approval (see `versioning.mdc`) — no automatic bump at session end
 4. On approved **D** bump to a pre-release (or before **B**): sync `docker/compose/*-alpha.yml` `image:` tags to `version.py` (skill section **Alpha compose sync**)
 5. For local or possibly temporary files **ask first** (e.g. personal VS Code settings, local paths)
