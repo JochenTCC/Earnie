@@ -158,3 +158,39 @@ def test_main_logs_the_plan_battery_limits_for_the_ledger(monkeypatch):
 
     assert len(payloads) == 1 and len(sent) == 1
     assert payloads[0]["shadow_battery_limits"] == plan_battery_limits(sent[0])
+
+
+def test_main_saves_the_run_when_the_plan_battery_limits_cannot_be_computed(monkeypatch, caplog):
+    """Mixed control modes have no plant battery: the cycle is still saved, without the limits."""
+    patch_main_run(monkeypatch, silent=True)
+    monkeypatch.setattr(main_module.optimizer, "calculate_optimization_savings", lambda *a, **k: None)
+    mixed = [
+        {**BATTERY, "id": "ess_a", "control": "full"},
+        {**BATTERY, "id": "ess_b", "control": "limits_only"},
+    ]
+    monkeypatch.setattr(main_module.config, "get_battery_params_list", lambda: mixed, raising=False)
+    monkeypatch.setattr(
+        main_module.ehal_live, "filter_planning_batteries_with_soc", lambda params, _soc: params
+    )
+    sent: list = []
+
+    def _milp(*_a, **k):
+        sent.append(k["battery_params"])
+        return (0, 0.0, 99.0, {}, {}, {HORIZON_SCHEDULE_KEY: [{}]}, {})
+
+    monkeypatch.setattr(main_module.optimizer, "milp_optimizer", _milp)
+    payloads: list[dict] = []
+    monkeypatch.setattr(main_module.run_state, "save_run_state", payloads.append)
+    ledger_calls: list = []
+    monkeypatch.setattr(
+        main_module.savings_ledger_daemon, "on_cycle", lambda *a: ledger_calls.append(a)
+    )
+    with pytest.raises(ValueError, match="different control modes"):
+        plan_battery_limits(mixed)
+
+    main_module.main(run_trigger=TRIGGER_QUARTER_HOUR)
+
+    assert len(sent) == 1 and isinstance(sent[0], list) and len(sent[0]) == 2
+    assert len(payloads) == 1 and len(ledger_calls) == 1
+    assert "shadow_battery_limits" not in payloads[0]
+    assert "shadow_battery_limits" in caplog.text

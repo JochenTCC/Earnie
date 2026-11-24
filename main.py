@@ -1177,6 +1177,17 @@ def _main_cycle(
                 for ess_id, soc in (current_soc_by_id or {}).items()
             }
             soc_percent_by_ess.update(load_virtual_soc_by_id())
+            # Savings ledger v4: the shadow plant books this slot under the plan battery's
+            # limits. Without a plant battery (house batteries with different control modes)
+            # the entry carries no limits; the cycle is still saved and logged.
+            shadow_battery_limits = None
+            try:
+                shadow_battery_limits = plan_battery_limits(battery_params)
+            except ValueError as exc:
+                logger.warning(
+                    "run_state: shadow_battery_limits nicht berechenbar, Eintrag ohne Limits: %s",
+                    exc,
+                )
 
             run_payload = {
                 "source": "main.py",
@@ -1236,9 +1247,9 @@ def _main_cycle(
                 "consumption_snapshot": consumption_snapshot,
                 "closed_interval": closed_interval,
                 "current_hour": int(current_hour),
-                # Savings ledger v4: the shadow plant books this slot under the plan battery's limits.
-                "shadow_battery_limits": plan_battery_limits(battery_params),
             }
+            if shadow_battery_limits is not None:
+                run_payload["shadow_battery_limits"] = shadow_battery_limits
             if consumption_snapshot is not None:
                 power_interval_sampler.note_decision_sample(
                     consumption_snapshot,
