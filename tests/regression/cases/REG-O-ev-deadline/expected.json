@@ -1,6 +1,6 @@
 {
   "engine": {
-    "earnie_version": "2.8.0-dev.13",
+    "earnie_version": "2.8.0-dev.40",
     "solver": "highs",
     "solver_mode": "strict",
     "highspy": "1.15.1",
@@ -14,32 +14,39 @@
   "metrics": {
     "status_optimal": 1,
     "n_slots": 192,
-    "cost_euro": 0.13199999999999995,
-    "import_kwh": 4.9799999999999995,
-    "export_kwh": 31.799999999999997,
-    "battery_throughput_kwh": 20.505,
-    "plausibility_failures": 0.0
+    "cost_euro": 0.11855000000000004,
+    "import_kwh": 4.915,
+    "export_kwh": 31.72,
+    "battery_throughput_kwh": 20.317500000000003,
+    "plausibility_failures": 0.0,
+    "peak_import_kw": 0.68,
+    "capacity_charge_eur": 0.0
   },
   "plan": {
     "plan_hash": null,
     "diff_slots": null
   },
   "baseline": {
-    "git_sha": "058c87e2ca3f1e3e35517cf347f21313fd296c27",
-    "recorded_at": "2026-11-09T15:25:29Z",
+    "git_sha": "32d975d75d181008632abbb03125ebc09bb9fbc9",
+    "recorded_at": "2026-11-24T16:32:40Z",
     "source": "update-golden"
   },
   "inputs": {
     "files": {
-      "fixtures/backtesting_scenarios.json": "0a959777f5a0cfe7",
-      "fixtures/components.json": "55ec9e6db654d771",
-      "fixtures/config.json": "590426fa4620c716",
-      "fixtures/cons_data.csv": "9dcccd6817385b2e",
+      "fixtures/backtesting_scenarios.json": "bb7bc335ef4482ee",
+      "fixtures/components.json": "ec06eec9361e36e3",
+      "fixtures/config.json": "baa554596553a69b",
+      "fixtures/cons_data.csv": "865c6c59585a3c10",
       "fixtures/cons_data.meta.json": "518b553dbff2d5c2",
       "fixtures/flex_consumers.json": "21be86172fc50e43",
       "fixtures/grid_fees.json": "ea40bffb4f3bdde2",
-      "fixtures/house_profiles.json": "9846fa4690b8618c",
+      "fixtures/house_profiles.json": "dd9368ad788c1d11",
+      "fixtures/open_meteo/47.4000_9.7000_2025-01-01_2025-12-31_Europe-Vienna_18.0_0.0.json": "9df19bcfd549e1dd",
+      "fixtures/open_meteo/47.4000_9.7000_2025-01-01_2025-12-31_Europe-Vienna_18.0_0.0_hzraw.json": "ad4fc83a7baaa43e",
       "fixtures/open_meteo/47.4000_9.7000_2025-01-01_2025-12-31_Europe-Vienna_none.json": "cced3026b26261c3",
+      "fixtures/open_meteo/47.4000_9.7000_2026-01-01_2026-10-17_Europe-Vienna_18.0_28.0.json": "ca48f2482e363ea4",
+      "fixtures/open_meteo/47.4000_9.7000_2026-01-01_2026-10-17_Europe-Vienna_18.0_28.0_hzraw.json": "95cca14c63f76b07",
+      "fixtures/open_meteo/47.4000_9.7000_2026-01-01_2026-10-17_Europe-Vienna_25.0_0.0.json": "de72d4d6af53b6fa",
       "fixtures/open_meteo/47.4040_9.7430_2026-01-01_2026-10-17_Europe-Vienna_18.0_28.0.json": "ba5564dba8d71740",
       "fixtures/prices.csv": "57885d9ae16e27b0",
       "fixtures/tariffs.json": "3fcafb70b778b8cd",
