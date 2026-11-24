@@ -198,8 +198,13 @@ def _prepare_horizon_state(
     disable_horizon_soc_anchor: bool,
     flexible_consumers: list | None,
     current_soc_by_id: dict[str, float] | None = None,
+    fixed_schedule: bool = False,
 ) -> _HorizonSetup:
-    """Bereitet Matrix, Lade-/Filterkontexte, Flex-Horizontgrenzen und Terminal-SoC auf."""
+    """Bereitet Matrix, Lade-/Filterkontexte, Flex-Horizontgrenzen und Terminal-SoC auf.
+
+    ``fixed_schedule``: the matrix is the control solve's, with the standby relief already in
+    it; the standby plans are only resolved for the chart's pack SoC.
+    """
     consumers_cfg = _consumers_or_configured(flexible_consumers)
     optimization_matrix, charging_contexts, consumer_daily_targets_kwh = (
         _matrix_and_charging_contexts(
@@ -258,7 +263,7 @@ def _prepare_horizon_state(
         optimization_matrix, current_soc_by_id
     )
     matrix = optimization_matrix
-    if standby_plans:
+    if standby_plans and not fixed_schedule:
         from optimizer.powerstation_standby import apply_standby_load_relief
 
         # Island relief + grid-pass-through charge must hit house MILP / Chart1
@@ -278,6 +283,7 @@ def _prepare_horizon_state(
         chart_soc_entities=chart_entities,
         standby_plans=standby_plans,
         standby_packs_by_id=standby_packs_by_id,
+        fixed_schedule=fixed_schedule,
     )
 
 
@@ -449,6 +455,10 @@ def _solve_run_slot(
         )
         return _SlotOutcome(chart_row, mode=mode, target_power=target_power)
     if state.buffer_pos >= len(state.commit_buffer):
+        if setup.fixed_schedule:
+            raise RuntimeError(
+                f"Gegebener Plan endet vor Slot {hour_index} (kein Ersatz-Solve)."
+            )
         state.commit_buffer = _refill_commit_buffer(
             setup,
             state.sim_soc,
@@ -472,14 +482,18 @@ def _run_horizon_slots(
     initial_soc: float,
     on_progress,
     simulation_hour_offset: int | None,
+    horizon_schedule: list[dict] | None = None,
 ) -> tuple[list[dict], float]:
     """Läuft die Matrix Slot für Slot ab (MPC bzw. Open-Loop-Commit-Puffer).
 
     With several house batteries every slot steps each battery (``sim_house_batteries``) and
-    ``sim_soc`` is their plant SoC.
+    ``sim_soc`` is their plant SoC. ``horizon_schedule`` fills the commit buffer once; it is
+    never refilled by a solve.
     """
     chart_rows: list[dict] = []
     state = _init_run_state(setup, initial_soc)
+    if horizon_schedule is not None:
+        state.commit_buffer = list(horizon_schedule[: len(setup.matrix)])
     total_steps = len(setup.matrix)
     with _own_cbc_event_collection():
         hour_base = simulation_hour_offset or 0
@@ -494,6 +508,24 @@ def _run_horizon_slots(
             if on_progress is not None:
                 on_progress(i + 1, total_steps)
     return chart_rows, state.sim_soc
+
+
+def _validate_horizon_schedule(
+    horizon_schedule: list[dict],
+    optimization_matrix: list,
+    commit_hours: int,
+    booking_matrix: list | None,
+) -> None:
+    """A given plan must cover the matrix; it runs open-loop and never on SE booking rows."""
+    if commit_hours <= 1:
+        raise ValueError("horizon_schedule erfordert den Open-Loop-Pfad (commit_hours > 1).")
+    if booking_matrix is not None:
+        raise ValueError("horizon_schedule und booking_matrix schließen sich aus.")
+    if len(horizon_schedule) < len(optimization_matrix):
+        raise ValueError(
+            f"horizon_schedule hat {len(horizon_schedule)} Slots, die Matrix "
+            f"{len(optimization_matrix)} (kein Ersatz-Solve für den Rest)."
+        )
 
 
 def simulate_horizon(
@@ -519,6 +551,7 @@ def simulate_horizon(
     current_soc_by_id: dict[str, float] | None = None,
     booking_matrix: list | None = None,
     import_caps: ImportCaps | None = None,
+    horizon_schedule: list[dict] | None = None,
 ) -> list:
     """
     Simuliert einen Optimierungshorizont über die gesamte Matrix.
@@ -535,7 +568,15 @@ def simulate_horizon(
     is applied to these actual rows (open-loop only; ``docs/dev/se-forecast-mode.md``).
     import_caps: SE import limit per matrix slot. A re-solve inside the matrix keeps these limits
     and does not lift them by what it already booked (``docs/dev/max-power-tariff-plan.md``, P4).
+    horizon_schedule: Live Chart 1, the control solve's plan (``milp_plan["horizon_schedule"]``)
+    on its own prepared matrix. The run applies it slot by slot and never solves: no refill, no
+    flex cap, no forced grid recharge at the horizon end, no second standby relief. A plan
+    shorter than the matrix raises ``ValueError``.
     """
+    if horizon_schedule is not None:
+        _validate_horizon_schedule(
+            horizon_schedule, optimization_matrix, commit_hours, booking_matrix
+        )
     if commit_hours < 1:
         raise ValueError(
             f"commit_hours must be >= 1 (got {commit_hours}). "
@@ -569,6 +610,7 @@ def simulate_horizon(
         disable_horizon_soc_anchor=disable_horizon_soc_anchor,
         flexible_consumers=flexible_consumers,
         current_soc_by_id=current_soc_by_id,
+        fixed_schedule=horizon_schedule is not None,
     )
     if booking_matrix is not None:
         setup = replace(
@@ -576,10 +618,14 @@ def simulate_horizon(
             booking_matrix=_booking_rows(raw_plan, setup.matrix, booking_matrix, options),
         )
     chart_rows, sim_soc = _run_horizon_slots(
-        setup, initial_soc, on_progress, simulation_hour_offset
+        setup, initial_soc, on_progress, simulation_hour_offset, horizon_schedule
     )
     plant_initial_soc = plant_start_soc(setup.batteries, initial_soc, setup.current_soc_by_id)
-    if sunrise_soc_min_index is None and not disable_horizon_soc_anchor:
+    if (
+        sunrise_soc_min_index is None
+        and not disable_horizon_soc_anchor
+        and horizon_schedule is None
+    ):
         sim_soc = _apply_forced_grid_recharge_at_horizon_end(
             chart_rows,
             sim_soc,

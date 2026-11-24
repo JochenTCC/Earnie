@@ -46,6 +46,8 @@ class _HorizonSetup:
     standby_packs_by_id: dict | None = None
     # SE forecast mode: the rows the schedule is applied to; the MILP solves on ``matrix``.
     booking_matrix: list | None = None
+    # Live Chart 1: the run shows a given plan (the control solve's) and never solves.
+    fixed_schedule: bool = False
 
 
 class _SlotInputs(NamedTuple):

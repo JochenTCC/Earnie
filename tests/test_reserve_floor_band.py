@@ -219,7 +219,9 @@ def test_gap_beyond_the_band_is_refilled_in_one_block_up_to_the_floor() -> None:
     charge = _charge_kw(battery, 10.0, [_HIGH] * 16)
     assert charge[0] > 0.0
     assert all(c <= _KW_TOL for c in charge[1:]), "refill spread over several slots"
-    gap = _FLOOR_KWH - 10.0 / 100.0 * _CAP_KWH + _DRAIN_KW * _DT_H
+    # The MILP has no idle drain (2026-11-24): the block is the gap alone; the next cycles
+    # refill the drain through the band.
+    gap = _FLOOR_KWH - 10.0 / 100.0 * _CAP_KWH
     assert charge[0] * _DT_H * _ETA == pytest.approx(gap, abs=1e-3)
 
 

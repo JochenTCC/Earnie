@@ -271,12 +271,17 @@ Implemented (2026-11-22):
   under `VIRTUAL_RESERVE_BASE_MIN_SOC_KEY`. Earnie does not know the device's own minimum
   (only `get_ess_soc_min` is read); using `min_soc` keeps the plan feasible at the
   configured minimum, as before.
-- **MILP** (`milp_horizon._idle_drain_kwh_term`): the energy balance of each battery loses
-  `idle_drain_kw · dt_h` per slot. Slot 0 starts at a known energy, so its drain is a
-  constant cut to the room above the floor. Later slots get a binary `idle_drain_off`
-  that may be 1 only when the start energy lies within one slot's drain of the floor; the
-  plan is then at most one slot's drain more optimistic than the simulation. Without a
-  drain the model has no extra variables, so regression goldens stay unchanged.
+- **MILP: no drain (since 2026-11-24).** First the energy balance lost `idle_drain_kw · dt_h`
+  per slot, with a binary `idle_drain_off` per slot near the floor (`_idle_drain_kwh_term`).
+  With a learned 0.012 kW that was 169 extra binaries on a weak big-M; on the slow NAS the
+  strict stage found no good incumbent within 5 s and the plan fell into the 10 % gap stage.
+  An exact LP form does not exist (the drain must be at least `min(drain, room above the
+  floor)`, a disjunction); a penalty form makes the plan buy the drain of the whole horizon at
+  the floor. The drain is a few Wh per slot and the plan is renewed every cycle from the
+  measured SoC, so the MILP leaves it out. `_reserve_build_before` (PV-only anchor) no longer
+  subtracts it. The reserve floors (`effective_floor_kwh`: band, reachability) keep their
+  drain terms; they are lower bounds, so the drain-free plan stays feasible and holds the
+  start energy instead of following the drain.
 - **Simulation** (`apply_soc_change(..., **idle_drain_kwargs(params))`): the drain is taken
   after the action and does not change the returned power. Wired into the plan simulation
   (`sim_chart_rows`), the multi-battery step (`sim_house_batteries`), the vendor-mode step
@@ -284,8 +289,8 @@ Implemented (2026-11-22):
   plausibility checks of measured SoC (`consistency.py`, `soc_plausibility.py`) and the UI
   chart ramps (`ui/chart_soc_ramps.py`).
 - **Setpoint.** `derive_control_from_milp_plan` adds the slot's drain to the plan's SoC
-  before it turns the SoC step into a charge or discharge power. Otherwise a hold slot
-  would read as a small discharge and a charge would be short by the drain.
+  before it turns the SoC step into a charge or discharge power, so the battery lands on the
+  plan's SoC after the drain. A hold slot stays Entladesperre (no power).
 - **Multi-battery.** The plant battery sums the drains (`primary_battery_with_plant_power`).
   Its floor is that of the first battery, which is approximate when the batteries'
   minimums differ.

@@ -303,8 +303,17 @@ def _run_savings_horizons(
     sunrise_soc_min_index: int | None,
     consumers: list | None,
     current_soc_by_id: dict[str, float] | None = None,
+    horizon_schedule: list[dict] | None = None,
+    horizon_targets_kwh: dict[str, float] | None = None,
+    battery_params: dict | list[dict] | None = None,
 ) -> _SavingsRows:
-    """Optimierter Open-Loop-Lauf plus freie und ziel-gematchte Baseline."""
+    """Optimierter Open-Loop-Lauf plus freie und ziel-gematchte Baseline.
+
+    With ``horizon_schedule`` (Live) the optimized run shows that plan without a solve, and
+    the matched baselines deliver its targets ``horizon_targets_kwh`` (remaining energy).
+    ``battery_params``: the plan's batteries (live limits, reserves) for all runs; ``None``
+    reads the configured batteries.
+    """
     from optimizer.charging_context import apply_horizon_charging_limits
     from optimizer.sim_baseline import (
         simulate_baseline_horizon,
@@ -312,6 +321,7 @@ def _run_savings_horizons(
     )
     from optimizer.simulation import simulate_horizon
     from optimizer.targets import (
+        remaining_horizon_targets,
         resolve_horizon_consumer_targets_kwh,
         resolve_matched_baseline_horizon_targets,
     )
@@ -319,8 +329,9 @@ def _run_savings_horizons(
     from optimizer.cbc_solver import SAVINGS_STRICT_TIME_LIMIT_SEC, strict_time_limit_at_most
     from runtime_store.cycle_timing import record_phase
 
-    # Open-loop: one MILP solve for the display horizon (not commit_hours=1 MPC). The plan is
-    # only shown, so its strict stage gets a shorter time limit than the plan that is sent.
+    # Without a given plan: one open-loop MILP solve for the display horizon (not
+    # commit_hours=1 MPC). That plan is only shown, so its strict stage gets a shorter time
+    # limit than the plan that is sent. With a given plan nothing is solved.
     savings_limit = strict_time_limit_at_most(SAVINGS_STRICT_TIME_LIMIT_SEC)
     with record_phase("savings_optimized"), savings_limit:
         optimized_rows = simulate_horizon(
@@ -335,16 +346,23 @@ def _run_savings_horizons(
             flexible_consumers=consumers,
             commit_hours=len(matrix),
             current_soc_by_id=current_soc_by_id,
+            horizon_schedule=horizon_schedule,
+            battery_params=battery_params,
         )
     with record_phase("savings_baseline"):
         baseline_rows = simulate_baseline_horizon(
-            matrix, baseline_soc, charging_contexts=charging_contexts, consumers=consumers
+            matrix,
+            baseline_soc,
+            charging_contexts=charging_contexts,
+            consumers=consumers,
+            battery_params=battery_params,
         )
     matched_targets = resolve_matched_baseline_horizon_targets(
         matrix,
         targets,
         charging_contexts,
         consumers=consumers,
+        horizon_targets_kwh=horizon_targets_kwh,
     )
     with record_phase("savings_matched"):
         matched_baseline_rows = simulate_matched_baseline_horizon(
@@ -353,12 +371,20 @@ def _run_savings_horizons(
             matched_targets,
             charging_contexts,
             consumers=consumers,
+            battery_params=battery_params,
+            # Live: BL Ziel delivers in the plan's delivery slots (today / until deadline).
+            plan_delivery_slots=horizon_schedule is not None,
         )
     # Same base as resolve_matched_baseline_horizon_targets, without the profile fallback.
-    costed_targets = apply_horizon_charging_limits(
-        resolve_horizon_consumer_targets_kwh(matrix, targets, flexible_consumers=consumers),
-        charging_contexts or {},
-    )
+    if horizon_targets_kwh is not None:
+        costed_targets = remaining_horizon_targets(
+            horizon_targets_kwh, _savings_consumers(consumers)
+        )
+    else:
+        costed_targets = apply_horizon_charging_limits(
+            resolve_horizon_consumer_targets_kwh(matrix, targets, flexible_consumers=consumers),
+            charging_contexts or {},
+        )
     fallback_kwh = _profile_fallback_kwh(matched_targets, costed_targets)
     if fallback_kwh:
         with record_phase("savings_matched_costed"):
@@ -368,6 +394,8 @@ def _run_savings_horizons(
                 costed_targets,
                 charging_contexts,
                 consumers=consumers,
+                battery_params=battery_params,
+                plan_delivery_slots=horizon_schedule is not None,
             )
     else:
         matched_costed_rows = matched_baseline_rows
@@ -378,6 +406,13 @@ def _run_savings_horizons(
         matched_costed_rows,
         fallback_kwh,
     )
+
+
+def _savings_consumers(consumers: list | None) -> list:
+    """Flex consumers of the savings run (default: the live scenario's)."""
+    if consumers is not None:
+        return consumers
+    return config.get_flexible_consumers(optimizer_only=True)
 
 
 def _savings_cost_block(rows: _SavingsRows) -> dict:
@@ -410,6 +445,7 @@ def _savings_target_block(
     targets: dict[str, float] | None,
     rows: _SavingsRows,
     consumers: list | None,
+    horizon_targets_kwh: dict[str, float] | None = None,
 ) -> dict:
     """Baseline-/angewandte Ziele und der Energievergleich je Verbraucher."""
     from optimizer.targets import (
@@ -422,6 +458,7 @@ def _savings_target_block(
         matrix,
         targets,
         consumers=consumers,
+        horizon_targets_kwh=horizon_targets_kwh,
     )
     baseline_targets = build_baseline_targets_detail(matrix, consumers=consumers)
     matched_flex_kwh = (
@@ -437,6 +474,7 @@ def _savings_target_block(
         matched_flex_kwh=matched_flex_kwh,
         profile_fallback_kwh=rows.profile_fallback_kwh,
         consumers=consumers,
+        horizon_targets_kwh=horizon_targets_kwh,
     )
     return {
         "baseline_targets": baseline_targets,
@@ -472,11 +510,16 @@ def _savings_hourly_block(rows: _SavingsRows, baseline_same_flex_rows: list) -> 
     }
 
 
-def _shadow_chain_block(rows: _SavingsRows, costs: dict, baseline_soc: float) -> dict:
+def _shadow_chain_block(
+    rows: _SavingsRows,
+    costs: dict,
+    baseline_soc: float,
+    battery_params: dict | list[dict] | None = None,
+) -> dict:
     """Saving figures for baselines on the shadow chain: the start energy must not count (Ledger P11)."""
     from optimizer.sim_baseline import _baseline_battery_params
 
-    battery = _baseline_battery_params(None)
+    battery = _baseline_battery_params(battery_params)
     increments = soc_correction_increments_euro(
         rows.optimized, rows.matched_baseline_costed, battery
     )
@@ -501,6 +544,8 @@ def _assemble_savings_dict(
     charging_contexts: dict[str, dict] | None,
     rows: _SavingsRows,
     consumers: list | None,
+    horizon_targets_kwh: dict[str, float] | None = None,
+    battery_params: dict | list[dict] | None = None,
 ) -> dict:
     """Fügt Kosten, Ziele, Simulationszeilen und Stundenreihen zum Payload zusammen."""
     from optimizer.charging_context import serialize_charging_contexts
@@ -509,16 +554,19 @@ def _assemble_savings_dict(
 
     costs = _savings_cost_block(rows)
     start_block = (
-        _shadow_chain_block(rows, costs, baseline_soc)
+        _shadow_chain_block(rows, costs, baseline_soc, battery_params)
         if on_shadow_chain
         else {"baseline_start_source": BASELINE_START_LIVE_SOC}
     )
-    target_details = _savings_target_block(matrix, targets, rows, consumers)
+    target_details = _savings_target_block(
+        matrix, targets, rows, consumers, horizon_targets_kwh
+    )
     baseline_same_flex_rows = simulate_baseline_with_optimized_flex(
         matrix,
         rows.optimized,
         baseline_soc,
         consumers=consumers,
+        battery_params=battery_params,
     )
     return {
         **costs,
@@ -544,12 +592,30 @@ def calculate_optimization_savings(
     consumers: list | None = None,
     current_soc_by_id: dict[str, float] | None = None,
     baseline_initial_soc: float | None = None,
+    horizon_schedule: list[dict] | None = None,
+    horizon_targets_kwh: dict[str, float] | None = None,
+    charging_contexts: dict[str, dict] | None = None,
+    battery_params: dict | list[dict] | None = None,
+    plan_energy_ids: list[str] | tuple[str, ...] = (),
 ) -> dict:
     """Berechnet die Einsparung in Euro gegenüber einer nicht-optimierten Baseline-Simulation.
 
-    Optimized path uses open-loop ``commit_hours=len(matrix)`` (one MILP), not
-    per-slot MPC — Live control already solved once; savings/charts must stay fast
-    on QH horizons (~188 slots).
+    Live (``horizon_schedule`` given): the optimized run shows the control solve's plan
+    (``milp_plan["horizon_schedule"]``) on the control's prepared ``optimization_matrix``
+    with its ``charging_contexts``; nothing is solved or prepared again. The matched
+    baselines deliver the control solve's remaining energy ``horizon_targets_kwh``, so
+    plan and BL Ziel deliver the same energy. All three are required together.
+
+    Without a plan (UI opt-in simulation): open-loop ``commit_hours=len(matrix)`` (one
+    MILP) on a freshly prepared matrix with the daily targets.
+
+    ``battery_params``: the plan's batteries with their live limits and reserves (Live). The
+    optimized run and every baseline use them, so the saving compares like with like (a live
+    discharge limit of 0 binds the baselines too). ``None`` reads the configured batteries.
+
+    ``plan_energy_ids`` (Live): heat pumps on a Live store plan
+    (``milp_plan["heat_store_planned"]``). The plan only keeps their store in its band, so
+    their remaining kWh is no delivery; the baselines deliver the plan's energy for them.
 
     ``baseline_initial_soc`` is the savings ledger's shadow SoC (Ledger P11): the
     baselines start there, the plan at ``initial_soc``, and the saving figures take out
@@ -560,11 +626,29 @@ def calculate_optimization_savings(
     from optimizer.charge_immediate import prepare_optimization_matrix
     from optimizer.filter_context import resolve_filter_contexts
 
-    matrix, charging_contexts, targets = prepare_optimization_matrix(
-        optimization_matrix,
-        consumer_daily_targets_kwh,
-        consumers=consumers,
-    )
+    if horizon_schedule is not None:
+        if horizon_targets_kwh is None or charging_contexts is None:
+            raise ValueError(
+                "horizon_schedule braucht horizon_targets_kwh und charging_contexts "
+                "des Control-Solves."
+            )
+        matrix, targets = optimization_matrix, consumer_daily_targets_kwh
+        if plan_energy_ids:
+            from optimizer.targets import with_plan_energy_targets
+
+            horizon_targets_kwh = with_plan_energy_targets(
+                horizon_targets_kwh, horizon_schedule, plan_energy_ids, len(matrix)
+            )
+    elif horizon_targets_kwh is not None or charging_contexts is not None or plan_energy_ids:
+        raise ValueError(
+            "horizon_targets_kwh / charging_contexts / plan_energy_ids nur mit horizon_schedule."
+        )
+    else:
+        matrix, charging_contexts, targets = prepare_optimization_matrix(
+            optimization_matrix,
+            consumer_daily_targets_kwh,
+            consumers=consumers,
+        )
     filters = filter_contexts or resolve_filter_contexts(matrix, consumers)
     on_shadow_chain = baseline_initial_soc is not None
     if on_shadow_chain:
@@ -572,10 +656,15 @@ def calculate_optimization_savings(
     else:
         # The baselines run the plant battery (``_baseline_battery_params``): with several
         # house batteries they start at the plant SoC, as the open-loop run does.
+        from optimizer.milp_plant import coerce_battery_params_list
         from optimizer.sim_horizon_chart_soc import plant_start_soc
 
         baseline_soc = plant_start_soc(
-            config.get_battery_params_list(), initial_soc, current_soc_by_id
+            config.get_battery_params_list()
+            if battery_params is None
+            else coerce_battery_params_list(battery_params),
+            initial_soc,
+            current_soc_by_id,
         )
     rows = _run_savings_horizons(
         matrix,
@@ -587,6 +676,9 @@ def calculate_optimization_savings(
         sunrise_soc_min_index=sunrise_soc_min_index,
         consumers=consumers,
         current_soc_by_id=current_soc_by_id,
+        horizon_schedule=horizon_schedule,
+        horizon_targets_kwh=horizon_targets_kwh,
+        battery_params=battery_params,
     )
     return _assemble_savings_dict(
         matrix,
@@ -597,4 +689,6 @@ def calculate_optimization_savings(
         charging_contexts,
         rows,
         consumers,
+        horizon_targets_kwh,
+        battery_params,
     )

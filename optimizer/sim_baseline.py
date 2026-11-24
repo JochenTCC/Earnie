@@ -81,6 +81,46 @@ def _baseline_battery_params(
     return plant_battery_params(house_balance_batteries(batteries))
 
 
+# Keys of the plan's battery that bind the vendor step (``limited_vendor_step``): live power
+# limits per direction and the virtual reserve floor (``reserve_price_floor.FLOOR_SOC_KEY``).
+PLAN_LIMIT_KEYS = ("max_charge_power_kw", "max_discharge_power_kw", "_virtual_reserve_floor_soc")
+
+
+def plan_battery_limits(battery_params: dict | list[dict]) -> dict[str, float]:
+    """The plan battery's limits (``PLAN_LIMIT_KEYS``) as the baselines run them (plant battery).
+
+    The savings ledger's shadow plant takes them per slot from the cycle's log entry
+    (``shadow_battery_limits``), so it runs the same battery as the cycle's baselines.
+    """
+    plant = _baseline_battery_params(battery_params)
+    return {key: float(plant[key]) for key in PLAN_LIMIT_KEYS if plant.get(key) is not None}
+
+
+def limited_vendor_step(
+    sim_soc: float, net_pv_surplus_kw: float, battery_params: dict, *, dt_h: float = DEFAULT_DT_H
+) -> tuple[float, float]:
+    """Vendor-mode slot under the battery's limits as the plan has them.
+
+    The charge and discharge power limits apply per direction (a live limit such as
+    ``max_discharge_power_kw`` 0 binds the baseline as it binds the plan), and a virtual
+    reserve floor (``_virtual_reserve_floor_soc``) is held as the minimum SoC: the vendor
+    battery keeps the reserve in every slot. Without these keys the step is
+    ``vendor_mode_step`` unchanged.
+    """
+    from optimizer.reserve_price_floor import FLOOR_SOC_KEY
+
+    assert FLOOR_SOC_KEY in PLAN_LIMIT_KEYS
+    params = battery_params
+    limit_key = "max_charge_power_kw" if net_pv_surplus_kw >= 0.0 else "max_discharge_power_kw"
+    limit = battery_params.get(limit_key)
+    if limit is not None and float(limit) < float(battery_params["max_power_kw"]):
+        params = {**params, "max_power_kw": max(0.0, float(limit))}
+    floor = battery_params.get(FLOOR_SOC_KEY)
+    if floor is not None and float(floor) > float(battery_params["min_soc"]):
+        params = {**params, "min_soc": float(floor)}
+    return bat.vendor_mode_step(sim_soc, net_pv_surplus_kw, params, dt_h=dt_h)
+
+
 def _matched_baseline_profile_kw(row: dict, consumer: dict) -> float:
     """Flex kW used as matched-baseline *shape*.
 
@@ -99,10 +139,14 @@ def build_matched_flex_kw_per_hour(
     charging_contexts: dict[str, dict] | None = None,
     *,
     consumers: list[dict] | None = None,
+    plan_delivery_slots: bool = False,
 ) -> list[dict[str, float]]:
     """
     Skaliert das historische Flex-Profil auf die aktuellen Horizont-Ziele (kWh).
     ``consumers``: flex consumers of the window (default: the live scenario's).
+    ``plan_delivery_slots`` (Live control plan): the energy goes only into the slots the
+    MILP may deliver it in — the day of slot 0, or up to the consumer's deadline
+    (``schedule_indices_for_consumer``) — so BL Ziel gets no more time than the plan.
     Zeitliche Form bleibt erhalten (auch unter Nennleistung); außerhalb des
     Ladezeitfensters null – wie im MILP. Live-Snapshot-Slots zählen nicht als Profil.
     No slot exceeds the nominal power: the excess moves to other eligible slots
@@ -121,14 +165,26 @@ def build_matched_flex_kw_per_hour(
     hour_count = len(rows)
     contexts = charging_contexts or {}
     schedule_indices = list(range(hour_count))
+    if plan_delivery_slots:
+        from optimizer.charging_schedule import schedule_indices_for_consumer
+        from optimizer.milp_inputs import _day_indices
+
+        day_indices = _day_indices(rows, hour_count)
 
     eligible_by_consumer: dict[str, set[int]] = {}
     for consumer in consumers_cfg:
         cid = consumer["id"]
+        candidates = (
+            schedule_indices_for_consumer(
+                rows, hour_count, day_indices, consumer, contexts.get(cid)
+            )
+            if plan_delivery_slots
+            else schedule_indices
+        )
         eligible = sim.consumer_charging_eligible_indices(
             rows,
             consumer,
-            schedule_indices,
+            candidates,
             contexts.get(cid),
         )
         eligible_by_consumer[cid] = set(eligible)
@@ -216,9 +272,7 @@ def _simulate_single_hour_baseline(
         total_flex_power = sum(float(v or 0.0) for v in flex_kw.values())
     net_pv_surplus = pv - con - total_flex_power
     old_soc = sim_soc
-    sim_soc, batt_action = bat.vendor_mode_step(
-        old_soc, net_pv_surplus, battery_params, dt_h=DEFAULT_DT_H
-    )
+    sim_soc, batt_action = limited_vendor_step(old_soc, net_pv_surplus, battery_params)
     p_grid = con + total_flex_power - pv + round(batt_action, 2)
     chart_row = {
         "Uhrzeit": _format_chart_uhrzeit(row),
@@ -331,16 +385,19 @@ def simulate_matched_baseline_horizon(
     *,
     battery_params: dict | list[dict] | None = None,
     consumers: list[dict] | None = None,
+    plan_delivery_slots: bool = False,
 ) -> list:
     """
     Baseline mit gleicher Flex-Energie wie die Optimierung,
     aber ohne Preis-Lastverschiebung – Batterie nur PV-Überschuss.
+    ``plan_delivery_slots``: see ``build_matched_flex_kw_per_hour``.
     """
     matched_flex = build_matched_flex_kw_per_hour(
         optimization_matrix,
         consumer_targets_kwh,
         charging_contexts,
         consumers=consumers,
+        plan_delivery_slots=plan_delivery_slots,
     )
     chart_rows = []
     sim_soc = initial_soc

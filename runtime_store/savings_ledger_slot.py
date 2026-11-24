@@ -22,7 +22,10 @@ from runtime_store.power_interval_sampler import MIN_SAMPLE_COUNT_FOR_MEAN
 # 3 (decided 2026-11-19, maintainer): v2 with the plant battery over all house batteries in the
 # shadow plant (spec § 3, § 9 item 15). Houses with one battery book the same as v2, but every
 # chain restarts once.
-SAVINGS_V = 3
+# 4 (decided 2026-11-24, maintainer): the shadow plant runs the plan battery's limits of each
+# slot's cycle (live charge/discharge limits, virtual reserve floor; spec § 3, § 9 item 16),
+# as the cycle's baselines do. Every chain restarts once.
+SAVINGS_V = 4
 
 
 # First version with the day replay (flex re-timing, spec § 7); ``SAVINGS_V`` reaches it in Ledger P9d.
@@ -214,19 +217,24 @@ def _shadow_step(
     shadow_soc: float | None,
     battery_params: dict | None,
     dt: float,
+    limits: dict[str, float] | None = None,
 ) -> tuple[float | None, float, float]:
     """``(soc_next, battery_kw, grid_kwh)`` of the shadow plant in one slot.
 
-    With a battery: vendor mode on the load plus standby. Without one (v2, spec § 7):
-    ``grid = load - pv`` and no SoC. The causal step and the day replay share this
-    function, so a replay on the logged timing gives the causal slots to the bit.
+    With a battery: vendor mode on the load plus standby, under ``limits``: the plan
+    battery's limits of the slot's cycle (``shadow_battery_limits`` of its log entry; v4,
+    spec § 3). ``None``: a log entry from before v4, the configured battery's own limits.
+    Without a battery (v2, spec § 7): ``grid = load - pv`` and no SoC. The causal step and
+    the day replay share this function, so a replay on the logged timing gives the causal
+    slots to the bit.
     """
+    from optimizer.sim_baseline import limited_vendor_step
+
     if battery_params is None:
         return None, 0.0, (house_kw - pv_kw) * dt
-    load_kw = house_kw + bat.standby_power_kw(battery_params)
-    soc_next, batt_kw = bat.vendor_mode_step(
-        float(shadow_soc), pv_kw - load_kw, battery_params, dt_h=dt
-    )
+    params = {**battery_params, **limits} if limits else battery_params
+    load_kw = house_kw + bat.standby_power_kw(params)
+    soc_next, batt_kw = limited_vendor_step(float(shadow_soc), pv_kw - load_kw, params, dt_h=dt)
     grid_shadow_kw = load_kw - pv_kw + batt_kw
     return soc_next, batt_kw, grid_shadow_kw * dt
 
@@ -239,11 +247,13 @@ def advance_slot(
     k_act_cent: float,
     k_push_cent: float,
     dt_h: float = DEFAULT_DT_H,
+    shadow_limits: dict[str, float] | None = None,
 ) -> LedgerSlot:
     """Price one closed slot with and without Earnie and step the shadow battery.
 
     ``battery_params`` is the shadow battery (``shadow_battery_params``); ``None`` (with
-    ``shadow_soc`` ``None``) is a house without battery, v2 only.
+    ``shadow_soc`` ``None``) is a house without battery, v2 only. ``shadow_limits``: the
+    plan battery's limits of the slot's cycle (``_shadow_step``).
     ``k_act_cent`` / ``k_push_cent`` are the buy and sell prices of that slot's
     cycle. A slot that does not count (``slot_skip_reason``) is skipped on both
     sides: zero cost, shadow SoC unchanged, ``skip_reason`` set.
@@ -267,7 +277,9 @@ def advance_slot(
     pv_kw = float(closed["pv_kw"])
     house_kw = ledger_house_kw(closed)
     grid_kw = float(closed["grid_kw"])
-    soc_next, batt_kw, grid_shadow_kwh = _shadow_step(pv_kw, house_kw, shadow_soc, battery_params, dt)
+    soc_next, batt_kw, grid_shadow_kwh = _shadow_step(
+        pv_kw, house_kw, shadow_soc, battery_params, dt, shadow_limits
+    )
     grid_kwh = grid_kw * dt
     k_act = float(k_act_cent)
     k_push = float(k_push_cent)
@@ -327,7 +339,9 @@ def replay_day(
             retimed = flex_retimed_kw[index]
             shift = sum(retimed.get(cid, 0.0) - delivered.get(cid, 0.0) for cid in set(retimed) | set(delivered))
             house_kw += shift
-        soc, _batt_kw, grid_kwh = _shadow_step(float(row["pv_kwh"]) / dt, house_kw, soc, battery_params, dt)
+        soc, _batt_kw, grid_kwh = _shadow_step(
+            float(row["pv_kwh"]) / dt, house_kw, soc, battery_params, dt, row.get("shadow_limits")
+        )
         k_act = float(row["k_act_cent"])
         k_push = float(row["k_push_cent"])
         replayed["cost_without_eur"] = _cost_eur(grid_kwh, k_act, k_push)

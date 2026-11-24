@@ -29,6 +29,8 @@ from runtime_store import cycle_duration_stats
 from runtime_store.cycle_timing import CycleTimer
 from optimizer.live_cycle_scope import live_cycle_scope
 from optimizer.cbc_solver import begin_solve_log, take_solve_log
+from optimizer.milp import HEAT_STORE_PLANNED_KEY, HORIZON_SCHEDULE_KEY
+from optimizer.sim_baseline import plan_battery_limits
 from runtime_store.live_display_loader import serialize_planning_window
 from runtime_store.single_instance import SingleInstanceError, ensure_single_instance
 from optimizer import schedule as optimization_schedule
@@ -311,6 +313,31 @@ def _read_pv_delta(out_of_band: bool) -> float:
         "PV-Energie-Delta (Integral letztes Intervall): %.3f kWh", pv_delta
     )
     return pv_delta
+
+
+def _save_no_plan_snapshot(
+    run_payload: dict, current_soc: float, optimization_matrix: list, planning_window
+) -> None:
+    """Chart 1 of an Automatik cycle without a plan: replace the last plan by "kein Plan"."""
+    try:
+        live_optimization_debug.save_debug_snapshot(
+            live_optimization_debug.build_no_plan_payload(
+                reason=live_optimization_debug.NO_PLAN_AUTOMATIK,
+                initial_soc=float(current_soc),
+                main_state=run_payload,
+                quarter_hour_slot=optimization_schedule.quarter_hour_slot_key(),
+                planning_matrix=optimization_matrix,
+                planning_window=serialize_planning_window(planning_window),
+            )
+        )
+        logger.info(
+            "live_optimization_debug: Anzeige-Snapshot gespeichert (%s).",
+            live_optimization_debug.NO_PLAN_LABEL,
+        )
+    except Exception as exc:  # noqa: BLE001 — the cycle has already written its setpoints
+        logger.warning(
+            "live_optimization_debug: Snapshot konnte nicht gespeichert werden: %s", exc
+        )
 
 
 def _save_import_cap_report(report: dict | None) -> None:
@@ -1061,29 +1088,49 @@ def _main_cycle(
 
     savings_snapshot = None
     savings_info = None
+    # Chart 1 and the forecast show the plan that was sent (no own solve). The Automatik
+    # fallback without an optimal solve has none: no chart plan, no forecast, no other solve.
+    horizon_schedule = (
+        milp_plan.get(HORIZON_SCHEDULE_KEY) if isinstance(milp_plan, dict) else None
+    )
     with timing.phase("savings"):
-        try:
-            savings_info = optimizer.calculate_optimization_savings(
-                optimization_matrix,
-                float(current_soc),
-                consumer_daily_targets_kwh=targets,
-                sunrise_soc_min_index=sunrise_soc_min_index,
-                filter_contexts=filter_contexts,
-                consumers=live_consumers,
-                current_soc_by_id=current_soc_by_id or None,
-                baseline_initial_soc=savings_ledger_daemon.planning_shadow_soc(closed_interval),
+        if horizon_schedule is None:
+            logger.warning(
+                "Chart 1 / Ersparnis-Prognose: %s — kein Ersatz-Solve.",
+                live_optimization_debug.NO_PLAN_LABEL,
             )
-            savings_snapshot = optimizer.build_savings_snapshot(savings_info)
-            logger.info(
-                "Prognostizierte Ersparnis (%d h): %.3f € vs BL Ziel "
-                "(%.3f € optimiert / %.3f € BL Ziel)",
-                len(optimization_matrix),
-                savings_snapshot["savings_matched_euro"],
-                savings_snapshot["optimized_cost_euro"],
-                savings_snapshot["matched_baseline_cost_euro"],
-            )
-        except Exception as exc:
-            logger.warning("Einsparungs-Prognose konnte nicht berechnet werden: %s", exc)
+        else:
+            try:
+                savings_info = optimizer.calculate_optimization_savings(
+                    optimization_matrix,
+                    float(current_soc),
+                    consumer_daily_targets_kwh=targets,
+                    sunrise_soc_min_index=sunrise_soc_min_index,
+                    filter_contexts=filter_contexts,
+                    consumers=live_consumers,
+                    current_soc_by_id=current_soc_by_id or None,
+                    baseline_initial_soc=savings_ledger_daemon.planning_shadow_soc(
+                        closed_interval
+                    ),
+                    horizon_schedule=horizon_schedule,
+                    horizon_targets_kwh=consumer_remaining,
+                    charging_contexts=charging_contexts,
+                    # The plan's batteries: live limits and reserves bind the baselines too.
+                    battery_params=battery_params,
+                    # Store-planned heat pumps: BL Ziel delivers the plan's energy.
+                    plan_energy_ids=milp_plan.get(HEAT_STORE_PLANNED_KEY, ()),
+                )
+                savings_snapshot = optimizer.build_savings_snapshot(savings_info)
+                logger.info(
+                    "Prognostizierte Ersparnis (%d h): %.3f € vs BL Ziel "
+                    "(%.3f € optimiert / %.3f € BL Ziel)",
+                    len(optimization_matrix),
+                    savings_snapshot["savings_matched_euro"],
+                    savings_snapshot["optimized_cost_euro"],
+                    savings_snapshot["matched_baseline_cost_euro"],
+                )
+            except Exception as exc:
+                logger.warning("Einsparungs-Prognose konnte nicht berechnet werden: %s", exc)
 
     with timing.phase("persist"):
         if not out_of_band:
@@ -1189,6 +1236,8 @@ def _main_cycle(
                 "consumption_snapshot": consumption_snapshot,
                 "closed_interval": closed_interval,
                 "current_hour": int(current_hour),
+                # Savings ledger v4: the shadow plant books this slot under the plan battery's limits.
+                "shadow_battery_limits": plan_battery_limits(battery_params),
             }
             if consumption_snapshot is not None:
                 power_interval_sampler.note_decision_sample(
@@ -1235,6 +1284,10 @@ def _main_cycle(
                         "live_optimization_debug: Snapshot konnte nicht gespeichert werden: %s",
                         exc,
                     )
+            elif horizon_schedule is None:
+                _save_no_plan_snapshot(
+                    run_payload, current_soc, optimization_matrix, planning_window
+                )
             try:
                 optimization_history.append_production_run(run_payload)
             except OSError as exc:

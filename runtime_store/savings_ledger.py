@@ -99,6 +99,9 @@ class LedgerInput:
     planned_flex_kw: dict[str, float] = field(default_factory=dict)
     filter_native: dict[str, dict[str, float]] = field(default_factory=dict)
     plugged_in: dict[str, bool] = field(default_factory=dict)
+    # Plan battery limits of the slot's cycle (``shadow_battery_limits`` of its log entry, v4);
+    # ``None`` for an entry from before v4.
+    shadow_limits: dict[str, float] | None = None
 
 
 @dataclass(frozen=True)
@@ -326,6 +329,7 @@ def advance_with_slots(
             k_act_cent=inp.k_act_cent,
             k_push_cent=inp.k_push_cent,
             dt_h=dt_h,
+            shadow_limits=inp.shadow_limits,
         )
     soc_actual_end = state.soc_actual_end
     closed = inp.closed or {}
@@ -403,6 +407,9 @@ def _slot_row(inp: LedgerInput, slot: LedgerSlot, dt_h: float) -> dict[str, Any]
             row["filter_native"] = {str(cid): dict(window) for cid, window in inp.filter_native.items()}
         if inp.plugged_in:
             row["plugged_in"] = {str(cid): bool(state) for cid, state in inp.plugged_in.items()}
+        if inp.shadow_limits:
+            # The day replay steps the shadow plant under the same limits.
+            row["shadow_limits"] = {str(k): float(v) for k, v in inp.shadow_limits.items()}
     return row
 
 

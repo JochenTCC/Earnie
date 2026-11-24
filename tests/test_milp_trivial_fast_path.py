@@ -12,10 +12,12 @@ from tests.fixtures.open_meteo_mock import install_open_meteo_climate_mock
 from optimizer.milp import (
     ENV_MILP_TRIVIAL_FAST_PATH,
     EMPTY_MILP_PLAN,
+    HORIZON_SCHEDULE_KEY,
     is_trivial_milp_window,
     milp_horizon_schedule,
     milp_optimizer,
     milp_trivial_fast_path_enabled,
+    trivial_horizon_schedule,
 )
 from optimizer.simulation import calculate_cost_euro_from_rows, simulate_horizon
 from simulation.horizon_mode import FIXED_24H
@@ -112,7 +114,10 @@ def test_trivial_optimizer_skips_solver():
     assert target_power == 0.0
     assert target_soc == pytest.approx(50.0)
     assert powers == {}
-    assert plan == EMPTY_MILP_PLAN
+    assert plan == {
+        **EMPTY_MILP_PLAN,
+        HORIZON_SCHEDULE_KEY: trivial_horizon_schedule(len(matrix)),
+    }
 
 
 def test_nontrivial_capacity_still_solves():

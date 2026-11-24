@@ -128,7 +128,8 @@ def patch_main_run(monkeypatch, *, silent: bool = True) -> None:
     monkeypatch.setattr(
         main_module.optimizer,
         "milp_optimizer",
-        lambda *a, **k: (0, 0.0, 99.0, {}, {}, {}, {}),
+        # A solved cycle: the plan carries its horizon (one slot, like the matrix).
+        lambda *a, **k: (0, 0.0, 99.0, {}, {}, {"horizon_schedule": [{}]}, {}),
     )
     monkeypatch.setattr(main_module.config, "get_battery_params", lambda: {"max_power_kw": 2.5})
     monkeypatch.setattr(main_module.optimizer, "battery_plan_kw_from_control", lambda *a, **k: 0.0)

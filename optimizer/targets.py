@@ -388,6 +388,7 @@ def resolve_matched_baseline_horizon_targets(
     charging_contexts: dict[str, dict] | None = None,
     *,
     consumers: list | None = None,
+    horizon_targets_kwh: dict[str, float] | None = None,
 ) -> dict[str, float]:
     """
     Horizont-Ziele für BL-Ziel-Simulation.
@@ -398,6 +399,9 @@ def resolve_matched_baseline_horizon_targets(
     Profil-Energie im Horizont, erhalten die Profil-Summe als Ziel — sonst
     fehlt Flex-Konkurrenz in der Batterie-Simulation (inflated SoC BL Ziel).
     EV/Ladeplan und explizite Config-Ziele bleiben unverändert.
+
+    ``horizon_targets_kwh``: the control solve's remaining energy (Live Chart 1). It replaces
+    the daily-target base, so BL Ziel delivers what the shown plan delivers.
     """
     from data import consumer_targets
 
@@ -406,13 +410,15 @@ def resolve_matched_baseline_horizon_targets(
         if consumers is not None
         else config.get_flexible_consumers(optimizer_only=True)
     )
-    targets = resolve_horizon_consumer_targets_kwh(
-        optimization_matrix,
-        consumer_daily_targets_kwh,
-        flexible_consumers=consumers_cfg,
-    )
-    contexts = charging_contexts or {}
-    targets = apply_horizon_charging_limits(targets, contexts)
+    if horizon_targets_kwh is not None:
+        targets = remaining_horizon_targets(horizon_targets_kwh, consumers_cfg)
+    else:
+        targets = resolve_horizon_consumer_targets_kwh(
+            optimization_matrix,
+            consumer_daily_targets_kwh,
+            flexible_consumers=consumers_cfg,
+        )
+        targets = apply_horizon_charging_limits(targets, charging_contexts or {})
     profile_totals = consumer_targets.resolve_horizon_flex_targets_kwh(
         optimization_matrix, consumers=consumers_cfg
     )
@@ -427,6 +433,45 @@ def resolve_matched_baseline_horizon_targets(
         if explicit <= 0 and profile_total > 0 and float(targets.get(cid, 0.0) or 0.0) <= 0:
             targets[cid] = round(profile_total, 3)
     return targets
+
+
+def remaining_horizon_targets(
+    horizon_targets_kwh: dict[str, float], consumers: list
+) -> dict[str, float]:
+    """The control solve's remaining energy per consumer of the window (0 when it has none)."""
+    return {
+        c["id"]: round(max(0.0, float(horizon_targets_kwh.get(c["id"], 0.0) or 0.0)), 3)
+        for c in consumers
+    }
+
+
+def with_plan_energy_targets(
+    horizon_targets_kwh: dict[str, float],
+    horizon_schedule: list[dict],
+    plan_energy_ids: list[str] | tuple[str, ...],
+    n_slots: int,
+) -> dict[str, float]:
+    """Remaining energy with the plan's own energy for ``plan_energy_ids`` (Live).
+
+    A heat pump on a Live store plan has no delivery in the MILP: it keeps the store in its
+    band and reaches the terminal level, so its remaining kWh (daily target) is only a hint.
+    BL Ziel delivers what the plan delivers for it, summed from the schedule's
+    ``consumer_powers`` over the first ``n_slots`` slots (the chart rows' window).
+    """
+    from optimizer.slot_duration import DEFAULT_DT_H
+
+    if len(horizon_schedule) < n_slots:
+        raise ValueError(
+            f"Plan-Energie: Plan hat {len(horizon_schedule)} Slots, Fenster {n_slots}."
+        )
+    out = dict(horizon_targets_kwh)
+    for cid in plan_energy_ids:
+        kw = sum(
+            float((slot.get("consumer_powers") or {}).get(cid, 0.0) or 0.0)
+            for slot in horizon_schedule[:n_slots]
+        )
+        out[cid] = round(kw * DEFAULT_DT_H, 3)
+    return out
 
 
 def resolve_applied_daily_targets(
@@ -445,8 +490,12 @@ def build_applied_targets_detail(
     consumer_daily_targets_kwh: dict | None = None,
     *,
     consumers: list | None = None,
+    horizon_targets_kwh: dict[str, float] | None = None,
 ) -> list[dict]:
-    """Bereitet die genutzten Tagesziele mit Verbrauchername und Quelle für die UI auf."""
+    """Bereitet die genutzten Tagesziele mit Verbrauchername und Quelle für die UI auf.
+
+    ``horizon_targets_kwh``: the control solve's remaining energy (Live); it is the target shown.
+    """
     consumption_mode = (
         optimization_matrix[0].get("consumption_mode") if optimization_matrix else None
     )
@@ -459,6 +508,8 @@ def build_applied_targets_detail(
         optimization_matrix, consumer_daily_targets_kwh, consumers=active
     )
     targets = apply_horizon_charging_limits(targets, charging_contexts)
+    if horizon_targets_kwh is not None:
+        targets = remaining_horizon_targets(horizon_targets_kwh, active)
     details = []
     for consumer in active:
         cid = consumer["id"]
@@ -576,6 +627,7 @@ def build_energy_comparison_detail(
     *,
     profile_fallback_kwh: dict[str, float] | None = None,
     consumers: list | None = None,
+    horizon_targets_kwh: dict[str, float] | None = None,
 ) -> list[dict]:
     """Kombiniert Profil-Baseline, Ziel-Baseline und Optimierung je Verbraucher inkl. Grundlast.
 
@@ -604,7 +656,10 @@ def build_energy_comparison_detail(
     optimized_by_id = {
         item["id"]: item
         for item in build_applied_targets_detail(
-            optimization_matrix, consumer_daily_targets_kwh, consumers=active
+            optimization_matrix,
+            consumer_daily_targets_kwh,
+            consumers=active,
+            horizon_targets_kwh=horizon_targets_kwh,
         )
     }
     matched_flex = matched_flex_kwh or {}

@@ -302,9 +302,9 @@ def _milp_full_control_setpoint(
     (``milp_soc_recovery``): the limits are widened to the current SoC, so the power is the
     plan's and not what would reach the limit within this slot.
 
-    ``drain_soc_pct``: SoC points the idle drain takes in this slot (Reserve P4). The plan's
-    SoC already lost them; the power is that of the plan's SoC plus the drain, so the action
-    alone matches the plan's charge or discharge.
+    ``drain_soc_pct``: SoC points the idle drain takes in this slot (Reserve P4). The plan has
+    no drain (the MILP leaves it out); the power is that of the plan's SoC plus the drain, so
+    the battery lands on the plan's SoC after the drain of the slot.
     """
     soc_floor = min(min_soc, current_soc)
     soc_ceiling = max(max_soc, current_soc) + drain_soc_pct

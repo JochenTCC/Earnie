@@ -7,6 +7,7 @@ import pandas as pd
 from data import consumer_targets, live_consumption, profile_manager
 from data.edibert_live_market import fetch_live_day_ahead_prices
 from runtime_store import main_daemon, run_state, savings_ledger_store
+from runtime_store.live_optimization_debug import NO_PLAN_LABEL, snapshot_no_plan
 from runtime_store.live_display_loader import (
     load_live_display_snapshot,
     snapshot_completed_at,
@@ -39,6 +40,13 @@ from ui.simulation_results import (
 
 SESSION_OPT_IN_SIMULATION = "live_opt_in_simulation_confirmed"
 SESSION_SNAPSHOT_CACHE_KEY = "live_display_snapshot_cache_key"
+# Set while the last main.py cycle had no plan (Automatik fallback): Chart 1 says so.
+SESSION_LIVE_NO_PLAN = "live_display_no_plan"
+NO_PLAN_NOTICE = (
+    f"Chart 1: **{NO_PLAN_LABEL}** — der letzte main.py-Lauf fand keinen optimalen Plan "
+    "und hat die Batterie auf Automatik gestellt. Es gibt für diesen Lauf keinen Plan "
+    "und keine Ersparnis-Prognose."
+)
 
 
 def _render_main_py_sync_notice(
@@ -80,6 +88,11 @@ def _snapshot_cache_key(
 
 
 def _store_bundle_from_snapshot(snapshot: dict) -> bool:
+    if snapshot_no_plan(snapshot):
+        st.session_state.pop(SESSION_LIVE_DISPLAY_BUNDLE, None)
+        st.session_state[SESSION_LIVE_NO_PLAN] = True
+        return True
+    st.session_state.pop(SESSION_LIVE_NO_PLAN, None)
     bundle = build_optimization_display_bundle_from_snapshot(
         snapshot,
         cycle_offset=get_s2_cycle_offset(),
@@ -97,6 +110,7 @@ def _store_bundle_from_snapshot(snapshot: dict) -> bool:
 def _refresh_snapshot_bundle(snapshot: dict | None, cache_key: str) -> None:
     if snapshot is None:
         st.session_state.pop(SESSION_LIVE_DISPLAY_BUNDLE, None)
+        st.session_state.pop(SESSION_LIVE_NO_PLAN, None)
         return
     if st.session_state.get(SESSION_SNAPSHOT_CACHE_KEY) == cache_key:
         return
@@ -439,6 +453,8 @@ def _live_optimization_prepare_fragment(current_soc: float) -> None:
 @st.fragment(run_every=CHARTS_FRAGMENT_RUN_EVERY)
 def _live_optimization_chart1_fragment(current_soc: float) -> None:
     bundle = st.session_state.get(SESSION_LIVE_DISPLAY_BUNDLE)
+    if bundle is None and st.session_state.get(SESSION_LIVE_NO_PLAN):
+        st.info(NO_PLAN_NOTICE)
     if bundle is not None:
         render_optimization_chart1(bundle)
         remember_live_soc(current_soc)

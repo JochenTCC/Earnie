@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from optimizer import battery as bat
-from optimizer.milp import milp_horizon_schedule, milp_optimizer
+from optimizer.milp import HORIZON_SCHEDULE_KEY, milp_horizon_schedule, milp_optimizer
 from optimizer.milp_result import _extract_milp_plan, extract_horizon_schedule
 from optimizer.milp_consumers import _consumer_powers_now
 from optimizer.simulation import simulate_horizon
@@ -64,6 +64,9 @@ def test_extract_horizon_schedule_t0_matches_t0_helpers():
         consumers=[],
     )
     assert len(schedule) == len(matrix)
+    # The control solve carries its whole plan; slot 0 of it is the plan it sent.
+    horizon = plan.pop(HORIZON_SCHEDULE_KEY)
+    assert horizon == schedule
     assert schedule[0]["milp_plan"] == plan
     derived = bat.derive_control_from_milp_plan(
         schedule[0]["milp_plan"],

@@ -31,10 +31,17 @@ OBSERVE = {"import_cap_kw": 5.0, "import_cap_margin_kw": 0.3, "import_cap_mode":
 
 
 def _shift_rows() -> list[dict]:
-    """Cheap now, dear later: without the cap Earnie buys now and keeps the battery for later."""
+    """Cheap now, dear later: without the cap Earnie buys now and keeps the battery for later.
+
+    Later slots export at 5.2 ct: more than a battery kWh saves now (5 ct), so keeping the battery
+    is strictly better, and less than charging now costs per exported kWh (5 / 0.95² ≈ 5.54 ct), so
+    there is no arbitrage. With export at 5 ct everywhere, discharging now and buying now tie.
+    """
     rows = _rows([4.0, 4.0, 3.0, 3.0, 3.0, 3.0])
     for row, price in zip(rows, [5.0, 5.0, 40.0, 40.0, 40.0, 40.0]):
         row["k_act"] = price
+    for row in rows[2:]:
+        row["k_push_act"] = 5.2
     return rows
 
 

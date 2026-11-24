@@ -93,6 +93,33 @@ def test_store_bundle_from_snapshot_without_rows_drops_the_old_bundle(fake_st, m
     assert SESSION_LIVE_DISPLAY_BUNDLE not in fake_st.session_state
 
 
+def test_no_plan_snapshot_drops_the_old_plan_and_chart1_says_so(fake_st, monkeypatch) -> None:
+    """Automatik cycle without a plan: Chart 1 shows "kein Plan", never the previous plan."""
+    from runtime_store.live_optimization_debug import NO_PLAN_AUTOMATIK, build_no_plan_payload
+
+    infos: list[str] = []
+    fake_st.info = infos.append
+    fake_st.session_state[SESSION_LIVE_DISPLAY_BUNDLE] = "OLD"
+    monkeypatch.setattr(
+        live_mode,
+        "build_optimization_display_bundle_from_snapshot",
+        lambda *a, **k: pytest.fail("no bundle for a cycle without a plan"),
+    )
+    snapshot = build_no_plan_payload(reason=NO_PLAN_AUTOMATIK, initial_soc=50.0)
+    assert live_mode._store_bundle_from_snapshot(snapshot) is True
+    assert SESSION_LIVE_DISPLAY_BUNDLE not in fake_st.session_state
+    # st.fragment only runs its body inside a script run; call the plain function.
+    live_mode._live_optimization_chart1_fragment.__wrapped__(50.0)
+    assert len(infos) == 1
+    assert "kein Plan (Automatik)" in infos[0]
+    # The next cycle with a plan clears the notice.
+    monkeypatch.setattr(
+        live_mode, "build_optimization_display_bundle_from_snapshot", lambda *a, **k: "NEW"
+    )
+    assert live_mode._store_bundle_from_snapshot({"id": 2}) is True
+    assert live_mode.SESSION_LIVE_NO_PLAN not in fake_st.session_state
+
+
 def test_refresh_snapshot_bundle_caches_by_key(fake_st, monkeypatch) -> None:
     builds: list[dict] = []
 

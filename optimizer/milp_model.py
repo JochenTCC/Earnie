@@ -33,6 +33,7 @@ from .milp_horizon import (
     _build_milp_model,
     _terminal_soc_energy_kwh,
     plant_soc_view,
+    simultaneous_flow_slots,
 )
 from .milp_horizon_extras import BASE_LEVEL_ENV, base_level_enabled, plant_capacity_kwh
 from .import_power_limit import ImportCaps
@@ -163,6 +164,7 @@ def _build_milp_model_with_objective(
         current_soc_by_id=current_soc_by_id,
         inverter_params=inv,
         pv_systems=pvs,
+        fallback_k_push=k_push,
     )
     _add_milp_objective(
         model,
@@ -239,17 +241,12 @@ def _reserve_build_before(model: MilpHorizonModel, sunrise_index: int) -> float:
     last = min(int(sunrise_index), len(floors) - 1)
     if last < 0:
         return 0.0
-    # The idle drain lowers the start energy slot by slot (Reserve P4).
+    # The plan has no idle drain (Reserve P4): the start energy holds without charging.
     params = model.battery_params_by_id[model.ess_ids[0]]
     base_kwh = bat.idle_drain_floor_soc(params) / 100.0 * float(params["battery_capacity_kwh"])
-    drain_kwh = bat.idle_drain_kw(params) * model.dt_h
     start = float(model.reserve_start_kwh)
     return max(
-        (
-            floors[k] - (start - drain_kwh * (k + 1))
-            for k in range(last + 1)
-            if floors[k] > base_kwh + 1e-9
-        ),
+        (floors[k] - start for k in range(last + 1) if floors[k] > base_kwh + 1e-9),
         default=0.0,
     )
 
@@ -416,6 +413,10 @@ def _solve_milp_to_model(
     if status != "Optimal":
         record_cbc_event("milp_no_optimal", final_status=status)
         return None
+    simultaneous = simultaneous_flow_slots(model)
+    if simultaneous["grid"] or simultaneous["battery"]:
+        logger.warning("MILP plan runs opposite flows at once: %s", simultaneous)
+        record_cbc_event("milp_simultaneous_flows", **simultaneous)
     return (
         model,
         inputs.preset_by_slot,

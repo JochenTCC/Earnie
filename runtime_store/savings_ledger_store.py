@@ -332,6 +332,16 @@ def _plugged_in_by_consumer(entry: dict[str, Any]) -> dict[str, bool]:
     return states
 
 
+def _shadow_limits(entry: dict[str, Any]) -> dict[str, float] | None:
+    """Plan battery limits the entry's cycle logged (``shadow_battery_limits``, v4); ``None`` before."""
+    limits = entry.get("shadow_battery_limits")
+    if limits is None:
+        return None
+    if not isinstance(limits, dict):
+        raise ValueError(f"savings ledger: shadow_battery_limits is no dict: {limits!r}")
+    return {str(k): float(v) for k, v in limits.items()}
+
+
 def pending_slot_from_entry(
     slot_start: datetime,
     slot_entry: dict[str, Any] | None,
@@ -349,6 +359,7 @@ def pending_slot_from_entry(
         "planned_flex_kw": _planned_flex_kw(slot_entry),
         "filter_native": _filter_native_windows(slot_entry),
         "plugged_in": _plugged_in_by_consumer(slot_entry),
+        "shadow_limits": _shadow_limits(slot_entry),
     }
 
 
@@ -375,6 +386,7 @@ def ledger_input_from_pending(
         planned_flex_kw=dict(pending.get("planned_flex_kw") or {}),
         filter_native=dict(pending.get("filter_native") or {}),
         plugged_in=dict(pending.get("plugged_in") or {}),
+        shadow_limits=pending.get("shadow_limits"),
     )
 
 

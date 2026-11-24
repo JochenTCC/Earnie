@@ -194,6 +194,61 @@ def build_debug_payload(
     return _json_safe(payload)
 
 
+# ``no_plan`` of a live snapshot: the cycle sent Automatik without an optimal solve, so
+# there is no plan to show (no chart rows, no forecast; no replacement solve).
+NO_PLAN_AUTOMATIK = "automatik"
+NO_PLAN_LABEL = "kein Plan (Automatik)"
+
+
+def build_no_plan_payload(
+    *,
+    reason: str,
+    initial_soc: float,
+    main_state: dict[str, Any] | None = None,
+    quarter_hour_slot: str | None = None,
+    planning_matrix: list[dict] | None = None,
+    planning_window: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Live snapshot of a cycle without a plan: empty rows and the reason (``no_plan``).
+
+    It replaces the previous cycle's snapshot, so the chart never shows an older plan as
+    the current one. The planning matrix stays for the devices page.
+    """
+    main_summary = _main_run_summary(main_state)
+    payload: dict[str, Any] = {
+        "completed_at": datetime.now().isoformat(timespec="seconds"),
+        "source": "main.py",
+        "simulation_kind": "live",
+        "no_plan": reason,
+        "initial_soc_percent": round(float(initial_soc), 2),
+        "savings": {},
+        "applied_targets": [],
+        "energy_comparison": [],
+        "simulation_rows": [],
+        "baseline_rows": [],
+        "matched_baseline_rows": [],
+        "baseline_same_flex_rows": [],
+        "quarter_hour_slot": quarter_hour_slot,
+        "sync_reason": "main_synced",
+        "simulation_rows_raw": [],
+        "main_run": main_summary,
+        "main_run_completed_at": main_summary.get("completed_at"),
+    }
+    if planning_matrix is not None:
+        payload["planning_matrix"] = planning_matrix
+    if planning_window is not None:
+        payload["planning_window"] = planning_window
+    return _json_safe(payload)
+
+
+def snapshot_no_plan(snapshot: dict[str, Any] | None) -> str | None:
+    """Reason the snapshot's cycle has no plan (``NO_PLAN_AUTOMATIK``), else None."""
+    if not snapshot:
+        return None
+    reason = snapshot.get("no_plan")
+    return str(reason) if reason else None
+
+
 def save_debug_snapshot(
     payload: dict[str, Any],
     *,

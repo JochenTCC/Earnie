@@ -19,6 +19,7 @@ from .cbc_events import (
 )
 from .charging_context import resolve_charging_contexts
 from .generic_flex_run import continue_on_from_state, update_generic_flex_run_state
+from .slot_duration import DEFAULT_DT_H
 from .targets import consumer_column_name
 from .sim_chart_rows import (
     _chart_row_from_schedule_slot,
@@ -136,13 +137,30 @@ def _cap_flex_and_advance_run(
     delivered_horizon: dict[str, float],
     generic_flex_run: dict[str, dict],
 ) -> None:
-    """Kappt Flex auf das Horizontziel und schreibt den Run-State fort."""
-    _cap_flex_delivery(
-        chart_row, setup.consumers_cfg, setup.horizon_limits, delivered_horizon
-    )
+    """Kappt Flex auf das Horizontziel und schreibt den Run-State fort.
+
+    A given plan (``fixed_schedule``) is shown as it is: its solve already held the targets.
+    """
+    if setup.fixed_schedule:
+        _book_flex_delivery(chart_row, setup.consumers_cfg, delivered_horizon)
+    else:
+        _cap_flex_delivery(
+            chart_row, setup.consumers_cfg, setup.horizon_limits, delivered_horizon
+        )
     for consumer in setup.consumers_cfg:
         power = float(chart_row.get(consumer_column_name(consumer), 0.0) or 0.0)
         update_generic_flex_run_state(generic_flex_run, consumer, power)
+
+
+def _book_flex_delivery(
+    chart_row: dict, consumers_cfg: list, delivered_horizon: dict[str, float]
+) -> None:
+    """Books the row's flex energy without a cap (a given plan is shown unchanged)."""
+    for consumer in consumers_cfg:
+        power = float(chart_row.get(consumer_column_name(consumer), 0.0) or 0.0)
+        if power > 0:
+            cid = consumer["id"]
+            delivered_horizon[cid] = delivered_horizon.get(cid, 0.0) + power * DEFAULT_DT_H
 
 
 def _slot_limit_marks(slot: dict) -> dict:

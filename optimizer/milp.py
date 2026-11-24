@@ -98,6 +98,14 @@ HEAT_STORAGE_TARGETS_KEY = "heat_storage_targets"
 HEAT_STORAGE_LEVELS_KEY = "heat_storage_levels"
 # ``milp_plan`` key: ids of the heat pumps in a forced charge now (HeatControl P5).
 HEAT_FORCED_CHARGE_KEY = "heat_forced_charge"
+# ``milp_plan`` key: ids of the heat pumps the plan runs on their Live store plan. Their
+# remaining kWh is no delivery for the MILP (store band + terminal level only), so the
+# savings baselines take the plan's energy for them. Missing: no Live store plan.
+HEAT_STORE_PLANNED_KEY = "heat_store_planned"
+# ``milp_plan`` key: the executed plan over the whole horizon (``extract_horizon_schedule``
+# slots), shown by Chart 1 and the savings forecast. Missing on the Automatik fallback
+# without an optimal solve: that cycle has no plan to show.
+HORIZON_SCHEDULE_KEY = "horizon_schedule"
 
 
 @dataclass
@@ -204,17 +212,20 @@ def shadow_import_cap_report(
     )
 
 
-def _trivial_optimizer_result(current_soc: float) -> (
+def _trivial_optimizer_result(current_soc: float, n_slots: int) -> (
     tuple[int, float, float, dict[str, float], dict[str, int], dict[str, float], dict[str, dict]]
 ):
-    """Automatik-Stellgrößen des trivialen Fensters (kein Solve, SoC bleibt stehen)."""
+    """Automatik-Stellgrößen des trivialen Fensters (kein Solve, SoC bleibt stehen).
+
+    The trivial window is a plan (Automatik, no flex) and carries it over the horizon.
+    """
     return (
         0,
         0.0,
         round(float(current_soc), 1),
         {},
         {},
-        dict(EMPTY_MILP_PLAN),
+        {**EMPTY_MILP_PLAN, HORIZON_SCHEDULE_KEY: trivial_horizon_schedule(n_slots)},
         {},
     )
 
@@ -271,7 +282,7 @@ def milp_optimizer(
     if trivial is not None:
         _warn_import_cap_not_planned(import_caps, "trivial window, no solve", cap_mode)
         return _with_not_planned_report(
-            _trivial_optimizer_result(current_soc),
+            _trivial_optimizer_result(current_soc, len(matrix)),
             import_caps,
             matrix,
             NOT_PLANNED_TRIVIAL,
@@ -340,6 +351,10 @@ def _solve_and_extract_controls(
     controls = _extract_optimizer_controls_from_model(
         model, matrix, preset_by_slot, current_soc, primary
     )
+    # Chart 1 and the savings forecast show this plan instead of solving their own.
+    controls.milp_plan[HORIZON_SCHEDULE_KEY] = extract_horizon_schedule(
+        model, primary, preset_by_slot
+    )
     if import_caps is not None and import_cap_observe:
         controls.milp_plan["import_cap_report"] = shadow_import_cap_report(
             model, matrix, import_caps, solve_args, fallback_k_push
@@ -378,6 +393,7 @@ def _add_heat_storage_plan(
     milp_plan[HEAT_FORCED_CHARGE_KEY] = forced
     milp_plan[HEAT_STORAGE_TARGETS_KEY] = heat_storage_targets(model, forced)
     milp_plan[HEAT_STORAGE_LEVELS_KEY] = store_level_report(model)
+    milp_plan[HEAT_STORE_PLANNED_KEY] = sorted(model.live_store_plans)
 
 
 def _optimizer_result_tuple(controls, urgent_observability: dict[str, dict]) -> tuple:
@@ -501,6 +517,8 @@ __all__ = [
     "MilpHorizonModel",
     "EMPTY_MILP_PLAN",
     "ENV_MILP_TRIVIAL_FAST_PATH",
+    "HORIZON_SCHEDULE_KEY",
+    "HEAT_STORE_PLANNED_KEY",
     "add_min_on_time_constraints",
     "filter_feasible_consumers",
     "is_trivial_milp_window",

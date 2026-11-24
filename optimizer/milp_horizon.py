@@ -13,7 +13,9 @@ import pulp
 
 logger = logging.getLogger(__name__)
 
-from .battery import IDLE_DRAIN_KEY, effective_p_act, idle_drain_floor_soc, idle_drain_kw  # noqa: F401
+from data.feed_in_prices import k_push_act_for_matrix_row
+
+from .battery import effective_p_act
 from .consumer_power import power_limits_kw
 from .milp_control_slot import (  # noqa: F401  (re-exported)
     _add_control_slot_constraints,
@@ -82,6 +84,50 @@ def _normalize_fixed_flex_by_t(
     }
 
 
+def _exclusivity_slots(
+    matrix: list[dict[str, Any]],
+    horizon: int,
+    batteries: list[dict],
+    fallback_k_push: float | None,
+) -> tuple[list[bool], list[bool]]:
+    """Slots that need the buy/sell and the charge/discharge binary.
+
+    Splitting a signed power into two non-negative parts is exact in an LP as long as running
+    both at once cannot pay: buying and selling at once loses money while the sell price is
+    below the buy price, and charging and discharging at once only burns energy through the
+    round-trip losses, which pays only when energy is worth nothing or less. So a slot needs
+    - ``delta_import`` when the sell price reaches the buy price, or for every slot when a
+      battery runs ``limits_only`` / ``read_only`` (their control constraints use it);
+    - ``delta_charge`` when the buy or the sell price is zero or below.
+    ``fallback_k_push`` ``None``: every slot keeps both binaries (callers without prices).
+    Vendor mode keeps them too: its export rules would be dodged by running both at once.
+    A plan that still runs both at once is reported after the solve (``simultaneous_flow_slots``).
+    """
+    from .milp_vendor_mode import plan_vendor_mode_enabled
+
+    if fallback_k_push is None or plan_vendor_mode_enabled():
+        return [True] * horizon, [True] * horizon
+    from house_config.battery_control import (
+        BATTERY_CONTROL_LIMITS_ONLY,
+        BATTERY_CONTROL_READ_ONLY,
+        control_from_battery_params,
+    )
+
+    restricted = any(
+        control_from_battery_params(bat)
+        in (BATTERY_CONTROL_LIMITS_ONLY, BATTERY_CONTROL_READ_ONLY)
+        for bat in batteries
+    )
+    need_import: list[bool] = []
+    need_charge: list[bool] = []
+    for row in matrix[:horizon]:
+        k_buy = float(row["k_act"])
+        k_sell = k_push_act_for_matrix_row(row, fallback_k_push)
+        need_import.append(restricted or k_sell >= k_buy)
+        need_charge.append(k_buy <= 0.0 or k_sell <= 0.0)
+    return need_import, need_charge
+
+
 def _create_grid_battery_vars(
     matrix: list[dict[str, Any]],
     horizon: int,
@@ -91,8 +137,13 @@ def _create_grid_battery_vars(
     *,
     inverter_params: dict | list[dict] | None = None,
     pv_systems: list[dict] | None = None,
+    fallback_k_push: float | None = None,
 ) -> _GridBatteryVars:
-    """LpVariables für Netzbezug/-einspeisung, Lade-/Entladeleistung und SOC-Energie."""
+    """LpVariables für Netzbezug/-einspeisung, Lade-/Entladeleistung und SOC-Energie.
+
+    ``delta_charge`` / ``delta_import`` hold ``None`` in slots that need no binary
+    (``_exclusivity_slots``).
+    """
     inverters = coerce_inverter_params_list(inverter_params)
     pv_list = coerce_pv_systems_list(pv_systems)
     batteries = filter_house_balance_batteries(
@@ -114,6 +165,7 @@ def _create_grid_battery_vars(
             }
         ]
     load_params = primary_battery_with_plant_power(batteries)
+    need_import, need_charge = _exclusivity_slots(matrix, horizon, batteries, fallback_k_push)
     ess_ids: list[str] = []
     params_by_id: dict[str, dict] = {}
     p_charge_by_ess: dict[str, list] = {}
@@ -149,6 +201,8 @@ def _create_grid_battery_vars(
         ]
         delta_charge_by_ess[ess_id] = [
             pulp.LpVariable(f"delta_charge_{slug}_{t}", cat=pulp.LpBinary)
+            if need_charge[t]
+            else None
             for t in range(horizon)
         ]
 
@@ -203,7 +257,8 @@ def _create_grid_battery_vars(
     max_pv = max((_slot_house_pv(row) for row in matrix[:horizon]), default=0.0)
     big_m_grid = max(max_load + max_flex_power + max_power, max_pv + max_power, 50.0)
     delta_import = [
-        pulp.LpVariable(f"delta_import_{t}", cat=pulp.LpBinary) for t in range(horizon)
+        pulp.LpVariable(f"delta_import_{t}", cat=pulp.LpBinary) if need_import[t] else None
+        for t in range(horizon)
     ]
     return _GridBatteryVars(
         p_grid_buy=p_grid_buy,
@@ -263,42 +318,6 @@ def _add_consumer_var_block(
             continue_on=bool(continue_on.get(cid, False)),
         )
     return block
-
-
-def _idle_drain_kwh_term(
-    prob: pulp.LpProblem,
-    bat: dict,
-    eid: str,
-    *,
-    t: int,
-    prev_e,
-    dt_h: float,
-):
-    """Energy the idle drain takes from battery ``eid`` in slot ``t`` (Reserve P4).
-
-    The drain applies while the energy at the start of the slot is above the drain floor
-    (``idle_drain_floor_soc``). Slot 0 starts at a known energy: the drain is a constant, cut
-    to the room above the floor as in the simulation (``apply_soc_change``). Later slots get a
-    binary ``idle_drain_off``: it may only be 1 when the start energy lies within one slot's
-    drain of the floor, and then the slot has no drain. Near the floor the plan is thus at most
-    one slot's drain more optimistic than the simulation. Without drain the term is 0 and the
-    model has no extra variables.
-    """
-    drain_kw = idle_drain_kw(bat)
-    capacity = float(bat.get("battery_capacity_kwh") or 0.0)
-    if drain_kw <= 0.0 or capacity <= 0.0:
-        return 0.0
-    drain_kwh = drain_kw * dt_h
-    floor_kwh = idle_drain_floor_soc(bat) / 100.0 * capacity
-    if t == 0:
-        return min(drain_kwh, max(0.0, float(prev_e) - floor_kwh))
-    slug = str(eid).replace("-", "_")
-    off = pulp.LpVariable(f"idle_drain_off_{slug}_{t}", cat=pulp.LpBinary)
-    prob += (
-        prev_e - floor_kwh <= drain_kwh + capacity * (1 - off),
-        f"idle_drain_floor_{slug}_{t}",
-    )
-    return drain_kwh * (1 - off)
 
 
 def _add_slot_power_balance_and_soc(
@@ -361,21 +380,18 @@ def _add_slot_power_balance_and_soc(
         )
         max_ess = max(max_c, max_d)
         delta = grid_vars.delta_charge_by_ess[eid][t]
-        prob += grid_vars.p_charge_by_ess[eid][t] <= max_ess * delta
-        prob += grid_vars.p_discharge_by_ess[eid][t] <= max_ess * (1 - delta)
+        if delta is not None:
+            prob += grid_vars.p_charge_by_ess[eid][t] <= max_ess * delta
+            prob += grid_vars.p_discharge_by_ess[eid][t] <= max_ess * (1 - delta)
         efficiency = float(bat.get("efficiency") or 1.0)
         e_batt = grid_vars.e_batt_by_ess[eid]
         prev_e = e_init_by_ess[eid] if t == 0 else e_batt[t - 1]
-        prob += (
-            e_batt[t]
-            == prev_e
-            + (
-                grid_vars.p_charge_by_ess[eid][t] * efficiency
-                - grid_vars.p_discharge_by_ess[eid][t] / efficiency
-            )
-            * dt_h
-            - _idle_drain_kwh_term(prob, bat, eid, t=t, prev_e=prev_e, dt_h=dt_h)
-        )
+        # The idle drain (Reserve P4) is not in the plan: a few Wh per slot, and the plan is
+        # renewed every cycle from the measured SoC. The simulation keeps it (``apply_soc_change``).
+        prob += e_batt[t] == prev_e + (
+            grid_vars.p_charge_by_ess[eid][t] * efficiency
+            - grid_vars.p_discharge_by_ess[eid][t] / efficiency
+        ) * dt_h
         _add_control_slot_constraints(
             prob,
             bat,
@@ -410,11 +426,12 @@ def _add_slot_power_balance_and_soc(
         + p_charge[t]
         + grid_vars.p_pv_curtail[t]
     )
-    prob += p_grid_buy[t] <= big_m_grid * delta_import[t]
-    sell_upper = big_m_grid
-    if export_cap_kw is not None:
-        sell_upper = min(big_m_grid, max(0.0, float(export_cap_kw)))
-    prob += p_grid_sell[t] <= sell_upper * (1 - delta_import[t])
+    if delta_import[t] is not None:
+        prob += p_grid_buy[t] <= big_m_grid * delta_import[t]
+        sell_upper = big_m_grid
+        if export_cap_kw is not None:
+            sell_upper = min(big_m_grid, max(0.0, float(export_cap_kw)))
+        prob += p_grid_sell[t] <= sell_upper * (1 - delta_import[t])
     if export_cap_kw is not None:
         prob += p_grid_sell[t] <= max(0.0, float(export_cap_kw))
 
@@ -555,6 +572,7 @@ def _build_milp_model(
     current_soc_by_id: dict[str, float] | None = None,
     inverter_params: dict | list[dict] | None = None,
     pv_systems: list[dict] | None = None,
+    fallback_k_push: float | None = None,
 ) -> MilpHorizonModel:
     dt_h = validate_dt_h(dt_h)
     prob = pulp.LpProblem("Energy_Cost_Minimization", pulp.LpMinimize)
@@ -567,6 +585,7 @@ def _build_milp_model(
         fixed_flex_by_t,
         inverter_params=inverter_params,
         pv_systems=pv_systems,
+        fallback_k_push=fallback_k_push,
     )
     consumer_vars = _add_consumer_var_block(
         prob,
@@ -625,3 +644,29 @@ def _build_milp_model(
         ),
     )
 
+
+
+SIMULTANEOUS_FLOW_TOL_KW = 1e-4
+
+
+def simultaneous_flow_slots(model: MilpHorizonModel) -> dict[str, list[int]]:
+    """Slots of a solved plan that buy and sell, or charge and discharge one battery, at once.
+
+    Only possible in slots without the binary (``_exclusivity_slots``); empty lists when the
+    price rule held.
+    """
+    tol = SIMULTANEOUS_FLOW_TOL_KW
+
+    def both(a: pulp.LpVariable, b: pulp.LpVariable) -> bool:
+        return (a.varValue or 0.0) > tol and (b.varValue or 0.0) > tol
+
+    grid = [t for t in range(model.horizon) if both(model.p_grid_buy[t], model.p_grid_sell[t])]
+    battery = sorted(
+        {
+            t
+            for eid in (model.p_charge_by_ess or {})
+            for t in range(model.horizon)
+            if both(model.p_charge_by_ess[eid][t], model.p_discharge_by_ess[eid][t])
+        }
+    )
+    return {"grid": grid, "battery": battery}

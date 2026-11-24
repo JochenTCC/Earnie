@@ -157,21 +157,39 @@ def _drain_vars(battery: dict, soc: float) -> list:
         _matrix([30.0] * 4), soc, battery, 0.0, False, [], *([None] * 9)
     )
     assert solved is not None
-    return [v for v in solved[0].prob.variables() if v.name.startswith("idle_drain_off")]
+    return [v for v in solved[0].prob.variables() if v.name.startswith("idle_drain")]
 
 
-def test_milp_without_drain_has_no_drain_variables():
+def _simulate_plan(schedule: list[dict], soc: float, battery: dict) -> list[float]:
+    """SoC after each slot when the plan's battery power runs through the simulation step."""
+    out = []
+    for slot in schedule:
+        action = slot["milp_plan"]["p_charge"] - slot["milp_plan"]["p_discharge"]
+        soc, _ = bat.apply_soc_change(
+            soc, action, 15.0, 0.95, float(battery["min_soc"]), 100.0, dt_h=DT_H,
+            **bat.idle_drain_kwargs(battery),
+        )
+        out.append(soc)
+    return out
+
+
+# The MILP leaves the drain out (2026-11-24: per-slot binaries pushed the slow production solve
+# into the gap stage); simulation, setpoint and reserve band keep it.
+
+
+def test_milp_has_no_drain_variables_with_or_without_drain():
     assert _drain_vars(BATTERY, 50.0) == []
-    assert len(_drain_vars(DRAINING, 50.0)) == 3  # slot 0 is a constant
+    assert _drain_vars(DRAINING, 50.0) == []
 
 
-def test_milp_idle_battery_loses_the_drain_each_slot():
+def test_milp_idle_plan_holds_its_soc_and_the_simulation_drains_each_slot():
     schedule = _schedule(_matrix([30.0] * 8), 50.0, DRAINING)
     for slot in schedule:
         assert slot["milp_plan"]["p_charge"] <= 1e-6
         assert slot["milp_plan"]["p_discharge"] <= 1e-6
-    socs = [slot["planned_soc_percent"] for slot in schedule]
-    assert socs[-1] == pytest.approx(50.0 - 8 * DRAIN_PCT_PER_SLOT, abs=SOC_TOLERANCE)
+    assert all(slot["planned_soc_percent"] == pytest.approx(50.0) for slot in schedule)
+    simulated = _simulate_plan(schedule, 50.0, DRAINING)
+    assert simulated[-1] == pytest.approx(50.0 - 8 * DRAIN_PCT_PER_SLOT)
 
 
 def test_milp_drain_stops_at_min_soc_without_forced_charge():
@@ -180,12 +198,13 @@ def test_milp_drain_stops_at_min_soc_without_forced_charge():
     assert all(slot["planned_soc_percent"] == pytest.approx(5.0) for slot in schedule)
 
 
-def test_milp_holding_a_reserve_floor_recharges_the_drain():
+def test_milp_holds_a_reserve_floor_without_charging_and_the_simulation_drains_through_it():
     reserved = {**DRAINING, "min_soc": 12.4, VIRTUAL_RESERVE_BASE_MIN_SOC_KEY: 5.0}
     schedule = _schedule(_matrix([30.0] * 8), 12.4, reserved)
-    charged_kwh = sum(slot["milp_plan"]["p_charge"] for slot in schedule) * 0.95 * DT_H
-    assert charged_kwh == pytest.approx(8 * DRAIN_KW * DT_H, rel=1e-3)
+    assert all(slot["milp_plan"]["p_charge"] <= 1e-6 for slot in schedule)
     assert all(slot["planned_soc_percent"] >= 12.4 - SOC_TOLERANCE for slot in schedule)
+    simulated = _simulate_plan(schedule, 12.4, {**reserved, "min_soc": 5.0})
+    assert simulated[-1] == pytest.approx(12.4 - 8 * DRAIN_PCT_PER_SLOT)
 
 
 # --- setpoint from the plan ---------------------------------------------------------------------
