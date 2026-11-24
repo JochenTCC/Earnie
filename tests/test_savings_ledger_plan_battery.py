@@ -14,7 +14,7 @@ import pytest
 import main as main_module
 from optimizer.milp import HORIZON_SCHEDULE_KEY
 from optimizer.run_trigger import TRIGGER_QUARTER_HOUR
-from optimizer.sim_baseline import plan_battery_limits
+from optimizer.sim_baseline import _baseline_battery_params, limited_vendor_step, plan_battery_limits
 from runtime_store import savings_ledger as sl
 from runtime_store import savings_ledger_store as store
 from tests.main_run_harness import patch_main_run
@@ -139,6 +139,25 @@ def test_plan_battery_limits_of_several_batteries_are_the_plant_battery():
     plant = plan_battery_limits([first, second])
     assert plant["max_charge_power_kw"] == pytest.approx(3.0)
     assert plant["max_discharge_power_kw"] == pytest.approx(1.5)
+    # The floor is a share of the first battery's 10 kWh: 2.5 kWh held there plus the second
+    # battery's 1 kWh min_soc, over the 20 kWh plant (not 25 % of the plant).
+    assert plant[FLOOR] == pytest.approx(17.5)
+    without_reserve = {k: v for k, v in first.items() if k != FLOOR}
+    assert FLOOR not in plan_battery_limits([without_reserve, second])
+
+
+def test_baseline_plant_battery_holds_only_the_reserve_batterys_floor():
+    """A 10 kWh floor 50 % + B 10 kWh min 10 %: the plant holds 5 + 1 = 6 kWh (30 %), not 10."""
+    reserve = {**BATTERY, "id": "a", FLOOR: 50.0}
+    other = {**BATTERY, "id": "b"}
+    plant = _baseline_battery_params([reserve, other])
+
+    assert plant["battery_capacity_kwh"] == pytest.approx(20.0)
+    assert plant[FLOOR] == pytest.approx(30.0)
+    soc = 40.0
+    for _ in range(8):
+        soc, _kw = limited_vendor_step(soc, -4.0, plant, dt_h=DT)
+    assert soc == pytest.approx(30.0)
 
 
 def test_main_logs_the_plan_battery_limits_for_the_ledger(monkeypatch):

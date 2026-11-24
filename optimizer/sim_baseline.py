@@ -78,7 +78,39 @@ def _baseline_battery_params(
             return batteries[0]
     from optimizer.sim_horizon_chart_soc import house_balance_batteries
 
-    return plant_battery_params(house_balance_batteries(batteries))
+    house = house_balance_batteries(batteries)
+    return _with_plant_reserve_floor(plant_battery_params(house), house)
+
+
+def _with_plant_reserve_floor(plant: dict, house: list[dict]) -> dict:
+    """``plant`` with the virtual reserve floor as a share of the plant capacity.
+
+    ``plant_battery_params`` keeps the first battery's ``_virtual_reserve_floor_soc``, a share
+    of that battery's capacity (``powerstation_reserve._set_reserve_floor``); as ``min_soc`` of
+    the plant battery (``limited_vendor_step``) it would hold far too much energy. The plant's
+    floor is the energy the batteries hold: the floor of a battery with a reserve, the
+    ``min_soc`` of the others, over the plant capacity. The MILP holds only the primary
+    battery's floor (``milp_horizon._apply_reserve_price_floor``), so this is the same energy.
+    Without a reserve on any house battery the plant has no floor.
+    """
+    from optimizer.reserve_price_floor import FLOOR_SOC_KEY
+
+    if len(house) < 2:
+        return plant
+    if not any(FLOOR_SOC_KEY in b for b in house):
+        plant.pop(FLOOR_SOC_KEY, None)
+        return plant
+    capacity = float(plant["battery_capacity_kwh"])
+    if capacity <= 0.0:
+        raise ValueError("Baseline plant battery: the house batteries have no capacity.")
+    held_kwh = 0.0
+    for battery in house:
+        floor = float(battery["min_soc"])
+        if FLOOR_SOC_KEY in battery:
+            floor = max(floor, float(battery[FLOOR_SOC_KEY]))
+        held_kwh += floor / 100.0 * float(battery.get("battery_capacity_kwh") or 0.0)
+    plant[FLOOR_SOC_KEY] = held_kwh / capacity * 100.0
+    return plant
 
 
 # Keys of the plan's battery that bind the vendor step (``limited_vendor_step``): live power
