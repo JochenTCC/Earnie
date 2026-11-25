@@ -22,19 +22,16 @@ Dev-Image bauen und per SSH auf die NAS laden (VS-Code-Tasks und einmalige Einri
 
 ## Compose-Stacks
 
-Jeder Stack hat **einen** Service (Streamlit + Auto-Start von `main.py` via `EARNIE_AUTO_START_MAIN=1`). Prod und Alpha sind **getrennte Compose-Dateien** (nicht parallel im selben File).
+Jeder Stack hat **einen** Service (Streamlit + Auto-Start von `main.py` via `EARNIE_AUTO_START_MAIN=1`). Vorabversionen laufen über dieselbe Produktiv-Compose mit dem Image-Tag `:next` statt `:latest`.
 
-Immer vom **Repo-Root** mit `--project-directory .`, damit Volume-Pfade (`./earnie_env/…`, `./earnie_env_alpha/…`, `./greenfield/…`) korrekt aufgelöst werden:
+Immer vom **Repo-Root** mit `--project-directory .`, damit Volume-Pfade (`./earnie_env/…`, `./greenfield/…`) korrekt aufgelöst werden:
 
 | Stack | Datei | Host-Port (UI) | Volumes |
 |-------|-------|----------------|---------|
 | Lokaler Dev | `docker/compose/dev.yml` | 8521 → 8501 | `earnie_env/` |
 | Synology (Prod) | `docker/compose/synology_productive.yml` | 8501 | `earnie_env/` |
-| Synology (Alpha) | `docker/compose/synology-alpha.yml` | 8511 → 8501 | `earnie_env_alpha/` |
 | LoxBerry (Prod) | `docker/compose/loxberry_productive.yml` | 8501 | `earnie_env/` |
-| LoxBerry (Alpha) | `docker/compose/loxberry-alpha.yml` | 8511 → 8501 | `earnie_env_alpha/` |
 | Proxmox LXC (Prod) | `docker/compose/proxmox_productive.yml` | 8501 | `earnie_env/` |
-| Proxmox LXC (Alpha) | `docker/compose/proxmox-alpha.yml` | 8511 → 8501 | `earnie_env_alpha/` |
 | Greenfield | `docker/compose/greenfield.yml` | 8502 → 8501 | `greenfield/` |
 
 UsagePing **receiver** (private, not in this repo): GitHub `JochenTCC/earnie-server` · client contract: [`docs/workflow/usage-ping.md`](../docs/workflow/usage-ping.md)
@@ -52,9 +49,6 @@ docker compose --project-directory . -f docker/compose/dev.yml up -d --build
 docker compose --project-directory . -f docker/compose/greenfield.yml up -d --build
 docker compose --project-directory . -f docker/compose/synology_productive.yml pull
 docker compose --project-directory . -f docker/compose/synology_productive.yml up -d
-# Alpha parallel (Image-Tag in der YAML pinnen; eigener Projektname earnie-alpha):
-docker compose --project-directory . -f docker/compose/synology-alpha.yml pull
-docker compose --project-directory . -f docker/compose/synology-alpha.yml up -d
 ```
 
 Ausführliche Anleitung: [`docs/einrichtung/container.md`](../docs/einrichtung/container.md)

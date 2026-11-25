@@ -2,6 +2,10 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Alpha compose variant retired (2026-11-25)
+
+- [x] **Alpha compose variant retired** `[infra]` *(decided 2026-11-25, maintainer)*: there is only a development variant (a `-dev` image loaded on the NAS over SSH into `earnie-productive`) and a release variant (`:latest`, or `:next` / `:<version>` for pre-releases) in the same `*_productive.yml`. Removed `docker/compose/{synology,loxberry,proxmox}-alpha.yml` (port 8511/8551; they mounted `./earnie_env/` although docs and comments promised separate `./earnie_env_alpha/` volumes), the "Alpha compose sync" duty in skill/rule `session-abschluss`, `release-checklist.md` and `branching-hotfix-playbook.md`, and the Alpha passages in `container.md`, `proxmox-lxc.md`, `docker/README.md`, `docs/dev/streamlit-ports.md` and `.gitignore`. Found in the docs review for 2.8.0-beta.1.
+
 ### Docs review for 2.8.0-beta.1: unchanged docs and group A (2026-11-25)
 
 - [x] **Docs review of the user docs changed since 2.7 (part 1)** `[docs]`: maintainer review together in chat of the documents unchanged since 2.7 (`docs/README.md`, LoxBerry, Proxmox, VMware `vctl`, heat storage T_eq, OeMAG) and group A (handbook, `charts.md`, `betriebsmodi.md`, `preise.md`, `batterie-pv.md`, `flexible-verbraucher.md`, `betrieb.md`, `overview.md`), each statement checked against the code. Wrong facts fixed (e.g. `chart_color_index` not in `config.json`, daily target in the house profile, Sankey flex nodes also on Home Assistant, aWATTar fallback in backtesting, grid base fee counted in the SE, production compose UI modes, `battery_ids`, Sicherheitsmarge), tariffs set up in the UI instead of editing `tariffs.json`, "Standard-Regeln" / `rule_reference` removed from the user docs and kept in `docs/dev/rule-based-reference.md` § 9. New rule in `.cursor/rules/german-user-docs.mdc`: user docs describe the current state only, no history and no announcements; links into `docs/dev/` are marked.

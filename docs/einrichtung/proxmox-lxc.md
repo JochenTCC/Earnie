@@ -3,7 +3,6 @@
 Diese Anleitung beschreibt den Betrieb von Earnie auf einem **Proxmox VE**-Host in einem **unprivileged LXC** mit Docker Compose. Image und Persistenz sind dieselben wie bei Synology und LoxBerry (`earnie_env/config/`, `earnie_env/runtime/`, UI-Port **8501**).
 
 **Compose (Produktivbetrieb):** [`docker/compose/proxmox_productive.yml`](../../docker/compose/proxmox_productive.yml)  
-**Compose (Alpha, Port 8511):** [`docker/compose/proxmox-alpha.yml`](../../docker/compose/proxmox-alpha.yml)  
 **LXC-Hilfen:** [`docker/proxmox/`](../../docker/proxmox/)  
 **Ports:** [streamlit-ports.md](../dev/streamlit-ports.md)  
 **Allgemeiner Container-Betrieb:** [container.md](container.md)

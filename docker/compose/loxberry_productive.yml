@@ -24,7 +24,6 @@
 #   docker compose --project-directory . -f docker/compose/loxberry_productive.yml pull
 #   docker compose --project-directory . -f docker/compose/loxberry_productive.yml up -d
 #
-# Community Pre-release parallel: docker/compose/loxberry-alpha.yml (Port 8511, earnie_env_alpha/).
 #
 # UI: EARNIE_UI_MODES=sunset2sunset,scenario_explorer,live_environment (Prod); Dev ohne Variable = Standard-Modi.
 # UI im LAN: http://<loxberry-ip>:8501 (kein DSM Reverse Proxy – extern nur mit eigenem Proxy/VPN).

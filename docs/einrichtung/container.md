@@ -125,25 +125,7 @@ Ein Release kann auch nur für einen Kanal erscheinen (manueller Start mit `targ
 
 **Vorabversionen (Community-Test):** Ein Tag `vX.Y.Z-alpha.N`, `vX.Y.Z-beta.N` bzw. `vX.Y.Z-rc.N` (ebenfalls passend zu `version.py`) durchläuft denselben Ablauf. Zuerst entsteht der Kandidat `:<version>`, nach `promote` zusätzlich `:next` und ein GitHub **Pre-release**, jedoch **kein** `:latest`.
 
-Zum Testen entweder `:next` verwenden (nach Freigabe) oder den Versions-Tag aus der Alpha-Compose pinnen (aktuell in den Dateien: `2.7.0-alpha.9`). Der Pin wird erst mit der nächsten Vorabversion aktualisiert und kann daher älter sein als die letzte offizielle Version. Die produktiven Compose-Dateien (`*_productive.yml`) mit `:latest` bleiben auf der letzten offiziellen Version.
-
-### Alpha parallel zur Produktion (Port 8511)
-
-Für die Alpha gibt es eigene Compose-Dateien, getrennt von der Prod-YAML: `docker/compose/synology-alpha.yml`, `loxberry-alpha.yml`, `proxmox-alpha.yml`.
-
-- **Container:** `earnie-alpha`, Host-Port **8511**, Volumes unter `./earnie_env_alpha/`.
-- **Compose-Projektname:** `earnie-alpha`; er kollidiert nicht mit dem Prod-Projekt `earnie-productive`.
-- **Image-Tag:** in der YAML an die gewünschte Pre-release anpassen (aktuell in den Dateien: `2.7.0-alpha.9`).
-
-```powershell
-mkdir -p earnie_env_alpha/config earnie_env_alpha/runtime
-docker compose --project-directory . -f docker/compose/synology-alpha.yml pull
-docker compose --project-directory . -f docker/compose/synology-alpha.yml up -d
-```
-
-UI: `http://<host>:8511`. Ports: [streamlit-ports.md](../dev/streamlit-ports.md).
-
-> **Hinweis:** Zwei Optimierer-Dienste dürfen nicht gleichzeitig mit Schreibzugriff auf denselben Miniserver laufen, außer mit Silent-Mode oder nach Absprache.
+Zum Testen einer Vorabversion in der Compose-Datei (`*_productive.yml`) `image:` von `:latest` auf `:next` oder auf den Versions-Tag `:<version>` stellen und den Container neu erstellen. Zurück zur offiziellen Version geht es mit `:latest`; hat die Vorabversion die Konfiguration migriert, vorher das Backup zurückkopieren (siehe [Update und Migration](betrieb.md#update-und-migration)).
 
 ### Einmaliges buildx-Setup (Entwicklungsrechner)
 

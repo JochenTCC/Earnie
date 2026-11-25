@@ -28,7 +28,6 @@
 #   docker compose --project-directory . -f docker/compose/proxmox_productive.yml pull
 #   docker compose --project-directory . -f docker/compose/proxmox_productive.yml up -d
 #
-# Community Pre-release parallel: docker/compose/proxmox-alpha.yml (Port 8511, earnie_env_alpha/).
 #
 # UI im LAN: http://<lxc-ip>:8501 (extern nur mit eigenem Proxy/VPN).
 

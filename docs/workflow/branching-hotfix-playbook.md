@@ -17,7 +17,7 @@ Related: [DEVELOPER.md](../../DEVELOPER.md) (tag → GHCR), [CONTRIBUTING.md](..
 | **Annotated tags** (`vX.Y.Z`, `vX.Y.Z-alpha.N` / `-beta.N` / `-rc.N`; `vX.Y.Z-dev.N` for dev builds: candidate image only, never promoted, no release notes) | Immutable shipped builds. Tag must equal `version.py` (no leading `v`). While a release branch is open for that MINOR, cut its tags from that branch, not from a diverged `main`. |
 | **Short-lived `hotfix/…`** | Only when users need a build **now** from an older tag and even the release branch must not ship as-is (rare). |
 
-There is **no** permanent `develop` or `alpha` branch. Pre-release is a **version channel** (`version.py` + tag + `*-alpha.yml` pins) on the active ship line (the release branch once opened, otherwise `main`).
+There is **no** permanent `develop` or `alpha` branch. Pre-release is a **version channel** (`version.py` + tag; Docker `:next` after `promote`) on the active ship line (the release branch once opened, otherwise `main`).
 
 ### Branch naming
 
@@ -127,7 +127,7 @@ Use when both are true:
 
 ```text
 git checkout -b hotfix/<short-name> <base-tag>
-# fix + tests only; D: bump version.py; sync *-alpha.yml if pre-release
+# fix + tests only; D: bump version.py
 # tag from hotfix tip → B or C
 # cherry-pick into release/… and (as a separate cherry-pick) onto a branch from main → PR
 ```
@@ -161,7 +161,6 @@ Rules that matter for branching:
 - Tag only when `version.py` on the tagged commit equals the tag without `v`.
 - While a release branch owns that MINOR, cut its tags from that branch.
 - After an alpha/beta/rc tag, leave that string on the ship line until the next approved bump.
-- Before **B**: `synology-alpha.yml` / `loxberry-alpha.yml` / `proxmox-alpha.yml` must pin `ghcr.io/jochentcc/earnie-energy:<version.py>`.
 - **B** and **C** are two-step: the tag builds a *candidate*; users see it only after approving job `promote` ([release-checklist.md](release-checklist.md)). A rejected candidate is not re-tagged; fix and tag the next version.
 
 ---
@@ -172,10 +171,9 @@ Rules that matter for branching:
 2. Prefer the open **`release/…`** branch for that product MINOR; otherwise `main`. Use `hotfix/…` only for Case 4/5.
 3. Ship **only** the fix (+ tests).
 4. Get approval for the new `version.py` string (**D**).
-5. If pre-release: sync all three `*-alpha.yml` image lines.
-6. Open a **PR to `main`** (or cherry-pick) so the fix is not lost. Align `version.py` on `main` only when that string is the next intended publish there.
-7. Push; annotated tag with `targets: both|docker|ha` → CI; test candidate; approve `promote`.
-8. Delete any short-lived hotfix branch; backlog → **Verifications Pending** until live OK.
+5. Open a **PR to `main`** (or cherry-pick) so the fix is not lost. Align `version.py` on `main` only when that string is the next intended publish there.
+6. Push; annotated tag with `targets: both|docker|ha` → CI; test candidate; approve `promote`.
+7. Delete any short-lived hotfix branch; backlog → **Verifications Pending** until live OK.
 
 ---
 

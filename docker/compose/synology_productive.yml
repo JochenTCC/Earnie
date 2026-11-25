@@ -24,7 +24,6 @@
 #   docker compose --project-directory . -f docker/compose/synology_productive.yml pull
 #   docker compose --project-directory . -f docker/compose/synology_productive.yml up -d
 #
-# Community Pre-release parallel: docker/compose/synology-alpha.yml (Port 8511, earnie_env_alpha/).
 #
 # Auf der NAS liegt die Datei oft als compose.yaml — Inhalt aus diesem File übernehmen.
 #

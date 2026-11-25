@@ -33,7 +33,6 @@ Re-create the dev add-on after larger wrapper changes (`run.sh`, `config.yaml` o
 ### 1. Prepare
 
 - [ ] `version.py` bump approved and on the ship line (`origin/release/x.y` while that line is open, otherwise `origin/main`) (tag = `version.py` without `v`)
-- [ ] Pre-release: `docker/compose/{synology,loxberry,proxmox}-alpha.yml` pin `ghcr.io/jochentcc/earnie-energy:<version>`
 - [ ] Release notes: AI draft via skill `release-notes` (`python -m scripts.release_notes_collect` writes the evidence pack, the AI writes `.github/release-notes/drafts/v<version>.draft.md`), **maintainer review**, then `python -m scripts.release_notes_finalize --version <version> --approved` → `v<version>.md` (committed **before** the tag). Workflow: [release-notes-workflow.md](release-notes-workflow.md). Not for `-dev` versions
 - [ ] Items from `.github/release-notes/UNRELEASED.md` appear in the draft (breaking / user-action items near the top); finalize resets `UNRELEASED.md` for official releases
 - [ ] **Migration section (when the registry gained steps):** if `runtime_store/migration/` added `MigrationStep`s since the previous published tag, the release notes **must** include a German **`## Migration`** section (what changes, wizard questions, that manual to-dos are computed at migrate time, backup under `config/backups/pre-migration-dm…`, no automated downgrade — restore backup by hand). Draft: `python -m scripts.migration_release_notes --since <previous-tag>` (paste into the notes; edit for clarity). Spec: [config-migration.md](config-migration.md). If the helper reports no new steps, omit the section.
@@ -74,7 +73,7 @@ Re-create the dev add-on after larger wrapper changes (`run.sh`, `config.yaml` o
 
 **Synology (maintainer productive stack)**
 
-In-place pin on the live `earnie-productive` compose (NAS project folder; often `compose.yaml` from `docker/compose/synology_productive.yml`). Candidate images exist as `:<version>` before approval — do **not** use `:next` / `:latest` yet. Do **not** run `earnie-alpha` in parallel if both would write to the same Miniserver / backend.
+In-place pin on the live `earnie-productive` compose (NAS project folder; often `compose.yaml` from `docker/compose/synology_productive.yml`). Candidate images exist as `:<version>` before approval — do **not** use `:next` / `:latest` yet.
 
 - [ ] Set `image:` to `ghcr.io/jochentcc/earnie-energy:<version>` (replace `:latest`)
 - [ ] `docker compose --project-directory . -f compose.yaml pull` then `up -d` (adjust `-f` if the file name differs)

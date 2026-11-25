@@ -11,7 +11,6 @@ description: >-
   before any tag (GitHub Actions → GHCR + GitHub Release; local Docker push as fallback).
   A tag only builds a release candidate; the user tests it on the target platform and
   approves job promote (environment release-approval) before anything reaches users.
-  On version bump / pre-release publish, sync docker/compose/*-alpha.yml image tags to version.py.
   After the release is approved (B or C), reset branch streamlitcloud to that release tag and push.
   Use for "end session", "backlog sync", "commit and push", or an explicit request to conclude the session.
 ---
@@ -183,41 +182,9 @@ and attach the report (release checklist §1). Private regression repo: <clean+p
 3. If `version.py` is already a pre-release and the user wants community test: recommend **B** (tag as-is), not a silent bump.
 4. If mid MINOR backlog cycle and community test is desired: recommend **D** then **B** with target `X.Y.Z-alpha.N` of the *upcoming* release — not a PATCH on the last official.
 5. Never bump `version.py` or push a tag until the user picks a letter (or equivalent clear wording: “publish alpha”, “official release”, “skip”).
-6. After **D**: propose exact string → wait → edit `version.py` → **run Alpha compose sync** (below) when the new string is a pre-release → commit (include synced YAML) → push → re-show the guide with the new `version.py` → user picks **B** or **C** (or **A**).
-7. Before **B**: **run Alpha compose sync** (or verify already matching). Do not tag until the three `*-alpha.yml` files pin `version.py`.
-8. **Release notes (B / C):** if `.github/release-notes/v<version>.md` does not exist, the next step is skill `release-notes` (draft → maintainer review), **before** any tag. Never write the final file from an unreviewed draft. For `-dev` versions and choice **A**: no release notes.
-9. **Regression warning (soft, never blocks):** scan `## Bugfix Verifications Pending` in `backlog/Backlog-Bugfixes.md` for case IDs matching `REG-\d+-`. If any is cited and `Earnie-regression-private` is **missing**, **dirty** (`git status --porcelain` non-empty) or **unpushed** (ahead of / no upstream), add a visible warning to the guide, e.g. “⚠ REG-142-eauto-deadline cited, private repo has uncommitted changes — the regression report only records the private `HEAD` SHA, so the release gate would not see this golden.” Fill in the live state; otherwise show “clean+pushed @ <short SHA>”. The user may still pick any letter (hard gate only with Regression P3).
-
----
-
-## Alpha compose sync (`version.py` → `*-alpha.yml`)
-
-Keep community Alpha stacks pointing at the current pre-release image.
-
-**Files (always all three):**
-
-- `docker/compose/synology-alpha.yml`
-- `docker/compose/loxberry-alpha.yml`
-- `docker/compose/proxmox-alpha.yml`
-
-**When to run**
-
-| Trigger | Action |
-|---------|--------|
-| **D** bump — new `version.py` contains `-` (alpha/beta/rc) | Set each file’s `image:` to `ghcr.io/jochentcc/earnie-energy:<version.py>` |
-| **D** bump — new `version.py` is clean `X.Y.Z` (official) | **Do not** change alpha compose (leave last pre-release pin); `*_productive.yml` stay on `:latest` |
-| Before **B** publish | Verify all three `image:` lines equal `ghcr.io/jochentcc/earnie-energy:<version.py>`; if not, sync, then commit + push before tagging |
-| **C** / **A** | No alpha compose edit required |
-
-**How**
-
-1. Read `__version__` from `version.py` (no `v` prefix).
-2. Replace the image line in each alpha compose file with exactly:  
-   `image: ghcr.io/jochentcc/earnie-energy:<version>`  
-   (preserve indentation; only change the tag after the last `:`).
-3. If `docs/einrichtung/container.md` (or similar) hardcodes an example pre-release tag for Alpha, update that example to the same `<version>` in the same change set.
-4. Include the synced files in the **same commit** as the `version.py` bump when doing **D**; for a late fix before **B**, a small follow-up commit is OK.
-5. Never point alpha compose at `:latest`. Never edit `*_productive.yml` image tags in this sync (they stay `:latest`).
+6. After **D**: propose exact string → wait → edit `version.py` → commit → push → re-show the guide with the new `version.py` → user picks **B** or **C** (or **A**).
+7. **Release notes (B / C):** if `.github/release-notes/v<version>.md` does not exist, the next step is skill `release-notes` (draft → maintainer review), **before** any tag. Never write the final file from an unreviewed draft. For `-dev` versions and choice **A**: no release notes.
+8. **Regression warning (soft, never blocks):** scan `## Bugfix Verifications Pending` in `backlog/Backlog-Bugfixes.md` for case IDs matching `REG-\d+-`. If any is cited and `Earnie-regression-private` is **missing**, **dirty** (`git status --porcelain` non-empty) or **unpushed** (ahead of / no upstream), add a visible warning to the guide, e.g. “⚠ REG-142-eauto-deadline cited, private repo has uncommitted changes — the regression report only records the private `HEAD` SHA, so the release gate would not see this golden.” Fill in the live state; otherwise show “clean+pushed @ <short SHA>”. The user may still pick any letter (hard gate only with Regression P3).
 
 ---
 
@@ -229,7 +196,6 @@ Start **only** on explicit **B** / **C** / “publish alpha” / “official rel
 
 - [ ] `version.py` on `origin/main` equals the intended tag without `v`
 - [ ] Channel correct: `-` in version → pre-release (**B**); clean `X.Y.Z` → official (**C**)
-- [ ] **If B:** all three `docker/compose/*-alpha.yml` have `image: ghcr.io/jochentcc/earnie-energy:<version.py>`
 - [ ] **Reviewed** release notes exist: `.github/release-notes/v<version>.md`, produced via skill `release-notes` (draft → maintainer review → `release_notes_finalize`). No generic default notes; **no notes and no tag for `-dev` versions**
 - [ ] If `runtime_store/migration/` gained steps since the previous tag: notes include `## Migration` (draft via `python -m scripts.migration_release_notes --since <tag>`) — see `docs/workflow/release-checklist.md` §1
 - [ ] HA Änderungsprotokoll: first prose line of those notes is user-facing (German, no pin/`latest` jargon) — see `docs/workflow/release-checklist.md` §1
@@ -244,8 +210,6 @@ Start **only** on explicit **B** / **C** / “publish alpha” / “official rel
 Read `version.py`. **Never change without explicit user approval** (see `versioning.mdc`).
 
 Prefer publishing from the ship line: `release/x.y` (or `release/<product>/x.y` on multi-product side repos) once the planned MINOR was moved there (official near + development continues on `main`; see `branching-hotfix-playbook.md`), otherwise `main`. After an alpha/beta/rc tag, leave that pre-release string on the ship line until the next approved bump — do **not** bump back to the previous official version. Port release-line fixes to `main` via PR when appropriate.
-
-If publishing **B** and alpha compose is out of date: run **Alpha compose sync**, commit, push, then continue.
 
 ### 2. Primary: push version tag (CI)
 
@@ -324,9 +288,7 @@ Report twice: after the tag push (candidate built, §2a instructions, approval p
 - Channel + `version.py` value
 - `streamlitcloud` reset to the release tag (or note if skipped/failed)
 - **If B (pre-release):**
-  - Testers: `docker compose --project-directory . -f docker/compose/<host>-alpha.yml pull` then `up -d`  
-    (Synology / LoxBerry / Proxmox: `synology-alpha.yml` / `loxberry-alpha.yml` / `proxmox-alpha.yml` — already pin `:<version>`)
-  - Or pin manually: `ghcr.io/jochentcc/earnie-energy:<version>`
+  - Testers: after `promote`, set `image:` in their `*_productive.yml` to `:next`, or pin `ghcr.io/jochentcc/earnie-energy:<version>`; LoxBerry plugin channel `prerelease`, HA add-on „Earnie (Vorabversion)“
   - Prod `*_productive.yml` with `:latest` is unchanged — last official
 - **If C (official):** deploy with usual compose pull of `:latest` or `:<version>`
   - Synology / LoxBerry / Proxmox: `docker compose --project-directory . -f docker/compose/<host>_productive.yml pull` then `up -d`
