@@ -4,6 +4,10 @@
 binaries only where prices need them; ``optimizer.milp_model`` logs a warning when a solved
 plan still runs opposite flows in one slot. In the test suite such a plan fails the test
 (autouse fixture in ``tests/conftest.py``), so a case the exclusivity rule missed shows up.
+
+Limit: the guard swaps the function in the test process only. Solves in worker processes
+(``ProcessPoolExecutor``, e.g. backtesting with more than one worker) run the original check
+and are not covered.
 """
 from __future__ import annotations
 

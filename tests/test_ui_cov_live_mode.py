@@ -120,8 +120,8 @@ def test_no_plan_snapshot_drops_the_old_plan_and_chart1_says_so(fake_st, monkeyp
     assert live_mode.SESSION_LIVE_NO_PLAN not in fake_st.session_state
 
 
-def test_failed_forecast_snapshot_says_plan_sent_not_automatik(fake_st, monkeypatch) -> None:
-    """Plan sent, chart simulation failed: Chart 1 drops the old plan and names that cause."""
+def test_failed_forecast_snapshot_names_the_failure_not_automatik(fake_st, monkeypatch) -> None:
+    """Plan computed, chart simulation failed: Chart 1 drops the old plan and names that cause."""
     from runtime_store.live_optimization_debug import (
         NO_PLAN_FORECAST_FAILED,
         build_no_plan_payload,
@@ -140,8 +140,19 @@ def test_failed_forecast_snapshot_says_plan_sent_not_automatik(fake_st, monkeypa
     assert SESSION_LIVE_DISPLAY_BUNDLE not in fake_st.session_state
     live_mode._live_optimization_chart1_fragment.__wrapped__(50.0)
     assert len(infos) == 1
-    assert "Plan gesendet, Anzeige fehlgeschlagen" in infos[0]
+    assert "Plan berechnet, Anzeige fehlgeschlagen" in infos[0]
     assert "Automatik" not in infos[0]
+
+
+def test_failed_forecast_notice_names_both_log_lines_and_claims_no_send() -> None:
+    """Review 2026-11-25: the reason covers a failed forecast and a failed snapshot build, so
+    the notice names both log lines; in silent mode or after failed writes nothing was sent."""
+    from runtime_store.live_optimization_debug import NO_PLAN_FORECAST_FAILED
+
+    notice = live_mode._no_plan_notice(NO_PLAN_FORECAST_FAILED)
+    assert "Einsparungs-Prognose konnte nicht berechnet werden" in notice
+    assert "Snapshot konnte nicht gespeichert werden" in notice
+    assert "gesendet" not in notice
 
 
 def test_unknown_no_plan_reason_is_named_not_taken_as_automatik() -> None:

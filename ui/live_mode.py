@@ -54,10 +54,11 @@ NO_PLAN_NOTICE = (
     "und keine Ersparnis-Prognose."
 )
 NO_PLAN_FORECAST_FAILED_NOTICE = (
-    f"Chart 1: **{NO_PLAN_FORECAST_FAILED_LABEL}** — der letzte main.py-Lauf hat seinen "
-    "Plan an die Anlage gesendet, aber Chart 1 und die Ersparnis-Prognose konnten nicht "
-    "berechnet werden (Ursache im Log: „Einsparungs-Prognose konnte nicht berechnet "
-    "werden“). Der Plan des vorherigen Laufs wird nicht angezeigt."
+    f"Chart 1: **{NO_PLAN_FORECAST_FAILED_LABEL}** — der letzte main.py-Lauf hat einen "
+    "Plan berechnet, aber Chart 1 und die Ersparnis-Prognose dazu konnten nicht erstellt "
+    "werden (Ursache im Log: „Einsparungs-Prognose konnte nicht berechnet werden“ oder "
+    "„Snapshot konnte nicht gespeichert werden“). Der Plan des vorherigen Laufs wird nicht "
+    "angezeigt."
 )
 
 

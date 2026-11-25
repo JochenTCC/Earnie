@@ -198,10 +198,11 @@ def build_debug_payload(
 # there is no plan to show (no chart rows, no forecast; no replacement solve).
 NO_PLAN_AUTOMATIK = "automatik"
 NO_PLAN_LABEL = "kein Plan (Automatik)"
-# The cycle sent a plan, but the chart / forecast simulation of it failed: no chart rows to
-# show, and the previous cycle's plan must not stand in for it.
+# The cycle computed a plan, but its forecast simulation or display snapshot failed: no chart
+# rows to show, and the previous cycle's plan must not stand in for it. The label does not
+# say "sent": in silent mode or after failed writes nothing reached the plant.
 NO_PLAN_FORECAST_FAILED = "forecast_failed"
-NO_PLAN_FORECAST_FAILED_LABEL = "Plan gesendet, Anzeige fehlgeschlagen"
+NO_PLAN_FORECAST_FAILED_LABEL = "Plan berechnet, Anzeige fehlgeschlagen"
 
 
 def build_no_plan_payload(
