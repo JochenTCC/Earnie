@@ -7,7 +7,13 @@ import pandas as pd
 from data import consumer_targets, live_consumption, profile_manager
 from data.edibert_live_market import fetch_live_day_ahead_prices
 from runtime_store import main_daemon, run_state, savings_ledger_store
-from runtime_store.live_optimization_debug import NO_PLAN_LABEL, snapshot_no_plan
+from runtime_store.live_optimization_debug import (
+    NO_PLAN_AUTOMATIK,
+    NO_PLAN_FORECAST_FAILED,
+    NO_PLAN_FORECAST_FAILED_LABEL,
+    NO_PLAN_LABEL,
+    snapshot_no_plan,
+)
 from runtime_store.live_display_loader import (
     load_live_display_snapshot,
     snapshot_completed_at,
@@ -40,13 +46,31 @@ from ui.simulation_results import (
 
 SESSION_OPT_IN_SIMULATION = "live_opt_in_simulation_confirmed"
 SESSION_SNAPSHOT_CACHE_KEY = "live_display_snapshot_cache_key"
-# Set while the last main.py cycle had no plan (Automatik fallback): Chart 1 says so.
+# Reason (``NO_PLAN_*``) while the last main.py cycle has no chart plan: Chart 1 says so.
 SESSION_LIVE_NO_PLAN = "live_display_no_plan"
 NO_PLAN_NOTICE = (
     f"Chart 1: **{NO_PLAN_LABEL}** — der letzte main.py-Lauf fand keinen optimalen Plan "
     "und hat die Batterie auf Automatik gestellt. Es gibt für diesen Lauf keinen Plan "
     "und keine Ersparnis-Prognose."
 )
+NO_PLAN_FORECAST_FAILED_NOTICE = (
+    f"Chart 1: **{NO_PLAN_FORECAST_FAILED_LABEL}** — der letzte main.py-Lauf hat seinen "
+    "Plan an die Anlage gesendet, aber Chart 1 und die Ersparnis-Prognose konnten nicht "
+    "berechnet werden (Ursache im Log: „Einsparungs-Prognose konnte nicht berechnet "
+    "werden“). Der Plan des vorherigen Laufs wird nicht angezeigt."
+)
+
+
+def _no_plan_notice(reason: str) -> str:
+    if reason == NO_PLAN_FORECAST_FAILED:
+        return NO_PLAN_FORECAST_FAILED_NOTICE
+    if reason == NO_PLAN_AUTOMATIK:
+        return NO_PLAN_NOTICE
+    # A reason this page does not know: name it instead of guessing a cause.
+    return (
+        f"Chart 1: **kein Plan** — der letzte main.py-Lauf meldet den unbekannten Grund "
+        f"„{reason}“. Es gibt für diesen Lauf keinen Plan und keine Ersparnis-Prognose."
+    )
 
 
 def _render_main_py_sync_notice(
@@ -88,9 +112,10 @@ def _snapshot_cache_key(
 
 
 def _store_bundle_from_snapshot(snapshot: dict) -> bool:
-    if snapshot_no_plan(snapshot):
+    no_plan = snapshot_no_plan(snapshot)
+    if no_plan:
         st.session_state.pop(SESSION_LIVE_DISPLAY_BUNDLE, None)
-        st.session_state[SESSION_LIVE_NO_PLAN] = True
+        st.session_state[SESSION_LIVE_NO_PLAN] = no_plan
         return True
     st.session_state.pop(SESSION_LIVE_NO_PLAN, None)
     bundle = build_optimization_display_bundle_from_snapshot(
@@ -453,8 +478,9 @@ def _live_optimization_prepare_fragment(current_soc: float) -> None:
 @st.fragment(run_every=CHARTS_FRAGMENT_RUN_EVERY)
 def _live_optimization_chart1_fragment(current_soc: float) -> None:
     bundle = st.session_state.get(SESSION_LIVE_DISPLAY_BUNDLE)
-    if bundle is None and st.session_state.get(SESSION_LIVE_NO_PLAN):
-        st.info(NO_PLAN_NOTICE)
+    no_plan = st.session_state.get(SESSION_LIVE_NO_PLAN)
+    if bundle is None and no_plan:
+        st.info(_no_plan_notice(str(no_plan)))
     if bundle is not None:
         render_optimization_chart1(bundle)
         remember_live_soc(current_soc)

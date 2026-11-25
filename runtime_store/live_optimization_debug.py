@@ -198,6 +198,10 @@ def build_debug_payload(
 # there is no plan to show (no chart rows, no forecast; no replacement solve).
 NO_PLAN_AUTOMATIK = "automatik"
 NO_PLAN_LABEL = "kein Plan (Automatik)"
+# The cycle sent a plan, but the chart / forecast simulation of it failed: no chart rows to
+# show, and the previous cycle's plan must not stand in for it.
+NO_PLAN_FORECAST_FAILED = "forecast_failed"
+NO_PLAN_FORECAST_FAILED_LABEL = "Plan gesendet, Anzeige fehlgeschlagen"
 
 
 def build_no_plan_payload(
@@ -242,7 +246,7 @@ def build_no_plan_payload(
 
 
 def snapshot_no_plan(snapshot: dict[str, Any] | None) -> str | None:
-    """Reason the snapshot's cycle has no plan (``NO_PLAN_AUTOMATIK``), else None."""
+    """Reason the snapshot's cycle has no chart plan (``NO_PLAN_*``), else None."""
     if not snapshot:
         return None
     reason = snapshot.get("no_plan")

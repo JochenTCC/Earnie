@@ -23,6 +23,8 @@ Wartet die Seite auf **main.py**, erscheint **über** den Charts ein blauer Sync
 
 **Kein Plan (Automatik):** Findet die Optimierung in einem Lauf keinen gültigen Plan, stellt Earnie die Batterie auf Automatik. Für diesen Lauf gibt es dann keinen Plan: Chart 1 zeigt den Hinweis „kein Plan (Automatik)“ statt eines Verlaufs, und es gibt keine Ersparnis-Prognose. Earnie rechnet dafür keinen Ersatzplan. Der nächste Lauf mit Plan zeigt den Chart wieder.
 
+**Plan gesendet, Anzeige fehlgeschlagen:** Hat ein Lauf seinen Plan an die Anlage gesendet, aber die Berechnung von Chart 1 und Ersparnis-Prognose ist fehlgeschlagen, zeigt Chart 1 diesen Hinweis statt eines Verlaufs. Die Ursache steht im Log („Einsparungs-Prognose konnte nicht berechnet werden“). Der Plan des vorherigen Laufs wird nicht mehr als aktueller Plan angezeigt.
+
 **Größe:** Auf Desktop und Tablet behält Chart 1 ein festes Seitenverhältnis Breite:Höhe, standardmäßig 3:1, und ist mindestens 320 px hoch. Ein breites Fenster macht den Chart also höher, ein schmales flacher. Siehe [Seitenverhältnis der Charts](#seitenverhältnis-der-charts).
 
 **Linke Y-Achse (kW):** Die Balkenhöhe zeigt die Leistung. Die Balkenbreite folgt der Slotdauer (**15 min** über den ganzen Horizont), die Fläche ist also proportional zur Energie. **Ausnahme Verbraucher:** Generic-Schedules werden intern stündlich modelliert und auf Viertelstunden gehalten. Läufe mit `duration_h < 1` können deshalb als mittlere Leistung erscheinen (`nominal × duration_h` in `generic_schedule`).

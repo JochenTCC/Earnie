@@ -250,6 +250,82 @@ def test_main_automatik_cycle_shows_no_plan_and_solves_nothing_else(monkeypatch,
     assert "kein Plan (Automatik)" in caplog.text
 
 
+def test_main_failed_forecast_replaces_the_previous_chart_plan(monkeypatch, caplog):
+    """Review 2026-11-25: a cycle whose plan was sent but whose forecast simulation failed
+    wrote no snapshot, so Chart 1 kept showing the previous cycle's plan as current."""
+    patch_main_run(monkeypatch, silent=True)
+    monkeypatch.setattr(
+        main_module.optimizer,
+        "milp_optimizer",
+        lambda *a, **k: (0, 0.0, 99.0, {}, {}, {HORIZON_SCHEDULE_KEY: [{"marker": 1}]}, {}),
+    )
+
+    def _fail(*_a, **_k):
+        raise ValueError("simulation broke")
+
+    monkeypatch.setattr(main_module.optimizer, "calculate_optimization_savings", _fail)
+    saved: list[dict] = []
+    monkeypatch.setattr(
+        main_module.live_optimization_debug,
+        "save_debug_snapshot",
+        lambda payload, **_: saved.append(payload),
+    )
+    monkeypatch.setattr(main_module.run_state, "save_run_state", lambda _payload: None)
+
+    with caplog.at_level("WARNING"):
+        main_module.main(run_trigger=TRIGGER_QUARTER_HOUR)
+
+    assert "Einsparungs-Prognose konnte nicht berechnet werden" in caplog.text
+    assert len(saved) == 1
+    assert saved[0]["no_plan"] == live_optimization_debug.NO_PLAN_FORECAST_FAILED
+    assert saved[0]["simulation_rows"] == []
+    assert saved[0].get("planning_matrix")
+
+
+def test_main_failed_snapshot_build_replaces_the_previous_chart_plan(monkeypatch, caplog):
+    """Review 2026-11-25: the forecast succeeds but building the display snapshot fails;
+    Chart 1 must not keep the previous cycle's plan either."""
+    patch_main_run(monkeypatch, silent=True)
+    monkeypatch.setattr(
+        main_module.optimizer,
+        "milp_optimizer",
+        lambda *a, **k: (0, 0.0, 99.0, {}, {}, {HORIZON_SCHEDULE_KEY: [{"marker": 1}]}, {}),
+    )
+    monkeypatch.setattr(
+        main_module.optimizer,
+        "calculate_optimization_savings",
+        lambda *a, **k: {"optimized_rows": [], "baseline_rows": []},
+    )
+    monkeypatch.setattr(
+        main_module.optimizer,
+        "build_savings_snapshot",
+        lambda _info: {
+            "savings_matched_euro": 0.0,
+            "optimized_cost_euro": 0.0,
+            "matched_baseline_cost_euro": 0.0,
+        },
+    )
+
+    def _fail(*_a, **_k):
+        raise KeyError("optimized_rows")
+
+    monkeypatch.setattr(main_module.optimizer, "overlay_main_run_on_rows", _fail)
+    saved: list[dict] = []
+    monkeypatch.setattr(
+        main_module.live_optimization_debug,
+        "save_debug_snapshot",
+        lambda payload, **_: saved.append(payload),
+    )
+    monkeypatch.setattr(main_module.run_state, "save_run_state", lambda _payload: None)
+
+    with caplog.at_level("WARNING"):
+        main_module.main(run_trigger=TRIGGER_QUARTER_HOUR)
+
+    assert "Snapshot konnte nicht gespeichert werden" in caplog.text
+    assert len(saved) == 1
+    assert saved[0]["no_plan"] == live_optimization_debug.NO_PLAN_FORECAST_FAILED
+
+
 def test_main_passes_the_control_plan_to_the_forecast(monkeypatch):
     patch_main_run(monkeypatch, silent=True)
     schedule = [{"marker": 1}]

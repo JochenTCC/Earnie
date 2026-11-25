@@ -301,6 +301,28 @@ def _clear_live_feature_failure_backoff():
     price_forecast_live._feature_failure_until.clear()
 
 
+@pytest.fixture(autouse=True)
+def _fail_on_simultaneous_milp_flows(request):
+    """Guard the sparse exclusivity binaries (2026-11-24): every solved MILP in the suite
+    must not buy and sell, or charge and discharge, in the same slot.
+
+    In production that plan only logs a warning (``milp_simultaneous_flows``); in the tests
+    it fails, so a price or mode the exclusivity rule missed shows up at once. A test that
+    wants such a plan marks itself ``allow_simultaneous_flows``.
+    """
+    from tests import milp_flow_guard
+
+    if request.node.get_closest_marker(milp_flow_guard.MARKER):
+        yield
+        return
+    found, restore = milp_flow_guard.install()
+    try:
+        yield
+    finally:
+        restore()
+    milp_flow_guard.check(found)
+
+
 class NetworkBlockedError(AssertionError):
     """Raised when a test tries a real (non-loopback) HTTP request."""
 
@@ -470,6 +492,11 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers",
         "e2e: Playwright-Smoketests gegen einen echten streamlit-Server (deselected by default)",
+    )
+    config.addinivalue_line(
+        "markers",
+        "allow_simultaneous_flows: test expects a MILP plan with opposite grid or battery "
+        "flows in one slot (skips the sparse exclusivity guard)",
     )
 
 

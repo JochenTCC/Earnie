@@ -316,13 +316,22 @@ def _read_pv_delta(out_of_band: bool) -> float:
 
 
 def _save_no_plan_snapshot(
-    run_payload: dict, current_soc: float, optimization_matrix: list, planning_window
+    run_payload: dict,
+    current_soc: float,
+    optimization_matrix: list,
+    planning_window,
+    *,
+    reason: str = live_optimization_debug.NO_PLAN_AUTOMATIK,
 ) -> None:
-    """Chart 1 of an Automatik cycle without a plan: replace the last plan by "kein Plan"."""
+    """Chart 1 of a cycle without a chart plan: replace the last plan by "kein Plan".
+
+    ``reason``: ``NO_PLAN_AUTOMATIK`` (no optimal solve) or ``NO_PLAN_FORECAST_FAILED``
+    (plan sent, but its chart / forecast simulation failed).
+    """
     try:
         live_optimization_debug.save_debug_snapshot(
             live_optimization_debug.build_no_plan_payload(
-                reason=live_optimization_debug.NO_PLAN_AUTOMATIK,
+                reason=reason,
                 initial_soc=float(current_soc),
                 main_state=run_payload,
                 quarter_hour_slot=optimization_schedule.quarter_hour_slot_key(),
@@ -332,7 +341,9 @@ def _save_no_plan_snapshot(
         )
         logger.info(
             "live_optimization_debug: Anzeige-Snapshot gespeichert (%s).",
-            live_optimization_debug.NO_PLAN_LABEL,
+            live_optimization_debug.NO_PLAN_FORECAST_FAILED_LABEL
+            if reason == live_optimization_debug.NO_PLAN_FORECAST_FAILED
+            else live_optimization_debug.NO_PLAN_LABEL,
         )
     except Exception as exc:  # noqa: BLE001 — the cycle has already written its setpoints
         logger.warning(
@@ -1295,9 +1306,28 @@ def _main_cycle(
                         "live_optimization_debug: Snapshot konnte nicht gespeichert werden: %s",
                         exc,
                     )
+                    # Same as a failed forecast: the previous cycle's plan must not stay
+                    # in Chart 1 as the current one.
+                    _save_no_plan_snapshot(
+                        run_payload,
+                        current_soc,
+                        optimization_matrix,
+                        planning_window,
+                        reason=live_optimization_debug.NO_PLAN_FORECAST_FAILED,
+                    )
             elif horizon_schedule is None:
                 _save_no_plan_snapshot(
                     run_payload, current_soc, optimization_matrix, planning_window
+                )
+            else:
+                # The plan was sent but its chart / forecast simulation failed: without a
+                # snapshot Chart 1 would keep showing the previous cycle's plan as current.
+                _save_no_plan_snapshot(
+                    run_payload,
+                    current_soc,
+                    optimization_matrix,
+                    planning_window,
+                    reason=live_optimization_debug.NO_PLAN_FORECAST_FAILED,
                 )
             try:
                 optimization_history.append_production_run(run_payload)
