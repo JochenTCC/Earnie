@@ -23,7 +23,7 @@ Am besten funktioniert das bei Häusern mit PV-Feldern, Batteriespeicher und Ver
 Die Live-Anbindung läuft über **EHAL**. Das Backend wird per Config umgeschaltet ([Smarthome-Backend wählen](docs/einrichtung/smarthome-backend-wahl.md)):
 
 - **[Loxone](https://www.loxone.com/dede/):** Standard-Backend.
-- **Pfad A2 (DACH):** [Home Assistant](https://www.home-assistant.io/) + [evcc](https://evcc.io/).
+- **[Home Assistant](https://www.home-assistant.io/) + [evcc](https://evcc.io/):** für Anlagen mit Home Assistant, optional mit evcc für die Wallbox.
 - **OpenEMS:** Prototyp für Lab und Industrie.
 
 Der große Hebel für Einsparungen liegt im geschickten Timing all dieser Verbraucher und im intelligenten Einsatz des Batteriespeichers als Puffer.
@@ -46,9 +46,9 @@ Details: [Betrieb](docs/einrichtung/betrieb.md)
 
 - **Günstiger laden und heizen:** Earnie nutzt günstige Stunden und PV-Überschuss, statt wie mit einer Flatrate zu planen.
 - **Speicher sinnvoll nutzen:** SOC-Ziele und Entladestrategie folgen dem Tagesverlauf, statt nur zwischen „voll“ und „leer“ zu wechseln.
-- **Flexible Geräte intelligent einplanen:** Earnie plant E-Auto, Wärmepumpe und SwimSpa-Filter ein; für manuelle Geräte gibt es Empfehlungen.
+- **Flexible Geräte intelligent einplanen:** Earnie plant E-Auto, Wärmepumpe, Heizstab und Pool ein; für manuelle Geräte gibt es Empfehlungen.
 - **Transparenz:** Der Monitor (Sunset-2-Sunset) zeigt Vergangenheit, Live-Snapshot und Vorausschau in einem Cockpit.
-- **Was-wäre-wenn ohne Risiko:** Die Szenario-Exploration vergleicht Varianten, ohne den Produktivbetrieb zu ändern. So lassen sich unnötige oder falsche Investitionen und die Wahl des falschen Stromtarifs vermeiden.
+- **Was-wäre-wenn ohne Risiko:** Der Szenario-Explorer vergleicht Varianten, ohne den Produktivbetrieb zu ändern. So lassen sich unnötige oder falsche Investitionen und die Wahl des falschen Stromtarifs vermeiden.
 
 
 ## Funktionen
@@ -59,7 +59,7 @@ Details: [Betrieb](docs/einrichtung/betrieb.md)
 
 - Earnie optimiert Speicher und Verbraucher gemeinsam im 15-Minuten-Takt. Ob Earnie oder die Nutzer:innen die Verbraucher aktivieren, ist wählbar.
 - Dynamische Strompreise (z. B. [aWATTar](https://www.awattar.at/)) und eine Preis-Prognose über die veröffentlichten Preise hinaus fließen in den Plan ein.
-- Die PV-Erzeugungsprognose kommt von [forecast.solar](https://forecast.solar/). Außen- und Klimadaten liefert [Open-Meteo](https://open-meteo.com/); sie dienen den thermischen Modellen und der temperaturabhängigen Grundlast.
+- Die PV-Erzeugungsprognose kommt von [forecast.solar](https://forecast.solar/) oder aus der Einstrahlungsprognose von [Open-Meteo](https://open-meteo.com/), wahlweise als Hauptquelle, die andere springt bei Ausfall ein; Verschattung durch Berge und Gebäude rechnet Earnie mit ein. Außen- und Klimadaten von Open-Meteo dienen den thermischen Modellen und der temperaturabhängigen Grundlast.
 - **Leistungspreis:** Eine optionale Bezugsgrenze je Viertelstunde lässt sich erst beobachten und dann einplanen ([Leistungspreis und Bezugsgrenze](docs/konfiguration/preise.md#leistungspreis-und-bezugsgrenze)).
 - **Eigene Tarife:** Tarife, die nicht im Katalog stehen, entstehen im eingebetteten Tarif-Editor [Edibert](https://github.com/JochenTCC/Edibert).
 
@@ -86,7 +86,7 @@ Details: [Betrieb](docs/einrichtung/betrieb.md)
 
 ### Betrieb
 
-- [Docker](https://www.docker.com/) auf [Synology](https://www.synology.com/), [LoxBerry](https://www.loxberry.com/), [Proxmox](https://www.proxmox.com/) LXC oder PC; weitere Systeme folgen bei Bedarf.
+- [Docker](https://www.docker.com/) auf [Synology](https://www.synology.com/), [LoxBerry](https://www.loxberry.com/), [Proxmox](https://www.proxmox.com/) LXC oder PC, auf Windows auch über VMware `vctl`.
 - **Home-Assistant-Add-on** (HA OS / Supervised): [docs/einrichtung/homeassistant-addon.md](docs/einrichtung/homeassistant-addon.md)
 - **Optimierer-Dienst** in Streamlit: Start, Stopp und Neustart von `main.py` in der UI; ein Docker-Container (`earnie-productive`) mit Auto-Start.
 - Persistente Laufzeitdaten sorgen für Nachvollziehbarkeit und ermöglichen Debug-Dumps.
@@ -103,7 +103,7 @@ Details: [Betrieb](docs/einrichtung/betrieb.md)
 4. **Was-wäre-wenn-Analyse:** Mit der Erstkonfiguration klären, ob sich ein Gesamtsystem und Earnie im produktiven Einsatz lohnen.
 5. **Verbindung zum Smarthome herstellen:** zuerst die Seite **Smarthome-Backend** (Auswahl und Erkennung), danach **EHAL-Com** (Live-Lesen). Bei Loxone optional `python -m scripts.verify_loxone_setup` ausführen.
 6. **Produktiv starten:** `python main.py` dauerhaft betreiben (**nur eine Instanz**) bzw. Docker mit Auto-Start nutzen.
-7. **Monitor öffnen:** [Streamlit](https://streamlit.io/) im Browser aufrufen. Den Port je Stack nennt [Streamlit-Ports](docs/dev/streamlit-ports.md) (Prod und lokale venv typisch **8501**).
+7. **Monitor öffnen:** [Streamlit](https://streamlit.io/) im Browser aufrufen. Den Port je Stack nennt [Streamlit-Ports](docs/dev/streamlit-ports.md) (Entwickler-Doku auf Englisch; Prod und lokale venv typisch **8501**).
 8. **Feintuning:** Hausprofil, Szenarien und flexible Verbraucher über die Planungs- und Betriebsseiten anpassen.
 
 Optional: [Greenfield Dev-Stack](docs/einrichtung/greenfield-dev-stack.md) (Ersteinrichtung)
@@ -137,17 +137,9 @@ Optional: [Greenfield Dev-Stack](docs/einrichtung/greenfield-dev-stack.md) (Erst
 
 
 
-## Roadmap (Kurz)
+## Roadmap
 
-- **2.7** (erschienen): Mehrspeicher, Exportbegrenzung, Binding-Komfort.
-- **2.8:** Tarif-Editor Edibert, Leistungspreis mit Bezugsgrenze, preisbewusste virtuelle Reserve, Ersparnis-Kachel, mehrere Wallboxen, Klimaanlage im Hausmodell (siehe Backlog).
-- **Parameter-Anpassung:** PV- und thermische Parameter passen sich über die Zeit an.
-- **Gekoppelte thermische Modelle:** Haus-, Speicher- und Solar-Modelle werden miteinander gekoppelt.
-- **Smartere Geräte-Empfehlungen:** adaptive Leistung und Laufzeit für Haushaltsgeräte.
-
-Earnie wird weitgehend mithilfe von [Cursor](https://cursor.com/) entwickelt.
-
-Vollständige Roadmap: **[backlog/Backlog.md](backlog/Backlog.md)**
+Was als Nächstes kommt, steht im [Backlog](backlog/Backlog.md).
 
 ## Lizenz
 
@@ -166,3 +158,5 @@ Wir freuen uns sehr über Ihre Unterstützung, vor allem bei der Einbindung weit
 
 Mitwirken (Lizenz, Forks, Hardware-Profile, Kontakt): **[CONTRIBUTING.md](CONTRIBUTING.md)**  
 Projektstruktur, lokale Entwicklung, Container-Build und technische Hinweise: **[DEVELOPER.md](DEVELOPER.md)**
+
+Earnie wird mithilfe von KI-Werkzeugen (Cursor, Claude Code) entwickelt.
