@@ -95,7 +95,7 @@ $env:EARNIE_ENV_PATH='greenfield'; $env:EARNIE_UI_STREAMLIT_PORT='8532'
 .venv\Scripts\python.exe -m scripts.run_streamlit
 ```
 
-`main.py` started with the same `EARNIE_ENV_PATH` uses `greenfield/config` and `greenfield/runtime` too.
+`main.py` started with the same `EARNIE_ENV_PATH` uses `greenfield/config` and `greenfield/runtime` too. In the multi-root workspace, the launch configs "Streamlit app.py (Greenfield :8532)" (also "… auto main") and "main.py (Greenfield)" (`earnie-workspace/.vscode/launch.json`) do the same.
 
 ## Reset the stack
 

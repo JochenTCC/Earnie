@@ -118,7 +118,7 @@ Details: [Betrieb](docs/einrichtung/betrieb.md)
 | **Einrichtung**        | [Smarthome-Backend wählen](docs/einrichtung/smarthome-backend-wahl.md) · [Loxone-Anbindung](docs/einrichtung/loxone-anbindung.md) · [HA + evcc](docs/einrichtung/ha-evcc.md) · [HA-Add-on](docs/einrichtung/homeassistant-addon.md) · [Betrieb](docs/einrichtung/betrieb.md) · [Container](docs/einrichtung/container.md) · [Proxmox LXC](docs/einrichtung/proxmox-lxc.md) · [VMware `vctl`](docs/einrichtung/vmware-vctl.md) |
 | **Konfiguration**      | [Überblick](docs/konfiguration/overview.md) · [PV & Batterie](docs/konfiguration/batterie-pv.md) · [Flexible Verbraucher](docs/konfiguration/flexible-verbraucher.md) · [Preise](docs/konfiguration/preise.md) |
 | **Benutzeroberfläche** | [Betriebsmodi](docs/ui/betriebsmodi.md) · [Charts](docs/ui/charts.md) · [Smarthome-Backend](docs/ui/smarthome-backend.md) · [EHAL-Com](docs/ui/ehal-com.md)                                                                                            |
-| **Referenz**           | [Abkürzungen](docs/referenz/abbreviations.md) · [Loxone-Signale und Earnie-Library](docs/referenz/loxone-signals.md)                                                                                                                                                                |
+| **Referenz**           | [Abkürzungen](docs/referenz/abbreviations.md) (auf Englisch) · [Loxone-Signale und Earnie-Library](docs/referenz/loxone-signals.md) (auf Englisch)                                                                                                                                                                |
 
 
 

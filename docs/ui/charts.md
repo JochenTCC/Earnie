@@ -237,7 +237,7 @@ Der Sankey aktualisiert sich etwa alle 10 Sekunden (`STATUS`-Fragment). Die Flex
 
 Lädt ein E-Auto, zeigt der Flex-Knoten den aktuellen SoC in der Beschriftung, sofern das Smarthome `sens_evcs_soc_act` des E-Autos an Earnie pusht (Loxone über Virtual Output, Home Assistant über das Paket aus EHAL-Com).
 
-Sind PV, Netz, Batterie und Haus alle exakt 0 kW, zeichnet Earnie keinen Sankey, sondern eine gelbe Warnung. Bei Loxone und Home Assistant ist die häufigste Ursache ein zu seltener Push: Bleibt ein Leistungswert länger als 3 × Wiederholintervall aus (Standard 10 s, also 30 s), nimmt Earnie 0 an (Status „0 angenommen (verstummt)“, siehe [Push-Takt](../referenz/loxone-signals.md#push-cadence-sb-neutral)). Den Status je Signal zeigt **EHAL-Com → Live-Lesen**.
+Sind PV, Netz, Batterie und Haus alle exakt 0 kW, zeichnet Earnie keinen Sankey, sondern eine gelbe Warnung. Bei Loxone und Home Assistant ist die häufigste Ursache ein zu seltener Push: Bleibt ein Leistungswert länger als 3 × Wiederholintervall aus (Standard 10 s, also 30 s), nimmt Earnie 0 an (Status „0 angenommen (verstummt)“, siehe [Push-Takt](../referenz/loxone-signals.md#push-cadence-sb-neutral) (auf Englisch)). Den Status je Signal zeigt **EHAL-Com → Live-Lesen**.
 
 ## Footer
 

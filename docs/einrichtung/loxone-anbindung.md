@@ -9,7 +9,7 @@ Die eigentliche Schaltlogik (Wechselrichter, Wallbox, Pool, …) ist in Loxone i
 
 Für andere Hubs (HA + evcc, OpenEMS) gilt: [Smarthome-Backend wählen](smarthome-backend-wahl.md).
 
-Die **Einrichtung** beschreibt [Loxone-Signale und Vorlagen](../referenz/loxone-signals.md):
+Die **Einrichtung** beschreibt [Loxone-Signale und Vorlagen](../referenz/loxone-signals.md) (auf Englisch):
 
 - **Zähler:** Zähler am EFM anlegen.
 - **Vorlagen:** Virtual-In/Out-Vorlagen auf EHAL-Com aus der Signalliste exportieren und in Loxone Config einspielen. Earnie erzeugt sie passend zur aktuellen Konfiguration.
@@ -35,7 +35,7 @@ Lehnt der Miniserver die Zugangsdaten ab (HTTP **401** oder **403**), zeigt die 
 - **Schreiben (Loud):** Sollwerte erscheinen in `status.json` unter qualifizierten EHAL-IDs. Der Miniserver liest sie per Virtual Input.
 - **Import / Struktur:** `GET http://{LOXONE_IP}/data/LoxAPP3.json` liefert die sichtbaren Control-Namen. Earnie nutzt sie für den Loxone-Import (Greenfield inkl. EFM-Zähler) und für die Presence-Probe auf EHAL-Com. Live-Telemetrie und Sollwerte laufen nicht über diese Datei.
 
-Aktivierte Signale stehen als Schlüssel in `plant.ehal_bindings` und `consumers[].ehal_bindings` (Hausprofil) sowie in `batteries[]`, `inverters[]`, `wallboxes[]` und `pv_systems[].ehal_bindings` (`components.json`). Die Werte zu den Schlüsseln bleiben leer, der Schlüssel dient nur als Aktivierungsflag. Die verbindliche Signalliste und den Match-Status zeigt die Seite **EHAL-Com → Signalliste**. Details: [Loxone-Signale](../referenz/loxone-signals.md).
+Aktivierte Signale stehen als Schlüssel in `plant.ehal_bindings` und `consumers[].ehal_bindings` (Hausprofil) sowie in `batteries[]`, `inverters[]`, `wallboxes[]` und `pv_systems[].ehal_bindings` (`components.json`). Die Werte zu den Schlüsseln bleiben leer, der Schlüssel dient nur als Aktivierungsflag. Die verbindliche Signalliste und den Match-Status zeigt die Seite **EHAL-Com → Signalliste**. Details: [Loxone-Signale](../referenz/loxone-signals.md) (auf Englisch).
 
 ## Was Earnie liest
 
@@ -49,7 +49,7 @@ Aktivierte Signale stehen als Schlüssel in `plant.ehal_bindings` und `consumers
 | Flexible Verbraucher | `consumers[].ehal_bindings`                  | Live-Leistung / Freigaben für `cons_data`         |
 | E-Auto-Status        | EVCS-Felder in `ehal_bindings` / Ladeplan    | Anschluss, Rest-SOC, Fertig-um, max. Ladeleistung |
 
-Earnie leitet die PV-Leistung der Anlage aus den netzgekoppelten Wechselrichtern ab: Σ(`inv.{id}.sens_inv_power_pv` · Wirkungsgrad), Vorlage `Earnie_WR_Leistung_PV`. Jeder Wechselrichter mit angeschlossenen PV-Feldern braucht dieses Signal (siehe [Batterie & PV](../konfiguration/batterie-pv.md)). Die PV-Energie je Intervall ergibt sich aus dem Integral über diese abgeleitete Leistung.
+Earnie leitet die PV-Leistung der Anlage aus den netzgekoppelten Wechselrichtern ab: Σ(`inv.{id}.sens_inv_power_pv` · Wirkungsgrad), Merker `Earnie_PV_Leistung`. Jeder Wechselrichter mit angeschlossenen PV-Feldern braucht dieses Signal (siehe [Batterie & PV](../konfiguration/batterie-pv.md)). Die PV-Energie je Intervall ergibt sich aus dem Integral über diese abgeleitete Leistung.
 
 ## Was Earnie schreibt
 
@@ -91,7 +91,7 @@ P_cons = P_PV + P_Grid + P_Bat
 | `P_Bat`  | `ess.{id}.sens_ess_power`           | Entladen  | Laden       |
 | `P_cons` | `sens_power_consumers`              | Verbrauch | – (≥ 0)     |
 
-Die Werte kommen per Virtual Output unter der qualifizierten EHAL-ID in Earnie an (Vorlagen `VO_Earnie_*`, siehe [Loxone-Signale](../referenz/loxone-signals.md)). Namen wie `Earnie_Netzleistung` sind nur ein optionaler Namenskatalog.
+Die Werte kommen per Virtual Output unter der qualifizierten EHAL-ID in Earnie an (Vorlagen `VO_Earnie_*`, siehe [Loxone-Signale](../referenz/loxone-signals.md) (auf Englisch)). Namen wie `Earnie_Netzleistung` sind nur ein optionaler Namenskatalog.
 
 Earnie speichert den Push zunächst unverändert. Erst beim Lesen rechnet Earnie den Hub-Wert in den EHAL-Wert um. Grundlage sind die `loxone`-Blöcke in den Rollen (`share/ehal/roles/*.json`) mit `factor` (z. B. kW → W) und `sign`. Die Vorzeichenkonvention oben gilt für den EHAL-Wert nach dieser Umrechnung.
 

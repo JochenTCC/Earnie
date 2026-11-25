@@ -82,6 +82,6 @@ Pro physischem Bus bzw. Gerät gibt es genau **einen** schreibenden Southbound-O
 
 - [EHAL-Com](../ui/ehal-com.md): Signalliste, YAML-Paket, Live-Lesen und Live-Schreiben (Englisch).
 - [Home-Assistant-Add-on](homeassistant-addon.md): Earnie innerhalb von Home Assistant, Ports und Supervisor-Proxy.
-- [EHAL-Spec § Home Assistant](../referenz/ehal.md#implementation-notes--home-assistant--evcc): Push-Verfahren, Token, Push-Takt und Einheiten auf der Leitung (Englisch).
+- [EHAL-Spec § Home Assistant](../referenz/ehal.md#implementation-notes--home-assistant--evcc) (Entwickler-Doku auf Englisch): Push-Verfahren, Token, Push-Takt und Einheiten auf der Leitung.
 - [Charts](../ui/charts.md): Darstellung der Ist-Werte.
 - Für Entwickler: Lab-Stack mit Home Assistant und evcc per Compose, Installation der evcc-Integration und Abnahmetabelle in der [HA-Lab-Anleitung](../dev/ha-lab-setup.md) (Entwickler-Doku auf Englisch).

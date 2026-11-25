@@ -3,7 +3,7 @@
 Dieses Handbuch beschreibt Earnie aus Sicht der Anwendung: vom ersten Start über die Was-wäre-wenn-Analyse bis zum Live-Betrieb.
 
 - Technische Details (Container, Config-Schema, Entwicklung): [Anwender-Dokumentation](../README.md) und [README](../../README.md)
-- Kurzformen wie EHAL, SE oder SoC: [Abkürzungen](../referenz/abbreviations.md)
+- Kurzformen wie EHAL, SE oder SoC: [Abkürzungen](../referenz/abbreviations.md) (auf Englisch)
 
 ---
 
@@ -283,7 +283,7 @@ Welche Referenzen der Szenario-Explorer rechnet, wird dort für den ganzen Lauf 
 - Der volumetrische **Netznutzung-Arbeitspreis** wird im Hausprofil in der Gruppe **Netzanschluss & Netzentgelt** gepflegt (Netzbereich oder eigener Arbeitspreis). Er fließt in Live-Betrieb und Szenario-Explorer ein und steht in den Fake-Jahresrechnungen getrennt vom Lieferantenanteil.
 - Nach jedem Lauf des Szenario-Explorers liegen **Fake-Jahresrechnungen** (Markdown) im Log-Ordner unter `invoices/`: Bezug und Einspeisung mit Ø Tarif- und Ø Ist-Preis, die Katalogparameter stehen am Ende.
 
-Nachrechnen: [Tarife und Preise nachrechnen](../referenz/tarife-quellen.md) · Technik: [Preise und Marktdaten](../konfiguration/preise.md)
+Nachrechnen: [Tarife und Preise nachrechnen](../referenz/tarife-quellen.md) (auf Englisch) · Technik: [Preise und Marktdaten](../konfiguration/preise.md)
 
 ### Tarife (Benutzertarife)
 
@@ -417,7 +417,7 @@ Details, Berechnungsregel der Earnie-Points und Abschalten: [Betrieb – Nutzung
 
 Überzeugt die Was-wäre-wenn-Analyse, folgt die Anbindung an die Smarthome-Steuerung. Earnie liefert **Sollwerte und Freigaben**; die eigentliche Schaltlogik (Wechselrichter, Wallbox, Relais) bleibt im Smarthome-Backend – auch aus Sicherheitsgründen oder bei Ausfall von Earnie.
 
-Das Backend wird auf der Seite **Daemon Control → Smarthome-Backend** gewählt und bei Bedarf gewechselt. Welches Backend zur Anlage passt, erklärt [Smarthome-Backend wählen](../einrichtung/smarthome-backend-wahl.md). Für Loxone gibt es zusätzlich VI/VO-Vorlagen und Merker: [Loxone-Signale und Vorlagen](../referenz/loxone-signals.md).
+Das Backend wird auf der Seite **Daemon Control → Smarthome-Backend** gewählt und bei Bedarf gewechselt. Welches Backend zur Anlage passt, erklärt [Smarthome-Backend wählen](../einrichtung/smarthome-backend-wahl.md). Für Loxone gibt es zusätzlich VI/VO-Vorlagen und Merker: [Loxone-Signale und Vorlagen](../referenz/loxone-signals.md) (auf Englisch).
 
 ### Vorbereitung der Smarthome-Konfiguration
 
@@ -465,11 +465,11 @@ Die Schritte 1–2 und 6–8 gelten für alle Backends. Bei Lesen und Schreiben 
 #### Silent / Loud und Abwesenheitsmodus
 
 - **Silent / Loud:** Der Umschalter liegt auf der Seite [Optimierer-Dienst](#optimierer-dienst) (gespeichert in `runtime/local_settings.json`). Sollwerte erreichen das Smarthome-Backend nur im Loud-Modus und bei laufendem Dienst.
-- **Abwesenheitsmodus:** Das Signal ist das EHAL-Feld `sens_absent_mode`; es wird in der **Signalliste** aktiviert (Loxone-Namenskatalog: `Earnie_Abwesend`; siehe [EHAL-Com](../ui/ehal-com.md), [Loxone-Signale](../referenz/loxone-signals.md)).
+- **Abwesenheitsmodus:** Das Signal ist das EHAL-Feld `sens_absent_mode`; es wird in der **Signalliste** aktiviert (Loxone-Namenskatalog: `Earnie_Abwesend`; siehe [EHAL-Com](../ui/ehal-com.md), [Loxone-Signale](../referenz/loxone-signals.md) (auf Englisch)).
 
 #### Backend-spezifische Details
 
-- **Loxone:** [Loxone-Anbindung](../einrichtung/loxone-anbindung.md) · [Loxone-Signale und Vorlagen](../referenz/loxone-signals.md). Optional und **nur Loxone:** Loxone-Import auf **Smarthome-Backend** (siehe Hinweis unter [Vorbereitung](#vorbereitung-der-smarthome-konfiguration)); zusätzlich `python -m scripts.verify_loxone_setup`.
+- **Loxone:** [Loxone-Anbindung](../einrichtung/loxone-anbindung.md) · [Loxone-Signale und Vorlagen](../referenz/loxone-signals.md) (auf Englisch). Optional und **nur Loxone:** Loxone-Import auf **Smarthome-Backend** (siehe Hinweis unter [Vorbereitung](#vorbereitung-der-smarthome-konfiguration)); zusätzlich `python -m scripts.verify_loxone_setup`.
 - **Home Assistant:** [Home Assistant + evcc](../einrichtung/ha-evcc.md)
 - **OpenEMS:** [OpenEMS-Lab](../einrichtung/openems-lab.md)
 - **Alle Backends:** Signalnamen, Feldlisten und vollständige Checkliste unter [EHAL-Com](../ui/ehal-com.md).

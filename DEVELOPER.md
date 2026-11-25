@@ -45,9 +45,9 @@ python -m scripts.run_streamlit
 
 The tariff library `edibert` is pinned to a git tag of [`JochenTCC/Edibert`](https://github.com/JochenTCC/Edibert) in `pyproject.toml` (decision: `docs/dev/edibert-integration.md`). To develop both side by side, install the sibling checkout editable over the pin: `python -m pip install -e ..\edibert`. A wheel-only install (`--only-binary=:all:`) needs `--no-binary=edibert`, because the tag archive is a source distribution.
 
-Since Edibert P3b every slot price (live and SE) comes from Edibert through `data/edibert_slot_prices.py` (pricing reference `_edibert_pricing` from the scenario resolution); Earnie's own engine, the switch `EARNIE_PRICING_ENGINE` and the parity harness are gone. The P3a parity fixture `tests/fixtures/edibert_parity/expected_prices.json` stays as the Edibert golden (`tests/test_edibert_slot_prices.py`).
+Every slot price (live and SE) comes from Edibert through `data/edibert_slot_prices.py` (pricing reference `_edibert_pricing` from the scenario resolution). The fixture `tests/fixtures/edibert_parity/expected_prices.json` is the Edibert golden (`tests/test_edibert_slot_prices.py`).
 
-House-profile timezone is derived from `land` (`AT`/`DE`/`CH` → IANA) in `house_config/geo_timezone.py` — no `timezonefinder`/`h3`. Run tests with `python -m scripts.run_pytest`, not plain `pytest` (the wrapper is also what the pre-commit hook uses). With `pytest-xdist` (dev extra), `run_pytest` defaults to `-n auto` (multi-CPU); use `-n 0` for sequential debugging. Directory targets and the full suite wait in a machine-wide test queue (`scripts/suite_queue.py`) so parallel runs do not compete for the CPUs; up to three explicit test files run at once without queueing.
+House-profile timezone is derived from `land` (`AT`/`DE`/`CH` → IANA) in `house_config/geo_timezone.py` — no `timezonefinder`/`h3`. Run tests with `python -m scripts.run_pytest`, not plain `pytest` (the wrapper is also what the pre-commit hook uses). With `pytest-xdist` (dev extra), `run_pytest` defaults to `-n auto` (multi-CPU) for queued runs and `-n 2` in the fast lane (up to three explicit files or node ids); use `-n 0` for sequential debugging. Directory targets and the full suite wait in a machine-wide test queue (`scripts/suite_queue.py`) so parallel runs do not compete for the CPUs; up to three explicit test files run at once without queueing.
 
 ### Dev Container (optional)
 
@@ -55,7 +55,7 @@ For a Linux-aligned editor/runtime (Docker Desktop required):
 
 1. Command Palette → **Dev Containers: Reopen in Container**
 2. Wait for `post-create` (`pip install --only-binary=:all: --no-binary=edibert -e ".[dev]"`, bootstrap `earnie_env/`; remote user `vscode`)
-3. F5 with a **Streamlit app.py … (earnie_env)** launch configuration (launch configs live in the gitignored, machine-specific `.vscode/launch.json`)
+3. Start the UI with `python -m scripts.run_streamlit` (port 8531). The VS Code launch configs live in `earnie-workspace/.vscode/launch.json` and are only available when the multi-root workspace is open, not in a container opened on `Earnie/` alone
 
 Config: `.devcontainer/` (Python 3.14-slim). The Dev Container sets `EARNIE_UI_STREAMLIT_PORT=8531` and forwards ports 8531 and 8541. Outside the container the UI port defaults to `8501` (`ui.streamlit_port` / `EARNIE_UI_STREAMLIT_PORT`), so a plain local run opens `http://localhost:8501`.
 
@@ -65,9 +65,9 @@ If `Activate.ps1` is missing: remove `.venv` and recreate with `py -3 -m venv .v
 
 Canonical metadata and dependencies: `pyproject.toml` (`version.py` = version source).
 
-CLI after `pip install -e .` (optional): `earnie-bootstrap`, `earnie-build-image`, `earnie-verify-loxone`, … (legacy aliases: `ernie-*`).
+CLI after `pip install -e .` (optional): `earnie-bootstrap`, `earnie-build-image`, `earnie-verify-loxone`, … (also installed as `ernie-*`).
 
-Primary config path: `earnie_env/config/config.json` (via `EARNIE_ENV_PATH`). Legacy fallbacks: repo-root `config/config.json`, then root `config.json`. Templates: `share/config/`.
+Primary config path: `earnie_env/config/config.json` (via `EARNIE_ENV_PATH`). Fallbacks: repo-root `config/config.json`, then root `config.json`. Templates: `share/config/`.
 
 ## Container (Synology / LoxBerry / Proxmox / Docker)
 
@@ -81,7 +81,7 @@ python -m scripts.build_container
 
 Windows wrapper: `.\docker\build-container.ps1`
 
-Local `build_container` default tags from `version.py`: every version → `:next` and `:<version>`; official also `:latest`; SemVer pre-release omits `:latest`. Legacy `ernie-energy` aliases follow the same rule. **CI** (tag → `release-publish.yml`): candidate is `:<version>` only; `:next` / `:latest` only after job `promote` (see the release bullets below).
+Local `build_container` default tags from `version.py`: every version → `:next` and `:<version>`; official also `:latest`; SemVer pre-release omits `:latest`. The `ernie-energy` alias and the organisation namespace `ghcr.io/earnie-hems/earnie-energy` follow the same rule. **CI** (tag → `release-publish.yml`): candidate is `:<version>` only; `:next` / `:latest` only after job `promote` (see the release bullets below).
 
 One-time buildx setup for multi-arch builds (Docker Desktop on Windows uses QEMU for arm64 automatically):
 
@@ -181,16 +181,16 @@ Notes:
 
 ### Release (tag → GitHub Actions)
 
-**Primary path:** bump `version.py` (user approval only), commit + push `main`, then push an annotated tag. CI (`.github/workflows/release-publish.yml`) builds a release candidate (multi-arch image to GHCR, draft GitHub Release) and publishes it after your approval. Per-release checklist: [docs/workflow/release-checklist.md](docs/workflow/release-checklist.md).
+**Primary path:** bump `version.py` (user approval only), commit + push the ship line (`release/x.y` while it is open, else `main`), then push an annotated tag. CI (`.github/workflows/release-publish.yml`) builds a release candidate (multi-arch image to GHCR, draft GitHub Release) and publishes it after your approval. Per-release checklist: [docs/workflow/release-checklist.md](docs/workflow/release-checklist.md).
 
 ```powershell
-# Official — after version.py == X.Y.Z is on origin/main:
+# Official — after version.py == X.Y.Z is on the ship line (origin/release/x.y or origin/main):
 git tag -a vX.Y.Z -m "Release vX.Y.Z" -m "targets: both"
 git push origin vX.Y.Z
 
-# Community pre-release — after version.py == X.Y.Z-alpha.N on origin/main:
-git tag -a vX.Y.Z-alpha.N -m "Pre-release vX.Y.Z-alpha.N" -m "targets: both"
-git push origin vX.Y.Z-alpha.N
+# Community pre-release — after version.py == X.Y.Z-beta.N is on the ship line:
+git tag -a vX.Y.Z-beta.N -m "Pre-release vX.Y.Z-beta.N" -m "targets: both"
+git push origin vX.Y.Z-beta.N
 ```
 
 - The tag message needs exactly one `targets: both|docker|ha` line (see *Partial release*); there is no default — a missing line or a lightweight tag fails the version gate.
@@ -198,14 +198,14 @@ git push origin vX.Y.Z-alpha.N
 - **Required** reviewed notes for every non-`-dev` tag: `.github/release-notes/vX.Y.Z.md` (also `-alpha.N` / `-beta.N` / `-rc.N`); CI has no generic fallback (`scripts.release_notes_finalize --check`). **Required care for HA:** the first non-heading prose line plus the compact bullet list directly below it become the add-on CHANGELOG / Änderungsprotokoll entry — write it for end users (German, no pin/`latest` jargon); checklist: [docs/workflow/release-checklist.md](docs/workflow/release-checklist.md) §1.
 - Official (after `promote`): GitHub Latest Release; images `:<version>`, `:next`, and `:latest` (+ legacy aliases).
 - Pre-release (after `promote`): GitHub Pre-release (not Latest); images `:<version>` and `:next` (no `:latest`).
-- **Candidate → approve → publish:** a tag push builds a *candidate* only — `:<version>` images (app + HA add-on), GitHub Release as **draft**. Pre-gate checks: `addon_smoke` (`scripts/ha_addon_smoke.py` starts `earnie-addon-{arch}:<version>` like the Supervisor; amd64 blocking, aarch64 under QEMU soft), `addon_lint` (pin bump + addon-linter, no commit), `qemu_smoke` (soft). Job `promote` then **waits for manual approval** (environment `release-approval`, required reviewer): Actions run → *Review deployments* → **Approve** sets `:next` (official also `:latest`), publishes the release and lets `publish_ha_addon` pin the add-on; **Reject** drops the candidate — nothing user-visible happened (next attempt = next version, no tag rewrite). Checklist: [docs/workflow/release-checklist.md](docs/workflow/release-checklist.md).
+- **Candidate → approve → publish:** a tag push builds a *candidate* only — `:<version>` images (app + prebuilt HA add-on images `ghcr.io/jochentcc/earnie-addon-{arch}:<version>`, both in job `release`), GitHub Release as **draft**. Pre-gate checks: `addon_smoke` (`scripts/ha_addon_smoke.py` starts `earnie-addon-{arch}:<version>` like the Supervisor; amd64 blocking, aarch64 under QEMU soft), `addon_lint` (pin bump + addon-linter, no commit), `qemu_smoke` (soft). Job `promote` then **waits for manual approval** (environment `release-approval`, required reviewer): Actions run → *Review deployments* → **Approve** sets `:next` (official also `:latest`), publishes the release and lets `publish_ha_addon` pin the add-on; **Reject** drops the candidate — nothing user-visible happened (next attempt = next version, no tag rewrite). Checklist: [docs/workflow/release-checklist.md](docs/workflow/release-checklist.md).
   - Before approving, test the candidate yourself: HA → local add-on on the `:<version>` image (`packaging/homeassistant-addon/README.md`, *Test a release candidate*); LoxBerry / Docker → pin `EARNIE_PINNED_VERSION` / image tag to `<version>`.
   - One-time setup: repo Settings → Environments → `release-approval` → *Required reviewers* = you. The `release` job fails early if the environment or its reviewer rule is missing (an unprotected environment would publish without waiting).
-- **HA Add-on:** every approved release runs job `publish_ha_addon` — official bumps `earnie` + `earnie_prerelease`; pre-release bumps only `earnie_prerelease`. Also pushes prebuilt `ghcr.io/jochentcc/earnie-addon-{arch}:<version>` (H6). Requires repo secret `HA_ADDON_REPO_TOKEN`. Manual retry: workflow **HA Add-on publish**. Details: `packaging/homeassistant-addon/README.md`.
+- **HA Add-on:** every approved release runs job `publish_ha_addon` — official bumps `earnie` + `earnie_prerelease`; pre-release bumps only `earnie_prerelease`. Requires repo secret `HA_ADDON_REPO_TOKEN`. Manual retry: workflow **HA Add-on publish**. Details: `packaging/homeassistant-addon/README.md`.
 - **Partial release (`targets`):** on a tag push the scope comes from the `targets:` line of the annotated tag message (`scripts/release_targets.py`; skill `session-abschluss` asks for it), on *Run workflow* from input `targets`; the run summary shows it before you approve `promote`: `docker` = LoxBerry/Synology channel only (`:next`/`:latest`; no add-on images, `addon_smoke`/`addon_lint`/`publish_ha_addon` skipped); `ha` = HA add-on only (`:next`/`:latest` stay put). The base image `earnie-energy:<version>` is always built (the add-on wraps it) and the GitHub Release is always published. Builds are idempotent: `scripts/release_image_gate.py` reuses an existing `:<version>` image whose `org.opencontainers.image.revision` label matches the tag commit, fails loud on a different commit, and warns + reuses images built before the label existed. So the other half can follow later by re-running the same tag with the other target (needs another approval). Because a `targets=ha` release is published on GitHub without moving `:next`/`:latest`, the LoxBerry plugin's update check reads the `org.opencontainers.image.version` label (set by `scripts/build_container.py`) of the channel tag on GHCR instead of GitHub Releases.
 - **GHCR tags:** every release gets `:<version>` on build (`build_container --versioned-only`) and `:next` on approval; official also `:latest` (`build_container --promote`, retag via `buildx imagetools`, no rebuild).
-- When the official is near and development continues: move that MINOR to `release/x.y` (side repos: `release/<product>/x.y`), finalize and maintain (bugfixes / PATCH) there; leave the pre-release string on the ship line until the next approved bump. Else publish from `main`.
-- Details: [docs/workflow/branching-hotfix-playbook.md](docs/workflow/branching-hotfix-playbook.md) (`main` + `release/…` + tags; PRs release→main; short-lived `hotfix/…` only when needed).
+- When the official is near and development continues: move that MINOR to `release/x.y` (multi-product side repos: `release/<product>/x.y`), finalize and maintain (bugfixes / PATCH) there; leave the pre-release string on the ship line until the next approved bump. Else publish from `main`.
+- Details: [docs/workflow/branching-hotfix-playbook.md](docs/workflow/branching-hotfix-playbook.md) (`main` + `release/…` + tags; fixes reach `main` as `git cherry-pick -x` in a PR, the release branch is never merged; short-lived `hotfix/…` only when needed).
 - **GHCR auth for Actions:** store a classic PAT with `write:packages` (and `read:packages`) as repo secret `GHCR_TOKEN`. Without it, `GITHUB_TOKEN` only works if each package (`earnie-energy`, `ernie-energy`) grants this repository **Write** under Package settings → Manage Actions access. Also set packages **Public** if anonymous `docker pull` is required.
 
 **Fallback** (CI down / emergency): local multi-arch push:
@@ -225,7 +225,7 @@ docker compose --project-directory . -f docker/compose/dev.yml up -d --build
 ### Production (Synology / LoxBerry / Proxmox LXC)
 
 1. Publish a tagged release (see above) — or fallback local `--push`
-2. On the target platform, deploy only the compose file (`docker/compose/synology_productive.yml`, `loxberry_productive.yml`, or `proxmox_productive.yml`), `config/`, and `runtime/`
+2. On the target platform, deploy only the compose file (`docker/compose/synology_productive.yml`, `loxberry_productive.yml`, or `proxmox_productive.yml`) plus `earnie_env/config/` and `earnie_env/runtime/`
 3. `docker compose --project-directory . -f docker/compose/<stack>.yml pull`
 4. `docker compose --project-directory . -f docker/compose/<stack>.yml up -d`
 5. UI on the LAN: `http://<host-ip>:8501`
@@ -236,7 +236,7 @@ Proxmox: LXC with `nesting=1`/`keyctl=1`, optional `docker/proxmox/bootstrap.sh`
 
 - `config.json` and the other config sidecars are local and gitignored.
 - Persistence root: `EARNIE_ENV_PATH` (default `earnie_env`). Config directory: `EARNIE_CONFIG_PATH` (default `{ENV_PATH}/config`). Runtime data (CSV, JSON, logs): `EARNIE_RUNTIME_PATH` or `{ENV_PATH}/runtime`.
-- Legacy layouts (repo-root `config/` and `runtime/`) are still picked up only when the default `earnie_env` root is in use and the new directory does not exist (`runtime_store/persist_paths.py`).
+- Repo-root `config/` and `runtime/` are picked up only when the default `earnie_env` root is in use and `earnie_env/config` / `earnie_env/runtime` do not exist (`runtime_store/persist_paths_base.py`).
 
 ### Test CSVs from live `cons_data`
 
@@ -257,7 +257,7 @@ Run a development build in parallel to Prod on the same live inputs without touc
 - Shared-config exception: EHAL-Com mapping may write `{runtime}/shadow_ehal_bindings.json` (merged on house-profile load); Prod config files stay untouched.
 - Prod must run with `"shadow_feed_enabled": true` in its `local_settings.json`.
 - Optional seed: `python -m scripts.shadow_seed_runtime --from <prod-runtime> --to <shadow-runtime>`.
-- Same-host UI port: `EARNIE_UI_STREAMLIT_PORT` (existing override). The local VS Code launch entries "Streamlit app.py (:8531 Shadow …)" use 8531 so they can run next to the 8501 local run.
+- Same-host UI port: `EARNIE_UI_STREAMLIT_PORT` (existing override). The VS Code launch entries "Streamlit app.py (Shadow :8542 …)" and "(Shadow :8543 …)" (`earnie-workspace/.vscode/launch.json`) use 8542 / 8543; 8542 is also the Greenfield daemon host port, so do not run both at once.
 - Debug review of a chart-debug dump: local launch entry "Streamlit app.py (chart_debug_review :8502)" uses 8502 (collides with the Greenfield Docker stack, [`docs/dev/streamlit-ports.md`](docs/dev/streamlit-ports.md)).
 - Package trees must never set `EARNIE_SHADOW` (release gate in `release-publish.yml`).
 

@@ -11,4 +11,4 @@ python -m scripts.bootstrap_runtime
 
 python -c "from house_config.geo_timezone import timezone_for_land; assert timezone_for_land('AT') == 'Europe/Vienna'; print('timezone_for_land OK')"
 
-echo "Dev container ready. Use F5: Streamlit app.py (:8531 lokal (earnie_env))."
+echo "Dev container ready. Start the UI: python -m scripts.run_streamlit (port 8531)."

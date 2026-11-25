@@ -1,232 +1,232 @@
-# Tarife und Preise nachrechnen
+# Recalculating tariffs and prices
 
-Diese Seite erklärt, wie Earnie Bezugs- und Einspeisepreise sowie die ungefähren Monatskosten bildet. Sie hilft beim Nachvollziehen der Werte im **Szenarienkonfigurator** und im **Szenario-Explorer** (kurz SE).
+This page explains how Earnie builds import and feed-in prices and the approximate monthly costs. It helps you trace the values in the **Szenarienkonfigurator** and in the **Szenario-Explorer** (SE for short).
 
-Verwandt: [Preise und Marktdaten](../konfiguration/preise.md) (Konfiguration und Tariftypen) · [OeMAG und Referenzmarktwert](oemag-referenzmarktwert.md)
+Related: [Preise und Marktdaten](../konfiguration/preise.md) (German; configuration and tariff types) · [OeMAG and Referenzmarktwert](oemag-referenzmarktwert.md)
 
-## 1. Was Earnie berechnet (und was nicht)
+## 1. What Earnie calculates (and what it does not)
 
-| Bestandteil | Live / MILP | Szenario-Explorer (Gesamt- und Monatskosten) |
-| ----------- | ----------- | --------------------------------------------- |
-| Energiepreis Bezug (€/kWh × Netzbezug) | ja | ja |
-| Einspeisevergütung (€/kWh × Netzeinspeisung) | ja | ja |
-| Aufschläge am Tarif (`settlement_fee_cent_kwh`, `markup_percent`, USt) | ja | ja |
-| **Lieferant-Grundpreis** (`monthly_fee_eur`, Näherung) | **nein** | **ja** (nach Aggregation) |
-| **Messstellengebühr** (`metering_monthly_fee_eur`) | **nein** | **ja** (wenn im Katalog) |
-| **Sonstige Fixkosten** (`other_monthly_fee_eur`) | **nein** | **ja** (wenn im Katalog) |
-| **Netznutzung Arbeitspreis** (`netznutzung` am Hausprofil, inkl. Zeitfenster SNAP) | **ja** (vor USt zum Bezugspreis) | **ja** |
-| **Netzverlust und Abgaben je kWh** (Netzbereich: Netzverlustentgelt, Erneuerbaren-Förderbeitrag, Elektrizitätsabgabe Haushalt) | **ja** (vor USt zum Bezugspreis) | **ja** |
-| **Feste Netzbeträge je Jahr** (Netzbereich: Grundpauschale, Förderbeitrag, Förderpauschale) | **nein** | **ja** (nach Aggregation) |
-| **Netznutzung Leistungspreis** (Netzbereich: `capacity_charges`) | **nein** | **ja** (nach Aggregation, je Kalendermonat) |
-| PLZ-/netzgebietsspezifische Stacks, Konzessionsabgabe | nein | nein |
+| Component | Live planning | Szenario-Explorer (total and monthly costs) |
+| --------- | ------------- | ------------------------------------------- |
+| Import energy price (€/kWh × grid import) | yes | yes |
+| Feed-in tariff (€/kWh × grid export) | yes | yes |
+| Tariff surcharges (`settlement_fee_cent_kwh`, `markup_percent`, VAT) | yes | yes |
+| **Supplier base fee** (`monthly_fee_eur`, approximation) | **no** | **yes** (after aggregation) |
+| **Metering fee** (`metering_monthly_fee_eur`) | **no** | **yes** (if in the catalog) |
+| **Other fixed costs** (`other_monthly_fee_eur`) | **no** | **yes** (if in the catalog) |
+| **Netznutzung Arbeitspreis** (`netznutzung` in the house profile, incl. SNAP time windows) | **yes** (added to the import price before VAT) | **yes** |
+| **Grid loss and levies per kWh** (grid area: Netzverlustentgelt, Erneuerbaren-Förderbeitrag, Elektrizitätsabgabe Haushalt) | **yes** (added to the import price before VAT) | **yes** |
+| **Fixed grid amounts per year** (grid area: Grundpauschale, Förderbeitrag, Förderpauschale) | **no** | **yes** (after aggregation) |
+| **Netznutzung Leistungspreis** (grid area: `capacity_charges`) | **no** | **yes** (after aggregation, per calendar month) |
+| Postcode- or grid-area-specific stacks, Konzessionsabgabe | no | no |
 
-> **Hinweis:** Der volumetrische **Netznutzung Arbeitspreis** wird am Hausprofil (Standort) gepflegt und ist unabhängig vom Lieferantentarif. Er kann zeitabhängig sein (SNAP, vorbereitet WiNAP). Die Werte stammen aus dem Laufzeitkatalog `earnie_env/config/grid_fees.json`; die Vorlage dafür liegt in `share/config/grid_fees.json`. Ein eigener Arbeitspreis ist ein Benutzer-Netzbereich in `user_grid_fees.json` (siehe [Preise](../konfiguration/preise.md#eigener-arbeitspreis-benutzer-netzbereich)). Alle vier Tarifdateien tragen das Tarifformat `tariff_format: 1`; jeder Tarif braucht einen `vat_percent`. Der Leistungspreis fehlt weiterhin.
+> **Note:** The volumetric **Netznutzung Arbeitspreis** is set in the house profile (site) and does not depend on the supplier tariff. It can be time-dependent (e.g. SNAP). The values come from the runtime catalog `earnie_env/config/grid_fees.json`; its template is `share/config/grid_fees.json`. A custom Arbeitspreis is a user grid area in `user_grid_fees.json` (see [Preise](../konfiguration/preise.md#eigener-arbeitspreis-benutzer-netzbereich) (German)). All four tariff files carry the tariff format `tariff_format: 1`; every tariff needs a `vat_percent`.
 
-Earnie liefert **ausreichend genaue Eurobeträge** für Vergleiche und Demos. Eine Abrechnung gegen echte Stromrechnungen ist damit **nicht** möglich. Katalogwerte können unvollständig oder veraltet sein; die Parameter im Szenarienkonfigurator daher prüfen.
+Earnie delivers **sufficiently accurate euro amounts** for comparisons and demos. It does **not** allow you to reconcile against real electricity bills. Catalog values can be incomplete or outdated, so check the parameters in the **Szenarienkonfigurator**.
 
-### Fake-Jahresrechnung
+### Fake annual invoice
 
-Nach jedem SE-Lauf schreibt Earnie zusätzlich **Fake-Jahresrechnungen** als Markdown-Datei unter `{Log-Ordner}/invoices/{szenario_label}_jahresrechnung.md`. Der Dateiname ergibt sich aus der Szenario-Bezeichnung. Die Rechnung enthält:
+After every SE run, Earnie also writes **fake annual invoices** as a Markdown file at `{log folder}/invoices/{szenario_label}_jahresrechnung.md`. The file name comes from the scenario label. The invoice contains:
 
-- **Kopf:** die Tarifnamen.
-- **Bezug und Einspeisung:** getrennt ausgewiesen, jeweils mit Ø Tarif- und Ø Ist-Preis.
-- **Fixkosten:** als eigene Position.
-- **Katalogparameter:** am Ende der Datei.
+- **Header:** the tariff names.
+- **Import and feed-in:** listed separately, each with the Ø tariff price and the Ø actual price.
+- **Fixed costs:** as a separate line item.
+- **Catalog parameters:** at the end of the file.
 
-Ist am Hausprofil ein **Netznutzung Arbeitspreis** gesetzt, erscheint ein Abschnitt **Netznutzung**. Die Jahrestabelle trennt dann **Energiebezug (Lieferant)**, **Netznutzung Arbeitspreis** und **Netzverlust und Abgaben je kWh**. Die Summe bleibt dabei gleich, es wird nichts doppelt gezählt. Die **Festen Netzbeträge** stehen als eigene Fixkosten-Position in der Jahrestabelle und je Betrag im Abschnitt Netznutzung.
+If a **Netznutzung Arbeitspreis** is set in the house profile, a **Netznutzung** section appears. The annual table then separates **Energiebezug (Lieferant)**, **Netznutzung Arbeitspreis** and **Netzverlust und Abgaben je kWh**. The total stays the same; nothing is counted twice. The **fixed grid amounts** appear as a separate fixed-cost line in the annual table and, per amount, in the Netznutzung section.
 
-- **Ø Tarif Cent/kWh:** arithmetisches Mittel der stündlichen Tarifpreise über alle Stunden des Monats (`Summe(k_act)/N` bzw. `k_push_act`).
-- **Ø Ist Cent/kWh:** `Energiekosten € / Netzenergie kWh × 100`.
+- **Ø tariff cent/kWh:** arithmetic mean of the hourly tariff prices over all hours of the month.
+- **Ø actual cent/kWh:** `energy cost € / grid energy kWh × 100`.
 
-## 2. Bezugspreis Schritt für Schritt
+## 2. Import price step by step
 
-Für Spot- und aWATTar-Tarife gilt folgende Reihenfolge (Cent/kWh), wie im Katalog und in der Vorschau:
+For spot and aWATTar tariffs the order is as follows (cent/kWh), as in the catalog and the preview:
 
-1. **Börsenpreis** des Slots (Day-Ahead, EPEX-Zone zum Land des Tarifs); bei `settlement_mtu: 60min` das Mittel der vier Viertelstunden der Stunde.
-2. Optional **prozentualer Aufschlag** (`markup_percent`), z. B. 3 → Faktor 1,03.
-3. **Fixer Aufschlag des Lieferanten** (`settlement_fee_cent_kwh`) in Cent/kWh. Das Feld gilt nur für Spot-Typen; Netzkosten gehören nicht hierher, sondern in `netznutzung` (Schritt 4).
-4. Optional **Netznutzung Arbeitspreis** aus dem Hausprofil (`netznutzung`, netto, je Slot, mit Zeitregeln wie SNAP) sowie **Netzverlust und Abgaben je kWh** des Netzbereichs (netto, ohne Zeitregeln).
-5. **Umsatzsteuer**, falls `prices_include_vat` = nein: Ergebnis × (1 + `vat_percent`/100). Bei `prices_include_vat` = ja ist der Lieferantenpreis schon brutto; die Netznutzung aus Schritt 4 erhält dann in Schritt 4 selbst die USt (`vat_percent`), weil sie ein Nettopreis ist.
+1. **Exchange price** of the slot (day-ahead, EPEX zone for the tariff's country); with `settlement_mtu: 60min` the mean of the four quarter hours of the hour.
+2. Optional **percentage markup** (`markup_percent`), e.g. 3 → factor 1.03.
+3. **Fixed supplier surcharge** (`settlement_fee_cent_kwh`) in cent/kWh. This field applies only to spot types. Grid costs do not belong here; they go into `netznutzung` (step 4).
+4. Optional **Netznutzung Arbeitspreis** from the house profile (`netznutzung`, net, per slot, with time rules such as SNAP) and **grid loss and levies per kWh** of the grid area (net, without time rules).
+5. **VAT**, if `prices_include_vat` = no: result × (1 + `vat_percent`/100). If `prices_include_vat` = yes, the supplier price is already gross; the grid charges from step 4 then get VAT (`vat_percent`) in step 4 itself, because they are net prices.
 
-Formel:
+Formula:
 
 ```
-(Börsenpreis × (1 + markup_percent/100) + settlement_fee_cent_kwh)
-  × (1 + vat_percent/100)   falls prices_include_vat = false
+(exchange price × (1 + markup_percent/100) + settlement_fee_cent_kwh)
+  × (1 + vat_percent/100)   if prices_include_vat = false
 ```
 
-Bei Festpreis-Tarifen (`fixed_cent`) ist der Arbeitspreis `fix_cent_kwh`; `settlement_fee_cent_kwh` hat dort keine Wirkung (Earnie warnt beim Laden). Die Netznutzung aus dem Hausprofil kommt auch hier dazu. Auch hier gilt die USt-Regel.
+For fixed-price tariffs (`fixed_cent`) the energy price is `fix_cent_kwh`; `settlement_fee_cent_kwh` has no effect there (Earnie warns when loading). The grid charges from the house profile are added here as well. The VAT rule applies here too.
 
-### Benutzertarife aus Edibert
+### User tariffs from Edibert
 
-Tarife aus `user_tariffs.json` (neben `tariffs.json`, IDs `user_…`) rechnet Earnie mit denselben Schritten wie Katalog-Tarife, über die Tarif-Bibliothek Edibert. Zeitregeln (`rules`) und Preisgrenzen (`price_floor_cent_kwh`, `price_cap_cent_kwh`) wirken je Slot (siehe [Preise und Marktdaten](../konfiguration/preise.md#benutzertarife-user_tariffsjson)).
+Earnie calculates tariffs from `user_tariffs.json` (next to `tariffs.json`, IDs `user_…`) with the same steps as catalog tariffs, through the tariff library Edibert. Time rules (`rules`) and price limits (`price_floor_cent_kwh`, `price_cap_cent_kwh`) apply per slot (see [Preise und Marktdaten](../konfiguration/preise.md#benutzertarife-usertariffsjson) (German)).
 
-### Eigener Festpreis (szenario-lokal)
+### Custom fixed price (scenario-local)
 
-Im Szenarienkonfigurator enthalten die Dropdowns für Bezug und Einspeisung den Eintrag **Eigener Festpreis**. Earnie speichert den Cent/kWh-Wert am Szenario in `backtesting_scenarios.json` (`user_import_cent_kwh` / `user_export_cent_kwh`, Tarif-ID `__user_fixed__`). In `tariffs.json` landet er **nicht**.
+In the **Szenarienkonfigurator**, the dropdowns for import and feed-in contain the entry **Eigener Festpreis**. Earnie stores the cent/kWh value with the scenario in `backtesting_scenarios.json` (`user_import_cent_kwh` / `user_export_cent_kwh`, tariff ID `__user_fixed__`). It does **not** go into `tariffs.json`.
 
-| Richtung | Bedeutung |
-| -------- | --------- |
-| Bezug | Lieferanten-Arbeitspreis inkl. USt (wie Katalog-`fixed_cent`); **Netznutzung Arbeitspreis** aus dem Hausprofil wird weiterhin addiert |
-| Einspeisung | eingegebene Vergütung ohne weitere Aufschläge |
+| Direction | Meaning |
+| --------- | ------- |
+| Import | Supplier energy price incl. VAT; the **Netznutzung Arbeitspreis** from the house profile is added |
+| Feed-in | The entered tariff without further surcharges |
 
-Für den eigenen Festpreis gibt es keine Katalog-Vorschau und keine Fixkosten aus dem Tarifkatalog. In den SE-Gesamtkosten zählen dann nur die festen Netzbeträge des Netzbereichs (siehe §4). Details: [Preise und Marktdaten](../konfiguration/preise.md).
+The custom fixed price has no catalog preview and no fixed costs from the tariff catalog. The SE total costs then contain only the fixed grid amounts of the grid area (see §4). Details: [Preise und Marktdaten](../konfiguration/preise.md) (German).
 
-### Beispiel: aWATTar HOURLY (AT)
+### Example: aWATTar HOURLY (AT)
 
-Katalog (`awattar_at`): Aufschlag 1,5 Cent/kWh netto, Markup 3 %, Preise **ohne** USt, USt 20 %.
+Catalog (`awattar_at`): surcharge 1.5 cent/kWh net, markup 3 %, prices **without** VAT, VAT 20 %.
 
-Angenommener Börsenpreis: **5,00** Cent/kWh.
+Assumed exchange price: **5.00** cent/kWh.
 
-1. 5,00 × 1,03 = 5,15  
-2. 5,15 + 1,50 = 6,65  
-3. 6,65 × 1,20 = **7,98 Cent/kWh** (brutto, so nutzt Earnie den Preis in der Kostenrechnung)
+1. 5.00 × 1.03 = 5.15
+2. 5.15 + 1.50 = 6.65
+3. 6.65 × 1.20 = **7.98 cent/kWh** (gross; Earnie uses this price in the cost calculation)
 
-Zusätzlich kann der Tarif eine **Monatsgebühr** haben (bei aWATTar AT ca. 4,79 € netto pro Monat). Sie fließt nur in die SE-Gesamt- und Monatskosten ein, nicht in den Stundenpreis.
+The tariff can also have a **monthly fee** (aWATTar AT: about 4.79 € net per month). It enters only the SE total and monthly costs, not the hourly price.
 
-### Beispiel: VKW Strom Dynamisch
+### Example: VKW Strom Dynamisch
 
-Katalog: +1,20 Cent/kWh **netto**, ohne Markup, `prices_include_vat` = nein. Bei einem Börsenpreis von 10,00 Cent/kWh ergibt sich (10,00 + 1,20) × 1,20 = **13,44 Cent/kWh** brutto.
+Catalog: +1.20 cent/kWh **net**, no markup, `prices_include_vat` = no. At an exchange price of 10.00 cent/kWh this gives (10.00 + 1.20) × 1.20 = **13.44 cent/kWh** gross.
 
-## 3. Einspeisevergütung
+## 3. Feed-in tariff
 
-Die Vergütung hängt vom Export-Tariftyp ab:
+The tariff depends on the export tariff type:
 
-- **Fest** (`fixed`): konstanter Cent/kWh-Wert (`k_push_cent`).
-- **Spot** (`spot_hourly`): Börsenpreis minus Abschlag (`settlement_fee_cent_kwh`).
-- **Monatspreis** (`monthly_table`): ein Cent/kWh-Wert je Kalendermonat (`monthly_rates`).
-- **Eigener Festpreis** (`__user_fixed__`): szenario-lokaler Cent/kWh-Wert (`user_export_cent_kwh`), siehe §2.
+- **Fixed** (`fixed`): constant cent/kWh value (`k_push_cent`).
+- **Spot** (`spot_hourly`): exchange price minus deduction (`settlement_fee_cent_kwh`).
+- **Monthly price** (`monthly_table`): one cent/kWh value per calendar month (`monthly_rates`).
+- **Eigener Festpreis** (`__user_fixed__`): scenario-local cent/kWh value (`user_export_cent_kwh`), see §2.
 
-### Beispiel: VKW PV-Einspeisetarif Dynamisch
+### Example: VKW PV-Einspeisetarif Dynamisch
 
-Vergütung ≈ EPEX − **0,60** Cent/kWh (**ohne USt** laut Produktseite). Bei einem Börsenpreis von 10,00 Cent/kWh ergibt sich **9,40 Cent/kWh**. Ein Faktor ×1,20 entfällt, weil der Katalog `prices_include_vat` false und `vat_percent` 0 setzt.
+Tariff ≈ EPEX − **0.60** cent/kWh (**without VAT** according to the product page). At an exchange price of 10.00 cent/kWh this gives **9.40 cent/kWh**. There is no factor ×1.20, because the catalog sets `prices_include_vat` false and `vat_percent` 0.
 
-Dasselbe USt-Muster gilt für `at_vkw_pv_flex` (`monthly_table`) und die meisten anderen Einspeise-Monats- und Spot-Tarife (OeMAG-Familie, SUNNY): Die Vergütung erhält **keinen** USt-Aufschlag.
+The same VAT pattern applies to `at_vkw_pv_flex` (`monthly_table`) and all other feed-in tariffs in the catalog (OeMAG family, SUNNY): the tariff gets **no** VAT surcharge.
 
-Details zu Typen und JSON: [Preise und Marktdaten](../konfiguration/preise.md).
+Details on types and JSON: [Preise und Marktdaten](../konfiguration/preise.md) (German).
 
-## 4. Fixkosten in den SE-Gesamtkosten
+## 4. Fixed costs in the SE total costs
 
-### Lieferant-Grundpreis
+### Supplier base fee
 
-- **Katalogfeld:** `monthly_fee_eur` ist optional; fehlt es, gilt 0.
-- **Pflichtfeld `supplier_id`** (Kennung des Stromlieferanten): Ist der Anbieter bei Bezug und Einspeisung derselbe, fällt nur **eine** Gebühr an (der höhere der beiden Werte, `max`). Gebühren unterschiedlicher Anbieter werden **addiert**.
-- **Pflichtfeld `land`** (`AT`, `DE` oder `CH`): Jeder Tarif in `tariffs.json` braucht ein Land, auch Festpreis- und Monatstabellen-Tarife. Earnie lehnt Tarife ohne `land` beim Laden mit einer Fehlermeldung ab; der Land-Filter im Szenarienkonfigurator würde sie sonst stillschweigend ausblenden. (Der „Eigene Festpreis“ ist kein Katalog-Tarif und braucht kein Land.)
+- **Catalog field:** `monthly_fee_eur` is optional; if it is missing, 0 applies.
+- **Required field `supplier_id`** (identifier of the electricity supplier): if import and feed-in have the same supplier, only **one** fee applies (the higher of the two values, `max`). Fees of different suppliers are **added**.
+- **Required field `land`** (`AT`, `DE` or `CH`): every tariff in `tariffs.json` needs a country, including fixed-price and monthly-table tariffs. Earnie rejects tariffs without `land` with an error message when loading; otherwise the country filter in the **Szenarienkonfigurator** would hide them silently. (The „Eigener Festpreis“ is not a catalog tariff and needs no country.)
 
-### Hausanschluss-Fixkosten (einmal je Szenario)
+### Connection fixed costs (once per scenario)
 
-| Feld | Bedeutung |
-| ---- | --------- |
-| `metering_monthly_fee_eur` | Messstellenbetrieb / Zählergebühr |
-| `other_monthly_fee_eur` | Sonstige Fixkosten (z. B. bekannte Abgabenpauschale) |
+| Field | Meaning |
+| ----- | ------- |
+| `metering_monthly_fee_eur` | Metering operation / meter fee |
+| `other_monthly_fee_eur` | Other fixed costs (e.g. a known flat levy) |
 
-Earnie übernimmt jeden Wert aus dem **Bezugstarif**. Fehlt er dort, kommt er aus dem Einspeisetarif; die beiden Werte werden **nicht** summiert. Tabellen nach PLZ sind nicht hinterlegt, fehlende Werte zählen als 0.
+Earnie takes each value from the **import tariff**. If it is missing there, it comes from the feed-in tariff; the two values are **not** summed. There are no tables by postcode; missing values count as 0.
 
-### Feste Netzbeträge (aus dem Netzbereich)
+### Fixed grid amounts (from the grid area)
 
-Grundpauschale, Förderbeitrag auf die Grundpauschale und Erneuerbaren-Förderpauschale stehen je Jahr und netto im Netzbereich des Hausprofils, nicht im Tarif. Earnie zählt je Kalendermonat ein Zwölftel davon und schlägt die USt des Bezugstarifs auf:
+Grundpauschale, Förderbeitrag on the Grundpauschale and Erneuerbaren-Förderpauschale are stored per year and net in the grid area of the house profile, not in the tariff. Earnie counts one twelfth of them per calendar month and adds the VAT of the import tariff:
 
-`Jahresbetrag / 12 × (1 + vat_percent/100)`
+`annual amount / 12 × (1 + vat_percent/100)`
 
-**Beispiel:** Die österreichischen Katalogbereiche führen 54,00 + 3,796 + 19,02 = 76,816 € netto je Jahr. Mit 20 % USt ergibt das 7,68 € je Monat, also 92,18 € je Jahr. Ohne Netzbereich am Szenario entfällt die Position.
+**Example:** The Austrian catalog areas carry 54.00 + 3.796 + 19.02 = 76.816 € net per year. With 20 % VAT this gives 7.68 € per month, i.e. 92.18 € per year. Without a grid area on the scenario, this line item is omitted.
 
-### Gemeinsame Regeln
+### Common rules
 
-- **EPEX-/Spot-Tarife:** `prices_include_vat` = nein. Volumetrische Aufschläge **und** Monatsgebühren immer **netto** speichern; die USt kommt über `vat_percent` auf beide. Beispiel: `awattar_at` führt 4,79 € netto und zählt mit 20 % USt 5,75 € je Monat. Die Vorschau im Szenarienkonfigurator zeigt den gespeicherten Wert.
-- **Festpreis-Tarife:** Netto oder brutto je nach `prices_include_vat` (oft brutto, also `true`).
-- **Einspeisetarife:** Sie führen meist `vat_percent` 0, ihre Monatsgebühr bleibt dann netto. Ist derselbe Anbieter auch Bezugslieferant, zählt der höhere Bruttowert, also meist der des Bezugstarifs.
-- **Abrechnung je Kalendermonat:** Für jeden Kalendermonat im SE-Zeitraum fällt **eine volle** Gebühr an, ohne anteilige Kürzung.
-- **Jahres- und Gesamtwert:** Summe aller Fixkosten über alle Monate plus volumetrische Energiekosten (Bezug minus Einspeiseerlös).
-- **Live-Planung:** Die Fixkosten fehlen im Live-MILP und in den stündlichen `sim_cost`-Kurven.
-- **Netznutzung Arbeitspreis:** Der volumetrische Wert kommt aus dem Hausprofil (`netznutzung`) und dem Netzentgelt-Katalog, nicht aus dem Tarifkatalog.
-- **Leistungspreis:** Nur wenn der Netzbereich `capacity_charges` trägt. Je Kalendermonat zählt die höchste gebuchte Viertelstunde des Netzbezugs, mindestens die Mindestleistung (`min_kw`). Über der Bandgrenze gilt der höhere Satz nur für den Anteil darüber. Der Betrag kommt netto aus Edibert und erhält die USt des Bezugstarifs. Ein angebrochener Monat zählt voll. Vor dem Beginn des ersten Eintrags fällt kein Leistungspreis an. Eine Lücke danach bricht den Lauf mit einer Fehlermeldung ab. Einträge mit einem Status außerhalb von `include_status` zählen nicht und erscheinen als Hinweis. Lastprofile aus Stundenwerten glätten kurze Spitzen, die echte Spitze kann höher liegen. Die Planung kennt den Preis selbst nicht; sie hält nur eine eingetragene Bezugsgrenze ein. Start je Netzbereich, Preise und ihr Status: [Leistungspreis und Bezugsgrenze](../konfiguration/preise.md#leistungspreis-und-bezugsgrenze).
+- **EPEX / spot tariffs:** `prices_include_vat` = no. Always store volumetric surcharges **and** monthly fees **net**; VAT is added to both via `vat_percent`. Example: `awattar_at` carries 4.79 € net and counts 5.75 € per month with 20 % VAT. The preview in the **Szenarienkonfigurator** shows the stored value.
+- **Fixed-price tariffs:** net or gross, depending on `prices_include_vat`.
+- **Feed-in tariffs:** they carry `vat_percent` 0, so their monthly fee stays net. If the same supplier is also the import supplier, the higher gross value counts, usually that of the import tariff.
+- **Billing per calendar month:** for every calendar month in the SE period, **one full** fee applies, without pro-rata reduction.
+- **Annual and total value:** sum of all fixed costs over all months plus volumetric energy costs (import minus feed-in revenue).
+- **Live planning:** fixed costs are not included in live planning and in the hourly cost curves.
+- **Netznutzung Arbeitspreis:** the volumetric value comes from the house profile (`netznutzung`) and the grid fee catalog, not from the tariff catalog.
+- **Leistungspreis:** only if the grid area carries `capacity_charges`. Per calendar month, the highest billed quarter hour of grid import counts, at least the minimum power (`min_kw`). Above the band limit, the higher rate applies only to the share above it. The amount comes net from Edibert and gets the VAT of the import tariff. A partial month counts in full. Before the start of the first entry, no Leistungspreis applies. A gap after that aborts the run with an error message. Entries with a status outside `include_status` do not count and appear as a note. Load profiles from hourly values smooth out short peaks; the real peak can be higher. The planning does not know the price itself; it only keeps to an entered import limit. Start per grid area, prices and their status: [Leistungspreis und Bezugsgrenze](../konfiguration/preise.md#leistungspreis-und-bezugsgrenze) (German).
 
-In der Oberfläche erscheinen die Fixkosten im Szenario-Explorer unter Gesamtkosten und Monatliche Stromkosten. Sind Gebühren vorhanden, zeigt die Seite den Hinweis „Näherung Monatsgebühren“ sowie einen Hinweis zu Netznutzungsentgelten. Zur Fake-Jahresrechnung siehe §1.
+In the interface, the fixed costs appear in the **Szenario-Explorer** under total costs and monthly electricity costs. If fees are present, the page shows the hint „Näherung Fixkosten“ and a note on grid usage fees. For the fake annual invoice, see §1.
 
-## 5. Katalogparameter prüfen
+## 5. Checking catalog parameters
 
-Nach der Tarifwahl zeigt der Szenarienkonfigurator eine **Vorschau ohne Bearbeitungsmöglichkeit**. Sie enthält Land, `supplier_id`, Aufschläge, USt-Flag und ggf. die ungefähren Lieferant- und Messstellen-Fixkosten.
+After you choose a tariff, the **Szenarienkonfigurator** shows a **read-only preview**. It contains the country, `supplier_id`, surcharges, the VAT flag and, if present, the approximate supplier and metering fixed costs.
 
-Besonders lohnt sich ein Blick auf diese Punkte:
+These points are especially worth a look:
 
-- Stimmen Aufschlag und USt-Flag mit dem Tarifblatt des Anbieters überein?
-- Ist der erwartete Lieferant-Grundpreis hinterlegt? Fehlt er, rechnet der Szenario-Explorer mit 0.
-- Erscheint die Lieferant-Gebühr bei gleichem Anbieter (z. B. aWATTar Bezug + SUNNY) nur **einmal**?
-- Netz- und Messstellenwerte sind oft netzgebietsspezifisch. Ohne Katalogeintrag bleiben sie 0; der volumetrische **Netznutzung Arbeitspreis** kommt aus dem Hausprofil.
+- Do surcharge and VAT flag match the supplier's tariff sheet?
+- Is the expected supplier base fee stored? If it is missing, the **Szenario-Explorer** calculates with 0.
+- Does the supplier fee appear only **once** for the same supplier (e.g. aWATTar import + SUNNY)?
+- Grid and metering values are often specific to the grid area. Without a catalog entry they stay 0; the volumetric **Netznutzung Arbeitspreis** comes from the house profile.
 
-Für Vollständigkeit und Aktualität des Katalogs gibt es **keine Garantie**.
+There is **no guarantee** that the catalog is complete and up to date.
 
-Die Formeln zum Nachrechnen stehen auf dieser Seite, das technische Mapping in [preise.md](../konfiguration/preise.md).
+The formulas for recalculating are on this page; the technical mapping is in [preise.md](../konfiguration/preise.md) (German).
 
-## 6. Quellen und Herkunft der Katalogwerte
+## 6. Sources and origin of catalog values
 
 ### Day-Ahead / EPEX
 
-| Quelle | Zugang | Rolle in Earnie |
-| ------ | ------ | --------------- |
-| **Offizielle EPEX** SFTP / MATS API | Kostenpflichtig ([Market Data Services](https://www.epexspot.com/en/marketdataservices), [EEX Webshop](https://webshop.eex-group.com/epex-spot-public-market-data)) | **Nicht** angebunden |
-| **ENTSO-E Transparency** `documentType=A44` | Persönlicher API-Token (`ENTSOE_API_TOKEN` in `config/.env`); [transparency.entsoe.eu](https://transparency.entsoe.eu/) | **Primäre** Live-Day-Ahead-Quelle, wenn ein Token gesetzt ist (AT / DE-LU / CH) |
-| **Energy-Charts** `GET /price?bzn=…` | Kostenlos; Fraunhofer ISE, CC BY 4.0 ([api.energy-charts.info](https://api.energy-charts.info/)) | Live-Fallback ohne ENTSO-E oder bei dessen Ausfall; **primäre** SE-/Backtesting-Quelle für AT, DE-LU, CH |
-| **aWATTar** `api.awattar.at` / `.de` | Kostenlos, Fair Use | Letzter Live-Fallback (AT, DE-LU); im SE / Backtesting nicht mehr genutzt |
-| **APG** markt.apg.at | Öffentliche Charts | Nur manuelle Referenz |
+| Source | Access | Role in Earnie |
+| ------ | ------ | -------------- |
+| **Official EPEX** SFTP / MATS API | Paid ([Market Data Services](https://www.epexspot.com/en/marketdataservices), [EEX Webshop](https://webshop.eex-group.com/epex-spot-public-market-data)) | **Not** connected |
+| **ENTSO-E Transparency** `documentType=A44` | Personal API token (`ENTSOE_API_TOKEN` in `config/.env`); [transparency.entsoe.eu](https://transparency.entsoe.eu/) | **Primary** live day-ahead source if a token is set (AT / DE-LU / CH) |
+| **Energy-Charts** `GET /price?bzn=…` | Free; Fraunhofer ISE, CC BY 4.0 ([api.energy-charts.info](https://api.energy-charts.info/)) | Live fallback without ENTSO-E or when it fails; the **only** SE / backtesting source for AT, DE-LU, CH (no fallback) |
+| **aWATTar** `api.awattar.at` / `.de` | Free, fair use | Last live fallback (AT, DE-LU) |
+| **APG** markt.apg.at | Public charts | Manual reference only |
 
 ### OeMAG Marktpreis
 
-- **Offizielle Quelle:** [oem-ag.at/marktpreis](https://www.oem-ag.at/marktpreis)
-- **Katalog:** `oemag_monthly_feed_in_rates`; Export `at_oemag_gesetzlicher_marktpreis`
+- **Official source:** [oem-ag.at/marktpreis](https://www.oem-ag.at/marktpreis)
+- **Catalog:** `oemag_monthly_feed_in_rates`; export `at_oemag_gesetzlicher_marktpreis`
 
 ### E-Control Referenzmarktwert
 
-- **Offizielle Quelle:** [e-control.at/referenzmarktwert](https://www.e-control.at/referenzmarktwert) · Abgrenzung: [oemag-referenzmarktwert.md](oemag-referenzmarktwert.md)
-- **Katalog:** `econtrol_referenzmarktwert_pv_monthly`
+- **Official source:** [e-control.at/referenzmarktwert](https://www.e-control.at/referenzmarktwert) · Distinction: [oemag-referenzmarktwert.md](oemag-referenzmarktwert.md)
+- **Catalog:** `econtrol_referenzmarktwert_pv_monthly`
 
 ### VKW (Vorarlberg)
 
-| Produkt | Formel (Energie) | Katalog-ID |
+| Product | Formula (energy) | Catalog ID |
 | ------- | ---------------- | ---------- |
-| Strom Dynamisch | EPEX + 1,20 ct netto | `at_vkw_strom_dynamisch` |
-| Strom Duo | Fixpreis als `monthly_table`: Okt–Mär 9,40 ct netto; Apr–Sep 9,15 ct netto (Mischwert aus Normaltarif 9,40 und Sommerfenster 8,40, 10–16 Uhr) | `at_vkw_strom_duo` |
-| Strom Duo ohne Sonderrabatt | Normalpreis als `monthly_table`: Okt–Mär 12,20 ct netto; Apr–Sep 11,95 ct netto (Mischwert aus 12,20 und Sommerfenster 11,20, 10–16 Uhr) | `at_vkw_strom_duo_normalpreis` |
-| Strom Einfach | Fixpreis rund um die Uhr: 17,20 ct netto (Normalpreis ohne befristeten Sonderrabatt von 7,30 ct bis 31.03.2027) | `at_vkw_strom_einfach` |
-| PV Dynamisch | EPEX − 0,60 ct netto | `at_vkw_pv_dynamisch` |
-| PV Flex | RefMarkt PV − 0,60 ct | `at_vkw_pv_flex` |
+| Strom Dynamisch | EPEX + 1.20 ct net | `at_vkw_strom_dynamisch` |
+| Strom Duo | Fixed price as `monthly_table`: Oct–Mar 9.40 ct net; Apr–Sep 9.15 ct net (blend of the normal rate 9.40 and the summer window 8.40, 10:00–16:00) | `at_vkw_strom_duo` |
+| Strom Duo ohne Sonderrabatt | Normal price as `monthly_table`: Oct–Mar 12.20 ct net; Apr–Sep 11.95 ct net (blend of 12.20 and the summer window 11.20, 10:00–16:00) | `at_vkw_strom_duo_normalpreis` |
+| Strom Einfach | Fixed price around the clock: 17.20 ct net (normal price without the temporary special discount of 7.30 ct valid until 2027-03-31) | `at_vkw_strom_einfach` |
+| PV Dynamisch | EPEX − 0.60 ct net | `at_vkw_pv_dynamisch` |
+| PV Flex | RefMarkt PV − 0.60 ct | `at_vkw_pv_flex` |
 
 ### Attribution
 
-Day-Ahead Live: optional [ENTSO-E Transparency Platform](https://transparency.entsoe.eu/) (persönlicher Token); sonst [Energy-Charts](https://energy-charts.info) (Fraunhofer ISE), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+Day-ahead live: optionally [ENTSO-E Transparency Platform](https://transparency.entsoe.eu/) (personal token); otherwise [Energy-Charts](https://energy-charts.info) (Fraunhofer ISE), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 
-## 7. Audit / Abweichungen (Stand 2026-10-17, Katalogstand 2026-09-28)
+## 7. Audit / deviations (as of 2026-10-17, catalog as of 2026-09-28)
 
-Dieser Abschnitt macht die Katalogpflege transparent: Er gleicht öffentliche Quellen mit `tariffs.json` ab. Zuletzt wurden die Tabellenwerte gegen den Katalog (`catalog_as_of` 2026-09-28) geprüft; die Anbieterseiten wurden dabei nicht erneut abgerufen. Sekundärseiten lassen Grundgebühren mitunter weg oder ordnen die USt falsch zu. Primärquellen (Produktseite, Tarifblatt) haben daher Vorrang.
+This section makes catalog maintenance transparent: it compares public sources with `tariffs.json`. The table values were last checked against the catalog (`catalog_as_of` 2026-09-28); the supplier pages were not fetched again for that check. Secondary sites sometimes omit base fees or assign VAT incorrectly. Primary sources (product page, tariff sheet) therefore take precedence.
 
-### Monatsgebühren (vorbelegt, Näherung)
+### Monthly fees (prefilled, approximation)
 
-| Katalog-ID | `monthly_fee_eur` | Basis | Quelle |
+| Catalog ID | `monthly_fee_eur` | Basis | Source |
 | ---------- | ----------------- | ----- | ------ |
-| `awattar_at` | 4,79 | netto | [awattar.at/tariffs/hourly](https://www.awattar.at/tariffs/hourly) |
-| `at_vkw_strom_dynamisch` | 3,00 | netto | [vkw.at Strom Dynamisch](https://www.vkw.at/produkte/strom/strom-dynamisch) (36 €/Jahr netto) |
-| `at_vkw_strom_duo` | 3,00 | netto | [vkw.at Strom Duo](https://www.vkw.at/produkte/strom/strom-duo) (36 €/Jahr netto) |
-| `at_vkw_strom_duo_normalpreis` | 3,00 | netto | [vkw.at Produktblatt Strom Duo](https://www.vkw.at/vkw/dokumente/strom/produktblaetter/produktblatt-strom-duo.pdf) (36 €/Jahr netto, Stand 04/2026) |
-| `at_vkw_strom_einfach` | 1,75 | netto | [vkw.at Produktblatt Strom Einfach](https://www.vkw.at/vkw/dokumente/strom/produktblaetter/produktblatt-strom-einfach.pdf) (21 €/Jahr netto, Stand 01/2026) |
-| `at_smartenergy_smartcontrol` | 2,49 | netto | [smartenergy.at/smartcontrol](https://smartenergy.at/smartcontrol) (2,99 brutto) |
-| `at_spotty_smart_active` | 2,00 | netto | Spotty-Rechnung / Portale (2,40 brutto) |
-| `at_verbund_v_strom_spot` | 3,99 | netto | Selectra / Verbund-Grundpreis (ca. 4,79 brutto) |
-| `de_tibber_tibber_dynamic` | 5,03 | netto | [Tibber Support](https://support.tibber.com/de/articles/12310314-grund-und-arbeitspreis-bei-tibber) (5,99 inkl. MwSt.) |
-| `de_awattar_de_hourly_de` | 4,58 | netto (Näherung) | [awattar.de HOURLY](https://www.awattar.de/tariffs/hourly) (ggf. PLZ-abhängig) |
+| `awattar_at` | 4.79 | net | [awattar.at/tariffs/hourly](https://www.awattar.at/tariffs/hourly) |
+| `at_vkw_strom_dynamisch` | 3.00 | net | [vkw.at Strom Dynamisch](https://www.vkw.at/produkte/strom/strom-dynamisch) (36 €/year net) |
+| `at_vkw_strom_duo` | 3.00 | net | [vkw.at Strom Duo](https://www.vkw.at/produkte/strom/strom-duo) (36 €/year net) |
+| `at_vkw_strom_duo_normalpreis` | 3.00 | net | [vkw.at Produktblatt Strom Duo](https://www.vkw.at/vkw/dokumente/strom/produktblaetter/produktblatt-strom-duo.pdf) (36 €/year net, as of 04/2026) |
+| `at_vkw_strom_einfach` | 1.75 | net | [vkw.at Produktblatt Strom Einfach](https://www.vkw.at/vkw/dokumente/strom/produktblaetter/produktblatt-strom-einfach.pdf) (21 €/year net, as of 01/2026) |
+| `at_smartenergy_smartcontrol` | 2.49 | net | [smartenergy.at/smartcontrol](https://smartenergy.at/smartcontrol) (2.99 gross) |
+| `at_spotty_smart_active` | 2.00 | net | Spotty invoice / portals (2.40 gross) |
+| `at_verbund_v_strom_spot` | 3.99 | net | Selectra / Verbund base fee (about 4.79 gross) |
+| `de_tibber_tibber_dynamic` | 5.03 | net | [Tibber Support](https://support.tibber.com/de/articles/12310314-grund-und-arbeitspreis-bei-tibber) (5.99 incl. VAT) |
+| `de_awattar_de_hourly_de` | 4.58 | net (approximation) | [awattar.de HOURLY](https://www.awattar.de/tariffs/hourly) (may depend on the postcode) |
 
-> **Hinweis:** Manche Vergleichsportale geben für aWATTar AT „kein Grundpreis“ an. Die offizielle aWATTar-Seite nennt dagegen einen Grundpreis.
+> **Note:** Some comparison portals state „kein Grundpreis“ (no base fee) for aWATTar AT. The official aWATTar page, however, lists a base fee.
 
-### Volumetrische Werte (Energieaufschläge)
+### Volumetric values (energy surcharges)
 
-| ID | Katalog | Prüfung | Status |
-| -- | ------- | ------- | ------ |
-| `awattar_at` | 1,5 ct + 3 % Markup, netto | Tarifblatt enthält 3 %; Marketingseite oft ohne 3 % | Match (Katalog vollständiger) |
-| `at_vkw_strom_dynamisch` | 1,2 ct netto | Offiziell +1,20 ct netto | Match |
-| `at_vkw_pv_dynamisch` / `at_vkw_pv_flex` | Abschlag 0,6; `vat_percent` 0 (ohne USt) | Offiziell ohne USt | Match |
-| `at_smartenergy_smartcontrol` | 1,20 ct netto (`prices_include_vat` false) | Offiziell 1,20 netto / 1,44 inkl. | Match |
-| `at_spotty_smart_active` | 1,49 ct netto | ≈ 1,79 inkl. / 1,2 | Match |
-| `de_tibber_tibber_dynamic` | 1,81 ct netto | Support 2,15 ct brutto / 1,19 | Match |
-| `at_verbund_v_strom_spot` | 1,3 + 4 % | Selectra eher Fix-ct; Formel unsicher | Offen, nur Monatsgebühr vorbelegt |
-| `de_awattar_de_hourly_de` | 2,25 + 3 % | Seite betont EPEX + 3 %; 2,25 unklar | Offen, Monatsgebühr ca. 4,58 |
+| ID | Catalog | Check | Status |
+| -- | ------- | ----- | ------ |
+| `awattar_at` | 1.5 ct + 3 % markup, net | Tariff sheet includes 3 %; marketing page often without 3 % | Match (catalog more complete) |
+| `at_vkw_strom_dynamisch` | 1.2 ct net | Official +1.20 ct net | Match |
+| `at_vkw_pv_dynamisch` / `at_vkw_pv_flex` | Deduction 0.6; `vat_percent` 0 (without VAT) | Official without VAT | Match |
+| `at_smartenergy_smartcontrol` | 1.20 ct net (`prices_include_vat` false) | Official 1.20 net / 1.44 incl. VAT | Match |
+| `at_spotty_smart_active` | 1.49 ct net | ≈ 1.79 incl. VAT / 1.2 | Match |
+| `de_tibber_tibber_dynamic` | 1.81 ct net | Support 2.15 ct gross / 1.19 | Match |
+| `at_verbund_v_strom_spot` | 1.3 + 4 % | Selectra suggests a fixed ct value; formula uncertain | Open, only the monthly fee is prefilled |
+| `de_awattar_de_hourly_de` | 2.25 + 3 % | Page emphasizes EPEX + 3 %; 2.25 unclear | Open, monthly fee about 4.58 |
 
-Technische Typen und APIs: [Preise und Marktdaten](../konfiguration/preise.md).
+Technical types and APIs: [Preise und Marktdaten](../konfiguration/preise.md) (German).

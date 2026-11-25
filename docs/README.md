@@ -17,7 +17,7 @@ Der Szenario-Explorer lässt sich ohne Installation online ausprobieren:
    - **Loxone:** `.env.example` nach `earnie_env/config/.env` kopieren und `LOXONE_IP`, `LOXONE_USER`, `LOXONE_PASS` eintragen. Im Docker-Betrieb legt der Entrypoint die `.env` im Config-Volume an.
    - **Home Assistant:** Backend wählen, dann das YAML-Paket aus EHAL-Com in Home Assistant einbinden.
 3. **Felder zuordnen:**
-   - **Loxone:** Signale auf **EHAL-Com** aktivieren und die VI/VO-Vorlagen aus der Signalliste exportieren ([Loxone-Signale und Vorlagen](referenz/loxone-signals.md)).
+   - **Loxone:** Signale auf **EHAL-Com** aktivieren und die VI/VO-Vorlagen aus der Signalliste exportieren ([Loxone-Signale und Vorlagen](referenz/loxone-signals.md) (auf Englisch)).
    - **Home Assistant:** Entities auf [EHAL-Com](ui/ehal-com.md) den EHAL-Feldern zuordnen, je Entität in `plant` bzw. `consumers[].ehal_bindings`.
 4. **Verbindung prüfen:** über EHAL-Com (Live-Lesen), bei Loxone alternativ mit dem Prüfskript:
   ```powershell
@@ -68,11 +68,11 @@ Der Szenario-Explorer lässt sich ohne Installation online ausprobieren:
 
 ### Referenz
 
-- [Abkürzungen](referenz/abbreviations.md) – EHAL, SE, HK, SoC, VI/VO und weitere Kurzformen
+- [Abkürzungen](referenz/abbreviations.md) (auf Englisch) – EHAL, SE, HK, SoC, VI/VO und weitere Kurzformen
 - [Streamlit-Ports](dev/streamlit-ports.md) – Port je Stack und Plattform (Entwickler-Doku auf Englisch)
-- [Loxone-Signale und Vorlagen](referenz/loxone-signals.md) – VI/VO-Export aus der Signalliste, Default-Merker, EFM, Signal-Tabellen
-- [OeMAG & Referenzmarktwert](referenz/oemag-referenzmarktwert.md) – OeMAG-Marktpreis und E-Control-RefMarkt PV im Vergleich
-- [Tarife und Preise nachrechnen](referenz/tarife-quellen.md) – Bezugs- und Einspeisepreise, SE-Fixkosten und Fake-Jahresrechnung
+- [Loxone-Signale und Vorlagen](referenz/loxone-signals.md) (auf Englisch) – VI/VO-Export aus der Signalliste, Default-Merker, EFM, Signal-Tabellen
+- [OeMAG & Referenzmarktwert](referenz/oemag-referenzmarktwert.md) (auf Englisch) – OeMAG-Marktpreis und E-Control-RefMarkt PV im Vergleich
+- [Tarife und Preise nachrechnen](referenz/tarife-quellen.md) (auf Englisch) – Bezugs- und Einspeisepreise, SE-Fixkosten und Fake-Jahresrechnung
 
 ### Für Entwickler:innen
 

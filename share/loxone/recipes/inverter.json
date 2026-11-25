@@ -12,7 +12,7 @@
     {
       "ehal_field": "sens_inv_power_pv",
       "loxone_blocks_key": "inverters[].ehal_bindings.inv.{id}.sens_inv_power_pv",
-      "suggested_name": "Earnie_WR_Leistung_PV",
+      "suggested_name": "Earnie_PV_Leistung",
       "notes": "TBD (P4 stub): PV input power kW ≥ 0."
     },
     {

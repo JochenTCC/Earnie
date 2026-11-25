@@ -84,4 +84,4 @@ Die gewählten IDs landen im jeweiligen Szenario in `backtesting_scenarios.json`
 - [Flexible Verbraucher](flexible-verbraucher.md)
 - [Verbrauchs-CSV](verbrauchs-csv.md)
 - [Preise und Marktdaten](preise.md)
-- [Loxone-Signale](../referenz/loxone-signals.md)
+- [Loxone-Signale](../referenz/loxone-signals.md) (auf Englisch)

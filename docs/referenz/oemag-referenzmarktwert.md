@@ -1,59 +1,59 @@
-# OeMAG Marktpreis und E-Control Referenzmarktwert
+# OeMAG Marktpreis and E-Control Referenzmarktwert
 
-Earnie nutzt für Einspeisetarife **zwei unterschiedliche** monatliche Referenzreihen. Diese Seite erklärt beide und grenzt sie voneinander ab.
+For feed-in tariffs, Earnie uses **two different** monthly reference series. This page explains both and how they differ.
 
-- Berechnungsformeln und Tariftypen: [Preise und Marktdaten](../konfiguration/preise.md)
-- Quellenverzeichnis (URLs, Entscheidungen): [Tarife und Preise nachrechnen](tarife-quellen.md)
+- Calculation formulas and tariff types: [Preise und Marktdaten](../konfiguration/preise.md) (German)
+- Source list (URLs, decisions): [Recalculating tariffs and prices](tarife-quellen.md)
 
-## Kurzüberblick
+## Overview
 
-| Begriff | Gesetz | Veröffentlichung | Rolle in Earnie |
-| ------- | ------ | ---------------- | --------------- |
-| **OeMAG Marktpreis** | § 13 ÖSG 2012 | [oem-ag.at/marktpreis](https://www.oem-ag.at/marktpreis) | Shared-Kurve `oemag_monthly_feed_in_rates`; Seed für OeMAG- und OeMAG-proportionale Monats-Einspeisetarife |
-| **Referenzmarktwert PV** | § 13 EAG | [e-control.at/referenzmarktwert](https://www.e-control.at/referenzmarktwert) | Shared-Kurve `econtrol_referenzmarktwert_pv_monthly`; Seed z. B. für VKW PV-Einspeisetarif Flex |
-| **Referenzmarktpreis** | § 12 EAG | [e-control.at/referenzmarktpreis1](https://www.e-control.at/referenzmarktpreis1) | Jahres- bzw. Monatsmittel der Day-Ahead-Preise; **nicht** die OeMAG-Auszahlungskurve |
+| Term | Law | Publication | Role in Earnie |
+| ---- | --- | ----------- | -------------- |
+| **OeMAG Marktpreis** | § 13 ÖSG 2012 | [oem-ag.at/marktpreis](https://www.oem-ag.at/marktpreis) | Shared curve `oemag_monthly_feed_in_rates`; seed for OeMAG and OeMAG-proportional monthly feed-in tariffs |
+| **Referenzmarktwert PV** | § 13 EAG | [e-control.at/referenzmarktwert](https://www.e-control.at/referenzmarktwert) | Shared curve `econtrol_referenzmarktwert_pv_monthly`; seed e.g. for VKW PV-Einspeisetarif Flex |
+| **Referenzmarktpreis** | § 12 EAG | [e-control.at/referenzmarktpreis1](https://www.e-control.at/referenzmarktpreis1) | Annual or monthly mean of the day-ahead prices; **not** the OeMAG payout curve |
 
 ## OeMAG Marktpreis (ÖSG)
 
-Die OeMAG vergütet Ökostrom in der Marktpreis-Bilanzgruppe (Anlagen < 500 kW(p)). Der Marktpreis wird **monatlich ex-post** festgelegt.
+OeMAG pays for green electricity in the Marktpreis balance group (plants < 500 kW(p)). The Marktpreis is set **monthly, ex post**.
 
-- **Basis:** Grundlage ist das mengengewichtete Day-Ahead-Monatsmittel bzw. der Korridor zum Quartalsmarktpreis (§ 41 ÖSG). Davon wird der Aufwand für Ausgleichsenergie abgezogen (2026 PV: 0,408 ct/kWh).
-- **Grenzen:** Die Untergrenze liegt bei 60 % des Quartalsmarktpreises (abzgl. Ausgleichsenergie), die Obergrenze bei 100 % derselben Größe.
-- **Veröffentlichung:** Die OeMAG veröffentlicht den Wert Anfang des Folgemonats auf ihrer Website.
+- **Basis:** the volume-weighted day-ahead monthly mean or the corridor to the quarterly market price (§ 41 ÖSG). The cost of balancing energy is deducted from it (2026 PV: 0.408 ct/kWh).
+- **Limits:** the lower limit is 60 % of the quarterly market price (minus balancing energy), the upper limit is 100 % of the same quantity.
+- **Publication:** OeMAG publishes the value at the start of the following month on its website.
 
-In `tariffs.json` liegt die Kurve unter `oemag_monthly_feed_in_rates`. Der Export-Tarif `at_oemag_gesetzlicher_marktpreis` hat **eigene** `monthly_rates` (Typ `monthly_table`). Die Shared-Kurve dient der Katalog-Wartung.
+In `tariffs.json` the curve is stored as `oemag_monthly_feed_in_rates`. The export tariff `at_oemag_gesetzlicher_marktpreis` has its **own** `monthly_rates` (type `monthly_table`). The shared curve is used for catalog maintenance.
 
 ## E-Control Referenzmarktwert PV (EAG)
 
-Der Referenzmarktwert ist der **erzeugungsgewichtete** Mittelwert der Day-Ahead-Stundenpreise in der österreichischen Gebotszone. Er gilt jeweils für eine Technologie, hier Photovoltaik. Der Wert dient u. a. zur Berechnung der Marktprämie. Außerdem ist er Bezugsgröße für marktorientierte Einspeisetarife (z. B. VKW Flex = RefMarkt − Abschlag).
+The Referenzmarktwert is the **generation-weighted** mean of the hourly day-ahead prices in the Austrian bidding zone. It applies to one technology at a time, here photovoltaics. Among other things, the value is used to calculate the market premium. It is also the reference for market-based feed-in tariffs (e.g. VKW Flex = RefMarkt − deduction).
 
-- **Veröffentlichung:** Die E-Control veröffentlicht den Wert monatlich (ca. 2.–9. des Folgemonats) unter [referenzmarktwert](https://www.e-control.at/referenzmarktwert). Maschinenlesbar mit Veröffentlichungsdatum: [Referenzmarktwert_Entwicklung.xlsx](https://www.e-control.at/documents/1785851/10823410/Referenzmarktwert_Entwicklung.xlsx) (Spalte „Photovoltaikanlagen“).
-- **Auflösung:** Seit 01.10.2025 liegen Mengen und Preise in Viertelstundenauflösung vor. Solange das EAG Stundenwerte vorschreibt, rechnet die E-Control weiterhin mit **Stundenaggregaten**.
+- **Publication:** E-Control publishes the value monthly (around the 2nd to 9th of the following month) at [referenzmarktwert](https://www.e-control.at/referenzmarktwert). Machine-readable with publication date: [Referenzmarktwert_Entwicklung.xlsx](https://www.e-control.at/documents/1785851/10823410/Referenzmarktwert_Entwicklung.xlsx) (column „Photovoltaikanlagen“).
+- **Resolution:** from 2025-10-01, quantities and prices are available in quarter-hour resolution. Because the EAG prescribes hourly values, E-Control calculates with **hourly aggregates**.
 
-In `tariffs.json` heißt die Kurve `econtrol_referenzmarktwert_pv_monthly`. Beispiel PV für August 2026: **9,42 ct/kWh** (E-Control-Veröffentlichung vom 04.09.2026).
+In `tariffs.json` the curve is called `econtrol_referenzmarktwert_pv_monthly`. Example PV for August 2026: **9.42 ct/kWh** (E-Control publication of 2026-09-04).
 
-## Referenzmarktpreis (nicht verwechseln)
+## Referenzmarktpreis (do not confuse)
 
-Der Referenzmarktpreis (§ 12 EAG) ist das **ungewichtete** arithmetische Mittel der Day-Ahead-Preise, jährlich bzw. monatlich. Er ist ein Vergleichswert, also weder die OeMAG-Auszahlung noch der RefMarkt PV.
+The Referenzmarktpreis (§ 12 EAG) is the **unweighted** arithmetic mean of the day-ahead prices, annually or monthly. It is a comparison value: neither the OeMAG payout nor the RefMarkt PV.
 
-## Pflegehinweis
+## Maintenance
 
-Earnie fragt die offiziellen Seiten nicht automatisch ab. Neue Monatswerte werden von dort übernommen und mit einem Script eingetragen. Das Script rechnet alle abhängigen Katalog-Tarife mit `monthly_seed` für die betroffenen Monate automatisch nach:
+Earnie does not query the official pages automatically. New monthly values are taken from there and entered with a script. The script automatically recalculates all dependent catalog tariffs with `monthly_seed` for the affected months:
 
 ```powershell
 python -m scripts.update_tariff_curves --oemag 2026-08=8.997 --refmarkt 2026-08=9.42 --catalog-as-of 2026-09-28
 python -m scripts.update_tariff_curves --check
 ```
 
-- **`--set export:TARIF_ID:JJJJ-MM=CENT`:** trägt einen Einzelwert für Monats-Tarife **ohne** `monthly_seed` ein (z. B. aWATTar SUNNY aus dem Tarifblatt).
-- **`--check`:** meldet Abweichungen zwischen Kurven und geseedeten Tarifen sowie Monate, die nur Platzhalter enthalten.
-- **`--dry-run`:** zeigt die Änderungen an, ohne zu schreiben.
+- **`--set export:TARIF_ID:JJJJ-MM=CENT`:** enters a single value for monthly tariffs **without** `monthly_seed` (e.g. aWATTar SUNNY from the tariff sheet).
+- **`--check`:** reports deviations between curves and seeded tariffs, and months that contain only placeholders.
+- **`--dry-run`:** shows the changes without writing them.
 
-Das Feld `monthly_seed` am Tarif dient nur der Katalog-Wartung. Die Runtime nutzt weiterhin `monthly_rates`.
+The `monthly_seed` field on the tariff is used only for catalog maintenance. Earnie calculates with `monthly_rates`.
 
-| `curve` | Formel |
-| ------- | ------ |
+| `curve` | Formula |
+| ------- | ------- |
 | `oemag` | OeMAG × `arbeitspreis_kwh_cent` / `monthly_float_reference_cent_kwh` − `settlement_fee_cent_kwh` |
 | `econtrol_refmarkt_pv` | RefMarkt PV − `settlement_fee_cent_kwh` |
 
-Ergibt die Formel einen Wert ≤ 0 ct, schreibt das Script nichts und gibt eine Warnung aus. `monthly_rates` erlaubt nur Werte > 0.
+If the formula gives a value ≤ 0 ct, the script writes nothing for that month and prints a warning. `monthly_rates` allows only values > 0.

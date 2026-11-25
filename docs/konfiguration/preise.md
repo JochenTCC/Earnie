@@ -1,6 +1,6 @@
 # Preise und Marktdaten
 
-**Nachrechnen für Anwender:** [Tarife und Preise nachrechnen](../referenz/tarife-quellen.md) erklärt Schritt für Schritt Bezugs- und Einspeisepreis, SE-Fixkosten und Fake-Jahresrechnung.
+**Nachrechnen für Anwender:** [Tarife und Preise nachrechnen](../referenz/tarife-quellen.md) (auf Englisch) erklärt Schritt für Schritt Bezugs- und Einspeisepreis, SE-Fixkosten und Fake-Jahresrechnung.
 
 Diese Seite beschreibt die Konfiguration: Tariftypen, JSON-Felder und Datenquellen.
 
@@ -15,7 +15,7 @@ Live-Bezugspreise entstehen aus Spot-Tarifen (`spot_hourly` u. a.) und dem Day-A
 
 Die aWATTar-API-URL leitet Earnie aus `import_tariff_id` → `land` ab, nicht aus dem Tarif-`type`.
 
-Quellen und rechtliche Grundlagen: [Tarife und Preise nachrechnen](../referenz/tarife-quellen.md), [OeMAG & Referenzmarktwert](../referenz/oemag-referenzmarktwert.md).
+Quellen und rechtliche Grundlagen: [Tarife und Preise nachrechnen](../referenz/tarife-quellen.md) (auf Englisch), [OeMAG & Referenzmarktwert](../referenz/oemag-referenzmarktwert.md) (auf Englisch).
 
 ### Fixkosten (nur SE)
 
@@ -25,7 +25,7 @@ Quellen und rechtliche Grundlagen: [Tarife und Preise nachrechnen](../referenz/t
 - **Netto oder brutto:** **EPEX-/Spot-Tarife** immer **netto** speichern und `prices_include_vat` = false setzen (gleiche Basis wie Settlement und Markup). Bei Festpreisen richtet sich netto/brutto nach `prices_include_vat`. Bei `prices_include_vat` = false schlägt Earnie den `vat_percent` des Tarifs auf die Monatsgebühren auf; bei true zählen sie unverändert.
 - **Wirkung:** Die Fixkosten erscheinen nur in den Gesamt- und Monatskosten des **Szenario-Explorers** und in den Fake-Jahresrechnungen unter `{Log}/invoices/`. Live-MILP und stündliche `sim_cost` enthalten sie nicht.
 
-Details: [tarife-quellen.md](../referenz/tarife-quellen.md) §4.
+Details: [tarife-quellen.md](../referenz/tarife-quellen.md) §4 (auf Englisch).
 
 ### Netznutzungsentgelte (Arbeitspreis)
 
@@ -112,7 +112,7 @@ Die Zahlen sind Platzhalter. Die Sätze sind netto; Earnie rechnet die USt des B
 
 **Was Earnie damit tut.**
 
-- **Szenario-Explorer:** Er weist den Betrag je Kalendermonat aus, für jede Vergleichsstufe und für die Optimierung ([Tarife und Preise nachrechnen](../referenz/tarife-quellen.md)).
+- **Szenario-Explorer:** Er weist den Betrag je Kalendermonat aus, für jede Vergleichsstufe und für die Optimierung ([Tarife und Preise nachrechnen](../referenz/tarife-quellen.md) (auf Englisch)).
 - **Monitor:** Er zeigt im laufenden Monat die gemessene Spitze, die abgerechnete Leistung und den Betrag bisher ([Betriebsmodi](../ui/betriebsmodi.md#sunset-2-sunset-seite-monitor)).
 - **Bezugsgrenze:** Am Szenario lässt sich eine Grenze für den Netzbezug je Viertelstunde eintragen, dazu eine Sicherheitsmarge ([Konfiguration](overview.md), [Handbuch](../user-manual/Benutzer-Handbuch-Earnie.md)). Der Plan hält den Bezug dann unter Grenze minus Sicherheitsmarge. Den Preis selbst kennt die Planung nicht: Earnie wägt nicht ab, ob sich ein Überschreiten in diesem Monat lohnen würde. Die Grenze wählt der Nutzer.
 - **Vorgehen:** Zuerst im Szenario-Explorer Varianten mit verschiedenen Grenzen vergleichen, denn eine enge Grenze kann mehr Strom kosten, als sie beim Leistungspreis spart. Dann die Grenze im Live-Betrieb auf **Beobachten** stellen: Earnie steuert wie ohne Grenze und zeigt auf dem Monitor, wo er eingegriffen hätte und was das gespart hätte. Erst danach auf **Danach planen** umstellen.
@@ -274,9 +274,9 @@ Die Seed-Formel gilt nur für die Katalogpflege, nicht zur Laufzeit. Sie ist pro
 - `OeMAG_Monat × arbeitspreis / monthly_float_reference_cent_kwh − settlement_fee` bzw.
 - `RefMarkt_PV − settlement_fee`.
 
-Die Hilfsfunktionen stehen in [data/monthly_float_rates.py](../../data/monthly_float_rates.py). Gepflegt werden die Kurven mit `python -m scripts.update_tariff_curves` (siehe [Pflegehinweis](../referenz/oemag-referenzmarktwert.md#pflegehinweis)).
+Die Hilfsfunktionen stehen in [data/monthly_float_rates.py](../../data/monthly_float_rates.py). Gepflegt werden die Kurven mit `python -m scripts.update_tariff_curves` (siehe [Pflegehinweis](../referenz/oemag-referenzmarktwert.md#maintenance) (auf Englisch)).
 
-Rechtliche Abgrenzung OeMAG vs. RefMarkt: [oemag-referenzmarktwert.md](../referenz/oemag-referenzmarktwert.md).
+Rechtliche Abgrenzung OeMAG vs. RefMarkt: [oemag-referenzmarktwert.md](../referenz/oemag-referenzmarktwert.md) (auf Englisch).
 
 aWATTar-SUNNY-Fixwerte liegen ebenfalls als `monthly_table` vor (z. B. `monthly_sunny_web_recherche`).
 

@@ -184,7 +184,7 @@ Ein Verbraucherfeld `appliance_kind: "air_conditioner"` entfernt die Migration `
 
 Optional lässt sich die Leistung anderer Verbraucher vom Ist-Wert abziehen (Pool − Filter).
 
-Feldnamen und Mapping-UI: [EHAL-Com](../ui/ehal-com.md). Loxone-Default-Namen und VO/VI-Vorlagen: [Loxone-Signale](../referenz/loxone-signals.md).
+Feldnamen und Mapping-UI: [EHAL-Com](../ui/ehal-com.md). Loxone-Default-Namen und VO/VI-Vorlagen: [Loxone-Signale](../referenz/loxone-signals.md) (auf Englisch).
 
 ## Pool: `thermal_control`
 
@@ -199,7 +199,7 @@ Bei `daily_target_source: thermal` leitet das RC-Modell das Tagesenergie-Ziel au
 | `consumers[].ehal_bindings` | EHAL-Felder am Pool-Verbraucher: `sens_temperature_water`, `get_temperature_water_setpoint`, `get_temperature_tolerance_c`, `sens_heating_active`. Die Außentemperatur liegt hausweit unter `plant.ehal_bindings.sens_temperature_outside`. |
 | `thermal_control.history_logs` | CSV-Pfade für die Kalibrierung; optional `heating_active_csv` / `filter_active_csv` statt einer reinen Leistungsschwelle |
 
-Details: [EHAL-Com](../ui/ehal-com.md), [Loxone-Signale](../referenz/loxone-signals.md) (Loxone-Defaults), [Pool-Filter](../dev/done/swimspa-filter.md) (Entwickler-Doku).
+Details: [EHAL-Com](../ui/ehal-com.md), [Loxone-Signale](../referenz/loxone-signals.md) (auf Englisch) (Loxone-Defaults), [Pool-Filter](../dev/done/swimspa-filter.md) (Entwickler-Doku).
 
 ## Haus Wärme: Heizsystem (`heating_system_id`)
 
@@ -437,7 +437,7 @@ Statt oder neben der Freigabe kann Earnie der Wärmepumpe einen **SG-Ready-Zusta
 - **Zustand 1:** Earnie sendet die Sperre noch nicht. Sie kommt erst, wenn entschieden ist, ob Earnie sie überhaupt nutzt.
 - **Optional:** Das Signal ist ein optionales Schreibsignal am `thermal_annual`-Verbraucher. Aktivieren in EHAL-Com unter **Optionale Signale aktivieren**. Die Freigabe `set_enable` bleibt Pflicht und wird weiter gesendet; ein Backend, das nur den Zustand braucht, ignoriert sie.
 - **Boost:** Der Boost der Wärmepumpe gehört in `heat_storage.boost_k` des Heizsystems (Hauskonfigurator, **Wärmespeicher Boost (K)**). Bei einer SG-Ready-Wärmepumpe steht er in deren Einstellungen für Zustand 3.
-- **Rückfallebene:** Ist Earnie nicht erreichbar, muss das Backend auf Zustand 2 zurückfallen. Das Home-Assistant-Paket aus EHAL-Com enthält dafür einen Watchdog, der den Zustand nach dem Timeout auf 2 setzt. Für Loxone: [Rückfallebene in Loxone Config](../referenz/loxone-signals.md#earnie-dead-fallback-in-loxone-config).
+- **Rückfallebene:** Ist Earnie nicht erreichbar, muss das Backend auf Zustand 2 zurückfallen. Das Home-Assistant-Paket aus EHAL-Com enthält dafür einen Watchdog, der den Zustand nach dem Timeout auf 2 setzt. Für Loxone: [Rückfallebene in Loxone Config](../referenz/loxone-signals.md#earnie-dead-fallback-in-loxone-config) (auf Englisch).
 
 <a id="haus-wärme-ladeziel"></a>
 
@@ -450,7 +450,7 @@ Mit dem Ladeziel `heatpump.<Kennung>.set_temperature_heat_storage_target` (°C) 
 - **0 = kein Ziel:** Läuft die Wärmepumpe im Plan jetzt nicht oder gibt es keinen Plan (Automatik, Start), sendet Earnie 0. Die Regelung arbeitet dann mit ihren eigenen Sollwerten. Ein Backend kann das Ziel deshalb auch ohne Freigabe- oder Zustandseingang nutzen: Ziel > 0 heißt bis zum Ziel laden, 0 heißt Normalbetrieb.
 - **Schaltdifferenz:** Die Regelung startet erst, wenn der Speicher um ihre Schaltdifferenz unter dem Ziel liegt. Ein Ziel knapp über der aktuellen Temperatur startet die Wärmepumpe daher nicht.
 - **Optional:** Aktivieren in EHAL-Com unter **Optionale Signale aktivieren**. Merker-Vorschlag für Loxone: `Earnie_Waermespeicher_Ladeziel`.
-- **Rückfallebene:** Ist Earnie nicht erreichbar, muss das Backend 0 annehmen. Das Home-Assistant-Paket setzt das Ziel über den Watchdog auf 0, für Loxone siehe [Rückfallebene](../referenz/loxone-signals.md#earnie-dead-fallback-in-loxone-config).
+- **Rückfallebene:** Ist Earnie nicht erreichbar, muss das Backend 0 annehmen. Das Home-Assistant-Paket setzt das Ziel über den Watchdog auf 0, für Loxone siehe [Rückfallebene](../referenz/loxone-signals.md#earnie-dead-fallback-in-loxone-config) (auf Englisch).
 - **Abweichung:** Meldet die Regelung über `sens_operating_mode` „gesperrt“ (4) oder „Störung“ (6), während der Plan die Wärmepumpe laufen lässt, schreibt Earnie eine Warnung ins `earnie.log`. Ein Warmwasserlauf während einer geplanten Heizungsladung ist keine Abweichung.
 - **Historie:** `optimization_history.jsonl` hält je Lauf unter `thermal_observability[].heat_control` das Ziel, ob die Wärmepumpe geplant lief, die gemeldete Betriebsart und eine Abweichung fest. Unter `store_level` stehen die geplante Speichertemperatur je Viertelstunde (`planned_temp_c`), der geforderte Endstand (`terminal_min_temp_c`) und wie weit der Plan das Band verlassen musste (`band_slack_kwh`).
 

@@ -16,7 +16,7 @@ End-user documentation is **German**. Do not translate it to English unless the 
 | `docs/einrichtung/` | Einrichtung, Betrieb, Container, Dev-Stacks |
 | `docs/konfiguration/` | `config.json`, Sidecars, Szenarien |
 | `docs/ui/` | Streamlit-Oberfläche, Charts, Betrieb |
-| `docs/referenz/` | Loxone-Signale, Ports, Tabellen |
+| `docs/referenz/` | Reference tables (Loxone signals, abbreviations, tariff sources, OeMAG) — **English**, see exceptions |
 
 **Not user docs:** `docs/workflow/` (Entwickler-Abläufe, English), `docs/entwicklung/` (Entwickler-Betrieb, z. B. Shadow-Modus), `docs/dev/` (working notes, drafts; `docs/dev/done/` = finished/historical — excluded from doc reviews and the quality gate), `Backlog*.md`. Root `README.md` is the public landing (German prose OK; keep in sync with user docs when facts change).
 
@@ -33,7 +33,7 @@ End-user documentation is **German**. Do not translate it to English unless the 
 
 - Brief English fragments (UI labels, proper nouns, API names) inside German docs are fine.
 - Do **not** silently anglicize whole sections or migrate user docs to English.
-- **`docs/referenz/ehal.md`** — English developer contract (EHAL), not a user doc; do not translate.
+- **`docs/referenz/`** — all reference pages are **English** (decided 2026-11-25, maintainer). `docs/referenz/ehal.md` is the English developer contract (EHAL), not a user doc. Links from German user docs into `docs/referenz/` are marked "(auf Englisch)".
 - **`docs/ui/ehal-com.md`** — intentionally **English** (operator deep-dive / field tables). Do not translate to German unless the user asks.
 - **HouseSim** (`docs/dev/house-sim.md`, `house_sim/`) — internal lab/dev only. Do not add to the German Anwender-TOC under Einrichtung; keep under Entwickler-Specs.
 

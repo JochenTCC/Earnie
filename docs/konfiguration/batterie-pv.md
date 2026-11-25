@@ -31,7 +31,7 @@ Im **Szenario-Explorer** (Verbrauchsdaten / cons_data) gilt für die PV-Linien:
 | `battery_max_charge_power_kw` | kW | `components.json` → `batteries[]` | Max. Ladeleistung |
 | `battery_max_discharge_power_kw` | kW | `components.json` → `batteries[]` | Max. Entladeleistung |
 | `battery_max_power_kw` | kW | `components.json` → `batteries[]` | **Veraltet:** eine gemeinsame Grenze für beide Richtungen. Steht sie noch in einer Konfiguration, überträgt Earnie sie beim Laden in Lade- und Entladegrenze. |
-| `limits_from_live` | bool | `components.json` → `batteries[]` | Bei `true` kommen SOC-Min/Max und max. Lade-/Entladeleistung live aus `get_ess_*` (Fallback: Hauskonfigurator-Werte). Diese Lesewerte müssen statische Gerätegrenzen sein, nie ein Wert, den Earnie selbst schreibt (Details: [EHAL-Referenz](../referenz/ehal.md#get_ess_-limits-device-capability-only-never-an-earnie-setpoint)) |
+| `limits_from_live` | bool | `components.json` → `batteries[]` | Bei `true` kommen SOC-Min/Max und max. Lade-/Entladeleistung live aus `get_ess_*` (Fallback: Hauskonfigurator-Werte). Diese Lesewerte müssen statische Gerätegrenzen sein, nie ein Wert, den Earnie selbst schreibt (Details: [EHAL-Referenz](../referenz/ehal.md#get_ess_-limits-device-capability-only-never-an-earnie-setpoint) (Entwickler-Doku auf Englisch)) |
 | `efficiency` | 0–1 | `components.json` → `inverters[]` | Einweg-Wirkungsgrad DC↔AC (**η_inv**), Pflicht. Wirkt auf PV DC→AC und als Teil des Speicherpfads. Migration bestehender Konfigurationen: `python -m scripts.migrate_conversion_efficiency_once --config-dir <config>` |
 | `battery_efficiency` | 0–1 | `components.json` → `batteries[]` | Einweg-Wirkungsgrad der Zellchemie (**η_batt**). Optimierung und Simulation nutzen **η_path = η_inv · η_batt** (Roundtrip ≈ η_path²). |
 | `battery_min_soc` | % | `components.json` → `batteries[]` | Untere SOC-Grenze (Schutz). Liegt der gemessene SoC darunter, plant Earnie keine Entladung, bis die Grenze wieder erreicht ist; geladen wird preisoptimal, nicht sofort. Danach wird die Grenze nicht mehr unterschritten. Eine virtuelle Reserve hebt die Grenze nur in den Viertelstunden an, in denen sie sich lohnt (siehe unten) |
@@ -216,7 +216,7 @@ Das Skript setzt `regulates_on: grid` für jede Hausbatterie und legt `plant.gri
 - **PV bei mehreren Wechselrichtern:** Bei mehreren netzgekoppelten Wechselrichtern mit PV bildet Earnie die Anlagen-PV immer als Summe der gemappten `inv.*`/`pv.*`-Leistungen (× η_inv). Ein flaches Anlagen-PV-Mapping wird in diesem Fall nicht verwendet; unvollständige Mappings führen zu einem Fehler.
 - **Abgeleitete Hauslast:** Eine negative Restbilanz unterhalb der Toleranz (`plant.balance_tolerance_pct` / `balance_tolerance_w`, Defaults 5 % / 100 W) gilt als Telemetrie-Fehler. Earnie setzt sie nicht stillschweigend auf `0`.
 
-Details: [EHAL-Spec § Plant topology](../referenz/ehal.md).
+Details: [EHAL-Spec § Plant topology](../referenz/ehal.md) (Entwickler-Doku auf Englisch).
 
 ## Steuerbarkeit (`control`)
 
@@ -226,7 +226,7 @@ Details: [EHAL-Spec § Plant topology](../referenz/ehal.md).
 | `limits_only` | Nur PV-Überschuss laden, nur Hauslast decken | Nur Automatik / Entladesperre (Lade-/Entladegrenzen) |
 | `read_only` | Eigenverbrauch-Kopplung (kein freier Fahrplan) | Keine ESS-Sollwerte |
 
-Verlangt `control` mehr, als das EHAL-Mapping hergibt (z. B. `full` ohne `set_ess_active_power` und ohne `plant.ha_ess_force`), warnt EHAL-Com. Für Huawei ohne Wirkleistungs-Entity gibt es optional `plant.ha_ess_force` (`driver: huawei_solar`, `device_id`, `duration_min`), siehe [EHAL-Spec](../referenz/ehal.md) und [EHAL-Com](../ui/ehal-com.md).
+Verlangt `control` mehr, als das EHAL-Mapping hergibt (z. B. `full` ohne `set_ess_active_power` und ohne `plant.ha_ess_force`), warnt EHAL-Com. Für Huawei ohne Wirkleistungs-Entity gibt es optional `plant.ha_ess_force` (`driver: huawei_solar`, `device_id`, `duration_min`), siehe [EHAL-Spec](../referenz/ehal.md) (Entwickler-Doku auf Englisch) und [EHAL-Com](../ui/ehal-com.md).
 
 <a id="einspeisegrenze"></a>
 

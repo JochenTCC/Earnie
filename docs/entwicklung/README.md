@@ -15,7 +15,7 @@ Lab- und Simulationsumgebungen (HA Lab Compose, HouseSim-Mock) sind nur hier bes
 - [Regression Suite](../workflow/regression-suite.md) – Golden-Master-Cases vor jedem Release, mit öffentlichen und privaten Daten.
 - [EV return prognosis](../dev/done/ev-return-prognosis.md) – Connect-Phasen bei abwesendem E-Auto (`forecast_when_absent`).
 
-Arbeitsnotizen, Entwürfe und abgeschlossene Epics liegen unter [`docs/dev/`](../dev/). Sie sind nicht Teil der Doku-Reviews.
+Die übrigen Arbeitsnotizen, Entwürfe und abgeschlossene Epics liegen unter [`docs/dev/`](../dev/). Sie sind nicht Teil der Doku-Reviews.
 
 ## Entwickler-Betrieb
 

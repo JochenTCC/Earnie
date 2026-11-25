@@ -7,7 +7,6 @@ New entries come from terms used in the main user docs (handbook, UI docs).
 | Abbreviation | Meaning |
 | --------- | ----------- |
 | **aWATTar** | Dynamic electricity tariff (spot/day-ahead); a frequent example in the docs |
-| **B2C** | Business-to-Consumer – end-customer/household product (as opposed to lab/industrial use) |
 | **BL** | Baseline – in chart 1 **SoC BL target**: reference run without a smart battery and without price-based load shifting |
 | **CSV** | Comma-Separated Values – table file for load, PV and consumer power profiles |
 | **DACH** | Germany, Austria, Switzerland – region for the HA+evcc recommendation |
@@ -20,9 +19,8 @@ New entries come from terms used in the main user docs (handbook, UI docs).
 | **EV** | Electric Vehicle |
 | **EVCS** | Electric Vehicle Charging Station – wallbox / charging station |
 | **evcc** | Open-source charging and PV control; sidecar under Home Assistant (DACH path) |
-| **FTP** | File Transfer Protocol – historically used for Miniserver logs; Earnie uses CSV/energy monitor data instead |
 | **GHCR** | GitHub Container Registry – source of the official Earnie container images |
-| **Greenfield / Default** | User docs say **Default** (template/import path, Merker prefix `Earnie_*`). "Greenfield" still appears in file names (`greenfield_device_map.json`) and older texts; the local dev stack often uses port **8502** |
+| **Default** | Template and import path with the Merker prefix `Earnie_*` |
 | **GX** | Victron GX (e.g. Cerbo) – device hub, often connected via Modbus TCP |
 | **HA** | Home Assistant – smarthome backend (often together with **evcc**) |
 | **HITL** | Human-in-the-Loop – manual mapping and confirmation in the UI (no fully automatic LLM mapping) |
@@ -31,7 +29,7 @@ New entries come from terms used in the main user docs (handbook, UI docs).
 | **LoxAPP3** | Loxone configuration/app export (`LoxAPP3.json`) – used e.g. for EFM meters and import |
 | **LoxBerry** | Mini-PC/Raspberry Pi plugin host in the Loxone ecosystem; the Earnie plugin is a Docker wrapper |
 | **LXC** | Linux Container – typical Proxmox environment for Docker Compose |
-| **MCP** | Model Context Protocol – in the docs: Loxone MCP (currently not offered in the UI) |
+| **MCP** | Model Context Protocol – Loxone interface, used only for lab comparisons |
 | **MILP** | Mixed-Integer Linear Programming – the mathematical optimization method behind the Earnie plan |
 | **Modbus** | Fieldbus/TCP protocol for inverters, Victron GX, wallboxes, etc.; only one writing owner per bus |
 | **NAS** | Network Attached Storage – e.g. Synology as a Docker host |

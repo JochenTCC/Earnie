@@ -37,7 +37,7 @@ Für Home Assistant und OpenEMS liegen passende Snippets unter `share/config/`:
 
 Die Zugangsdaten für Loxone liegen in `earnie_env/config/.env`: `LOXONE_IP` / `LOXONE_USER` / `LOXONE_PASS`.
 
-`plant.ehal_bindings` / `consumers[].ehal_bindings` (Hausprofil) und `batteries[]` / `inverters[]` / `pv_systems[]` / `wallboxes[].ehal_bindings` (`components.json`) enthalten bei Loxone und Home Assistant nur Aktivierungsschlüssel ohne Wert; bei OpenEMS steht im Binding der Kanal (`Komponente/Kanal`). Merker- bzw. Entity-Namen stehen in den Loxone-Vorlagen bzw. im HA-YAML-Paket. Details: [Loxone-Signale](../referenz/loxone-signals.md), [Home Assistant + evcc](ha-evcc.md).
+`plant.ehal_bindings` / `consumers[].ehal_bindings` (Hausprofil) und `batteries[]` / `inverters[]` / `pv_systems[]` / `wallboxes[].ehal_bindings` (`components.json`) enthalten bei Loxone und Home Assistant nur Aktivierungsschlüssel ohne Wert; bei OpenEMS steht im Binding der Kanal (`Komponente/Kanal`). Merker- bzw. Entity-Namen stehen in den Loxone-Vorlagen bzw. im HA-YAML-Paket. Details: [Loxone-Signale](../referenz/loxone-signals.md) (auf Englisch), [Home Assistant + evcc](ha-evcc.md).
 
 > **Hinweis:** Nach jedem Wechsel die Verbindung auf **EHAL-Com** prüfen (Live-Lesen bzw. Verbindungstest), bevor der Silent-Modus ausgeschaltet wird.
 
