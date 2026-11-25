@@ -18,9 +18,9 @@ Project rules live in `.cursor/rules/*.mdc` and `.cursor/skills/*/SKILL.md` (wri
 - Backtesting / SE runs: always `--workers N` with the largest useful N (`.cursor/rules/backtesting-max-workers.mdc`).
 - Red golden-master regression case (`scripts.run_regression`, pre-push hook): triage with `.cursor/skills/regression-triage/SKILL.md` (report verdict → `--compare-at <baseline-sha>` → bisect → bug / intended / test data) before any `--update-golden`.
 
-## Parallel sessions / worktrees
+## Parallel sessions
 
-Classify each session (`review`, `fix`, `hotfix`, `feat`, `port`, `spike`, triage); those classes work in their own worktree `..\earnie-wt\<class>-<slug>` — never switch branches in the main checkout. Docs/backlog-only work, Q&A and session conclusion stay in the main checkout. In a worktree run tests with the main checkout's `.venv` python from the worktree root. Rule `.cursor/rules/parallel-sessions.mdc`, workflow `docs/workflow/parallel-sessions.md`.
+One checkout per line, no worktrees: parallel sessions share it and never switch branches there. Child sessions edit only their named files, run targeted tests only and do not commit; the parent runs one joint full suite + regression at the end. Rule `.cursor/rules/parallel-sessions.mdc`, workflow `docs/workflow/parallel-sessions.md`, skill `parallel-sessions` (earnie-workspace).
 
 ## Shell
 
