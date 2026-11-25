@@ -24,7 +24,7 @@ Background: a tag push builds a **candidate** only; nothing reaches users until 
 - [x] Local HA test add-on **Earnie (Dev)**: `\\HOMEASSISTANT\addons\earnie_dev` (copy of `packaging/homeassistant-addon/earnie_prerelease/`, `slug: earnie_dev`, host ports `null`, `image:` unchanged → Supervisor pulls the published candidate image). HA slug `local_earnie_dev`, config dir `\\HOMEASSISTANT\addon_configs\local_earnie_dev`.
 - [ ] Optional: seed the dev config from the real add-on — copy `\\HOMEASSISTANT\addon_configs\20b22c55_earnie_prerelease\*` → `\\HOMEASSISTANT\addon_configs\local_earnie_dev\` (runtime history under `/data` is not reachable via Samba and starts empty).
 
-Re-create the dev add-on after larger wrapper changes (`run.sh`, `config.yaml` options/schema): copy the folder again and re-apply the four edits above.
+Re-create the dev add-on after larger wrapper changes (`run.sh`, `config.yaml` options/schema): copy the folder again and re-apply the edits above.
 
 ---
 
@@ -32,16 +32,16 @@ Re-create the dev add-on after larger wrapper changes (`run.sh`, `config.yaml` o
 
 ### 1. Prepare
 
-- [ ] `version.py` bump approved and on `origin/main` (tag = `version.py` without `v`)
+- [ ] `version.py` bump approved and on the ship line (`origin/release/x.y` while that line is open, otherwise `origin/main`) (tag = `version.py` without `v`)
 - [ ] Pre-release: `docker/compose/{synology,loxberry,proxmox}-alpha.yml` pin `ghcr.io/jochentcc/earnie-energy:<version>`
-- [ ] Release notes: AI draft via skill `release-notes` (`python -m scripts.release_notes_collect` → `.github/release-notes/drafts/v<version>.draft.md`), **maintainer review**, then `python -m scripts.release_notes_finalize --version <version> --approved` → `v<version>.md` (committed **before** the tag). Workflow: [release-notes-workflow.md](release-notes-workflow.md). Not for `-dev` versions
+- [ ] Release notes: AI draft via skill `release-notes` (`python -m scripts.release_notes_collect` writes the evidence pack, the AI writes `.github/release-notes/drafts/v<version>.draft.md`), **maintainer review**, then `python -m scripts.release_notes_finalize --version <version> --approved` → `v<version>.md` (committed **before** the tag). Workflow: [release-notes-workflow.md](release-notes-workflow.md). Not for `-dev` versions
 - [ ] Items from `.github/release-notes/UNRELEASED.md` appear in the draft (breaking / user-action items near the top); finalize resets `UNRELEASED.md` for official releases
 - [ ] **Migration section (when the registry gained steps):** if `runtime_store/migration/` added `MigrationStep`s since the previous published tag, the release notes **must** include a German **`## Migration`** section (what changes, wizard questions, that manual to-dos are computed at migrate time, backup under `config/backups/pre-migration-dm…`, no automated downgrade — restore backup by hand). Draft: `python -m scripts.migration_release_notes --since <previous-tag>` (paste into the notes; edit for clarity). Spec: [config-migration.md](config-migration.md). If the helper reports no new steps, omit the section.
 - [ ] **HA add-on Änderungsprotokoll (user-facing):** after `promote`, `bump_ha_addon` copies the **first non-heading prose line** of those release notes plus the **compact bullet list directly below it** (nested bullets) into `packaging/homeassistant-addon/earnie[_prerelease]/CHANGELOG.md` (what HA shows as Änderungsprotokoll). Edit that first line for end users: short German, no pin/`latest`/channel jargon, no internal backlog IDs — use Highlights-style bullets users can understand. Optional: after a local `python -m scripts.bump_ha_addon --version <version> --dry-run`, sanity-check the planned CHANGELOG blurb; if the auto blurb is still too technical, expand the first line (or first paragraph as one line) before tagging.
 - [ ] **Private regression repo clean and pushed:** `git status` in `Earnie-regression-private` shows no changes and nothing ahead of upstream — especially when a `## Bugfix Verifications Pending` item cites a `REG-<issue>-…` case. The report records the private SHA from `HEAD` only; uncommitted cases / goldens are invisible to it. Report shows `private-root-missing` → no full gate; clone the private repo first.
-- [ ] **Regression suite green locally** (public + private), run **before tagging**: `python -m scripts.run_regression --workers N` (or `pytest -m regression` / `EARNIE_RUN_REGRESSION=1`); attach `backtesting_logs/regression/regression_report.md` to the release notes draft. Red metrics → fix, or a conscious `--update-golden` with a rationale commit, **before the tag**. Spec: [regression-suite.md](regression-suite.md). Soft gate for now (hard CI gate in Regression P3).
+- [ ] **Regression suite green locally** (public + private), run **before tagging**: `python -m scripts.run_regression --workers N` (or `python -m scripts.run_pytest -m regression` / `EARNIE_RUN_REGRESSION=1`); attach `backtesting_logs/regression/regression_report.md` to the release notes draft. Red metrics → fix, or a conscious `--update-golden` with a rationale commit, **before the tag**. Spec: [regression-suite.md](regression-suite.md). Soft gate for now (hard CI gate in Regression P3).
 - [ ] Temporary doc review checklist (`docs/dev/doc-review-checklist.md`, from the quality gate) moved to `docs/dev/done/doc-review-checklist-<version>.md`
-- [ ] `git status` clean, `main` == `origin/main`
+- [ ] `git status` clean, ship-line branch == its upstream
 
 ### 2. Build the candidate
 
@@ -105,7 +105,7 @@ In-place pin on the live `earnie-productive` compose (NAS project folder; often 
 ### 5. Reject path (failed candidate)
 
 - [ ] Note what failed (backlog bugfix item)
-- [ ] Fix on `main`, approve the next version (`alpha.N+1` / PATCH) — **never** re-tag or force-push the rejected tag
+- [ ] Fix on the ship line (`release/x.y` if open, else `main`; cherry-pick to `main`), approve the next version (`alpha.N+1` / PATCH) — **never** re-tag or force-push the rejected tag
 - [ ] Optional: delete the draft release of the rejected candidate
 - [ ] Start again at step 1
 

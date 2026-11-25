@@ -58,7 +58,7 @@ The step-by-step agent workflow (triage, intake, baseline, fix, lock, full run, 
 
 | What | Where | Content |
 |---|---|---|
-| Runner, case schema, marker | Public `Energy-Optimizer` | `scripts/run_regression.py`, `tests/regression/` |
+| Runner, case schema, marker | Public `Earnie` | `scripts/run_regression.py`, `tests/regression/` |
 | Public cases | Public, `tests/regression/cases/` | HouseSim output, own data |
 | Private cases | Private repo `Earnie-regression-private`, sibling checkout | raw or scrubbed customer data |
 
@@ -68,7 +68,7 @@ The runner reads **two roots**: `tests/regression/cases/` and `$EARNIE_REGRESSIO
 
 **Hard rules**
 
-- Raw customer data never enters `Energy-Optimizer`, not even temporarily on a branch (the public history was scrubbed once already).
+- Raw customer data never enters `Earnie`, not even temporarily on a branch (the public history was scrubbed once already).
 - CI artifacts / logs of a run that included private cases must not be published; the report only contains aggregated numbers and case IDs.
 
 ## 5. Case format
@@ -85,7 +85,7 @@ The runner reads **two roots**: `tests/regression/cases/` and `$EARNIE_REGRESSIO
 ```yaml
 id: REG-142-eauto-deadline        # see §6
 title: E-car not full at deadline
-level: L1                          # L1 | L2
+level: L1                          # L1 | L2 | L1-invariants
 source: customer                   # synthetic | own | customer
 anonymized: false
 issue: JochenTCC/Earnie#142        # optional, public issue reference
@@ -170,7 +170,7 @@ python -m scripts.run_regression --intake <debug_dump.zip> --id REG-142-eauto-de
 
 ## 9. Intake and anonymization
 
-**Intake (P2)** — `--intake` turns a unified debug-dump ZIP (schema v3, see `scripts/replay_debug_dump.py`) into a private L1 case folder (`source: customer`), assigns the ID and writes `case.yaml` + case-local `recorder/`. Requires `--private` and an explicit cycle selector (`--seed-anchor` or `--cycle-index`). Does not scrub. Does not write `expected.json` (follow with `--update-golden`). Dump without `recorder/` **fails loud** (no synthetic fallback).
+**Intake (P2)** — `--intake` turns a unified debug-dump ZIP (schema v3, see `scripts/replay_debug_dump.py`) into a private L1 case folder (`source: customer`, or `own` for `REG-O-<slug>`), assigns the ID and writes `case.yaml` + case-local `recorder/`. Requires `--private` and an explicit cycle selector (`--seed-anchor` or `--cycle-index`). Does not scrub. Does not write `expected.json` (follow with `--update-golden`). Dump without `recorder/` **fails loud** (no synthetic fallback).
 
 **Scrub (P3)** — only needed when a customer case should become public (e.g. as a minimal repro). Whitelist-based: unknown fields are dropped, not copied.
 
@@ -285,7 +285,7 @@ Frozen inputs remove time and price as sources of deviation. What remains is the
 
 Per run: stage reached, runtime, objective value, cost (€), plan hash, number of slots differing from the reference (strict without limit). Cases: full 96-slot problems with several consumers and battery (recorder windows or backtesting engine with HouseSim fixtures; **not** the hourly prod-dump scenarios).
 
-**Expected decision:** if strict without limit finishes in acceptable time, goldens use that deterministic mode and tolerances can be tight; otherwise a small `gapRel` with no wall-clock limit as a dedicated regression solver mode, plus a production-path sample so the real path is still exercised. Per-metric tolerances in `expected.json` are derived from the measured spread, not guessed (the ±0.5 % default of §7 is a placeholder until then).
+**Expected decision:** if strict without limit finishes in acceptable time, goldens use that deterministic mode and tolerances can be tight; otherwise a small `gapRel` with no wall-clock limit as a dedicated regression solver mode, plus a production-path sample so the real path is still exercised. Per-metric tolerances in `expected.json` are derived from the measured spread, not guessed (the §7 default of ±0.05 % comes from the R0 reduced study below).
 
 ### R0 reduced study result (2026-10-14)
 

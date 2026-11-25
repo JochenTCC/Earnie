@@ -14,7 +14,7 @@ Related: [DEVELOPER.md](../../DEVELOPER.md) (tag → GHCR), [CONTRIBUTING.md](..
 |------|---------|
 | **`main`** | Ongoing development. Features for the *next* MINOR (and anything that must **not** ship in the release being finalized). |
 | **`release/…`** | Long-lived **release line** for a product MINOR. Opened when the official release is **near** and development should continue on `main`. The planned release is **moved** here and finalized (remaining alpha → beta → rc → official). After the official, this branch also carries **bugfixes** and **PATCH / minor maintenance releases**. |
-| **Annotated tags** (`vX.Y.Z`, `vX.Y.Z-alpha.N` / `-beta.N` / `-rc.N`) | Immutable shipped builds. Tag must equal `version.py` (no leading `v`). While a release branch is open for that MINOR, cut its tags from that branch, not from a diverged `main`. |
+| **Annotated tags** (`vX.Y.Z`, `vX.Y.Z-alpha.N` / `-beta.N` / `-rc.N`; `vX.Y.Z-dev.N` for dev builds: candidate image only, never promoted, no release notes) | Immutable shipped builds. Tag must equal `version.py` (no leading `v`). While a release branch is open for that MINOR, cut its tags from that branch, not from a diverged `main`. |
 | **Short-lived `hotfix/…`** | Only when users need a build **now** from an older tag and even the release branch must not ship as-is (rare). |
 
 There is **no** permanent `develop` or `alpha` branch. Pre-release is a **version channel** (`version.py` + tag + `*-alpha.yml` pins) on the active ship line (the release branch once opened, otherwise `main`).
@@ -151,8 +151,8 @@ Same letters as the session-conclusion guide:
 | Choice | Meaning |
 |--------|---------|
 | **A** | No tag |
-| **B** | Community pre-release (GitHub Pre-release; GHCR `:<version>` only) |
-| **C** | Official (Latest; GHCR `:<version>` + `:latest`) |
+| **B** | Community pre-release (GitHub Pre-release; GHCR `:<version>` + `:next`, no `:latest`) |
+| **C** | Official (Latest; GHCR `:<version>`, `:next` + `:latest`) |
 | **D** | Approve and set `version.py` first, then B or C |
 
 Rules that matter for branching:

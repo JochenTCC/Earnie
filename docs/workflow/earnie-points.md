@@ -4,11 +4,11 @@
 
 ## 1. Purpose
 
-The Earnie-Points rate the size and complexity of one **plant** (one location). The cloud tariff S / M / L is a mapping *points → tariff* that may change over time; the **points calculation itself stays constant**. Therefore:
+The Earnie-Points rate the size and complexity of one **plant** (one location). The cloud tariff S / M / L / XL is a mapping *points → tariff* that may change over time; the **points calculation itself stays constant**. Therefore:
 
 - The client computes points from the **live** configuration only (not Scenario-Explorer scenarios, not backtesting).
 - Only the point **total** goes on the wire (usage ping, schema v2). The breakdown is local (UI, tests).
-- No tariff name is sent or stored by the client. The mapping to S / M / L happens at analysis time from the histogram.
+- No tariff name is sent or stored by the client. The mapping to S / M / L / XL happens at analysis time from the histogram.
 - Points are not a licence check; values are fakeable like the rest of the ping statistic.
 - Private, non-commercial self-hosting is free up to **15 points** (maintainer decision 2026-11-13). Since 2.8 this is stated in the README, the operations guide and on the points view (`FREE_SELF_HOST_POINTS` in `ui/earnie_points_view.py`); nothing checks or limits it, and `LICENSE.md` is unchanged until the new licence.
 
@@ -85,7 +85,7 @@ Boundaries: 3.4 kWp = 0, 3.5 kWp = 1, 10.5 kWp = 2; 1.9 kWh = 0, 2 kWh = 1, 6 kW
 - It recomputes only when the mtime stamp (`config.json`, `backtesting_scenarios.json`, `components.json`, `house_profiles.json`) changed and consent is `on`; the stamp is stored even after an error, so a broken config is evaluated once per change. Stores `points`, `points_v`, `points_stamp` in `runtime/usage_ping.json`.
 - Hook: `note_live_cycle_success()` (live stage only, skipped in Shadow mode).
 - A configuration or calculation error logs a WARNING and **removes** `points` / `points_v` from the state; the ping stays valid as schema v1 and never affects the cycle.
-- A change of the points value (consent `on`) clears the daily send gate so the ping is sent again the same UTC day (like the scenario counter).
+- A change to a new valid points value (consent `on`) clears the daily send gate so the ping is sent again the same UTC day (like the scenario counter); removing the points after an error does not.
 
 ## 5. Privacy
 
