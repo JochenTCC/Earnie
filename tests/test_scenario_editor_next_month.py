@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 import pytest
-import time_machine
+from freezegun import freeze_time
 
 import config
 from ui.pages.scenario_editor_tariffs import _next_month_in_planning_tz
@@ -23,5 +23,6 @@ from ui.pages.scenario_editor_tariffs import _next_month_in_planning_tz
 )
 def test_te5_next_month_in_the_planning_time_zone(monkeypatch, utc_now, expected):
     monkeypatch.setattr(config.CONFIG, "PLANNING_TIMEZONE", "Europe/Vienna")
-    with time_machine.travel(utc_now, tick=False):
+    # freezegun (pure Python): time-machine's native extension may be blocked on Windows.
+    with freeze_time(utc_now):
         assert _next_month_in_planning_tz() == expected

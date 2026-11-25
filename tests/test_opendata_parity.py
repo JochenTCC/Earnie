@@ -11,6 +11,12 @@ import pytest
 
 from scripts import opendata_golden as golden
 
+# The replay freezes the clock with time-machine: the window crosses the DST change
+# (2025-10-26), which needs the real local time zone (freezegun's fixed offset drops an
+# hour). ImportError, not only ModuleNotFoundError: Windows Smart App Control may block
+# its native extension (see pyproject.toml); the test then skips.
+pytest.importorskip("time_machine", exc_type=ImportError)
+
 
 @pytest.fixture(scope="module")
 def expected():
