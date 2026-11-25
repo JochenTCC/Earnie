@@ -1,6 +1,6 @@
 # Konfiguration – Überblick
 
-Die zentrale Datei ist `earnie_env/config/config.json`. Als Ausgangspunkt dient [`share/config/config.example.json`](../../share/config/config.example.json); der Bootstrap kopiert fehlende Dateien. Siehe auch [Speichern / Laden](speichern-laden.md) und [Private Haus-Config](../einrichtung/private-env.md).
+Die zentrale Datei ist `earnie_env/config/config.json`. Als Ausgangspunkt dient [`share/config/config.example.json`](../../share/config/config.example.json); der Bootstrap kopiert fehlende Dateien. Siehe auch [Speichern / Laden](speichern-laden.md).
 
 ## Schema und Editor-Hilfe
 

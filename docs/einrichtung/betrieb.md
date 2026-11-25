@@ -81,6 +81,11 @@ Beim Wechsel von Datenmodell 3 (offizielle 2.6) auf 4 fragt der Assistent bei Lo
 
 Die Frage kommt nur einmal (beim Wechsel 3 → 4). In beiden Fällen müssen die virtuellen Ein-/Ausgänge in der Loxone Config auf die neuen Titel umgestellt werden; der Assistent zeigt das als manuellen Schritt. Home Assistant und OpenEMS sind nicht betroffen, denn dort sind die Werte Entity-IDs.
 
+### Home-Assistant-Add-on: Konfigurationsordner und `.env`
+
+- Liegt die Konfiguration noch unter `/data/earnie_env/config/`, kopiert das Add-on sie beim Start einmalig nach `/config/` und benennt den alten Ordner in `config.migrated-<datum>` um. Earnie löscht ihn nicht.
+- Liegt noch eine `.env` im Datenvolume (`/data/earnie_env/config/.env`), übernimmt Earnie beim Start einmalig ihre Werte nach `/config/.env`. Bei abweichenden Werten gilt der aus der alten Datei. Leere Werte und Werte aus der Vorlage (`.env.example`) übernimmt es nicht. Die alte Datei heißt danach `.env.migrated-<datum>`. Welche Schlüssel übernommen wurden, steht im Log (`addon_dotenv`, ohne die Werte).
+
 ### Backup
 
 Vor dem Schreiben legt Earnie ein Verzeichnis an:
@@ -151,7 +156,7 @@ Unter **Optimierer-Dienst → Dienst-Log** zeigt die App das Ende (Tail) von `ru
 
 **Lokal (venv / VS Code):** `main.py` und Streamlit können getrennt laufen. Der Auto-Start ist aus, solange `EARNIE_AUTO_START_MAIN` nicht auf `1` steht. So bleibt `main.py` beim Debugging unter eigener Kontrolle.
 
-Die Konfiguration schreiben die Seiten **Hauskonfigurator**, **Szenarienkonfigurator** und **Manuelle Geräte**. Wo hausbezogene Daten lokal bzw. in einem privaten Repo liegen, beschreibt [Private Haus-Config](private-env.md).
+Die Konfiguration schreiben die Seiten **Hauskonfigurator**, **Szenarienkonfigurator** und **Manuelle Geräte**.
 
 ## Optimierungs-Takt
 

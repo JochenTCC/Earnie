@@ -20,13 +20,13 @@ Für neue Setups ohne bestehende Loxone-Anlage lautet die offizielle Empfehlung 
 
 1. In der Oberfläche die Seite **Daemon Control → Smarthome-Backend** öffnen.
 2. Das Backend wählen. Dafür gibt es zwei Wege:
-   - **Automatische Suche:** per mDNS/SSDP, optional mit OpenEMS-Portscan.
+   - **Automatische Suche:** per mDNS/SSDP; findet sie nichts, optional erweiterte Suche mit OpenEMS-Portscan.
    - **Manuelle Auswahl:** Loxone, Home Assistant oder OpenEMS.
-3. Bei Loxone und OpenEMS die Zugangsdaten speichern. Danach folgt die Anbindung auf **EHAL-Com** über die **Signalliste**:
+3. Bei Loxone und OpenEMS die Zugangsdaten speichern, bei Home Assistant die Auswahl mit **Speichern** bestätigen (keine Zugangsdaten nötig). Danach folgt die Anbindung auf **EHAL-Com** über die **Signalliste**:
    - **Home Assistant:** Signale aktivieren und das **YAML-Paket** herunterladen; die echten Entities trägt man in Home Assistant ein (siehe [Home Assistant + evcc](ha-evcc.md#entity-mapping-human-in-the-loop)).
    - **Loxone:** Signale aktivieren und die Vorlagen für Virtual Inputs/Outputs exportieren.
 
-Die Auswahl schreibt `ehal.backend` in `config.json` und leert dabei den Adapter-Cache.
+Die Auswahl schreibt `ehal.backend` und `adapter_id` in `config.json` und leert dabei den Adapter-Cache.
 
 ### Manuell in `config.json` / `.env`
 
@@ -35,9 +35,9 @@ Für Home Assistant und OpenEMS liegen passende Snippets unter `share/config/`:
 - **HA:** [ehal.ha.snippet.json](../../share/config/ehal.ha.snippet.json) enthält `ehal.backend`, `adapter_id` sowie die optionalen Feldlisten `ha.sign` und `ha.boolean_invert`.
 - **OpenEMS:** [ehal.openems.snippet.json](../../share/config/ehal.openems.snippet.json).
 
-Die Zugangsdaten für Loxone liegen in `config/.env`: `LOXONE_IP` / `LOXONE_USER` / `LOXONE_PASS`.
+Die Zugangsdaten für Loxone liegen in `earnie_env/config/.env`: `LOXONE_IP` / `LOXONE_USER` / `LOXONE_PASS`.
 
-`plant.ehal_bindings` / `consumers[].ehal_bindings` (Hausprofil) und `batteries[]` / `inverters[]` / `pv_systems[].ehal_bindings` (`components.json`) enthalten nur Aktivierungsschlüssel ohne Wert. Merker- bzw. Entity-Namen stehen in den Loxone-Vorlagen bzw. im HA-YAML-Paket. Details: [Loxone-Signale](../referenz/loxone-signals.md), [Home Assistant + evcc](ha-evcc.md).
+`plant.ehal_bindings` / `consumers[].ehal_bindings` (Hausprofil) und `batteries[]` / `inverters[]` / `pv_systems[]` / `wallboxes[].ehal_bindings` (`components.json`) enthalten bei Loxone und Home Assistant nur Aktivierungsschlüssel ohne Wert; bei OpenEMS steht im Binding der Kanal (`Komponente/Kanal`). Merker- bzw. Entity-Namen stehen in den Loxone-Vorlagen bzw. im HA-YAML-Paket. Details: [Loxone-Signale](../referenz/loxone-signals.md), [Home Assistant + evcc](ha-evcc.md).
 
 > **Hinweis:** Nach jedem Wechsel die Verbindung auf **EHAL-Com** prüfen (Live-Lesen bzw. Verbindungstest), bevor der Silent-Modus ausgeschaltet wird.
 
@@ -59,4 +59,4 @@ Neu zugeordnet werden je Backend folgende Mappings:
 - [EHAL-Com](../ui/ehal-com.md) – Signalliste, Live-Lesen und -Schreiben
 - [Loxone-Anbindung](loxone-anbindung.md)
 - [Home Assistant + evcc](ha-evcc.md)
-- Entwickler-Spec (Englisch): [docs/referenz/ehal.md](../referenz/ehal.md)
+- [EHAL-Referenz](../referenz/ehal.md) (Entwickler-Doku auf Englisch)

@@ -12,7 +12,7 @@ Der Szenario-Explorer lässt sich ohne Installation online ausprobieren:
 
 ## Erste Schritte
 
-1. **Konfiguration anlegen:** Der Bootstrap erzeugt aus `share/config/config.example.json` die Datei `earnie_env/config/config.json` (lokal, nicht committen). Alternativ `python -m scripts.bootstrap_runtime` ausführen. Hausdaten: [Private Haus-Config](einrichtung/private-env.md).
+1. **Konfiguration anlegen:** Der Bootstrap erzeugt aus `share/config/config.example.json` die Datei `earnie_env/config/config.json` (lokal, nicht committen). Alternativ `python -m scripts.bootstrap_runtime` ausführen.
 2. **Smarthome-Backend wählen:** Standard ist Loxone, alternativ HA+evcc oder OpenEMS-Lab ([Smarthome-Backend wählen](einrichtung/smarthome-backend-wahl.md)). Auswahl und Zugangsdaten stehen in der UI unter [Smarthome-Backend](ui/smarthome-backend.md).
    - **Loxone:** `.env.example` nach `earnie_env/config/.env` kopieren und `LOXONE_IP`, `LOXONE_USER`, `LOXONE_PASS` eintragen. Im Docker-Betrieb legt der Entrypoint die `.env` im Config-Volume an.
    - **Home Assistant:** Backend wählen, dann das YAML-Paket aus EHAL-Com in Home Assistant einbinden.

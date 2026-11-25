@@ -106,8 +106,6 @@ Details: [Betrieb](docs/einrichtung/betrieb.md)
 7. **Monitor öffnen:** [Streamlit](https://streamlit.io/) im Browser aufrufen. Den Port je Stack nennt [Streamlit-Ports](docs/dev/streamlit-ports.md) (Entwickler-Doku auf Englisch; Prod und lokale venv typisch **8501**).
 8. **Feintuning:** Hausprofil, Szenarien und flexible Verbraucher über die Planungs- und Betriebsseiten anpassen.
 
-Optional: [Greenfield Dev-Stack](docs/einrichtung/greenfield-dev-stack.md) (Ersteinrichtung)
-
 ## Anwender-Dokumentation
 
 - **Benutzer-Handbuch (Einstieg aus Anwendersicht):** [docs/user-manual/Benutzer-Handbuch-Earnie.md](docs/user-manual/Benutzer-Handbuch-Earnie.md)

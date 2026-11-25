@@ -8,7 +8,7 @@
 #   docker compose --project-directory . -f docker/compose/greenfield.yml up -d --build
 #
 # UI: http://localhost:8502 — Ersteinrichtung (setup_dotenv), Sunset-2-Sunset + Backtesting (1.26.0 P0).
-# Checkliste: docs/einrichtung/greenfield-dev-stack.md
+# Checkliste: docs/dev/greenfield-dev-stack.md
 #
 # Ein Container: Streamlit-UI startet main.py automatisch (EARNIE_AUTO_START_MAIN=1).
 # Stack stoppen (Daten bleiben in greenfield/):

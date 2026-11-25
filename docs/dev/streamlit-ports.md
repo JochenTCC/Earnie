@@ -13,7 +13,7 @@ In the container and in the venv, `config.json` → `ui.streamlit_port` or the e
 | **8521** | **Local dev stack (Docker)** | Windows/Linux dev PC | in the `earnie` container (auto-start) | `http://localhost:8521` | `docker/compose/dev.yml` (`8521:8501`) |
 | **8502** | **Greenfield (Docker)** | Dev PC (Docker) | in the `earnie-greenfield` container (auto-start) | `http://localhost:8502` | `docker/compose/greenfield.yml` (`8502:8501`) |
 | **8542** | **Greenfield – EHAL Loxone request HTTP** | Dev PC (Docker) | Daemon in the Greenfield container | `http://localhost:8542` → container **8541** | `greenfield.yml` (`8542:8541`); VO address on the dev PC possibly `:8542` |
-| **8532** | **Greenfield (venv)** | Dev PC (venv) | `python main.py` with `greenfield/config` | `http://localhost:8532` | VS Code "Streamlit app.py (Greenfield :8532)" |
+| **8532** | **Greenfield (venv)** | Dev PC (venv) | `python main.py` with `greenfield/config` | `http://localhost:8532` | `EARNIE_ENV_PATH=greenfield`, `EARNIE_UI_STREAMLIT_PORT=8532`, `python -m scripts.run_streamlit` |
 | **8503** | **OpenEMS lab (Docker)** | Dev PC / Pi (Docker) | in the `earnie-openems-lab` container (auto-start) | `http://localhost:8503` | `docker/compose/openems-lab.yml` (`8503:8501`); setup: [openems-lab](../einrichtung/openems-lab.md) |
 | **8504** | **Local against NAS data** | Dev PC (venv) | **on the NAS** (in the `earnie-productive` production container) | `http://localhost:8504` | VS Code "Streamlit app.py (NAS)"; reads `config`/`runtime` from the NAS via UNC/SMB (formerly often :8503; that port stays free for the OpenEMS lab) |
 | **8506** | **HA + evcc lab (Docker)** | Dev PC / Pi (Docker) | in the `earnie-ha-lab` container (auto-start) | `http://localhost:8506` | `docker/compose/ha-lab.yml` (`8506:8501`); setup: [ha-evcc](../einrichtung/ha-evcc.md) |
@@ -46,5 +46,5 @@ The variable overrides `ui.streamlit_port` from `config.json` (see `ui/streamlit
 - [Container](../einrichtung/container.md) – deployment on Synology and LoxBerry
 - [Proxmox LXC](../einrichtung/proxmox-lxc.md) – LXC with Docker Compose
 - [VMware Workstation `vctl`](../einrichtung/vmware-vctl.md) – Windows PC without Docker Desktop
-- [Greenfield dev stack](../einrichtung/greenfield-dev-stack.md)
+- [Greenfield dev stack](greenfield-dev-stack.md)
 - [Operation](../einrichtung/betrieb.md) – `main.py` and Streamlit compared

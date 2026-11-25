@@ -11,7 +11,7 @@ Quellbaum im Repo: [`packaging/homeassistant-addon/earnie/`](../../packaging/hom
 
 Die Anbindung an Home Assistant ist in beiden Fällen dieselbe: Home Assistant schickt Messwerte per **Push** an Earnie und holt die Sollwerte über `status.json` ab (`ehal.backend=ha`, siehe [Home Assistant + evcc](ha-evcc.md)). Das Add-on ist also nur eine Installationsart, keine eigene Art der Anbindung.
 
-**Begriff „Add-on“ und „App“:** Seit Home Assistant 2026.2 heißt der Menüpunkt in der Oberfläche **„Apps“** statt „Add-ons“. Das betrifft nur die Beschriftung; Repository-Format, `config.yaml` und Supervisor-API heißen technisch weiterhin „Add-on“. Diese Doku bleibt beim Begriff „Add-on“ für das Earnie-Paket. In der HA-Oberfläche steht es unter **Einstellungen → Apps**.
+**Begriff „Add-on“ und „App“:** In der Home-Assistant-Oberfläche heißt der Menüpunkt **„Apps“**; technisch (Repository-Format, `config.yaml`, Supervisor-API) heißt das Paket „Add-on“. Diese Doku verwendet „Add-on“ für das Earnie-Paket. In der HA-Oberfläche steht es unter **Einstellungen → Apps**.
 
 ## Voraussetzungen (Go/No-Go)
 
@@ -30,9 +30,9 @@ Die Anbindung an Home Assistant ist in beiden Fällen dieselbe: Home Assistant s
 3. **Typ** `host` wählen (alternativ `x86-64-v2-AES`) → **OK**.
 4. VM wieder starten. Ein Neustart aus Home Assistant heraus reicht nicht; die VM muss aus- und wieder eingeschaltet werden.
 
-Die CPU lässt sich z. B. im Add-on **Terminal & SSH** prüfen: `grep -o -w -E 'sse4_2|popcnt' /proc/cpuinfo | sort -u` muss beide Begriffe ausgeben.
+Die CPU lässt sich z. B. im Add-on **Terminal & SSH** prüfen: `grep -o -w -E 'cx16|lahf_lm|popcnt|pni|sse4_1|sse4_2|ssse3' /proc/cpuinfo | sort -u` muss alle sieben Begriffe ausgeben.
 
-Zusätzlich prüft der Image-Entrypoint die Schreibrechte unter `/config` und `/data/earnie_env/runtime` sowie die Systemuhr (gegen das Build-Datum des Images). Die Health-Prüfung übernimmt der Docker-**HEALTHCHECK** des Images (`docker/healthcheck.sh`). Er prüft Streamlit auf dem internen Port 8502 und, wenn der Daemon läuft, ein frisches `runtime/daemon_heartbeat.json`.
+Zusätzlich prüft der Image-Entrypoint die Schreibrechte unter `/config` und `/data/earnie_env/runtime` sowie die Systemuhr (gegen das Build-Datum des Images). Die Health-Prüfung übernimmt der Docker-**HEALTHCHECK** des Images (`docker/healthcheck.sh`). Er prüft Streamlit (hinter nginx auf dem internen Port 8502, ohne Ingress-Pfad direkt auf 8501) und, wenn der Daemon läuft, ein frisches `runtime/daemon_heartbeat.json`.
 
 ## Installation
 
@@ -42,7 +42,7 @@ Zusätzlich prüft der Image-Entrypoint die Schreibrechte unter `/config` und `/
 4. Optional: App-Optionen ausfüllen (siehe unten). Alle Felder sind optional.
 5. **Start** wählen. Die Web-UI öffnet sich über die **HA-Seitenleiste** (Ingress) oder über **OPEN WEB UI** auf der App-Seite. Ein Host-Port `:8501` oder das Nachschlagen der VM-/Host-IP ist dafür **nicht** nötig.
    Optional (Fortgeschritten): direkter LAN-Zugriff über `http://<home-assistant-ip>:8501`.
-   **Nach dem Start ca. 20–40 Sekunden warten**, bis die Oberfläche erreichbar ist. In dieser Zeit legt Earnie die `earnie_env`-Dateien an und startet Streamlit hinter nginx. Wird Ingress **sofort** geöffnet, erscheint typischerweise eine der folgenden Anzeigen:
+   **Nach dem Start ca. 20–40 Sekunden warten**, bis die Oberfläche erreichbar ist. In dieser Zeit legt Earnie fehlende Konfigurations- und Laufzeitdateien an und startet Streamlit hinter nginx. Wird Ingress **sofort** geöffnet, erscheint typischerweise eine der folgenden Anzeigen:
    - die Hinweis-Seite **„Earnie startet noch“** (von nginx, aktualisiert sich selbst) oder
    - die HA-Meldung **„Bad Gateway / 502“**, falls der Proxy noch gar nicht antwortet.
 
@@ -51,12 +51,12 @@ Zusätzlich prüft der Image-Entrypoint die Schreibrechte unter `/config` und `/
 
 ## Konfiguration
 
-Die Add-on-Optionen (`config.yaml` → `options`) sind ein optionales Zusatzangebot. Ohne Einträge wird Earnie weiterhin dateibasiert konfiguriert (`config.json`, Sidecars), genau wie bei den anderen Installationsarten.
+Die Add-on-Optionen (`config.yaml` → `options`) sind ein optionales Zusatzangebot. Ohne Einträge wird Earnie dateibasiert konfiguriert (`config.json`, Sidecars), genau wie bei den anderen Installationsarten.
 
 | Add-on-Option | Wirkung | Pflicht |
 |---|---|---|
-| `streamlit_port` (Default `8501`) | Merge nach `config.json` `ui.streamlit_port` (nur informativ). Der UI-Port des Add-ons bleibt `8501` (nginx), Streamlit läuft intern immer auf `8502`. | nein |
-| `ehal_http_port` (Default `8541`) | Port des Daemon-HTTP für das Push-Verfahren mit Home Assistant; Merge nach `config.json` `system.ehal_http_port`. Hieß früher `ehal_loxone_http_port`: Ein dort gespeicherter Wert wird übernommen, solange `ehal_http_port` auf `8541` steht. Danach den alten Eintrag entfernen. | nein |
+| `streamlit_port` (Default `8501`) | Merge nach `config.json` `ui.streamlit_port` (nur informativ). Der UI-Port des Add-ons bleibt `8501`; Streamlit läuft dahinter auf `8502` (ohne Ingress-Pfad direkt auf `8501`, siehe [Ingress](#ingress)). | nein |
+| `ehal_http_port` (Default `8541`) | Port des Daemon-HTTP für das Push-Verfahren mit Home Assistant; Merge nach `config.json` `system.ehal_http_port`. Steht in den Optionen noch `ehal_loxone_http_port`, gilt dessen Wert, solange `ehal_http_port` auf `8541` steht. Dann den Wert in `ehal_http_port` eintragen und den alten Eintrag entfernen. | nein |
 | `ui_modes` (Default `sunset2sunset,scenario_explorer,live_environment`) | `EARNIE_UI_MODES` | nein |
 | `auto_start_main` (Default `true`) | `EARNIE_AUTO_START_MAIN` | nein |
 | `timezone` (Default `Europe/Vienna`) | `TZ` | nein |
@@ -79,9 +79,9 @@ Live-Telemetrie und Sollwerte laufen über ein **Push-Verfahren**:
 4. Das Paket in Home Assistant als Package einbinden und die Platzhalter durch echte `entity_id`s ersetzen. Der Push muss periodisch laufen (Standard-Wiederholintervall 10 s) – nicht nur bei Wertänderung. Bleibt ein Leistungswert länger aus, nimmt Earnie **0** an; Energiezähler nimmt Earnie nie als 0 an.
 5. Live-Lesen / Live-Schreiben auf EHAL-Com bestätigen, dass Werte ankommen und Sollwerte abgerufen werden.
 
-### YAML-Paket und Add-on 1.0
+### YAML-Paket
 
-Das YAML-Paket erzeugt die Earnie-App (Download auf EHAL-Com bzw. CLI `python -m scripts.ha_carrier_yaml_gen`). Das Add-on-Repository [`ha-addon-earnie`](https://github.com/JochenTCC/ha-addon-earnie) ist getrennt vom App-Image. Erwartung für **Add-on 1.0**: das Add-on kann das generierte Package mitliefern oder den Import in HA vereinfachen. Bis dahin bleibt der manuelle Download und die Einbindung als HA-Package der unterstützte Weg.
+Das YAML-Paket erzeugt Earnie (Download auf EHAL-Com bzw. CLI `python -m scripts.ha_carrier_yaml_gen`). In Home Assistant wird es als Package eingebunden.
 
 ### Ingress
 
@@ -100,11 +100,9 @@ Die Konfiguration liegt im Supervisor-Ordner `addon_config` (sichtbar per Samba 
 
 > **Hinweis:** Die `.env` mit Zugangsdaten liegt damit im per Samba sichtbaren Ordner. Das ist bei HA üblich (`secrets.yaml` liegt ebenso dort). Beim Wechsel auf die Vorabversion den Inhalt von `…_earnie/` nach `…_earnie_prerelease/` kopieren (siehe unten).
 
-**Migration älterer Installationen:** Beim ersten Start einer Version mit `addon_config` kopiert `run.sh` einmalig `/data/earnie_env/config/` nach `/config/`. Den Altordner benennt es in `config.migrated-<datum>` um und bewahrt ihn eine Version lang auf.
+Liegt die Konfiguration einer älteren Installation noch im Datenvolume, übernimmt das Add-on sie beim Start, siehe [Betrieb → Update und Migration](betrieb.md#home-assistant-add-on-konfigurationsordner-und-env).
 
-**`.env` bis Version 2.7:** Bis 2.7 hat das Add-on die `.env` trotz dieser Migration weiter unter `/data/earnie_env/config/.env` gelesen; die kopierte `/config/.env` blieb unbenutzt. Ab 2.8 liest es `/config/.env`. Beim ersten Start übernimmt Earnie einmalig die Werte aus der alten Datei nach `/config/.env`. Bei abweichenden Werten gilt der aus der alten Datei, denn mit ihm lief Earnie bisher. Leere Werte und Werte aus der Vorlage (`.env.example`) übernimmt es nicht. Die alte Datei heißt danach `.env.migrated-<datum>`. Welche Schlüssel übernommen wurden, steht im Log (`addon_dotenv`, ohne die Werte).
-
-Erreichbar sind die Ordner z. B. über das Add-on **Samba** oder **SSH & Web Terminal**.
+Erreichbar sind die Ordner z. B. über das Add-on **Samba** oder **Terminal & SSH**.
 
 ## Ports
 
@@ -114,7 +112,7 @@ Erreichbar sind die Ordner z. B. über das Add-on **Samba** oder **SSH & Web Ter
 | `8501/tcp` | Optionaler Direktzugriff (Streamlit) |
 | `8541/tcp` | Daemon-HTTP für das EHAL-Push-Verfahren (Telemetrie, Heartbeat, `status.json`, Request-Optimize). **Immer freigeben** – nötig für die Anbindung an Home Assistant (`ehal.backend=ha`). Ohne diesen Port erreicht das HA-YAML-Paket Earnie nicht. |
 
-Gesamtübersicht der Ports: [`docs/dev/streamlit-ports.md`](../dev/streamlit-ports.md).
+Gesamtübersicht der Ports: [`docs/dev/streamlit-ports.md`](../dev/streamlit-ports.md) (Entwickler-Doku auf Englisch).
 
 ## Add-on-Update vs. Image-Update
 
@@ -144,8 +142,8 @@ Den Kanal bestimmt das installierte Add-on (`earnie` / `earnie_prerelease`).
 
 ## Einschränkungen
 
-- Die Add-on-Optionen decken nur die gängigsten Werte ab. Die vollständige Konfiguration von Haus und Entities erfolgt weiterhin in der App oder dateibasiert.
-- Es gibt kein MQTT Discovery, keine nativen HA-Entitäten und keine Integration ins Energy-Dashboard. Mitlieferung bzw. vereinfachter Import des Earnie-YAML-Pakets ist für Add-on **1.0** vorgesehen (siehe oben); bis dahin Download auf EHAL-Com.
+- Die Add-on-Optionen decken nur die gängigsten Werte ab. Die vollständige Konfiguration von Haus und Entities erfolgt in der App oder dateibasiert.
+- Es gibt kein MQTT Discovery, keine nativen HA-Entitäten und keine Integration ins Energy-Dashboard. Das YAML-Paket kommt per Download auf EHAL-Com.
 
 ## Deinstallation
 

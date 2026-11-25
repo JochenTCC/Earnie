@@ -2,6 +2,10 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Docs review for 2.8.0-beta.1: group B (2026-11-25)
+
+- [x] **Docs review of setup and configuration docs (group B)** `[docs]`: reviewed together in chat with the maintainer, every finding confirmed one by one: `speichern-laden.md`, `verbrauchs-csv.md`, `ha-evcc.md`, `loxone-anbindung.md`, `container.md`, `homeassistant-addon.md`, `openems-lab.md` (marked as lab guide), `smarthome-backend-wahl.md`, `ui/smarthome-backend.md`. Facts checked against the code (scenario delete, wallbox bindings, `.env` path, `config.json` / `components.json` content, Loxone startup check, add-on CPU flags and internal port, scan order and subnet sources, HA save step). Current-state wording, no future announcements, links into dev docs marked. Developer content moved: test CSV export, buildx / multi-arch build and NAS cycle profiling to `DEVELOPER.md`; `greenfield-dev-stack.md` and `private-env.md` to `docs/dev/` (English); add-on config / `.env` migration notes to `betrieb.md` § Update und Migration. Follow-ups: VS Code launch configs named in `docs/dev/streamlit-ports.md` do not exist, and `earnie-workspace/ai/ECOSYSTEM.md` says launch configs live in `Earnie.code-workspace`, which has none.
+
 ### Alpha compose variant retired (2026-11-25)
 
 - [x] **Alpha compose variant retired** `[infra]` *(decided 2026-11-25, maintainer)*: there is only a development variant (a `-dev` image loaded on the NAS over SSH into `earnie-productive`) and a release variant (`:latest`, or `:next` / `:<version>` for pre-releases) in the same `*_productive.yml`. Removed `docker/compose/{synology,loxberry,proxmox}-alpha.yml` (port 8511/8551; they mounted `./earnie_env/` although docs and comments promised separate `./earnie_env_alpha/` volumes), the "Alpha compose sync" duty in skill/rule `session-abschluss`, `release-checklist.md` and `branching-hotfix-playbook.md`, and the Alpha passages in `container.md`, `proxmox-lxc.md`, `docker/README.md`, `docs/dev/streamlit-ports.md` and `.gitignore`. Found in the docs review for 2.8.0-beta.1.

@@ -30,7 +30,7 @@ Run in parallel:
 - `git diff --cached`
 - `git log -5 --oneline` (commit style)
 - Chat history for this session: what was completed, what remains open?
-- **Private earnie-env (if present):** `git status` / `git diff` in the sibling private site-pack repo (default `..\Earnie-env-home`, see `docs/einrichtung/private-env.md` / `scripts/link_private_env.ps1`). Do not invent a second path; if the junction exists, follow its target.
+- **Private earnie-env (if present):** `git status` / `git diff` in the sibling private site-pack repo (default `..\Earnie-env-home`, see `docs/dev/private-env.md` / `scripts/link_private_env.ps1`). Do not invent a second path; if the junction exists, follow its target.
 - **Shared checkout (`parallel-sessions.mdc`):** other sessions may have uncommitted changes in the same checkout; commit only this session's files — the rest belongs to the user or another session.
 - **Private regression repo (if present):** `git status -sb` in `Earnie-regression-private` (parent of `$EARNIE_REGRESSION_PRIVATE_DIR`, default sibling `..\Earnie-regression-private`, see `docs/workflow/regression-suite.md` §4). Needed for §2b and the publish-guide warning.
 

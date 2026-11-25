@@ -165,7 +165,7 @@ Config is loaded at process start — editing JSON alone is not enough.
 
 ### 1.5 Live planning (needed for a full Live cycle)
 
-SoC read from OpenEMS is enough to prove the adapter path. A **full** optimization cycle still needs a usable Live scenario (house profile, battery, tariffs) — same idea as [Greenfield](../einrichtung/greenfield-dev-stack.md): complete Hauskonfigurator + Live scenario under **[http://192.168.178.34:8503](http://192.168.178.34:8503)**. Without that, Live may fail later for planning reasons even when OpenEMS REST works.
+SoC read from OpenEMS is enough to prove the adapter path. A **full** optimization cycle still needs a usable Live scenario (house profile, battery, tariffs) — same idea as [Greenfield](greenfield-dev-stack.md): complete Hauskonfigurator + Live scenario under **[http://192.168.178.34:8503](http://192.168.178.34:8503)**. Without that, Live may fail later for planning reasons even when OpenEMS REST works.
 
 ---
 

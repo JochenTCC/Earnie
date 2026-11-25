@@ -90,7 +90,7 @@ Die typischen Wege im Überblick:
 3. Oberfläche im Browser öffnen (im Produktivbetrieb meist Port **8501**, siehe [Streamlit-Ports](../dev/streamlit-ports.md)).
 4. Für den späteren Live-Betrieb: auf der Seite **Smarthome-Backend** das Backend wählen und den Zugang hinterlegen ([Smarthome-Backend wählen](../einrichtung/smarthome-backend-wahl.md)). Danach mit dem Hauskonfigurator weitermachen.
 
-Details: [Container](../einrichtung/container.md) · [VMware `vctl` (Windows-PC)](../einrichtung/vmware-vctl.md) · [Betrieb](../einrichtung/betrieb.md) · [Greenfield](../einrichtung/greenfield-dev-stack.md)
+Details: [Container](../einrichtung/container.md) · [VMware `vctl` (Windows-PC)](../einrichtung/vmware-vctl.md) · [Betrieb](../einrichtung/betrieb.md)
 
 Nach dem ersten Start öffnet Earnie die Seite **Smarthome-Backend** (unter **Daemon Control**). Dort wird das Backend gewählt und verbunden; **Optimierer-Dienst** und **EHAL-Com** sind erst danach freigeschaltet. Weitere Seiten wie Monitor oder Szenario-Explorer erscheinen, sobald die Einrichtung weit genug ist.
 

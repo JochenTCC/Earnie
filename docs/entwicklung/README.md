@@ -19,7 +19,8 @@ Arbeitsnotizen, Entwürfe und abgeschlossene Epics liegen unter [`docs/dev/`](..
 
 ## Entwickler-Betrieb
 
-- [Greenfield Dev-Stack](../einrichtung/greenfield-dev-stack.md) – lokale Ersteinrichtung für Hauskonfigurator und Backtesting.
+- [Greenfield Dev-Stack](../dev/greenfield-dev-stack.md) – lokale Ersteinrichtung für Hauskonfigurator und Backtesting.
+- [Private site config](../dev/private-env.md) – privates Repo `Earnie-env-home`, Junction, Tarifkatalog veröffentlichen, private Regression-Fälle, Cloud-Demo.
 - [OpenEMS-Lab](../einrichtung/openems-lab.md) – Earnie mit OpenEMS Edge/UI; der Kommunikationscheck steht in der Spezifikation.
 - [HA ↔ Loxone Bridge-Generator](../dev/done/ha-loxone-bridge.md) – Prototyp (POC): erzeugt die Brücke für die Delta 3 aus einer Mapping-Datei, Loxone → HA per Webhook.
 

@@ -102,7 +102,7 @@ docker manifest inspect ghcr.io/jochentcc/earnie-energy:latest
 
 Before `--push` the build checks the bundled tariff catalog (`share/config/tariffs.json`: schema, example scenario references, DACH completeness); by hand: `python -m scripts.validate_tariffs --check-catalog` (a site file: `--tariffs <path> --check-catalog`). `EARNIE_STRICT_TARIFF_VALIDATE=1` makes `main.py` stop on catalog errors (set in the compose files).
 
-Local test before a NAS deploy: `docker/compose/dev.yml` (local build, same mounts; see *Start Locally (Dev)*). Acceptance on empty volumes: Greenfield stack, [docs/einrichtung/greenfield-dev-stack.md](docs/einrichtung/greenfield-dev-stack.md).
+Local test before a NAS deploy: `docker/compose/dev.yml` (local build, same mounts; see *Start Locally (Dev)*). Acceptance on empty volumes: Greenfield stack, [docs/dev/greenfield-dev-stack.md](docs/dev/greenfield-dev-stack.md).
 
 ### Cycle profiling on the NAS (one-off)
 
