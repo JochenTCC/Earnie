@@ -223,7 +223,7 @@ Lokale Auswertung (nach dem Kopieren von `timing/` von der NAS):
 python -m scripts.summarize_cycle_timing earnie_env/runtime/timing/cycles.jsonl
 ```
 
-Einmaliger Test auf der NAS (lokales Image, Compose-Env): siehe [Container – Live-Zyklus-Profiling (NAS-Einmal-Test)](container.md#live-zyklus-profiling-nas-einmal-test).
+Einmaliger Test auf der NAS (lokales Image, Compose-Env): siehe [DEVELOPER.md – Cycle profiling on the NAS](../../DEVELOPER.md#cycle-profiling-on-the-nas-one-off) (Entwickler-Doku auf Englisch).
 
 ### Zyklus-Pünktlichkeit und Vorlauf (immer aktiv)
 

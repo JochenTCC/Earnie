@@ -23,9 +23,9 @@ Die **Einrichtung** beschreibt [Loxone-Signale und Vorlagen](../referenz/loxone-
 | `LOXONE_USER` | Benutzername (HTTP Basic Auth)                                                                         |
 | `LOXONE_PASS` | Passwort                                                                                               |
 
-Earnie braucht die Zugangsdaten für den Loxone-Import (`LoxAPP3.json`) und die Presence-Probe auf EHAL-Com. Der Optimierer-Dienst plant und schreibt auch ohne sie, weil Telemetrie und Sollwerte nur über VO-Push und `status.json` laufen.
+Earnie braucht die Zugangsdaten für den Loxone-Import (`LoxAPP3.json`), die Presence-Probe auf EHAL-Com und das Prüfskript `verify_loxone_setup`. Der Optimierer-Dienst plant und schreibt auch ohne sie, weil Telemetrie und Sollwerte nur über VO-Push und `status.json` laufen.
 
-Im Produktivbetrieb (Docker) legt der Container-Start (Entrypoint) eine fehlende `config/.env` aus der Vorlage an. Die Werte werden danach unter **Smarthome-Backend → Anbindung** eingetragen oder direkt in der Datei gesetzt. Lokal ohne Container: [.env.example](../../.env.example) nach `config/.env` kopieren, sofern die Datei noch fehlt.
+Im Produktivbetrieb (Docker) legt der Container-Start (Entrypoint) eine fehlende `config/.env` aus der Vorlage an. Die Werte werden danach unter **Smarthome-Backend → Anbindung** eingetragen oder direkt in der Datei gesetzt. Lokal ohne Container: [.env.example](../../.env.example) nach `earnie_env/config/.env` kopieren, sofern die Datei noch fehlt.
 
 Lehnt der Miniserver die Zugangsdaten ab (HTTP **401** oder **403**), zeigt die Web-Oberfläche einen Fehlerhinweis. Betroffen sind nur Loxone-Import und Presence-Probe; der Optimierer-Dienst läuft weiter. Abhilfe: IP, Benutzer und Passwort unter **Smarthome-Backend → Anbindung** korrigieren und die Merker erneut testen.
 
@@ -49,7 +49,7 @@ Aktivierte Signale stehen als Schlüssel in `plant.ehal_bindings` und `consumers
 | Flexible Verbraucher | `consumers[].ehal_bindings`                  | Live-Leistung / Freigaben für `cons_data`         |
 | E-Auto-Status        | EVCS-Felder in `ehal_bindings` / Ladeplan    | Anschluss, Rest-SOC, Fertig-um, max. Ladeleistung |
 
-Ein Anlagen-Feld für die PV-Leistung gibt es nicht mehr. Earnie leitet die PV-Leistung der Anlage aus den netzgekoppelten Wechselrichtern ab: Σ(`inv.{id}.sens_inv_power_pv` · Wirkungsgrad), Vorlage `Earnie_WR_Leistung_PV`. Jeder Wechselrichter mit angeschlossenen PV-Feldern braucht dieses Signal (siehe [Batterie & PV](../konfiguration/batterie-pv.md)). Die PV-Energie je Intervall ergibt sich aus dem Integral über diese abgeleitete Leistung.
+Earnie leitet die PV-Leistung der Anlage aus den netzgekoppelten Wechselrichtern ab: Σ(`inv.{id}.sens_inv_power_pv` · Wirkungsgrad), Vorlage `Earnie_WR_Leistung_PV`. Jeder Wechselrichter mit angeschlossenen PV-Feldern braucht dieses Signal (siehe [Batterie & PV](../konfiguration/batterie-pv.md)). Die PV-Energie je Intervall ergibt sich aus dem Integral über diese abgeleitete Leistung.
 
 ## Was Earnie schreibt
 
@@ -62,7 +62,7 @@ Ein Anlagen-Feld für die PV-Leistung gibt es nicht mehr. Earnie leitet die PV-L
 | Ziel-SoC (optional)                 | `batteries[].ehal_bindings.set_ess_target_soc`                    | %; bei Entladesperre der Ist-SoC, bei Zwangsladen/-entladen der geplante SoC am Slot-Ende plus Puffer (1 % + ¼ der geplanten SoC-Änderung des Slots, Richtung Lade-/Entladeziel, begrenzt auf SoC-Min/-Max), in Automatik 99. Ein Huawei beendet den Zwangsbetrieb bei diesem SoC und meldet den SoC nur in ganzen Prozent; ohne Puffer endet der Slot zu früh |
 | Einspeisegrenze (outbound)          | `plant.ehal_bindings.set_grid_export_power_limit`                 | kW, Betrag ≥ 0; harte Obergrenze für die Netz-Einspeisung; `0` = keine Einspeisung; Wert ohne Begrenzung: siehe [Einspeisegrenze](../konfiguration/batterie-pv.md#einspeisegrenze) |
 | Einspeisegrenze (inbound, optional) | `plant.ehal_bindings.get_grid_export_power_limit`                 | kW; variable Grenze vom Netz/HEMS an Earnie                                                                                                         |
-| Verbraucher-Freigabe                | `consumers[].ehal_bindings` (Flex enable)                         | `0` = gesperrt, `1` = Freigabe (SwimSpa, Wärmepumpe, Filter)                                                                                        |
+| Verbraucher-Freigabe                | `consumers[].ehal_bindings` (Flex enable)                         | `0` = gesperrt, `1` = Freigabe (Pool, Wärmepumpe, Filter)                                                                                        |
 | E-Auto Sollstrom                    | `ehal_bindings.set_evcs_max_current`                              | Ziel-Ladestrom / -leistung                                                                                                                          |
 | E-Auto PV-Follow                    | `ehal_bindings` / `set_evcs_mode`                                 | `0`/`1` bzw. Modus                                                                                                                                  |
 
@@ -100,7 +100,7 @@ Manche Geräte liefern entgegengesetzte Vorzeichen, z. B. Huawei-Register 37113 
 - **In Loxone Config:** Das Vorzeichen so drehen, dass der VO den von der Rolle erwarteten Hub-Wert liefert.
 - **In der Rolle:** Ein passendes `sign` setzen (Standard für Loxone-Leistungen: `sign: 1`).
 
-Historische Verbrauchsdaten kommen über CSV-Upload, Energiemonitor bzw. `cons_data`. Ein FTP-Log vom Miniserver wird nicht mehr genutzt.
+Historische Verbrauchsdaten kommen über CSV-Upload, Energiemonitor bzw. `cons_data`.
 
 ## Verbindung prüfen
 

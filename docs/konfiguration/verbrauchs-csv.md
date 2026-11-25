@@ -1,6 +1,6 @@
 # Historische Leistungsprofil-CSV (Hausprofil)
 
-Im **Hauskonfigurator** lassen sich Jahres-Leistungsprofile als CSV hinterlegen – für das gesamte Haus und optional je Verbraucher. Gemeint ist die Leistung, die Verbraucher im Haus tatsächlich bezogen haben. Woher sie stammt (Netz, PV-Feld oder Batterie), spielt keine Rolle. Kennzahlen in **kWh** (z. B. Monatsverbrauch, Jahresverbrauch) bleiben Energiegrößen und heißen weiterhin Verbrauch bzw. Erzeugung.
+Im **Hauskonfigurator** lassen sich Jahres-Leistungsprofile als CSV hinterlegen – für das gesamte Haus und optional je Verbraucher. Gemeint ist die Leistung, die Verbraucher im Haus tatsächlich bezogen haben. Woher sie stammt (Netz, PV-Feld oder Batterie), spielt keine Rolle. Kennzahlen in **kWh** (z. B. Monatsverbrauch, Jahresverbrauch) bleiben Energiegrößen und heißen Verbrauch bzw. Erzeugung.
 
 Zusätzlich kann ein **PV-Erzeugungsprofil [kW]** (Summe aller PV-Felder) importiert werden. Auch hier zählt die gesamte Leistung der PV-Felder, unabhängig davon, ob Verbraucher im Haus sie direkt genutzt haben, ob sie in die Batterie geflossen ist oder ins Netz eingespeist wurde.
 
@@ -53,7 +53,7 @@ In der Gruppe **Historische Messdaten (CSV)** des Hausprofils stehen drei Modi z
 - **Negativ** bedeutet Laden bzw. Einspeisung.
 - Ein negatives \(P_\mathrm{Ges}\) setzt Earnie auf 0 und gibt eine Warnung aus.
 - Optional lässt sich das Vorzeichen je Serie umkehren. Earnie speichert diese Einstellung im Hausprofil und leitet das Lastprofil beim nächsten Öffnen nicht neu ab, solange sich weder ein Pfad noch ein Vorzeichen geändert hat.
-- Bei einem Profil aus einer älteren Version ist die Vorzeichen-Einstellung nicht gespeichert. Der Hauskonfigurator weist darauf hin und behält das gespeicherte Lastprofil, bis ein Pfad oder ein Vorzeichen geändert wird.
+- Fehlt im Hausprofil die Vorzeichen-Einstellung, weist der Hauskonfigurator darauf hin und behält das gespeicherte Lastprofil, bis ein Pfad oder ein Vorzeichen geändert wird.
 
 Gespeicherte Pfade im Hausprofil:
 
@@ -139,18 +139,16 @@ Diese Zwei-Spalten-Regel gilt **nur** für **Netz-Leistung** im Modus Bilanz. Ba
 
 Die Gesamt-CSV ist optional. Sie dient dem Abgleich Ist vs. Modell und ist die Grundlage für die Rest-Grundlast, wenn Verbraucher-CSVs abgezogen werden.
 
-Die Kennzahlen **Ist-Jahresverbrauch** und **Modell-Jahresverbrauch** beziehen sich auf die **letzten 8760 Stunden** der CSV (ca. 12 Monate), auch wenn die Datei länger ist. Monats- und Wochencharts nutzen weiterhin die gesamte Zeitreihe.
+Die Kennzahlen **Ist-Jahresverbrauch** und **Modell-Jahresverbrauch** beziehen sich auf die **letzten 8760 Stunden** der CSV (ca. 12 Monate), auch wenn die Datei länger ist. Monats- und Wochencharts nutzen die gesamte Zeitreihe.
 
 Im Abgleich **Ist vs. Modell** (Hauskonfigurator, Abschnitt **Gesamt-Lastverhalten**) lässt sich die Verteilung der Modell-Basislast wählen (`baseload_distribution` am Hausprofil):
 
 | Modus | Verhalten |
 | ----- | --------- |
-| **Jahres-Rest gleichmäßig** (`equal`, Standard) | Eine konstante Grundlast aus dem Jahres-Rest Ist − Verbraucher (letzte 8760 h). Im Chart beträgt sie mindestens **1 %** des konfigurierten Jahresverbrauchs. Im Szenario-Explorer (Pfad A): flache `baseload_kwh/8760`. |
-| **Monats-Rest je Monat** (`monthly`) | Pro Kalendermonat `max(0, Ist − Verbraucher)`, gleichmäßig auf die Stunden des Monats verteilt. Im Chart gibt es keine 1 %-Untergrenze. Monate, in denen die Verbraucher mehr als das Ist ergeben, bleiben ohne Basislast. **Gilt für die Charts und für Pfad A im Szenario-Explorer**, sofern eine Gesamt-CSV vorhanden ist. |
+| **Jahres-Rest gleichmäßig** (`equal`, Standard) | Eine konstante Grundlast aus dem Jahres-Rest Ist − Verbraucher (letzte 8760 h). Im Chart beträgt sie mindestens **1 %** des konfigurierten Jahresverbrauchs. Im Szenario-Explorer gleichmäßig über alle Stunden. |
+| **Monats-Rest je Monat** (`monthly`) | Pro Kalendermonat `max(0, Ist − Verbraucher)`, gleichmäßig auf die Stunden des Monats verteilt. Im Chart gibt es keine 1 %-Untergrenze. Monate, in denen die Verbraucher mehr als das Ist ergeben, bleiben ohne Basislast. **Gilt für die Charts und den Szenario-Explorer (außer beim stündlichen Rest)**, sofern eine Gesamt-CSV vorhanden ist. |
 
-**Pfad B im Szenario-Explorer** (Gesamt-CSV vorhanden und alle Verbraucher der Rollen Gesteuert/Manuell mit aktiver CSV) verwendet weiterhin den stündlichen Meter-Rest. `baseload_distribution` hat auf Pfad B keinen Einfluss.
-
-Die Modell-Basislast im Chart entspricht damit dem gewählten Jahres- oder Monats-Rest plus den gestapelten Verbrauchern. Der stündliche Meter-Rest aus Pfad B fließt dort nicht ein.
+Die Modell-Basislast im Chart entspricht dem gewählten Jahres- oder Monats-Rest plus den gestapelten Verbrauchern. Der stündliche Rest des Szenario-Explorers (siehe [Verbraucher-CSV](#verbraucher-csv-profile_csv--use_profile_csv)) fließt nicht in den Chart ein.
 
 ## PV-Erzeugungsprofil (`pv_profile_csv`)
 
@@ -167,21 +165,19 @@ Pro Verbraucher:
 1. CSV-Pfad angeben oder Datei hochladen.
 2. Checkbox **„Von Basis-Last abziehen“** setzen oder leer lassen.
 
-- **Aktiv:** Earnie nutzt die Last aus der CSV statt der Synthese und zieht sie von der Basislast ab (im Hauskonfigurator und, bei Pfad B, im Szenario-Explorer).
+- **Aktiv:** Earnie nutzt die Last aus der CSV statt der Synthese und zieht sie von der Basislast ab (im Hauskonfigurator und, beim stündlichen Rest, im Szenario-Explorer).
 - **Inaktiv:** Earnie nutzt das synthetische Modell bzw. den Schedule. Der Pfad kann gespeichert bleiben, fließt aber nicht in die Modellierung ein.
 
 | earnie_role | Hauskonfigurator | Szenario-Explorer | Live |
 | ----------- | ---------------- | ----------------- | ---- |
 | Bekannt | Abzug von Basislast | feste zusätzliche Last aus CSV (nicht Schedule) | wie Szenario-Explorer |
-| Gesteuert | Abzug von Basislast | CSV-Energie über den Horizont als MILP-Ziel; Timing wird optimiert | CSV ignorieren, Schedule |
+| Gesteuert | Abzug von Basislast | Earnie plant die Energie aus der CSV und optimiert den Zeitpunkt | CSV ignorieren, Schedule |
 | Manuelles Gerät | Abzug von Basislast | wie Gesteuert | Nutzer-Tagesplan, wenn aktiv; sonst weder CSV noch Default-Schedule |
 
 **Basislast im Szenario-Explorer:**
 
-- **Pfad B** (stündlicher Meter-Rest) gilt, wenn eine Gesamt-CSV vorhanden ist und alle Verbraucher der Rollen Gesteuert/Manuell eine aktive CSV haben. Vom Gesamtverbrauch zieht Earnie jede Stunde alle Verbraucher ab, die es danach wieder als eigene Last rechnet: Verbraucher mit aktiver CSV (gemessen), die Wärmepumpe (`thermal_annual`, ohne CSV modelliert) sowie E-Auto und `thermal_rc`, wenn das MILP sie plant. Feste Verbraucher ohne CSV bleiben im Rest.
-- **Pfad A** gilt in allen anderen Fällen. Bei `baseload_distribution=monthly` verwendet er monatsweise Ist − Modellverbraucher, sonst eine flache `baseload_kwh/8760`.
-
-Die synthetische `cons_data.csv` nutzt die konfigurierte Grundlast (`baseload_kwh / 8760`). Ausnahmen: Der Szenario-Explorer läuft mit Pfad B oder mit Pfad A und Monats-Rest aus dem Hausprofil.
+- **Stündlicher Rest:** Gibt es eine Gesamt-CSV und haben alle Verbraucher der Rollen Gesteuert und Manuell eine aktive CSV, zieht Earnie jede Stunde vom gemessenen Gesamtverbrauch alle Verbraucher ab, die es selbst als eigene Last rechnet: Verbraucher mit aktiver CSV, die Wärmepumpe (**Haus Wärme**) sowie E-Auto und Verbraucher vom Typ **Temperatur (RC)**, wenn Earnie sie plant. Feste Verbraucher ohne CSV bleiben im Rest.
+- **Sonst** gilt die im Hauskonfigurator gewählte Verteilung: Monats-Rest je Monat oder ein gleichmäßiger Jahres-Rest.
 
 ### Digitale Ein/Aus-Signale (0/1)
 
@@ -192,19 +188,9 @@ Enthält die CSV nach der Erkennung überwiegend nur die Werte **0** und **1** (
 
 Die Haus-Gesamt-CSV (`total_profile_csv`) wird nicht so skaliert, weil es dort keine einzelne Nennleistung gibt.
 
-## Test-Export aus Live-`cons_data`
-
-Für lokale Import-Tests lässt sich aus der Live-Datei `cons_data.csv` eine CSV für das **PV-Erzeugungsprofil** und eine **Energiemonitor**-CSV (nur relevante Spalten) erzeugen:
-
-```text
-python -m scripts.export_historical_test_csvs --out-dir Historical-Data/export-test
-```
-
-Optionale Parameter: `--cons-data`, `--from`, `--to`. Die Dateien sind Loxone-kompatibel und lassen sich im Hauskonfigurator wieder einlesen (getrennte CSVs bzw. Energiemonitor). Nötig sind mindestens 8760 Stunden.
-
 ## Von Loxone Energieflussmonitor zum Hausprofil
 
-Kurzanleitung für die Einrichtung. Details und Rollen-Tabelle stehen in der [EFM-Auto-Sync-Spezifikation](../dev/done/efm-auto-sync.md).
+Kurzanleitung für die Einrichtung.
 
 1. In Loxone **Energieflussmonitor** und **Zähler** für Netz, PV, Speicher und Verbraucher anlegen (flach bzw. bewusst flach halten).
 2. Auf der Seite **Smarthome-Backend** den **Loxone-Import** ausführen. Er übernimmt Merker und EFM-Zähler ins Hausprofil bzw. in die `ehal_bindings`, optional auch Live-`flex.{slug}.sens_power_act` = Zähler-Bezeichnung. Freigabe-Merker (`flex.{slug}.set_enable`) und Feintuning bleiben Handarbeit unter **EHAL-Com → Signalliste**.
@@ -220,4 +206,4 @@ Kurzanleitung für die Einrichtung. Details und Rollen-Tabelle stehen in der [EF
 | Offline-Flex-Log | `path_historical_log` am Hausprofil-Verbraucher (nur Pool-Filter)      | Einzelserie → cons_data          |
 
 
-Das Feld `path_historical_log` (Hausprofil-Verbraucher, derzeit nur Pool-Filter) gehört zum Offline-Weg Loxone-Log → `cons_data.csv`. Es ist unabhängig von den Jahres-CSVs im Hausprofil. Die früheren Keys `path_consumption` / `path_production` in `config.json` sind entfernt (data-model v3).
+Das Feld `path_historical_log` (Hausprofil-Verbraucher, nur Pool-Filter) gehört zum Offline-Weg Loxone-Log → `cons_data.csv`. Es ist unabhängig von den Jahres-CSVs im Hausprofil.

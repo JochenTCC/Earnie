@@ -1,6 +1,6 @@
 # Container-Betrieb (Synology / LoxBerry / Proxmox / Docker)
 
-**Streamlit-Ports aller Stacks:** [streamlit-ports.md](../dev/streamlit-ports.md)
+**Streamlit-Ports aller Stacks:** [streamlit-ports.md](../dev/streamlit-ports.md) (Entwickler-Doku auf Englisch)
 
 **Proxmox VE (LXC + Docker Compose):** [proxmox-lxc.md](proxmox-lxc.md)
 
@@ -41,13 +41,13 @@ Diese Verzeichnisse liegen **außerhalb des Images** und überleben Image-Update
 
 | Mount (Host)                          | Inhalt                                                                                                                  |
 | ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `./earnie_env/config/config.json`                | Haus-Konfiguration (wird nie überschrieben)                                                                             |
+| `./earnie_env/config/config.json`                | System-Einstellungen (Smarthome-Backend, Oberfläche, Live-Szenario); wird nie überschrieben |
 | `./earnie_env/config/tariffs.json`               | Mitgelieferter Tarif-Katalog (Bezug/Einspeise); Sidecar neben `config.json`; nicht von Hand ändern                      |
 | `./earnie_env/config/user_tariffs.json`          | Eigene Tarife (Benutzertarife) aus der Seite **Tarife**                                                                 |
 | `./earnie_env/config/grid_fees.json`             | Netzentgelt-Katalog (Netzbereiche / Zeitregeln); Sidecar; Bootstrap aus `share/config/`                                 |
 | `./earnie_env/config/backtesting_scenarios.json` | Szenarien inkl. Live-Baseline                                                                                           |
 | `./earnie_env/config/house_profiles.json`        | Hausprofile (Sidecar)                                                                                                   |
-| `./earnie_env/config/components.json`            | Gerätekomponenten (`batteries[]`, `pv_systems`, `inverters[]` inkl. `ehal_bindings`)                                    |
+| `./earnie_env/config/components.json`            | Gerätekomponenten (`inverters[]`, `batteries[]`, `pv_systems[]` und `wallboxes[]` inkl. `ehal_bindings`; `heating_systems[]`) |
 | `./earnie_env/config/deviation_rules.json`       | Soll/Ist-Regeln für Chart-Marker (Bootstrap legt an)                                                                    |
 | `./earnie_env/config/config.example.json`        | Nur zum Nachschlagen; fehlt sie, kopiert der Entrypoint die Vorlage aus dem Image (`share/config/`). Nach Updates wird sie nicht aufgefrischt |
 | `./earnie_env/runtime/`                          | `cons_data.csv`, Zustands-JSONs, Profile, Logs                                                                   |
@@ -115,99 +115,19 @@ python -m scripts.bootstrap_runtime
 
 Der Befehl legt nur fehlende Dateien an; bestehende bleiben unverändert.
 
-## Image bauen und deployen
+## Images und Updates
 
-Das Image ist ein **Multi-Arch-Manifest** (`linux/amd64` für Synology, `linux/arm64` für LoxBerry). Beide Hosts referenzieren denselben Tag `ghcr.io/jochentcc/earnie-energy:latest`.
+Das Image `ghcr.io/jochentcc/earnie-energy` gibt es für `linux/amd64` (Synology, Proxmox, PC) und `linux/arm64` (LoxBerry). Die Tags:
 
-**Veröffentlichte Images** entstehen über GitHub Actions. Ein Tag `vX.Y.Z` (passend zu `version.py`) startet [`.github/workflows/release-publish.yml`](../../.github/workflows/release-publish.yml). Der Workflow baut zuerst nur den **Release-Kandidaten** `ghcr.io/jochentcc/earnie-energy:X.Y.Z`; der Tag allein setzt weder `:latest` noch `:next`. Nach manueller Freigabe des Jobs `promote` (Environment `release-approval`) folgen `:latest` (nur offizielle Versionen) bzw. `:next` sowie die veröffentlichte GitHub Release. Details: [DEVELOPER.md](../../DEVELOPER.md) § Release.
-
-Ein Release kann auch nur für einen Kanal erscheinen (manueller Start mit `targets` = `docker` oder `ha`). Bei einem reinen Home-Assistant-Release bleiben `:latest` und `:next` auf dem bisherigen Stand; LoxBerry- und Synology-Installationen, die diesen Tags folgen, bekommen die neue Version dann erst mit dem Docker-Release.
-
-**Vorabversionen (Community-Test):** Ein Tag `vX.Y.Z-alpha.N`, `vX.Y.Z-beta.N` bzw. `vX.Y.Z-rc.N` (ebenfalls passend zu `version.py`) durchläuft denselben Ablauf. Zuerst entsteht der Kandidat `:<version>`, nach `promote` zusätzlich `:next` und ein GitHub **Pre-release**, jedoch **kein** `:latest`.
+| Tag | Inhalt |
+| --- | --- |
+| `:latest` | letzte offizielle Version; Standard in den Compose-Dateien `*_productive.yml` |
+| `:next` | neueste Vorabversion (Beta / Release-Kandidat) oder, wenn es keine neuere gibt, die letzte offizielle Version |
+| `:<version>` | genau diese Version, z. B. zum Festhalten einer Version |
 
 Zum Testen einer Vorabversion in der Compose-Datei (`*_productive.yml`) `image:` von `:latest` auf `:next` oder auf den Versions-Tag `:<version>` stellen und den Container neu erstellen. Zurück zur offiziellen Version geht es mit `:latest`; hat die Vorabversion die Konfiguration migriert, vorher das Backup zurückkopieren (siehe [Update und Migration](betrieb.md#update-und-migration)).
 
-### Einmaliges buildx-Setup (Entwicklungsrechner)
-
-Für Multi-Arch-Builds unter Windows oder Linux:
-
-```powershell
-docker buildx create --name earnie-builder --use
-docker buildx inspect --bootstrap
-```
-
-Unter Windows nutzt Docker Desktop QEMU für arm64-Cross-Builds automatisch.
-
-### 1. Build (Entwicklungsrechner)
-
-Standardbefehl, baut wie bisher nur für Synology (amd64):
-
-```powershell
-python -m scripts.build_container
-# oder unter Windows:
-.\docker\build-container.ps1
-```
-
-Zielplattform wählen:
-
-```powershell
-# Synology (amd64)
-python -m scripts.build_container --target synology
-
-# LoxBerry (arm64, lokaler Test)
-python -m scripts.build_container --target loxberry
-
-# Beide Plattformen publizieren (buildx, erfordert --push)
-python -m scripts.build_container --target all --push
-```
-
-Vor `--push` prüft der Build automatisch den gebündelten Tarifkatalog (`share/config/tariffs.json`: Schema, Beispiel-Szenario-Referenzen, DACH-Vollständigkeit). Manuell:
-
-```powershell
-python -m scripts.validate_tariffs --check-catalog
-```
-
-Auf der NAS vor der ersten Umstellung auf den Produktivbetrieb die produktive Sidecar-Datei prüfen:
-
-```powershell
-python -m scripts.validate_tariffs --tariffs share/config/tariffs.json --check-catalog
-```
-
-Mit `EARNIE_STRICT_TARIFF_VALIDATE=1` bricht `main.py` bei Fehlern ab (siehe Compose).
-
-Ein lokaler `build_container` (ohne CI) setzt Standard-Tags aus `version.py`, jeweils für den kanonischen Namen und den Legacy-Alias:
-
-- **Jede Version:** `:next` und `:<version>` für `earnie-energy` und Legacy `ernie-energy`.
-- **Offizielle Version (`X.Y.Z`):** zusätzlich `:latest`.
-- **Vorabversion (`X.Y.Z-alpha.N` / `-beta.N` / `-rc.N`):** kein `:latest`.
-
-Im **CI-Release** (Tag → `release-publish.yml`) gilt abweichend: Der Tag-Build setzt nur `:<version>`; `:next` / `:latest` folgen erst nach dem Job `promote`.
-
-Nach `docker login ghcr.io`:
-
-```powershell
-# Einzelplattform
-python -m scripts.build_container --target synology --push
-
-# Release für Synology + LoxBerry
-python -m scripts.build_container --target all --push
-```
-
-Nur ein bestimmter Tag:
-
-```powershell
-python -m scripts.build_container --target all --tag ghcr.io/jochentcc/earnie-energy:latest --push
-```
-
-Manifest prüfen:
-
-```bash
-docker manifest inspect ghcr.io/jochentcc/earnie-energy:latest
-```
-
-
-
-### 2. Deploy (Synology)
+### Aktualisieren (Synology)
 
 Im Projektordner auf der NAS (nur Compose und persistente Daten, kein Quellcode nötig):
 
@@ -223,7 +143,7 @@ docker compose pull
 docker compose up -d
 ```
 
-Beim Start von `main.py` (auch nach Auto-Start aus der UI) laufen automatisch die Tarif-Plausibilitätsprüfung und `verify_loxone_setup`. Das Ergebnis steht in `runtime/earnie.log` (`Tarif-Startup-Prüfung`, `[loxone-verify]`).
+Beim Start von `main.py` (auch nach Auto-Start aus der UI) laufen automatisch die Tarif-Plausibilitätsprüfung und, sofern die Loxone-Zugangsdaten gesetzt sind, `verify_loxone_setup`. Das Ergebnis steht in `runtime/earnie.log` (`Tarif-Startup-Prüfung`, `[loxone-verify]`).
 
 Optional:
 
@@ -232,7 +152,7 @@ Optional:
 | --------------------------------- | ------------------------------------------------------ |
 | `EARNIE_VERIFY_LOXONE_ON_START=0` | Prüfung aus                                            |
 | `EARNIE_SKIP_LOXONE_VERIFY=1`     | Prüfung aus                                            |
-| `EARNIE_STRICT_LOXONE_VERIFY=1`   | Container startet nicht, wenn eine Prüfung fehlschlägt |
+| `EARNIE_STRICT_LOXONE_VERIFY=1`   | Der Optimierer-Dienst bricht ab, wenn eine Prüfung fehlschlägt (die Oberfläche läuft weiter) |
 
 
 Manuell (z. B. nach einer Config-Änderung ohne Neustart):
@@ -242,62 +162,6 @@ python -m scripts.verify_loxone_setup
 ```
 
 `docker/compose/synology_productive.yml` referenziert `ghcr.io/jochentcc/earnie-energy:latest`.
-
-### Live-Zyklus-Profiling (NAS-Einmal-Test)
-
-Phasen-Timing und optional `cProfile` lassen sich über Umgebungsvariablen einschalten (`EARNIE_CYCLE_TIMING` / `EARNIE_CYCLE_PROFILE`, siehe [betrieb.md](betrieb.md) § Live-Zyklus-Profiling). Die Compose-Dateien im Repository bleiben unverändert; die Variablen nur auf der NAS für das Testfenster setzen.
-
-**1. Image lokal bauen** (Entwicklungsrechner, Synology amd64, ohne GHCR-Push):
-
-```powershell
-python -m scripts.build_container --target synology
-```
-
-Die Tags kommen aus `version.py` (u. a. `:next` und `:<version>`; bei Dev-Versionen kein `:latest`).
-
-**2. Image auf die NAS bringen** (Beispiel mit `docker save` / `load`; Tag ggf. anpassen):
-
-```powershell
-docker save -o earnie-timing.tar ghcr.io/jochentcc/earnie-energy:next
-# Datei auf die NAS kopieren, dann:
-docker load -i earnie-timing.tar
-```
-
-**3. Produktiv-Compose auf der NAS** vorübergehend anpassen:
-
-- `image:` auf den geladenen Tag zeigen lassen (z. B. `…:next` oder `…:<version>`). Alternativ das lokal geladene Image als `…:latest` retaggen, wenn die Compose-Datei `:latest` behalten soll.
-- Unter `environment:` für das Testfenster ergänzen:
-
-```yaml
-EARNIE_CYCLE_TIMING: "1"
-# optional nur 1–2 Zyklen:
-# EARNIE_CYCLE_PROFILE: "1"
-```
-
-Danach `docker compose up -d` ausführen. Nach einigen Viertelstunden aufräumen:
-
-1. `EARNIE_CYCLE_PROFILE` entfernen (falls gesetzt).
-2. `timing/` und ggf. `profile/` aus `earnie_env/runtime/` kopieren.
-3. Die Flags entfernen und das Image wieder auf den vorherigen Stand stellen.
-
-**4. Auswerten:**
-
-```powershell
-python -m scripts.summarize_cycle_timing path/to/cycles.jsonl
-```
-
-### 3. Lokaler Test vor dem NAS-Deploy
-
-```powershell
-docker compose --project-directory . -f docker/compose/dev.yml build
-docker compose --project-directory . -f docker/compose/dev.yml up -d
-```
-
-Dieser Test nutzt `docker/compose/dev.yml` mit lokalem Build und denselben Mounts (`./earnie_env/config` → `/app/config`, `./earnie_env/runtime` → `/app/runtime`).
-
-### Greenfield Dev-Stack (Ersteinrichtung)
-
-Für die Abnahme von Hauskonfigurator und Backtesting auf **leeren** Volumes (Port **8502**, getrennte Container-Namen): [greenfield-dev-stack.md](greenfield-dev-stack.md) und `docker/compose/greenfield.yml`.
 
 ## LoxBerry (RPi 4B, arm64)
 

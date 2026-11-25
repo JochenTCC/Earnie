@@ -24,10 +24,10 @@ Wo Earnie läuft, ist davon unabhängig: als [Home-Assistant-Add-on](homeassista
 
 ## Einrichtung
 
-Die Komponenten tragen unter `ehal_bindings` nur **Aktivierungsschlüssel** ohne Wert: `plant.ehal_bindings` und `consumers[].ehal_bindings` (in `house_profiles.json`) sowie `batteries[].ehal_bindings`, `inverters[].ehal_bindings` und `pv_systems[].ehal_bindings` (in `components.json`). Die Zuordnung zu echten Entities steht im YAML-Paket in Home Assistant.
+Die Komponenten tragen unter `ehal_bindings` nur **Aktivierungsschlüssel** ohne Wert: `plant.ehal_bindings` und `consumers[].ehal_bindings` (in `house_profiles.json`) sowie `batteries[].ehal_bindings`, `inverters[].ehal_bindings`, `pv_systems[].ehal_bindings` und `wallboxes[].ehal_bindings` (in `components.json`). Die Zuordnung zu echten Entities steht im YAML-Paket in Home Assistant.
 
 1. Auf **Daemon Control → Smarthome-Backend** das Backend **Home Assistant** wählen. Die Seite setzt `ehal.backend=ha`. Alternativ `ehal.backend` aus dem Snippet [`share/config/ehal.ha.snippet.json`](../../share/config/ehal.ha.snippet.json) übernehmen.
-2. Haus und Komponenten im **Hauskonfigurator** speichern. Earnie aktiviert dabei die Pflichtsignale als leere Schlüssel in `ehal_bindings`. Für jede netzgekoppelte Hausbatterie gehört dazu auch die **Batterieleistung** (`ess.<id>.sens_ess_power`): Earnie leitet daraus die Anlagen-Batterieleistung ab, ohne sie bricht Live-Lesen ab. Bei einer bestehenden Konfiguration ergänzt die **Konfigurations-Migration** das Signal; danach das YAML-Paket neu herunterladen und den neuen Platzhalter `ENTITY_ess_<id>_sens_ess_power` belegen.
+2. Haus und Komponenten im **Hauskonfigurator** speichern. Earnie aktiviert dabei die Pflichtsignale als leere Schlüssel in `ehal_bindings`. Für jede netzgekoppelte Hausbatterie gehört dazu auch die **Batterieleistung** (`ess.<id>.sens_ess_power`): Earnie leitet daraus die Anlagen-Batterieleistung ab, ohne sie bricht Live-Lesen ab. Fehlt das Signal in einer Konfiguration, ergänzt es der [Migrations-Assistent](betrieb.md#update-und-migration); danach das YAML-Paket neu herunterladen und den Platzhalter `ENTITY_ess_<id>_sens_ess_power` belegen.
 3. Auf **Daemon Control → EHAL-Com** die **Signalliste** prüfen. Die Liste zeigt den Signalvertrag: Pflicht, optional, aktiviert und Match-Status. Optionale Signale lassen sich dort zu- und abschalten.
 4. Unter **HA Push-Carrier** das **YAML-Paket** herunterladen. Es enthält `ENTITY_*`-Platzhalter, den periodischen Push, den Heartbeat und den Abruf von `status.json`.
 5. In Home Assistant unter **Entwicklerwerkzeuge → Zustände** die passenden `entity_id`s heraussuchen. Das Paket als Package einbinden und jeden `ENTITY_*`-Platzhalter durch die passende `entity_id` ersetzen (siehe [Mindestsignale](#mindestsignale)). Der Push läuft periodisch (Standard 10 s), nicht nur bei Wertänderung.
@@ -42,7 +42,7 @@ Die Werte im Push sind bereits in EHAL-Einheiten (z. B. W, kWh, %). Die Umrechnu
 - Die Werte stehen in EHAL-Einheiten (W, A) in `house_profiles.json` unter `plant.ha_fail_safe_values`. Der Watchdog schreibt sie nach derselben Zeit und rechnet sie in die Einheit der Entity um. Passt die Einheit nicht, überspringt er das Signal und schreibt eine Warnung ins HA-Log.
 - Ein Signal ohne Wert bleibt, wie es ist. Das Paket enthält den Watchdog auch dann, wenn es kein `set_ess_active_power` gibt, sobald ein Wert eingetragen ist.
 - Bei `set_ess_active_power` ersetzt der Wert die 0. Ein Wert ungleich 0 hält die Batterie im Zwang, bis Earnie wieder antwortet. Mit `ha_ess_force` lässt sich hier kein Wert eintragen.
-- Modi und Schalter (`set_ess_mode`, `set_evcs_mode`, `set_ess_source_select`, `set_enable`) können noch keinen Wert annehmen.
+- Für Modi und Schalter (`set_ess_mode`, `set_evcs_mode`, `set_ess_source_select`, `set_enable`) lässt sich kein Fail-safe-Wert eintragen.
 - Sobald Earnie wieder antwortet, setzen die Sollwert-Automationen die Werte neu, die Earnie vorgibt. Ein Signal, für das Earnie gerade keinen Wert vorgibt, bleibt auf dem Fail-safe-Wert.
 - **Ein schon importiertes Paket behält den alten Watchdog**, bis es neu heruntergeladen und in Home Assistant importiert ist. Das gilt auch nach jeder Änderung der Werte.
 
@@ -54,7 +54,7 @@ Die Werte im Push sind bereits in EHAL-Einheiten (z. B. W, kWh, %). Die Umrechnu
 
 Optional: Ladeleistung der Wallbox und Maxstrom (`number`-Entity) als Schreibweg.
 
-**Vorzeichen:** Im EHAL bedeutet Netz **+** Bezug und ESS **+** Entladen. Weicht die Integration davon ab, **negate** setzen (unter `ehal.ha.sign`). Das YAML-Paket rechnet nur Einheiten um, kein Vorzeichen. **Live-Lesen** zeigt den Wert nach `ehal.ha.sign`, also so, wie Earnie damit rechnet; gedrehte Felder tragen in der Spalte Detail den Hinweis „Vorzeichen gedreht“. Beim Umstieg von 2.6 fragt der Migrationsassistent, ob ein altes `ehal.ha.sign` erhalten bleiben soll. Liefert die neu gebundene Entity das EHAL-Vorzeichen bereits, den Eintrag entfernen, sonst wird der Wert doppelt gedreht.
+**Vorzeichen:** Im EHAL bedeutet Netz **+** Bezug und ESS **+** Entladen. Weicht die Integration davon ab, **negate** setzen (unter `ehal.ha.sign`). Das YAML-Paket rechnet nur Einheiten um, kein Vorzeichen. **Live-Lesen** zeigt den Wert nach `ehal.ha.sign`, also so, wie Earnie damit rechnet; gedrehte Felder tragen in der Spalte Detail den Hinweis „Vorzeichen gedreht“. Liefert die Entity das EHAL-Vorzeichen bereits, keinen `sign`-Eintrag setzen, sonst wird der Wert doppelt gedreht.
 
 **Ist-Werte je Slot:** Die Ist-Werte je Viertelstunde (z. B. für die [Charts](../ui/charts.md)) berechnet Earnie aus den gepushten Leistungswerten. Sie werden alle 30 s abgetastet und über die Viertelstunde gemittelt. Zusätzliche Energiezähler sind dafür nicht nötig.
 
@@ -84,4 +84,4 @@ Pro physischem Bus bzw. Gerät gibt es genau **einen** schreibenden Southbound-O
 - [Home-Assistant-Add-on](homeassistant-addon.md): Earnie innerhalb von Home Assistant, Ports und Supervisor-Proxy.
 - [EHAL-Spec § Home Assistant](../referenz/ehal.md#implementation-notes--home-assistant--evcc): Push-Verfahren, Token, Push-Takt und Einheiten auf der Leitung (Englisch).
 - [Charts](../ui/charts.md): Darstellung der Ist-Werte.
-- Für Entwickler: Lab-Stack mit Home Assistant und evcc per Compose, Installation der evcc-Integration und Abnahmetabelle in der [HA-Lab Spec](../dev/ha-lab-setup.md) (Englisch).
+- Für Entwickler: Lab-Stack mit Home Assistant und evcc per Compose, Installation der evcc-Integration und Abnahmetabelle in der [HA-Lab-Anleitung](../dev/ha-lab-setup.md) (Entwickler-Doku auf Englisch).

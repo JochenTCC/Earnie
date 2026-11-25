@@ -83,6 +83,43 @@ Windows wrapper: `.\docker\build-container.ps1`
 
 Local `build_container` default tags from `version.py`: every version → `:next` and `:<version>`; official also `:latest`; SemVer pre-release omits `:latest`. Legacy `ernie-energy` aliases follow the same rule. **CI** (tag → `release-publish.yml`): candidate is `:<version>` only; `:next` / `:latest` only after job `promote` (see the release bullets below).
 
+One-time buildx setup for multi-arch builds (Docker Desktop on Windows uses QEMU for arm64 automatically):
+
+```powershell
+docker buildx create --name earnie-builder --use
+docker buildx inspect --bootstrap
+```
+
+Targets and publishing:
+
+```powershell
+python -m scripts.build_container --target synology          # amd64 (default)
+python -m scripts.build_container --target loxberry          # arm64, local test
+python -m scripts.build_container --target all --push        # both platforms (buildx needs --push)
+python -m scripts.build_container --target all --tag ghcr.io/jochentcc/earnie-energy:latest --push
+docker manifest inspect ghcr.io/jochentcc/earnie-energy:latest
+```
+
+Before `--push` the build checks the bundled tariff catalog (`share/config/tariffs.json`: schema, example scenario references, DACH completeness); by hand: `python -m scripts.validate_tariffs --check-catalog` (a site file: `--tariffs <path> --check-catalog`). `EARNIE_STRICT_TARIFF_VALIDATE=1` makes `main.py` stop on catalog errors (set in the compose files).
+
+Local test before a NAS deploy: `docker/compose/dev.yml` (local build, same mounts; see *Start Locally (Dev)*). Acceptance on empty volumes: Greenfield stack, [docs/einrichtung/greenfield-dev-stack.md](docs/einrichtung/greenfield-dev-stack.md).
+
+### Cycle profiling on the NAS (one-off)
+
+Phase timing and optional `cProfile` are switched on by environment variables (`EARNIE_CYCLE_TIMING` / `EARNIE_CYCLE_PROFILE`, see [betrieb.md](docs/einrichtung/betrieb.md) § Live-Zyklus-Profiling). Keep the repo compose files unchanged; set the variables on the NAS for the test window only.
+
+1. Build and load the image on the NAS (*Dev build and transfer to the NAS* below), point `image:` of `earnie-productive` at that tag.
+2. Add under `environment:` for the test window:
+
+   ```yaml
+   EARNIE_CYCLE_TIMING: "1"
+   # optional, 1–2 cycles only:
+   # EARNIE_CYCLE_PROFILE: "1"
+   ```
+
+3. `docker compose up -d`. After a few quarter hours: drop `EARNIE_CYCLE_PROFILE`, copy `timing/` (and `profile/`) from `earnie_env/runtime/`, remove the flags and restore the previous image.
+4. Evaluate: `python -m scripts.summarize_cycle_timing path/to/cycles.jsonl`
+
 ### Dev build and transfer to the NAS
 
 Dev images reach the NAS over SSH, without a registry. Only `scripts/build_container.py` adds the Shadow client to a `-dev` image. A plain `docker build`, including *Build Image* in the VS Code Docker extension, leaves it out, and that image refuses to start with `EARNIE_SHADOW=1`.
@@ -200,6 +237,16 @@ Proxmox: LXC with `nesting=1`/`keyctl=1`, optional `docker/proxmox/bootstrap.sh`
 - `config.json` and the other config sidecars are local and gitignored.
 - Persistence root: `EARNIE_ENV_PATH` (default `earnie_env`). Config directory: `EARNIE_CONFIG_PATH` (default `{ENV_PATH}/config`). Runtime data (CSV, JSON, logs): `EARNIE_RUNTIME_PATH` or `{ENV_PATH}/runtime`.
 - Legacy layouts (repo-root `config/` and `runtime/`) are still picked up only when the default `earnie_env` root is in use and the new directory does not exist (`runtime_store/persist_paths.py`).
+
+### Test CSVs from live `cons_data`
+
+For local import tests, build a **PV generation profile** CSV and an **Energiemonitor** CSV (relevant columns only) from the live `cons_data.csv`:
+
+```text
+python -m scripts.export_historical_test_csvs --out-dir Historical-Data/export-test
+```
+
+Optional: `--cons-data`, `--from`, `--to`. The files are Loxone-compatible and load again in the Hauskonfigurator (separate CSVs or Energiemonitor). At least 8760 hours are needed.
 
 ## Shadow Mode (Dev client)
 
