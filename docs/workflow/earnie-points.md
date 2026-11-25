@@ -1,6 +1,6 @@
 # Earnie-Points
 
-**Status:** implemented client-side (`house_config/earnie_points.py`); wire format in [`usage-ping.md`](usage-ping.md) §4 (schema v2). Rule source: business plan §5.2 "Tarifmodell" (Earnie-Projekt repo). This file is the **single source** for the rule as implemented; the public German rule table in `docs/einrichtung/betrieb.md` must stay in sync with it.
+**Status:** implemented client-side (`house_config/earnie_points.py`); wire format in [`usage-ping.md`](usage-ping.md) §4 (schema v2). Rule source: private maintainer notes (business plan). This file is the **single source** for the rule as implemented; the public German rule table in `docs/einrichtung/betrieb.md` must stay in sync with it.
 
 ## 1. Purpose
 

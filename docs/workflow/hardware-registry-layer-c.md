@@ -26,7 +26,7 @@ This document describes how a user obtains a one-time registry bound to hardware
 6. **Future Layer C only:** official sealed images may require a valid entitlement *or* show an indelible watermark. Source forks stay unsupported; we do not claim forks keep the banner.
 
 **End-user how-to (German):** [`docs/user-manual/Benutzer-Handbuch-Earnie.md`](../user-manual/Benutzer-Handbuch-Earnie.md) § Hardware-Registry.  
-**Issuer procedure (generation):** Earnie-Projekt `Entwicklungsplan/Hardware-Registry-Ausstellung.md`.
+**Issuer procedure (generation):** private maintainer notes.
 
 ---
 

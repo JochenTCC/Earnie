@@ -1,6 +1,6 @@
 # Opt-in usage ping (installation statistics)
 
-**Status:** implemented — client P1 + daemon/milestones P2 + consent UI P3 + German docs/privacy P5 implemented in this repo; **receiver** lives in private **`JochenTCC/earnie-server`** (production HTTPS via Caddy at `https://cloudserver.earnie-hems.com`). Production host: **easyname** (Austria) — see §6 / §9.
+**Status:** implemented — client P1 + daemon/milestones P2 + consent UI P3 + German docs/privacy P5 implemented in this repo; **receiver** lives in a private server repo (production HTTPS via Caddy at `https://cloudserver.earnie-hems.com`). Production host: **easyname** (Austria) — see §6 / §9.
 
 ## 1. Goal
 
@@ -67,7 +67,7 @@ Exact keys only: `v`, `id`, `app_version`, `context`, `stage`. `context` = `dete
 
 ## 5. Server design
 
-Minimal HTTPS endpoint `POST /ping` on a rented VPS: **Caddy** on the host terminates TLS and proxies to a **stdlib HTTP receiver**, the systemd service `earnie-server` on `127.0.0.1` (no TLS in-process, no Docker). Implementation and deploy artifacts live in the private repo **`JochenTCC/earnie-server`** (not this public tree). See §9 Q3.
+Minimal HTTPS endpoint `POST /ping` on a rented VPS: **Caddy** on the host terminates TLS and proxies to a **stdlib HTTP receiver**, the systemd service `earnie-server` on `127.0.0.1` (no TLS in-process, no Docker). Implementation and deploy artifacts live in a private server repo (not this public tree). See §9 Q3.
 
 - Validate schema + size (body limit 1 KB in the receiver); reject everything else.
 - **No IP / User-Agent logging** (disable access logs for this route; Caddy access log off).
@@ -100,7 +100,7 @@ Minimal HTTPS endpoint `POST /ping` on a rented VPS: **Caddy** on the host termi
 ### Decided
 
 - **Q1** Random install ID, server hashes with a daily rotating salt; only daily counters stored (no 7/30-day active values).
-- **Q3** Production receiver = own VPS only (not internet-facing home NAS), implemented in private **`JochenTCC/earnie-server`**. **Caddy** on the host (auto-TLS, access log off) proxies to a **minimal stdlib receiver**, systemd service on `127.0.0.1` (plain HTTP, own service user, `NoNewPrivileges`, `ProtectSystem=strict`, one writable data directory; body limit 1 KB and per-IP rate limit in memory in the receiver; routes `POST /ping`, `/review`, `/demo-session`). Pre-deploy against Earnie client mock / pytest, optional **LAN-only** lab on NAS (Docker compose in `earnie-server`, no port-forward / DDNS / DSM proxy), then deploy on the VPS.
+- **Q3** Production receiver = own VPS only (not internet-facing home NAS), implemented in a private server repo. **Caddy** on the host (auto-TLS, access log off) proxies to a **minimal stdlib receiver**, systemd service on `127.0.0.1` (plain HTTP, own service user, `NoNewPrivileges`, `ProtectSystem=strict`, one writable data directory; body limit 1 KB and per-IP rate limit in memory in the receiver; routes `POST /ping`, `/review`, `/demo-session`). Pre-deploy against Earnie client mock / pytest, optional **LAN-only** lab on NAS (Docker compose in `earnie-server`, no port-forward / DDNS / DSM proxy), then deploy on the VPS.
 - **Q3 hosting** Provider **easyname**, location **Austria**.
 - **Q3a / Q3b** Synology as **public** endpoint / DSM reverse-proxy — **won't do**. LAN-only lab on NAS via `earnie-server` is allowed.
 - **Q4** Payload extras: install context only (payload §4 stays `v`, `id`, `app_version`, `context`, plus the stage from Q2).

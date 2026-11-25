@@ -1167,131 +1167,180 @@
             "markup_percent": 0.0,
             "prices_include_vat": false,
             "vat_percent": 0.0,
-            "notes": "Kopplung an den monatlichen PV-Referenzmarktwert nach § 13 EAG abzueglich Bearbeitungsgebuehr. Untergrenze bei 0 Cent. Seed: OeMAG×5.85/7.15−1.5 (Wartung: shared oemag_monthly_feed_in_rates).",
+            "notes": "Referenzmarktwert Photovoltaik nach § 13 EAG minus 1,5 ct/kWh Abschlag (VPI-wertgesichert), Untergrenze 0 ct/kWh. Quelle: https://www.energieag.at/teamsonnefloat (geprueft 2026-11-25). Seed: RefMarkt PV − 1,5 (Wartung: shared econtrol_referenzmarktwert_pv_monthly). 2025-05 ergibt 0 ct (Untergrenze); eingetragen ist 0,01, weil monthly_rates nur Werte > 0 erlaubt.",
             "monthly_seed": {
-                "curve": "oemag",
-                "arbeitspreis_kwh_cent": 5.85
+                "curve": "econtrol_refmarkt_pv"
             },
             "monthly_rates": [
                 {
+                    "year": 2023,
+                    "month": 12,
+                    "tariff_cent_kwh": 5.98
+                },
+                {
+                    "year": 2024,
+                    "month": 1,
+                    "tariff_cent_kwh": 6.53
+                },
+                {
+                    "year": 2024,
+                    "month": 2,
+                    "tariff_cent_kwh": 4.68
+                },
+                {
+                    "year": 2024,
+                    "month": 3,
+                    "tariff_cent_kwh": 3.12
+                },
+                {
+                    "year": 2024,
+                    "month": 4,
+                    "tariff_cent_kwh": 1.62
+                },
+                {
+                    "year": 2024,
+                    "month": 5,
+                    "tariff_cent_kwh": 1.84
+                },
+                {
+                    "year": 2024,
+                    "month": 6,
+                    "tariff_cent_kwh": 2.74
+                },
+                {
+                    "year": 2024,
+                    "month": 7,
+                    "tariff_cent_kwh": 2.77
+                },
+                {
+                    "year": 2024,
+                    "month": 8,
+                    "tariff_cent_kwh": 4.25
+                },
+                {
+                    "year": 2024,
+                    "month": 9,
+                    "tariff_cent_kwh": 4.36
+                },
+                {
                     "year": 2024,
                     "month": 10,
-                    "tariff_cent_kwh": 5.6182
+                    "tariff_cent_kwh": 4.69
                 },
                 {
                     "year": 2024,
                     "month": 11,
-                    "tariff_cent_kwh": 5.6182
+                    "tariff_cent_kwh": 10.58
                 },
                 {
                     "year": 2024,
                     "month": 12,
-                    "tariff_cent_kwh": 5.6182
+                    "tariff_cent_kwh": 11.82
                 },
                 {
                     "year": 2025,
                     "month": 1,
-                    "tariff_cent_kwh": 6.4609
+                    "tariff_cent_kwh": 11.65
                 },
                 {
                     "year": 2025,
                     "month": 2,
-                    "tariff_cent_kwh": 6.4609
+                    "tariff_cent_kwh": 11.02
                 },
                 {
                     "year": 2025,
                     "month": 3,
-                    "tariff_cent_kwh": 3.4148
+                    "tariff_cent_kwh": 4.91
                 },
                 {
                     "year": 2025,
                     "month": 4,
-                    "tariff_cent_kwh": 3.2905
+                    "tariff_cent_kwh": 1.13
                 },
                 {
                     "year": 2025,
                     "month": 5,
-                    "tariff_cent_kwh": 3.2905
+                    "tariff_cent_kwh": 0.01
                 },
                 {
                     "year": 2025,
                     "month": 6,
-                    "tariff_cent_kwh": 3.2905
+                    "tariff_cent_kwh": 0.11
                 },
                 {
                     "year": 2025,
                     "month": 7,
-                    "tariff_cent_kwh": 3.3805
+                    "tariff_cent_kwh": 4.41
                 },
                 {
                     "year": 2025,
                     "month": 8,
-                    "tariff_cent_kwh": 3.3207
+                    "tariff_cent_kwh": 1.71
                 },
                 {
                     "year": 2025,
                     "month": 9,
-                    "tariff_cent_kwh": 3.3207
+                    "tariff_cent_kwh": 3.34
                 },
                 {
                     "year": 2025,
                     "month": 10,
-                    "tariff_cent_kwh": 5.8702
+                    "tariff_cent_kwh": 7.35
                 },
                 {
                     "year": 2025,
                     "month": 11,
-                    "tariff_cent_kwh": 6.0003
+                    "tariff_cent_kwh": 8.74
                 },
                 {
                     "year": 2025,
                     "month": 12,
-                    "tariff_cent_kwh": 6.0003
+                    "tariff_cent_kwh": 9.76
                 },
                 {
                     "year": 2026,
                     "month": 1,
-                    "tariff_cent_kwh": 5.7344
+                    "tariff_cent_kwh": 12.45
                 },
                 {
                     "year": 2026,
                     "month": 2,
-                    "tariff_cent_kwh": 5.4194
+                    "tariff_cent_kwh": 6.66
                 },
                 {
                     "year": 2026,
                     "month": 3,
-                    "tariff_cent_kwh": 3.18
+                    "tariff_cent_kwh": 4.44
                 },
                 {
                     "year": 2026,
                     "month": 4,
-                    "tariff_cent_kwh": 4.0407
+                    "tariff_cent_kwh": 0.2
                 },
                 {
                     "year": 2026,
                     "month": 5,
-                    "tariff_cent_kwh": 4.0407
+                    "tariff_cent_kwh": 2.26
                 },
                 {
                     "year": 2026,
                     "month": 6,
-                    "tariff_cent_kwh": 4.0407
+                    "tariff_cent_kwh": 4.05
                 },
                 {
                     "year": 2026,
                     "month": 7,
-                    "tariff_cent_kwh": 3.5285
+                    "tariff_cent_kwh": 5.35
                 },
                 {
                     "year": 2026,
                     "month": 8,
-                    "tariff_cent_kwh": 5.8612
+                    "tariff_cent_kwh": 7.92
                 },
                 {
                     "year": 2026,
                     "month": 9,
-                    "tariff_cent_kwh": 6.8193
+                    "tariff_cent_kwh": 9.03
                 }
             ],
             "supplier_id": "energie_ag_ober_sterreich"

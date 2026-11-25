@@ -97,6 +97,23 @@
         "forecast_model_path": {
           "type": "string",
           "description": "Pfad zur JSON mit OLS-Koeffizienten (scripts/train_price_forecast_model.py)."
+        },
+        "live_bias_enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Rollierende EPEX-Bias-Korrektur (Day-Ahead minus OLS) auf prognostizierte Slots."
+        },
+        "live_bias_lookback_hours": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 48,
+          "description": "Lookback-Fenster der Bias-Korrektur in Stunden."
+        },
+        "live_bias_cap_cent_kwh": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "default": 12.0,
+          "description": "Absolute Kappe der Bias-Korrektur in ±Cent/kWh."
         }
       }
     },

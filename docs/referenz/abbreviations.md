@@ -23,7 +23,6 @@ New entries come from terms used in the main user docs (handbook, UI docs).
 | **Default** | Template and import path with the Merker prefix `Earnie_*` |
 | **GX** | Victron GX (e.g. Cerbo) – device hub, often connected via Modbus TCP |
 | **HA** | Home Assistant – smarthome backend (often together with **evcc**) |
-| **HITL** | Human-in-the-Loop – manual mapping and confirmation in the UI (no fully automatic LLM mapping) |
 | **HK** | Hauskonfigurator – Streamlit area for house and profile configuration |
 | **kWp** | Kilowatt-peak – installed PV nominal power |
 | **LoxAPP3** | Loxone configuration/app export (`LoxAPP3.json`) – used e.g. for EFM meters and import |
