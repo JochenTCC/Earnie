@@ -28,7 +28,7 @@ Wenn seit dem letzten Tag neue Schritte in `runtime_store/migration/` hinzukamen
 
 - **Szenario-Explorer: Ein Gerät, dessen Lauf nicht mehr ins Planungsfenster passte, legte die ganze Planung lahm.** Ein verschiebbares Gerät (Rolle „Gesteuert“ oder „Manuelles Gerät“) läuft in ganzen Blöcken. Blieb im Fenster weniger Platz als ein Block, etwa am ersten Morgen eines Laufs, war der Planungsschritt unlösbar und Earnie fiel für diese Stunden in die Automatik zurück. Jetzt plant Earnie den Lauf im nächsten Fenster und die übrigen Verbraucher wie gewohnt.
 
-- **Ersparnis-Buch auf Systemen mit UTC-Uhr (Home-Assistant-Add-on):** Die gemessenen Viertelstunden landeten bisher ein bis zwei Stunden versetzt im Buch, weil Earnie die Uhrzeit des Containers als Ortszeit der Anlage las. Jetzt stimmen sie. Am Tag des Updates fehlen dadurch einmalig einige Viertelstunden in der Abdeckung; Tage vor dem Update bleiben versetzt gebucht. Ein Neuaufbau mit `scripts.build_savings_ledger` muss auf dem System laufen, das das Protokoll geschrieben hat.
+- **Ersparnis-Buch auf Systemen, deren Uhr in einer anderen Zeitzone läuft als die Anlage (z. B. ein Container ohne `TZ`):** Die gemessenen Viertelstunden landeten bisher ein bis zwei Stunden versetzt im Buch, weil Earnie die Uhrzeit des Containers als Ortszeit der Anlage las. Jetzt stimmen sie. Am Tag des Updates fehlen dadurch einmalig einige Viertelstunden in der Abdeckung; Tage vor dem Update bleiben versetzt gebucht. Ein Neuaufbau mit `scripts.build_savings_ledger` muss auf dem System laufen, das das Protokoll geschrieben hat.
 
 ## Breaking / Bitte prüfen
 
