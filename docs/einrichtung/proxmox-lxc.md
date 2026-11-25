@@ -76,7 +76,7 @@ Für ein privates GHCR-Image vor dem `pull` im CT anmelden: `echo "$TOKEN" | doc
 Die Konfiguration funktioniert wie bei Synology und LoxBerry:
 
 1. **Loxone-Zugang:** in `earnie_env/config/.env` eintragen.
-2. **Haus und Tarife:** in `earnie_env/config/config.json` und `earnie_env/config/tariffs.json` pflegen.
+2. **Haus, Szenarien und Tarife:** in der Oberfläche einrichten: **Hauskonfigurator**, **Szenarienkonfigurator** und **Tarife**. Eigene Tarife speichert Earnie in `user_tariffs.json`; den mitgelieferten Katalog `tariffs.json` nicht von Hand ändern.
 3. **Neustart:** nach Änderungen an der Konfiguration den Container neu starten:
 
 ```bash

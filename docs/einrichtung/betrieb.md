@@ -157,7 +157,7 @@ Die Konfiguration schreiben die Seiten **Hauskonfigurator**, **Szenarienkonfigur
 
 - **Viertelstunden-Grenzen:** Ein Lauf startet an jeder Viertelstunden-Grenze (`:00`, `:15`, `:30`, `:45`).
 - **Sofort auf Anfrage:** Zusätzlich startet ein Lauf sofort, wenn das Loxone Virtual Out **`Earnie_Request_Optimize`** den HTTP-Dienst des Daemons aufruft (`POST /ehal/loxone/request_optimize`).
-- **Port:** `system.ehal_http_port` in `config.json` bzw. `EARNIE_EHAL_HTTP_PORT` (Standard **8541**; alte Namen `system.ehal_loxone_http_port` / `EARNIE_EHAL_LOXONE_HTTP_PORT` gelten weiter). Vorlage `VO_Earnie_Status.xml` → `http://EARNIE_HOST:8541`.
+- **Port:** `system.ehal_http_port` in `config.json` bzw. `EARNIE_EHAL_HTTP_PORT` (Standard **8541**; die Namen `system.ehal_loxone_http_port` / `EARNIE_EHAL_LOXONE_HTTP_PORT` gelten ebenfalls). Vorlage `VO_Earnie_Status.xml` → `http://EARNIE_HOST:8541`.
 - **Link-Nachweis (Hub → Earnie):** Ein wiederholendes Heartbeat-VO `Push_Earnie_Heartbeat` ruft `GET /ehal/telemetry/heartbeat_smarthome/<v>` auf.
 - **Status für Virtual In:** Der Status je Entität liegt am selben Port unter `GET /ehal/loxone/status.json`.
 - **Maximale Wartezeit:** `system.loop_timeout` in `config.json` legt die maximale Wartezeit zwischen Durchläufen in Sekunden fest (Standard 900 = 15 Min.).
@@ -191,7 +191,7 @@ Standardverzeichnis: `earnie_env/runtime/`. Es lässt sich mit `EARNIE_RUNTIME_P
 | `optimizer_run_state.json`      | Letzter erfolgreicher `main.py`-Durchlauf (SoC, Modus, Soll-Leistungen, Flex-Soll).          |
 | `optimization_history.jsonl`    | Historie aller Produktiv-Durchläufe, eine Zeile JSON pro Lauf. Monatlich rotiert, max. 12 Archive. Enthält u. a. `consumption_snapshot`, optional `closed_interval`. |
 | `live_optimization_debug.json`  | Anzeige-Snapshot des Optimierungs-Horizonts (von `main.py` geschrieben, von der App gelesen). |
-| `edibert_market/market_<zone>.json` | Cache der Live-Day-Ahead-Preise (QH, letzte 7 Tage bis morgen; Zone z. B. `AT`; Quelle ENTSO-E, Energy-Charts oder aWATTar). Deckt er das erwartete Fenster ab, fragt Earnie keine Quelle. Die alte Datei `live_day_ahead_<zone>.json` wird nicht mehr gelesen und kann gelöscht werden. |
+| `edibert_market/market_<zone>.json` | Cache der Live-Day-Ahead-Preise (QH, letzte 7 Tage bis morgen; Zone z. B. `AT`; Quelle ENTSO-E, Energy-Charts oder aWATTar). Deckt er das erwartete Fenster ab, fragt Earnie keine Quelle. Eine Datei `live_day_ahead_<zone>.json` liest Earnie nicht; sie kann gelöscht werden. |
 | `edibert_market/market_archive/<zone>/` | Monats-Cache der Börsenpreise für Szenario-Explorer und Backtesting (`JJJJ-MM.json`, Quelle Energy-Charts). Abgeschlossene Monate werden nicht erneut abgefragt; löschen erzwingt einen neuen Abruf. |
 | `local_settings.json`           | Lokale Betriebseinstellungen, z. B. `silent_mode` (auch über die Seite **Optimierer-Dienst**) und die Cycle-Recorder-Schlüssel `recorder_enabled` / `recorder_retention_days`. |
 | `recorder/`                     | Cycle-Recorder-Ringpuffer (`cycles_YYYY-MM-DD.jsonl.gz`, Config-Snapshots unter `configs/`). Enthält Lastprofile für die Regression; bleibt lokal und ist standardmäßig an. |
@@ -245,7 +245,7 @@ Earnie schreibt die Sollwerte für eine Viertelstunde genau zu deren Beginn, **n
 - **Vorladen (Prefetch):** Direkt nach jedem Lauf lädt Earnie in der Wartezeit die langsamen Internet-Daten für den nächsten Lauf vor. Dazu gehören Day-Ahead-Preise, Wetterdaten für die Preisprognose, Außentemperatur und Kollektor-Einstrahlung (Open-Meteo).
   - Der nächste Lauf findet die Daten dann im Zwischenspeicher und ist schneller fertig.
   - In `earnie.log` steht dazu je Lauf eine Zeile `Prefetch für 13:00: … in … s` (oder „alles aus dem Cache“).
-  - Schlägt das Vorladen fehl, holt der Lauf die Daten wie bisher selbst.
+  - Schlägt das Vorladen fehl, holt der Lauf die Daten selbst.
   - Die PV-Prognose (forecast.solar) wird wegen des Abruflimits nicht vorgeladen.
 - **Aktueller Zustand:** Ladestand und Leistung liest Earnie zu Beginn des Laufs, also höchstens 90 s vor dem Takt. Der Zustand wird nicht auf den Takt hochgerechnet; der Unterschied ist bei so kurzer Zeit vernachlässigbar.
 
@@ -287,7 +287,7 @@ Earnie speichert die Eingaben jedes Optimierungszyklus in einem lokalen Ringpuff
 
 ### Log- und Historiendateien
 
-Betriebsstatus der wichtigsten Log-, Historien- und Debug-Dateien (Review 2026-06):
+Betriebsstatus der wichtigsten Log-, Historien- und Debug-Dateien:
 
 
 | Datei                                | Status                         | Hinweis                                                       |
@@ -298,10 +298,10 @@ Betriebsstatus der wichtigsten Log-, Historien- und Debug-Dateien (Review 2026-0
 | `optimizer_run_state.json`           | **aktiv**                      | Letzter erfolgreicher `main.py`-Durchlauf.                    |
 | `live_optimization_debug.json`       | **aktiv**                      | Anzeige-Snapshot des Optimierungs-Horizonts für die Streamlit-App. |
 | `cycle_stats.jsonl`                  | **aktiv**                      | Dauer, Vorlauf und Pünktlichkeit je Optimierungslauf (rollierend 7 Tage), siehe [Zyklus-Pünktlichkeit und Vorlauf](#zyklus-pünktlichkeit-und-vorlauf-immer-aktiv). |
-| `savings_ledger.jsonl`               | **aktiv** (ab 2.8)             | Ersparnis-Buch: eine JSON-Zeile je abgeschlossenem Tag von Sonnenaufgang zu Sonnenaufgang. Vergleicht die gemessenen Kosten mit einer Schattenanlage ohne Earnie (gleiche PV, gleiche Preise, je Gerät der gleiche Tagesverbrauch zur gewohnten Zeit, Batterie im Herstellermodus mit den Lade- und Entladegrenzen und der Energiereserve der echten Batterie; ohne Hausbatterie auch ohne Batterie). Wird nur angehängt, nicht rotiert. Ändert sich die Rechnung mit einem Update, beginnt eine neue Zählung. Nachträglich aus dem Verlauf aufbauen: `python -m scripts.build_savings_ledger --since <JJJJ-MM-TT>` (`--dry-run` zeigt nur die Tagestabelle, `--rebuild` ersetzt ein vorhandenes Buch; Earnie vorher stoppen). |
-| `savings_ledger_slots.jsonl`         | **aktiv** (ab 2.8)             | Viertelstundenwerte der abgeschlossenen Tage zum Ersparnis-Buch: eine JSON-Zeile je Tag. Wird nur angehängt, nicht rotiert. Fehlt die Datei oder ist sie defekt, neu aufbauen, ohne Buch und Zustand zu ändern: `python -m scripts.build_savings_ledger --since <JJJJ-MM-TT> --slots-only` (Earnie vorher stoppen; bricht ab, wenn der Verlauf nicht zum Buch passt). |
-| `savings_ledger_state.json`          | **aktiv** (ab 2.8)             | Zustand des Ersparnis-Buchs: SoC der Schattenbatterie, der laufende Tag und die Preise der letzten Viertelstunde. Nicht löschen: Ohne diese Datei beginnt eine neue Zählung. Eine unlesbare Datei wird als `savings_ledger_state.json.broken-<Zeitstempel>` beiseitegelegt. |
-| `backtesting_log.json`               | **nur Dev/Backtesting**        | Ergebnis des Szenario-Explorers; nicht für die Produktiv-NAS gedacht. |
+| `savings_ledger.jsonl`               | **aktiv**                      | Ersparnis-Buch: eine JSON-Zeile je abgeschlossenem Tag von Sonnenaufgang zu Sonnenaufgang. Vergleicht die gemessenen Kosten mit einer Schattenanlage ohne Earnie (gleiche PV, gleiche Preise, je Gerät der gleiche Tagesverbrauch zur gewohnten Zeit, Batterie im Herstellermodus mit den Lade- und Entladegrenzen und der Energiereserve der echten Batterie; ohne Hausbatterie auch ohne Batterie). Wird nur angehängt, nicht rotiert. Ändert sich die Rechnung mit einem Update, beginnt eine neue Zählung. Nachträglich aus dem Verlauf aufbauen: `python -m scripts.build_savings_ledger --since <JJJJ-MM-TT>` (`--dry-run` zeigt nur die Tagestabelle, `--rebuild` ersetzt ein vorhandenes Buch; Earnie vorher stoppen). |
+| `savings_ledger_slots.jsonl`         | **aktiv**                      | Viertelstundenwerte der abgeschlossenen Tage zum Ersparnis-Buch: eine JSON-Zeile je Tag. Wird nur angehängt, nicht rotiert. Fehlt die Datei oder ist sie defekt, neu aufbauen, ohne Buch und Zustand zu ändern: `python -m scripts.build_savings_ledger --since <JJJJ-MM-TT> --slots-only` (Earnie vorher stoppen; bricht ab, wenn der Verlauf nicht zum Buch passt). |
+| `savings_ledger_state.json`          | **aktiv**                      | Zustand des Ersparnis-Buchs: SoC der Schattenbatterie, der laufende Tag und die Preise der letzten Viertelstunde. Nicht löschen: Ohne diese Datei beginnt eine neue Zählung. Eine unlesbare Datei wird als `savings_ledger_state.json.broken-<Zeitstempel>` beiseitegelegt. |
+| `backtesting_log.json`               | **aktiv**                      | Ergebnis des Szenario-Explorers. |
 
 
 ## Umgebungsvariablen (optional)
@@ -310,15 +310,15 @@ Betriebsstatus der wichtigsten Log-, Historien- und Debug-Dateien (Review 2026-0
 | Variable                                | Wirkung                                                                                                                                                                                                                              |
 | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `EARNIE_ENV_PATH`                       | Wurzelverzeichnis für Persistenz (Standard: `earnie_env`). Daraus leiten sich `…/config` und `…/runtime` ab, sofern nicht separat gesetzt. |
-| `EARNIE_CONFIG_PATH`                    | Pfad zum **Config-Verzeichnis** (Standard: `earnie_env/config`; ältere Ordner: `config/`). Enthält `config.json`, Sidecars, `.env` und `uploads/`. Ältere Setups mit Pfad zur `config.json`-Datei werden weiterhin akzeptiert. |
-| `EARNIE_RUNTIME_PATH`                   | Verzeichnis für Laufzeitdaten (Standard: `earnie_env/runtime`; ältere Ordner: `runtime`). |
+| `EARNIE_CONFIG_PATH`                    | Pfad zum **Config-Verzeichnis** (Standard: `earnie_env/config`; auch `config/`). Enthält `config.json`, Sidecars, `.env` und `uploads/`. Ein Pfad zur `config.json`-Datei wird ebenfalls akzeptiert. |
+| `EARNIE_RUNTIME_PATH`                   | Verzeichnis für Laufzeitdaten (Standard: `earnie_env/runtime`; auch `runtime`). |
 | `EARNIE_EARLY_START`                    | `on` (Standard, auch wenn nicht gesetzt) oder `off`. Bei `on` starten reguläre Läufe 15–90 s vor dem Viertelstundentakt und schreiben die Sollwerte genau zum Takt. Bei `off` startet der Lauf erst zum Takt und schreibt, sobald er fertig ist. Andere Werte führen zu einem Fehler beim Start. Siehe [Zyklus-Pünktlichkeit und Vorlauf](#zyklus-pünktlichkeit-und-vorlauf-immer-aktiv). |
-| `EARNIE_UI_MODES`                       | Kommagetrennt: `sunset2sunset` (Monitor, Manuelle Geräte), `scenario_explorer`, `live_environment` (Smarthome-Backend, EHAL-Com, Optimierer-Dienst, Analyse Verbrauch & Kosten), `price_forecast`. Ohne Variable gilt `sunset2sunset,scenario_explorer,live_environment` (`price_forecast` nur bei `ui.price_forecast_page_enabled=true`). Die Compose-Dateien für den Produktivbetrieb setzen oft `sunset2sunset,live_environment`, die Cloud `scenario_explorer`. Siehe [Betriebsmodi](../ui/betriebsmodi.md). |
-| `EARNIE_UI_STREAMLIT_PORT`              | TCP-Port für Streamlit (überschreibt `ui.streamlit_port`; siehe [Streamlit-Ports](../dev/streamlit-ports.md)).                                                                                                                  |
-| `EARNIE_EHAL_HTTP_PORT`                 | TCP-Port für den Daemon-HTTP (`Earnie_Request_Optimize` / Telemetry inkl. Heartbeat / `status.json`). Überschreibt `system.ehal_http_port`; Standard **8541**. Alter Name `EARNIE_EHAL_LOXONE_HTTP_PORT` gilt weiter.                  |
+| `EARNIE_UI_MODES`                       | Kommagetrennt: `sunset2sunset` (Monitor, Manuelle Geräte), `scenario_explorer`, `live_environment` (Smarthome-Backend, EHAL-Com, Optimierer-Dienst, Analyse Verbrauch & Kosten), `price_forecast`. Ohne Variable gilt `sunset2sunset,scenario_explorer,live_environment` (`price_forecast` nur bei `ui.price_forecast_page_enabled=true`). Die Compose-Dateien für den Produktivbetrieb setzen `sunset2sunset,scenario_explorer,live_environment`, die Labor-Stacks `sunset2sunset,live_environment`, die Cloud `scenario_explorer`. Siehe [Betriebsmodi](../ui/betriebsmodi.md). |
+| `EARNIE_UI_STREAMLIT_PORT`              | TCP-Port für Streamlit (überschreibt `ui.streamlit_port`; siehe [Streamlit-Ports](../dev/streamlit-ports.md), Entwickler-Doku auf Englisch).                                                                                                                  |
+| `EARNIE_EHAL_HTTP_PORT`                 | TCP-Port für den Daemon-HTTP (`Earnie_Request_Optimize` / Telemetry inkl. Heartbeat / `status.json`). Überschreibt `system.ehal_http_port`; Standard **8541**. Der Name `EARNIE_EHAL_LOXONE_HTTP_PORT` gilt ebenfalls.                  |
 | `EARNIE_AUTO_START_MAIN`                | `1` = beim Start von `scripts.run_streamlit` automatisch `main.py` starten, falls es nicht schon läuft (Docker-Compose setzt das). Ohne Variable bzw. lokal: aus.                                                                     |
 | `EARNIE_OFFLINE`                        | `1` = keine Loxone-/Live-Verbindung erforderlich. Der Bootstrap füllt leere Entitäts-IDs im Live-Szenario aus den Katalogen. Sinnvoll für die Streamlit Community Cloud. |
-| `EARNIE_OPEN_METEO_CACHE_PATH`          | Verzeichnis für den Open-Meteo-Klimacache (Standard: `data/cache/open_meteo_utc`; das frühere `data/cache/open_meteo` wird nicht mehr gelesen und kann gelöscht werden). Vor allem für Tests und Container mit eigenem Cache-Volume. |
+| `EARNIE_OPEN_METEO_CACHE_PATH`          | Verzeichnis für den Open-Meteo-Klimacache (Standard: `data/cache/open_meteo_utc`; ein Ordner `data/cache/open_meteo` wird nicht gelesen und kann gelöscht werden). Vor allem für Tests und Container mit eigenem Cache-Volume. |
 | `EARNIE_ENERGY_CHARTS_CACHE_PATH`       | Verzeichnis für den Cache der EU-Marktdaten (Standard: `data/cache/energy_charts`): EU-Erzeugung und AT-Börsenpreise von Energy-Charts sowie das Open-Meteo-Archiv des EU-Wettergitters. Earnie legt nur abgeschlossene Tage ab (Energy-Charts älter als zwei Tage, Open-Meteo älter als sieben Tage), jüngere Daten lädt es jedes Mal neu. Ein zweiter Bau des Trainingsdatensatzes für denselben Zeitraum braucht dadurch kaum Netz. Mehrere Backtesting-Prozesse können sich das Verzeichnis teilen. |
 | `EARNIE_OPEN_METEO_AS_OF`               | Pinnt den letzten Archivtag des Open-Meteo-Klimacaches (ISO-Datum, z. B. `2026-10-22`). Der Cache-Schlüssel des laufenden Jahres bleibt dann stabil – für eingefrorene Offline-Läufe. Ein Datum nach dem tatsächlich letzten Archivtag oder ein ungültiges Format bricht mit Fehler ab. |
 | `EARNIE_CLIMATE_REFERENCE_YEAR`         | Archivjahr (JJJJ), das Wärmemodell, Grundlast und Modellprofile statt des letzten vollen Kalenderjahres als Klima-Referenz nehmen – für eingefrorene Studienläufe mit anderem Preisjahr (z. B. `2024`). Ein Jahr nach dem letzten vollen Archivjahr oder ein ungültiger Wert bricht mit Fehler ab. Im Normalbetrieb nicht setzen. |
@@ -326,11 +326,11 @@ Betriebsstatus der wichtigsten Log-, Historien- und Debug-Dateien (Review 2026-0
 | `EARNIE_USAGE_PING`                     | `off` = Kill-Switch: Es wird **nichts** gesendet, auch wenn die Zustimmung in der UI eingeschaltet ist. Andere Werte bzw. nicht gesetzt: Kill-Switch aus, die Zustimmung steuert. Siehe [Nutzungsstatistik](#nutzungsstatistik). |
 
 
-Streamlit-Port-Übersicht (Stacks, Plattformen): [streamlit-ports.md](../dev/streamlit-ports.md).
+Streamlit-Port-Übersicht (Stacks, Plattformen): [streamlit-ports.md](../dev/streamlit-ports.md) (Entwickler-Doku auf Englisch).
 
 ## Nutzungsstatistik
 
-Ab Version 2.7 kann Earnie optional und anonym melden, dass eine Installation aktiv ist (Versionszähler). So sehen wir, wie viele Installationen pro Tag aktiv sind. Es gibt keine Nutzungsanalyse, kein Feature-Tracking und kein Fehlerreporting. Wenn Sie zustimmen, unterstützen Sie damit die Weiterentwicklung von Earnie – vielen Dank!
+Earnie kann optional und anonym melden, dass eine Installation aktiv ist (Versionszähler). So sehen wir, wie viele Installationen pro Tag aktiv sind. Es gibt keine Nutzungsanalyse, kein Feature-Tracking und kein Fehlerreporting. Wenn Sie zustimmen, unterstützen Sie damit die Weiterentwicklung von Earnie – vielen Dank!
 
 **Zustimmung (drei Zustände):** noch nicht gefragt (`unset`), zugestimmt (`on`) oder abgelehnt (`off`). Gesendet wird nur bei `on`.
 
@@ -359,7 +359,7 @@ Wer bereits zugestimmt hat, wird wegen `points` nicht erneut gefragt. Die exakte
 
 ### Earnie-Points
 
-Die Earnie-Points sind eine grobe Größenkennzahl **einer Anlage** (ein Standort). Earnie berechnet sie aus dem **Live-Szenario**, nicht aus Szenarien des Szenarienkonfigurators. Die Seite **Optimierer-Dienst** zeigt sie unter **Earnie-Points dieser Anlage** mit Aufschlüsselung an. Für private, nicht gewerbliche Selbst-Hoster ist Earnie bis **15 Earnie-Points** kostenfrei; größere Anlagen bitte beim Projekt melden. Earnie prüft die Punkte nicht und schränkt bei mehr Punkten nichts ein. Zukünftig dienen sie auch der Zuordnung zu möglichen Abo-Tarifen. Fehlen Angaben im Live-Szenario, zeigt Earnie den Grund an und sendet keine Punkte.
+Die Earnie-Points sind eine grobe Größenkennzahl **einer Anlage** (ein Standort). Earnie berechnet sie aus dem **Live-Szenario**, nicht aus Szenarien des Szenarienkonfigurators. Die Seite **Optimierer-Dienst** zeigt sie unter **Earnie-Points dieser Anlage** mit Aufschlüsselung an. Für private, nicht gewerbliche Selbst-Hoster ist Earnie bis **15 Earnie-Points** kostenfrei; größere Anlagen bitte beim Projekt melden. Earnie prüft die Punkte nicht und schränkt bei mehr Punkten nichts ein. Fehlen Angaben im Live-Szenario, zeigt Earnie den Grund an und sendet keine Punkte.
 
 Regel (Version 3). Jeder Teil wird kaufmännisch auf ganze Punkte gerundet. Ein Ausbau der Anlage (mehr PV, mehr Speicher, eine weitere Wallbox) senkt die Punkte nie:
 
@@ -372,7 +372,7 @@ Regel (Version 3). Jeder Teil wird kaufmännisch auf ganze Punkte gerundet. Ein 
 | Heizstab | nach der Wärmequelle, die er ergänzt: Gas, Öl, Fernwärme 6; Pellets, Holz 3; Wärmepumpe, elektrische Direktheizung 0. |
 | Weitere flexible Großverbraucher | 1 Punkt je von Earnie gesteuertem Verbraucher ab 2,5 kW (z. B. Pool) |
 
-Die Phasenzahl einer Wallbox spielt keine Rolle, und die Größe der PV-Anlage ändert die Punkte für Speicher und Heizstab nicht mehr. Mit dem Wechsel auf Version 3 ändert sich die angezeigte Summe einmal, ohne dass sich an der Anlage etwas ändert.
+Die Phasenzahl einer Wallbox und die Größe der PV-Anlage ändern die Punkte für Speicher und Heizstab nicht.
 
 **Abschalten:**
 
@@ -401,7 +401,7 @@ Wurde in einer Sitzung eine Simulation im **Szenario-Explorer** gestartet, kann 
 
 ## Support-Paket (Debug-Dump)
 
-Das Support-Paket hilft, Anzeige- und Optimierungsprobleme nachzuvollziehen, ohne die Produktivdateien erneut zu durchsuchen. Es ist immer verfügbar: Seitenleiste → **Sichern & Übertragen** → **Support-Paket**. Ein Schalter wird nicht mehr gebraucht (der frühere Schlüssel `ui.chart_debug_capture_enabled` wird per Migration entfernt, siehe [Datenmodell 6](#datenmodell-6-wallboxen)).
+Das Support-Paket hilft, Anzeige- und Optimierungsprobleme nachzuvollziehen, ohne die Produktivdateien erneut zu durchsuchen. Es ist immer verfügbar: Seitenleiste → **Sichern & Übertragen** → **Support-Paket**.
 
 Ablauf:
 

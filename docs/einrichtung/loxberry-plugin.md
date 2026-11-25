@@ -57,7 +57,7 @@ Zusätzlich gibt es eine kleine Plugin-Notizdatei `…/config/plugins/earnie/plu
 | Schlüssel               | Bedeutung                                                                    |
 | ----------------------- | ---------------------------------------------------------------------------- |
 | `EARNIE_CHANNEL`        | `stable` \| `prerelease` \| `pinned` (Standard nach Install/Upgrade: `stable`) |
-| `EARNIE_PINNED_VERSION` | nur bei `pinned`, z. B. `2.5.3`                                              |
+| `EARNIE_PINNED_VERSION` | nur bei `pinned`, z. B. `2.7.2`                                              |
 | `EARNIE_AUTO_UPDATE`    | `1`/`0` – täglicher Image-Pull; nur wirksam bei `stable`/`prerelease`        |
 | `STREAMLIT_PORT`        | Host-Port (Standard **8501**)                                                |
 
@@ -80,7 +80,7 @@ Beim Speichern in der Plugin-UI schreibt `sync_compose_env.sh` folgende Werte na
 | ----------------- | ---------------------------- | ---------------------------------------------- |
 | **Stabil**        | `:latest`                    | ja, wenn `EARNIE_AUTO_UPDATE=1` (Timer ~03:30) |
 | **Vorabversion**  | `:next`                      | ja, wenn `EARNIE_AUTO_UPDATE=1` (Timer ~03:30) |
-| **Feste Version** | `:<SemVer>` (z. B. `:2.5.3`) | nein, der Timer überspringt `pinned`           |
+| **Feste Version** | `:<SemVer>` (z. B. `:2.7.2`) | nein, der Timer überspringt `pinned`           |
 
 
 `:next` zeigt auf das neueste Release einschließlich Vorabversionen. Ist die neueste Vorabversion älter als die letzte stabile Version, fällt `:next` nicht hinter diese zurück.

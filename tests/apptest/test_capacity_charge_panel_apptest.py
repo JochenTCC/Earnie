@@ -84,6 +84,14 @@ def test_a_known_month_shows_peak_billed_amount_and_next_kw(tmp_path: Path):
     assert not app.expander
 
 
+def test_the_cap_line_names_the_margin_like_the_scenario_form(tmp_path: Path):
+    # The scenario form calls the field "Sicherheitsmarge"; "Reserve" is the virtual reserve.
+    app = _run(_panel({**_params(tmp_path, [_charge()]), **CAP}, month_peak(3.0), {"plan": _plan(), "measured": {}}))
+    cap_line = next(item.value for item in app.caption if item.value.startswith("Bezugsgrenze"))
+    assert "Sicherheitsmarge" in cap_line
+    assert "Reserve" not in cap_line
+
+
 def test_an_unknown_month_says_so_and_never_shows_zero(tmp_path: Path):
     app = _run(_panel(_params(tmp_path, [_charge()]), None))
     metrics = _metrics(app)

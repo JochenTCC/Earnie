@@ -42,7 +42,8 @@ Diese Verzeichnisse liegen **außerhalb des Images** und überleben Image-Update
 | Mount (Host)                          | Inhalt                                                                                                                  |
 | ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
 | `./earnie_env/config/config.json`                | Haus-Konfiguration (wird nie überschrieben)                                                                             |
-| `./earnie_env/config/tariffs.json`               | Tarif-Katalog (Bezug/Einspeise); Sidecar neben `config.json`                                                            |
+| `./earnie_env/config/tariffs.json`               | Mitgelieferter Tarif-Katalog (Bezug/Einspeise); Sidecar neben `config.json`; nicht von Hand ändern                      |
+| `./earnie_env/config/user_tariffs.json`          | Eigene Tarife (Benutzertarife) aus der Seite **Tarife**                                                                 |
 | `./earnie_env/config/grid_fees.json`             | Netzentgelt-Katalog (Netzbereiche / Zeitregeln); Sidecar; Bootstrap aus `share/config/`                                 |
 | `./earnie_env/config/backtesting_scenarios.json` | Szenarien inkl. Live-Baseline                                                                                           |
 | `./earnie_env/config/house_profiles.json`        | Hausprofile (Sidecar)                                                                                                   |
@@ -84,7 +85,7 @@ Auf **Smarthome-Backend** und **EHAL-Com** zeigt Earnie „Letzter Aufruf vom Mi
 1. Projektordner mit `docker/compose/synology_productive.yml` anlegen (auf der NAS oft als `compose.yaml` kopiert).
 2. Verzeichnisse anlegen: `mkdir -p earnie_env/config earnie_env/runtime`.
 3. Container starten. Der **Entrypoint** legt fehlende Dateien an: `.env`, `config.json`, `tariffs.json`, weitere Sidecars, bei Bedarf Vorlagen aus `share/config/` sowie leere Runtime-Dateien.
-4. `earnie_env/config/.env`, `earnie_env/config/config.json` und `earnie_env/config/tariffs.json` anpassen (Loxone-Zugang, Entitäten, Tarif-IDs der Szenarien).
+4. Zugangsdaten in `earnie_env/config/.env` eintragen (Loxone-Zugang). Haus, Szenarien und Tarife in der Oberfläche einrichten: **Hauskonfigurator**, **Szenarienkonfigurator** und **Tarife**. Eigene Tarife speichert Earnie in `user_tariffs.json`; den mitgelieferten Katalog `tariffs.json` nicht von Hand ändern.
 5. Optional: historische `cons_data` aus Dev nach `earnie_env/runtime/cons_data.csv` kopieren.
 
 
@@ -335,7 +336,7 @@ Für die Abnahme von Hauskonfigurator und Backtesting auf **leeren** Volumes (Po
 1. Projektordner anlegen (z. B. `/opt/earnie-energy/`) mit `docker/compose/loxberry_productive.yml`.
 2. Verzeichnisse anlegen: `mkdir -p earnie_env/config earnie_env/runtime`.
 3. Container starten. Der **Entrypoint** legt fehlende Dateien im gemounteten Volume an (`earnie_env/config/.env`, `config.json`, …).
-4. `earnie_env/config/.env`, `earnie_env/config/config.json` und `earnie_env/config/tariffs.json` anpassen (Loxone-Zugang, Entitäten, Tarif-IDs der Szenarien).
+4. Zugangsdaten in `earnie_env/config/.env` eintragen (Loxone-Zugang). Haus, Szenarien und Tarife in der Oberfläche einrichten: **Hauskonfigurator**, **Szenarienkonfigurator** und **Tarife**. Eigene Tarife speichert Earnie in `user_tariffs.json`; den mitgelieferten Katalog `tariffs.json` nicht von Hand ändern.
 5. Optional: historische `cons_data` nach `earnie_env/runtime/cons_data.csv` kopieren.
 
 

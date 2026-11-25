@@ -19,7 +19,11 @@ Wartet die Seite auf **main.py**, erscheint **über** den Charts ein blauer Sync
 
 **Überschrift:** Fensterbezeichnung und Datumsbereich, z. B. „SA₀→SA₂ (Live)“ am Desktop bzw. „SA₀→SA₁ (Live)“ mobil. Das **?** daneben erklärt die Hintergrundzonen (grau, neutral, grün) und die Navigation.
 
-**Welcher Plan:** Rechts von **Jetzt** zeigt Chart 1 genau den Plan, den Earnie in diesem Lauf an Batterie und Verbraucher geschickt hat: den ganzen Horizont aus derselben Optimierung, Slot für Slot. Earnie rechnet für die Anzeige keine zweite Optimierung mehr. Chart 1 und die Ersparnis-Prognose können deshalb nicht mehr einen anderen Plan zeigen als den, der läuft. BL Ziel bekommt dieselbe Restenergie je Verbraucher wie der Plan (was heute noch zu liefern ist), sodass beide Seiten dieselbe Energie liefern. BL Ziel bekommt dafür auch dieselbe Zeit wie der Plan: Ein Verbraucher ohne Fertigstellungszeit muss seine Restenergie bis Mitternacht des aktuellen Tages bekommen, einer mit Fertigstellungszeit bis zu dieser. BL Ziel verteilt die Energie nur auf diese Slots und schiebt sie nicht in die günstige Nacht oder die PV des nächsten Tages. Ausnahme Wärmepumpe mit Wärmespeicher (Live): Der Plan hält dort nur den Speicher in seinem Band und erreicht den Endfüllstand; die Restenergie aus dem Tagesziel ist für ihn nur ein Richtwert. BL Ziel liefert der Wärmepumpe deshalb genau die Energie, die der Plan ihr gibt, sonst würde BL Ziel Wärme bezahlen, die der Plan gar nicht kauft. Alle Vergleichsläufe (BL Ziel, BL Profil, gleiche Flex) rechnen außerdem mit derselben Batterie wie der Plan: mit den aktuellen Lade- und Entladegrenzen des Wechselrichters und mit der Energiereserve. Sperrt der Wechselrichter gerade das Entladen, entlädt also auch die Vergleichsbatterie nicht; eine virtuelle Reserve hält die Vergleichsbatterie in jedem Slot.
+**Welcher Plan:** Rechts von **Jetzt** zeigt Chart 1 genau den Plan, den Earnie in diesem Lauf an Batterie und Verbraucher geschickt hat: den ganzen Horizont aus derselben Optimierung, Slot für Slot.
+
+**BL Ziel: gleiche Energie, gleiche Zeit.** BL Ziel bekommt dieselbe Restenergie je Verbraucher wie der Plan (was heute noch zu liefern ist), sodass beide Seiten dieselbe Energie liefern. BL Ziel bekommt dafür auch dieselbe Zeit wie der Plan: Ein Verbraucher ohne Fertigstellungszeit muss seine Restenergie bis Mitternacht des aktuellen Tages bekommen, einer mit Fertigstellungszeit bis zu dieser. BL Ziel verteilt die Energie nur auf diese Slots und schiebt sie nicht in die günstige Nacht oder die PV des nächsten Tages. Ausnahme Wärmepumpe mit Wärmespeicher (Live): Der Plan hält dort nur den Speicher in seinem Band und erreicht den Endfüllstand; die Restenergie aus dem Tagesziel ist für ihn nur ein Richtwert. BL Ziel liefert der Wärmepumpe deshalb genau die Energie, die der Plan ihr gibt, sonst würde BL Ziel Wärme bezahlen, die der Plan gar nicht kauft.
+
+**Vergleichsbatterie:** Alle Vergleichsläufe (BL Ziel, BL Profil) rechnen außerdem mit derselben Batterie wie der Plan: mit den aktuellen Lade- und Entladegrenzen des Wechselrichters und mit der Energiereserve. Sperrt der Wechselrichter gerade das Entladen, entlädt also auch die Vergleichsbatterie nicht; eine virtuelle Reserve hält die Vergleichsbatterie in jedem Slot.
 
 **Kein Plan (Automatik):** Findet die Optimierung in einem Lauf keinen gültigen Plan, stellt Earnie die Batterie auf Automatik. Für diesen Lauf gibt es dann keinen Plan: Chart 1 zeigt den Hinweis „kein Plan (Automatik)“ statt eines Verlaufs, und es gibt keine Ersparnis-Prognose. Earnie rechnet dafür keinen Ersatzplan. Der nächste Lauf mit Plan zeigt den Chart wieder.
 
@@ -72,18 +76,18 @@ Dieselbe Slot-Zuordnung nutzt auch die Auswertung [Analyse Verbrauch & Kosten](#
 
 PV, Last, Netz, Batterieflüsse und **Flex-Verbraucher** zeigen im grauen Bereich Ist-Werte aus dem Produktiv-Log.
 
-- **Viertelstunden-Mittel:** Ab Builds des Optimierer-Dienstes mit Viertelstunden-Mittelung schreibt `main.py` zusätzlich `closed_interval`. Das ist der Mittelwert der Leistungsproben (≤ 60 s) über die *vorherige* Viertelstunde, typisch alle 30 s.
+- **Viertelstunden-Mittel:** `main.py` schreibt in jede Log-Zeile `closed_interval`: den Mittelwert der Leistungsproben (≤ 60 s, typisch alle 30 s) über die *vorherige* Viertelstunde.
 - **Nutzung der Mittelwerte:** Chart 1, Verbrauch & Kosten und die Ist-Seite von Soll/Ist nutzen diese Mittelwerte, sobald `sample_count ≥ 3`. Andernfalls dient die Probe am Entscheidungspunkt (`consumption_snapshot`) als Fallback. Ältere Log-Zeilen ohne `closed_interval` bleiben Punktproben.
 - **Loxone-Zähler (optional, VO-Push):** Sind die Energie-Felder aktiviert (`sens_pv_energy` / `sens_grid_energy_*` bzw. `consumer.*.sens_energy_total`), liest der Sampler die vom Miniserver gepushten Zählerstände aus der Inbox. Für diese Kanäle setzt er die mittlere Slot-Leistung aus ΔkWh / 0,25 h (`ist_power_source`: `counter`). Veraltete oder fehlende Zähler (kein Push bzw. älter als 3 × VO-Repeat) lassen den Kanal auf dem Leistungsmittel. Dasselbe gilt für gemeinsame Zähler mit `subtract_consumer_ids` und für zu grobe Zähler: Zeigen beide Zählerstände einer Viertelstunde höchstens eine Nachkommastelle (z. B. ein PV-Zähler in ganzen kWh), bleibt der Kanal auf dem Leistungsmittel. Sonst bekäme eine Viertelstunde den ganzen Zählerschritt (1 kWh = 4 kW) und die übrigen 0. Das Log nennt solche Kanäle unter `coarse_counters`, der Daemon warnt einmal je Kanal, und **EHAL-Com** zeigt die Warnung *Zählerstände zu grob — bitte handeln* mit der Abhilfe (Loxone: `<v.3>` statt `<v>` im Virtual-Output-Befehl). Ebenso bleibt ein Kanal auf dem Leistungsmittel, wenn sein Zählerstand in einer Viertelstunde um mehr springt, als 250 kW erlauben (z. B. nach einer geänderten Skalierung in Loxone, 923 → 9233 kWh). Das Log warnt dann mit altem und neuem Zählerstand und nennt den Kanal unter `implausible_counters`.
 - **HA-Energiezähler (optional):** Zusätzliche Entities `sens_pv_energy` / `sens_grid_energy_import` / `sens_grid_energy_export` in `plant.ehal_bindings` (`device_class=energy`, bevorzugt `state_class=total_increasing`). Für PV und Netz gilt derselbe Vertrag ΔE / 0,25 h; Batterie und Flex bleiben auf dem Leistungsmittel.
 - **Zähler im Ersparnis-Buch:** Stammt PV oder Netz einer Viertelstunde aus einem Zähler, rechnet das Ersparnis-Buch die Hauslast aus der Bilanz PV + Netz + Batterie. So haben beide Seiten des Vergleichs denselben Verbrauch.
 - **Batterie:** Die Aufteilung in Laden und Einspeisung ergibt sich aus der gemessenen Batterieleistung (`Ist Batterie-Leistung (kW)`), nicht aus `battery_plan_kw`. Widerspricht das Ist-Vorzeichen dem SoC-Schritt zum nächsten Log-Slot und fehlt ein brauchbares Slot-Mittel, leitet Earnie die Batterieleistung für die Balken aus dem SoC-Delta ab.
 
-**PV im grauen Bereich:** Eine Prognose-Linie läuft über alle Zonen. Sie zeigt den Forecast.Solar-Wert **vor** dem Live-Overlay (Feld `forecast_pv_kw` im Log). Die PV-Balken (Rauf-Seite der Energiebilanz) nutzen im Log dagegen den **Ist**-Wert (`PV-Ist (kW)` aus `consumption_snapshot.pv_kw`). Die Abweichung ist ab dem nächsten Worker-Lauf nach dem Fix sichtbar. Ältere Log-Einträge können identische Werte haben, weil früher der Ist-Wert fälschlich als Prognose geloggt wurde.
+**PV im grauen Bereich:** Eine Prognose-Linie läuft über alle Zonen. Sie zeigt den Forecast.Solar-Wert **vor** dem Live-Overlay (Feld `forecast_pv_kw` im Log). Die PV-Balken (Rauf-Seite der Energiebilanz) nutzen im Log dagegen den **Ist**-Wert (`PV-Ist (kW)` aus `consumption_snapshot.pv_kw`).
 
 ### Flexible Verbraucher
 
-**Farben:** Flexible Verbraucher erscheinen als gestapelte Runter-Segmente. Ihre Farbe stammt aus der festen **8er-Palette** in `ui/chart_colors.py` (`CONSUMER_PALETTE`, Farbton **260→40**, S≈90, L≈50). In `config.json` legt **`chart_color_index`** (0–7) die Farbe je Verbraucher fest; freie Hex-Werte gibt es nicht mehr. Die Auflösung läuft zentral über `consumer_chart_color()`, sodass Chart 1 und Sankey dieselben Vollfarben zeigen.
+**Farben:** Flexible Verbraucher erscheinen als gestapelte Runter-Segmente. Ihre Farbe stammt aus der festen **8er-Palette** in `ui/chart_colors.py` (`CONSUMER_PALETTE`, Farbton **260→40**, S≈90, L≈50). Jeder Verbraucher bekommt automatisch eine Farbe der Palette (**`chart_color_index`** 0–7): Pool, Poolfilter, E-Auto und Wärmepumpe feste Vorzugsfarben, die übrigen die nächste freie Farbe (`house_config/planning_flex_bridge.py`). Die Auflösung läuft zentral über `consumer_chart_color()`, sodass Chart 1 und Sankey dieselben Vollfarben zeigen.
 
 **Generic `earnie_role: known` und `manual`:** Die Optimierung zählt diese Verbraucher zum Grundlast-Overlay. Chart 1 zieht ihre geplanten Slot-Leistungen trotzdem **sichtbar** aus `Verbrauch-Prognose` heraus und zeigt sie als eigene Runter-Segmente (`house_config/known_chart_display.py`). `manual` bleibt für die Empfehlungs-UI relevant. SE und Live rechnen den Default-Schedule mit, unter der Annahme, dass der Start wie empfohlen erfolgt.
 
@@ -120,7 +124,7 @@ Soll/Ist-Icons erscheinen im grauen Log-Bereich, und zwar nur für Slots mit ech
 | Symbol | Kategorie | Farbe | Bedeutung |
 |--------|-----------|-------|-----------|
 | ▲ | Hinweis | grün | Unkritische Abweichung (z. B. Wärmepumpe: Freigabe ohne Anlauf) |
-| ◆ | Warnung | gelb | Erwartete Abweichung (z. B. SwimSpa im Sollband, Zwangs-Laden lädt 60–80 % der Zielenergie) |
+| ◆ | Warnung | gelb | Erwartete Abweichung (z. B. Pool im Sollband, Zwangs-Laden lädt 60–80 % der Zielenergie) |
 | ⬡ | Fehler | rot | Anweisung von Earnie nicht befolgt |
 
 Die Marker liegen oberhalb der Chart-Fläche; beim **Hover** erscheinen Kategorie-Label und Regeltext. Pro Slot sind mehrere Icons möglich (verschiedene Scopes, z. B. Batterie und E-Auto).
@@ -129,7 +133,7 @@ Beim Zwangs-Laden vergleicht Earnie die im Slot tatsächlich geladene Energie (m
 
 Die Wärmepumpe („Freigabe, aber nicht angesprungen“) bewertet Earnie genauso: Der grüne Hinweis erscheint, wenn die Wärmepumpe im Slot weniger als 50 % der geplanten Energie aufgenommen hat **und** mehr als 0,1 kWh fehlen. Läuft sie nur etwas schwächer als geplant, erscheint kein Hinweis. Beide Schwellen stehen getrennt von den Zwangs-Laden-Regeln als `params.max_ratio` und `params.min_shortfall_kwh` in der Wärmepumpen-Regel. Auch hier gibt es ohne gemessenen Slot-Mittelwert kein Urteil.
 
-**Regelwerk:** `config/deviation_rules.json` (Schema: `deviation_rules.schema.json`). Pflegehinweis: [Spec Soll-Ist §5.3](../dev/done/soll-ist-abweichung.md).
+**Regelwerk:** `config/deviation_rules.json` (Schema: `deviation_rules.schema.json`). Pflegehinweis: [Spec Soll-Ist §5.3](../dev/done/soll-ist-abweichung.md) (Entwickler-Doku).
 
 **Regeln der Vorlage** (`share/config/deviation_rules.example.json`):
 
@@ -217,7 +221,7 @@ Rohdaten-Tabelle aller Slots im sichtbaren Sunset-2-Sunset-Fenster (15-min-Log u
 
 Tabelle je flexiblem Verbraucher über den Horizont SA₀→SA₂ mit den Spalten **BL Profil**, **BL Ziel**, **Profil ohne Ziel** und **Optimierung** (kWh).
 
-**Profil ohne Ziel:** Verbraucher mit Tagesziel 0 aus `config.json` und Energie im Flex-Profil plant der Optimierer nicht. BL Ziel simuliert ihre Profil-Energie trotzdem mit, damit **SoC BL Ziel** in Chart 1 die Konkurrenz um den Speicher zeigt. In die BL-Ziel-Kosten und den BL-Ziel-Verbrauch in Chart 2 geht diese Energie nicht ein. Dafür rechnet Earnie BL Ziel ein zweites Mal, nur mit den Zielen der Optimierung. So vergleicht **Ersparnis erwartet** gleiche Energie mit gleicher Energie.
+**Profil ohne Ziel:** Verbraucher mit Tagesziel 0 (`daily_target_kwh` im Hausprofil) und Energie im Flex-Profil plant der Optimierer nicht. BL Ziel simuliert ihre Profil-Energie trotzdem mit, damit **SoC BL Ziel** in Chart 1 die Konkurrenz um den Speicher zeigt. In die BL-Ziel-Kosten und den BL-Ziel-Verbrauch in Chart 2 geht diese Energie nicht ein. Dafür rechnet Earnie BL Ziel ein zweites Mal, nur mit den Zielen der Optimierung. So vergleicht **Ersparnis erwartet** gleiche Energie mit gleicher Energie.
 
 ## Energiefluss (Live-Sankey)
 
@@ -228,7 +232,7 @@ Der Sankey aktualisiert sich etwa alle 10 Sekunden (`STATUS`-Fragment). Die Flex
 | Teil | Quelle im Code | Backends heute |
 |------|----------------|----------------|
 | PV / Netz / Batterie / Hausleistung | `ehal_live.read_live_power_kw()` → aktiver Adapter | **Loxone, Home Assistant, OpenEMS** |
-| Flex-Leistungen (Verbraucherknoten, Grundlast-Aufteilung) | `live_consumption.fetch_live_flex_kw_for_ui` → `ehal_live.resolve_flexible_consumers_live_power` (Implementierung in `integrations/loxone_live_power.py`) | **nur Loxone** (bei HA/OpenEMS keine Live-Flex-Aufschlüsselung über Merker) |
+| Flex-Leistungen (Verbraucherknoten, Grundlast-Aufteilung) | `live_consumption.fetch_live_flex_kw_for_ui` → `ehal_live.resolve_flexible_consumers_live_power` (Implementierung in `integrations/loxone_live_power.py`, liest aus der Push-Inbox) | **Loxone, Home Assistant** (Push von `sens_power_act`, beim E-Auto `sens_evcs_active_power`); nicht OpenEMS |
 | EV-SoC in der Knotenbeschriftung beim Laden | `fetch_loxone_actual_soc_percent` → Push-Eingang (`sens_evcs_soc_act`) | **Loxone, Home Assistant** (Push); nicht OpenEMS |
 
 Lädt ein E-Auto, zeigt der Flex-Knoten den aktuellen SoC in der Beschriftung, sofern das Smarthome `sens_evcs_soc_act` des E-Autos an Earnie pusht (Loxone über Virtual Output, Home Assistant über das Paket aus EHAL-Com).

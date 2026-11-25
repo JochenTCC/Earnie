@@ -1,6 +1,6 @@
 # Flexible Verbraucher
 
-Ab Version **2.0** liegen steuerbare Verbraucher (SwimSpa, E-Auto, Wärmepumpe, Filter, Generics) primär im **Hausprofil** (`earnie_env/config/house_profiles.json`). Live-Parameter und Bindings stehen dort je Verbraucher unter `consumers[].ehal_bindings`. Der frühere Block `flexible_consumers[]` in `config.json` ist **entfernt**. Ein verbliebener Block (auch `[]`) bricht den Start mit einer Fehlermeldung ab; der Migrations-Assistent (`python -m scripts.migrate_config`) löscht einen leeren Block. Enthält er noch Einträge, bricht die Migration ab: Verbraucher dann zuerst im Hausprofil anlegen und den Block danach löschen. Eine doppelte `id` im Hausprofil ist ein Konfigurationsfehler.
+Steuerbare Verbraucher (Pool, E-Auto, Wärmepumpe, Filter, Generics) liegen im **Hausprofil** (`earnie_env/config/house_profiles.json`). Live-Parameter und Bindings stehen dort je Verbraucher unter `consumers[].ehal_bindings`. Ein Block `flexible_consumers[]` in `config.json` (auch `[]`) bricht den Start mit einer Fehlermeldung ab; der Migrations-Assistent (`python -m scripts.migrate_config`) löscht einen leeren Block. Enthält er noch Einträge, bricht die Migration ab: Verbraucher dann zuerst im Hausprofil anlegen und den Block danach löschen. Eine doppelte `id` im Hausprofil ist ein Konfigurationsfehler.
 
 Die Optimierung legt fest, **wann** die Verbraucher laufen. Ob die Anlage technisch laufen kann, entscheidet sie nicht. Die Freigabe an das Smarthome ist ein 0/1-Signal (E-Auto: Leistungs-Sollwert + PV-Follow). Die Feldnamen unten gelten für die aufgelöste Flex-Struktur im Hausprofil.
 
@@ -11,7 +11,7 @@ Die Optimierung legt fest, **wann** die Verbraucher laufen. Ob die Anlage techni
 | `id` / `id_locked` / `id_provisional_label` | Interne Kennung bzw. EHAL-Slug (z. B. `eauto`). Neue Einträge starten freigegeben (`id_locked: false`, Startwert in `id_provisional_label`). Die erste geänderte **Bezeichnung** setzt `id` aus dem Label und sperrt die Kennung. Bestehende Einträge ohne Flag gelten als gesperrt. Einmalig steht der UI-Button „ID aus Bezeichnung übernehmen“ zur Verfügung. |
 | `name` / `label` | Anzeigename in Charts und UI |
 | `nominal_power_kw` | Nennleistung für die MILP |
-| `chart_color_index` | Farbindex 0–7 für Chart 1 und Sankey (siehe [Charts](../ui/charts.md)) |
+| `chart_color_index` | Optional: Farbindex 0–7 für Chart 1 und Sankey. Fehlt er, vergibt Earnie die Farbe automatisch (siehe [Charts](../ui/charts.md)). |
 | `optimizer_enabled` | `false` = von der Optimierung ausgeschlossen |
 | `bidirectional` | Nur Typ `ev`, optional (`true`/`false`, fehlt = `false`): Die Wallbox kann entladen (V2G). Der Autoakku fließt dann in die [Earnie-Points](../einrichtung/betrieb.md#earnie-points) ein (mindestens 1 Punkt). Im Hauskonfigurator: **Wallbox bidirektional (V2G)**. |
 
@@ -160,16 +160,16 @@ So rechnet Earnie:
 - „Kühlung betrachten“ ist unabhängig von „Heizung betrachten“. Ist die Heizung aus, rechnet das Hausmodell die Heizung trotzdem mit, damit die Raumtemperatur stimmt; ihr Strom bleibt dann aber in der Grundlast. Die Kühlung braucht das Hausmodell, also einmal ausgefüllte Gebäudedaten und einen Verbraucher „Haus Wärme“.
 - In den [Earnie-Points](../einrichtung/betrieb.md#earnie-points) zählt ein Klimagerät wie eine Wärmepumpe (1 Punkt). Eine reversible Wärmepumpe zählt nur einmal.
 
-Bis Datenmodell 5 gab es das Verbraucherfeld `appliance_kind: "air_conditioner"` (Hauskonfigurator **Geräteart**). Die Migration `dm5.house_cooling` entfernt es (siehe [Betrieb](../einrichtung/betrieb.md)).
+Ein Verbraucherfeld `appliance_kind: "air_conditioner"` entfernt die Migration `dm5.house_cooling` (siehe [Betrieb](../einrichtung/betrieb.md)).
 
 ## Tagesenergie-Ziel
 
 | Feld | Bedeutung |
 | ---- | --------- |
 | `daily_target_kwh` | Festes 24-h-Ziel in kWh (bei `daily_target_source: config`) |
-| `daily_target_source` | `config` = fester Wert / `charging_schedule`; `historical` = Profil aus der Vergangenheit; `loxone` = Live-EHAL-Wert in kWh (Config-Enum-Name historisch); `loxone_remaining_hours` = Live-Schulden in Stunden × `nominal_power_kw` (SwimSpa-Filter); `thermal` = RC-Modell (SwimSpa-Heizung) |
+| `daily_target_source` | `config` = fester Wert / `charging_schedule`; `historical` = Profil aus der Vergangenheit; `loxone` = Live-EHAL-Wert in kWh (Config-Enum-Name historisch); `loxone_remaining_hours` = Live-Schulden in Stunden × `nominal_power_kw` (Pool-Filter); `thermal` = RC-Modell (Pool-Heizung) |
 | `min_on_quarterhours` | Mindestlaufzeit pro Einschaltung in 15-Minuten-Slots |
-| `path_historical_log` | Historische Leistungs-CSV (Offline → `cons_data`; typisch ein Loxone-Export). Wird aus dem Hausprofil nur für den Pool-Filter übernommen; der Loxone-Log-Import (`integrations/loxone_log_import.py`) dient nur noch Migration und Tests |
+| `path_historical_log` | Historische Leistungs-CSV (Offline → `cons_data`; typisch ein Loxone-Export). Wird aus dem Hausprofil nur für den Pool-Filter übernommen; der Loxone-Log-Import (`integrations/loxone_log_import.py`) dient Migration und Tests |
 | `signal_type` | `power` (kW) oder `binary` (Ein/Aus × `nominal_power_kw`) |
 | `log_signal_type` | Optional: abweichendes Format nur für `path_historical_log` |
 
@@ -179,10 +179,10 @@ Bis Datenmodell 5 gab es das Verbraucherfeld `appliance_kind: "air_conditioner"`
 
 | Verbraucher | Lesen (EHAL) | Schreiben (EHAL) |
 | ----------- | ------------ | ---------------- |
-| SwimSpa, Wärmepumpe, Filter | `ehal_bindings` / Leistung (`sens_*` bzw. Flex-Power) | `ehal_bindings` Freigabe (`set_enable` / Flex-Enable, 0/1) |
+| Pool, Wärmepumpe, Filter | `ehal_bindings` / Leistung (`sens_*` bzw. Flex-Power) | `ehal_bindings` Freigabe (`set_enable` / Flex-Enable, 0/1) |
 | E-Auto | EVCS-Telemetrie (`sens_evcs_*`, …) | `set_evcs_max_current`, `set_evcs_mode` / PV-Follow |
 
-Optional lässt sich die Leistung anderer Verbraucher vom Ist-Wert abziehen (SwimSpa − Filter).
+Optional lässt sich die Leistung anderer Verbraucher vom Ist-Wert abziehen (Pool − Filter).
 
 Feldnamen und Mapping-UI: [EHAL-Com](../ui/ehal-com.md). Loxone-Default-Namen und VO/VI-Vorlagen: [Loxone-Signale](../referenz/loxone-signals.md).
 
@@ -199,7 +199,7 @@ Bei `daily_target_source: thermal` leitet das RC-Modell das Tagesenergie-Ziel au
 | `consumers[].ehal_bindings` | EHAL-Felder am Pool-Verbraucher: `sens_temperature_water`, `get_temperature_water_setpoint`, `get_temperature_tolerance_c`, `sens_heating_active`. Die Außentemperatur liegt hausweit unter `plant.ehal_bindings.sens_temperature_outside`. |
 | `thermal_control.history_logs` | CSV-Pfade für die Kalibrierung; optional `heating_active_csv` / `filter_active_csv` statt einer reinen Leistungsschwelle |
 
-Details: [EHAL-Com](../ui/ehal-com.md), [Loxone-Signale](../referenz/loxone-signals.md) (Loxone-Defaults), [SwimSpa Filter](../dev/done/swimspa-filter.md).
+Details: [EHAL-Com](../ui/ehal-com.md), [Loxone-Signale](../referenz/loxone-signals.md) (Loxone-Defaults), [Pool-Filter](../dev/done/swimspa-filter.md) (Entwickler-Doku).
 
 ## Haus Wärme: Heizsystem (`heating_system_id`)
 
@@ -312,9 +312,9 @@ Eine Wärmepumpe arbeitet schlechter, je heißer sie laden muss und je kälter i
 - **Zwischen den Punkten** rechnet Earnie linear, außerhalb gilt der Randwert. Earnie rechnet nicht über die Punkte hinaus.
 - **Absolute Werte:** Earnie nimmt die Punkte, wie sie eingetragen sind, und gleicht sie nicht an die JAZ an. Datenblattwerte sind oft etwas besser als der Betrieb; zeigt die Historie, dass der Speicher weniger Wärme bekommt als geplant, die Punkte entsprechend senken.
 - **Prüfung beim Laden:** Lücken im Raster, doppelte Punkte, ein COP ≤ 0, ein COP, der mit der Senkentemperatur steigt oder mit der Quellentemperatur fällt, und `cop_points` an einer anderen Wärmequelle lehnt Earnie mit einer Fehlermeldung ab.
-- **Ohne Punkte** bleibt alles wie bisher: Earnie plant mit der JAZ, und das Band endet bei `Sollwert + boost_k`.
+- **Ohne Punkte** plant Earnie mit der JAZ, und das Band endet bei `Sollwert + boost_k`.
 - **Pflege:** in `components.json` am Heizsystem. Der Hauskonfigurator zeigt die Anzahl der Punkte an und behält sie beim Speichern; ein Eingabefeld gibt es noch nicht.
-- **Geltungsbereich:** die Live-Planung des Wärmespeichers. Jahressimulation, Szenarien-Explorer und die abgeleitete elektrische Leistung rechnen weiter mit der JAZ.
+- **Geltungsbereich:** die Live-Planung des Wärmespeichers. Jahressimulation, Szenarien-Explorer und die abgeleitete elektrische Leistung rechnen mit der JAZ.
 
 **So rechnet Live mit den Punkten:**
 
@@ -366,13 +366,13 @@ Die Signale ordnest du in der EHAL-Zuordnung der eigenen Zeile des Heizstabs zu.
 
 **Mögliche Doppelzählung:** Lief ein Heizstab im Haus während des Messzeitraums (z. B. über eine PV-Überschussregelung), steckt sein Verbrauch im gemessenen Gesamtverbrauch und damit in der Grundlast. Plant der Optimierer den Heizstab im Szenario zusätzlich, zählt dieser Strom doppelt. Earnie nimmt das in Kauf und zeigt dazu keinen Hinweis.
 
-Ältere Entwicklungsstände kannten `heating_rod_profile_csv` und `heating_rod_annual_kwh` am Verbraucher. Earnie lehnt diese Felder beim Laden ab; das Feld aus `house_profiles.json` entfernen.
+Die Felder `heating_rod_profile_csv` und `heating_rod_annual_kwh` am Verbraucher lehnt Earnie beim Laden ab; sie sind aus `house_profiles.json` zu entfernen.
 
 <a id="haus-wärme-optionaler-wärmespeicher-heat_storage"></a>
 
 ### Optionaler Wärmespeicher (`heat_storage`)
 
-Im Heizsystem lässt sich unter `heat_storage` ein **Pufferspeicher** modellieren. Solarthermie und Wärmepumpe speisen den Speicher; Raumheizung und Warmwasser entnehmen Wärme nur aus dem Speicher. Ohne Speicher bzw. bei `volume_liters = 0` gilt das bisherige Modell: Solarthermie wirkt als Tages-Gutschrift auf den WP-Bedarf.
+Im Heizsystem lässt sich unter `heat_storage` ein **Pufferspeicher** modellieren. Solarthermie und Wärmepumpe speisen den Speicher; Raumheizung und Warmwasser entnehmen Wärme nur aus dem Speicher. Ohne Speicher bzw. bei `volume_liters = 0` wirkt Solarthermie als Tages-Gutschrift auf den WP-Bedarf.
 
 **Temperaturband (Jahressimulation):** Die Speichertemperatur darf zwischen `setpoint_c − tolerance_c` und **95 °C** liegen. Die Wärmepumpe heizt hart nach, wenn die Temperatur unter die Untergrenze fallen würde. Sie speist höchstens bis zum Sollwert (`setpoint_c`) und bleibt darüber aus. Überschusswärme oberhalb des Sollwerts kommt nur von der Solarthermie; deren Eingang wird erst oberhalb von 95 °C begrenzt.
 
@@ -381,11 +381,11 @@ Im Heizsystem lässt sich unter `heat_storage` ein **Pufferspeicher** modelliere
 - **Mit Speicher:** Speicherband, also Volumen × (`tolerance_c` + `boost_k`). Der Speicher verliert Wärme nach `heat_loss_kw_per_k`: Je weiter der Pegel über der Mitte des normalen Bands liegt, desto mehr. Wärme auf Vorrat lohnt sich deshalb nur, wenn der Preisvorteil den Verlust bis zur Nutzung übersteigt. Das Haus zählt neben einem Speicher nicht als Puffer, weil Earnie es noch nicht gezielt aufheizen kann.
 - **Ohne Speicher:** Hausmasse (Wohnfläche × Bauweise, wie in Live) × Komfortband `house_tolerance_c`; die Wärmepumpe heizt das Haus direkt.
 
-Jedes Fenster beginnt mit dem Pegel, mit dem das vorige endete; das erste Fenster beginnt in der Mitte des normalen Bands. Hält das Band nicht (z. B. bei einem kurzen Freigabefenster), plant der Optimierer trotzdem, aber mit hohen Strafkosten für die Wärme außerhalb des Bands. Live nutzt dasselbe Speichermodell (siehe **Live-Band**); die Standard-Regeln der Referenzleiter (L2) nutzen es nicht. Ohne Speicher und ohne Wohnfläche bricht der Szenarien-Explorer mit einer Meldung ab.
+Jedes Fenster beginnt mit dem Pegel, mit dem das vorige endete; das erste Fenster beginnt in der Mitte des normalen Bands. Hält das Band nicht (z. B. bei einem kurzen Freigabefenster), plant der Optimierer trotzdem, aber mit hohen Strafkosten für die Wärme außerhalb des Bands. Live nutzt dasselbe Speichermodell (siehe **Live-Band**). Ohne Speicher und ohne Wohnfläche bricht der Szenarien-Explorer mit einer Meldung ab.
 
 | Feld | Bedeutung |
 | ---- | --------- |
-| `heat_storage.volume_liters` | Speichervolumen; `≤ 0` oder fehlend = bisheriges Modell ohne Speicher |
+| `heat_storage.volume_liters` | Speichervolumen; `≤ 0` oder fehlend = kein Speicher |
 | `heat_storage.heat_loss_kw_per_k` | Speicherverlust gegen die Umgebung; fehlt er, gilt 0,02 kW/K. 0 = verlustfreier Speicher |
 | `heat_storage.setpoint_c` / `tolerance_c` | Normaler Sollwert der Regelung und Untergrenze (`setpoint − tolerance`); Obergrenze im Normalbetrieb = Sollwert, absolute Obergrenze (Solarthermie) = 95 °C |
 | `heat_storage.boost_k` | Fester Boost in K: um so viel hebt die Regelung das Soll an, wenn Earnie die Wärmepumpe freigibt (Freigabe 1 bzw. SG-Ready-Zustand 3). Earnie lädt auf Vorrat bis `setpoint + boost`. Vorgabe 0 = nur bis zum Sollwert |
@@ -397,10 +397,10 @@ Jedes Fenster beginnt mit dem Pegel, mit dem das vorige endete; das erste Fenste
 - **Start:** die gemessene `T_eq`.
 - **Zufluss:** die geplante Wärme der Wärmepumpe (Strom × JAZ, mit [COP-Punkten](#haus-wärme-cop-punkte) Strom × COP der jeweiligen Stufe) und eines Heizstabs daneben.
 - **Abfluss:** Wärmebedarf von Haus und Warmwasser abzüglich Kollektorertrag, aus der Prognose des Normalbetriebs (siehe **Live-Prognose**), dazu der Speicherverlust nach `heat_loss_kw_per_k`. Kollektorwärme, die in einen vollen Speicher nicht mehr passt, verfällt ohne Kosten.
-- **Band:** Der Speicher bleibt zwischen `setpoint − tolerance` und `setpoint + boost_k` (höchstens `get_temperature_heat_storage_max`). Mit COP-Punkten und Ladeziel reicht das Band bis `get_temperature_heat_storage_max`. Vor erwarteter Kollektorwärme bleibt der Platz dafür über dem Sollwert frei. Wann und wie weit die Wärmepumpe lädt, entscheidet der Optimierer nach Preis und Verlust. Feste Zwangsstunden gibt es nicht mehr.
+- **Band:** Der Speicher bleibt zwischen `setpoint − tolerance` und `setpoint + boost_k` (höchstens `get_temperature_heat_storage_max`). Mit COP-Punkten und Ladeziel reicht das Band bis `get_temperature_heat_storage_max`. Vor erwarteter Kollektorwärme bleibt der Platz dafür über dem Sollwert frei. Wann und wie weit die Wärmepumpe lädt, entscheidet der Optimierer nach Preis und Verlust.
 - **Ende des Horizonts:** Der Speicher endet mindestens auf dem mittleren Stand, den der Normalbetrieb am letzten Tag des Horizonts hätte. Earnie leert ihn also nicht auf Kosten der Zeit danach.
 - **Band hält nicht:** Reicht die Leistung nicht, plant der Optimierer trotzdem, mit hohen Strafkosten für die Wärme außerhalb des Bands. Das `earnie.log` warnt dann („Plan hält den Speicher nicht im Band“).
-- **Unterster Fühler:** Liegt `T_low` unter `setpoint − tolerance`, erzwingt Earnie die Freigabe in der ersten Stunde wie bisher.
+- **Unterster Fühler:** Liegt `T_low` unter `setpoint − tolerance`, erzwingt Earnie die Freigabe in der ersten Stunde.
 - **Starts:** Die Wärmepumpe startet höchstens `max_pulses_per_day`-mal pro Tag (Vorgabe 4). Eine Höchstdauer je Lauf gibt es mit Speicher nicht; das Band begrenzt die Ladung.
 
 **Speicherband aus der Regelung:** Meldet das Smarthome-Backend Sollwert und Toleranz der Heizungsregelung, plant Live mit diesen Werten und nicht mit `heat_storage.setpoint_c` / `tolerance_c`. Plan und Regelung können dann nicht auseinanderlaufen.
@@ -419,7 +419,7 @@ Die Ladung bis `Sollwert + boost_k` (höchstens bis zur gemeldeten Maximaltemper
 - **Wärmeverlust des Gebäudes:** Ohne eigenen Wert in `house_heat_loss_kw_per_k` kalibriert Earnie den Wärmeverlust (H) aus dem **letzten vollständigen Kalenderjahr** des Open-Meteo-Archivs. Das laufende, unvollständige Jahr fließt nicht ein.
 - **Hauskonfigurator beim ersten Öffnen:** Für den Jahresbedarf einer Wärmepumpe (`thermal_annual`) lädt der Hauskonfigurator die Klimadaten des Archivs einmal von Open-Meteo und legt sie im Cache ab (`data/cache/open_meteo_utc`, anderes Verzeichnis über `EARNIE_OPEN_METEO_CACHE_PATH`). Währenddessen zeigt die Seite einen Hinweis. Dauert der Abruf länger als 30 s (langsames Netz, Ratenlimit), bricht Earnie ab und zeigt eine Fehlermeldung; ein erneutes Öffnen versucht es noch einmal.
 
-**Live ohne Wärmespeicher:** Auch ohne `heat_storage` rechnet die Live-Optimierung nur über den Planungshorizont. Die Simulation des Hauses startet bei der Solltemperatur (`target_temp_c`), da es keinen Innentemperatur-Fühler gibt. Sie nutzt die Außentemperatur-Prognose und dieselben Regeln wie die Jahressimulation. Daraus ergeben sich der WP-Bedarf je Viertelstunde und die Tagesziele. Ohne Wohnfläche (`living_area_m2 = 0`) plant Earnie nur Warmwasser und zieht den prognostizierten Kollektorertrag pro Tag ab. Szenario-Explorer und Backtesting nutzen weiterhin die Jahressimulation mit historischem Wetter.
+**Live ohne Wärmespeicher:** Auch ohne `heat_storage` rechnet die Live-Optimierung nur über den Planungshorizont. Die Simulation des Hauses startet bei der Solltemperatur (`target_temp_c`), da es keinen Innentemperatur-Fühler gibt. Sie nutzt die Außentemperatur-Prognose und dieselben Regeln wie die Jahressimulation. Daraus ergeben sich der WP-Bedarf je Viertelstunde und die Tagesziele. Ohne Wohnfläche (`living_area_m2 = 0`) plant Earnie nur Warmwasser und zieht den prognostizierten Kollektorertrag pro Tag ab. Szenario-Explorer und Backtesting nutzen die Jahressimulation mit historischem Wetter.
 
 <a id="haus-wärme-sg-ready"></a>
 
@@ -443,7 +443,7 @@ Statt oder neben der Freigabe kann Earnie der Wärmepumpe einen **SG-Ready-Zusta
 
 ### Speicher-Ladeziel
 
-Mit dem Ladeziel `heatpump.<Kennung>.set_temperature_heat_storage_target` (°C) sagt Earnie der Regelung, **wie weit** sie den Speicher laden soll, statt nur ob. Die Ladung wird dosiert und nicht mehr zwischen Soll und Soll + Boost umgeschaltet.
+Mit dem Ladeziel `heatpump.<Kennung>.set_temperature_heat_storage_target` (°C) sagt Earnie der Regelung, **wie weit** sie den Speicher laden soll, statt nur ob. Die Ladung wird dosiert, statt zwischen Soll und Soll + Boost umzuschalten.
 
 - **Berechnung:** Wo der Plan die Wärmepumpe jetzt laufen lässt, ist das Ziel die Speichertemperatur am Ende dieses Laufs. Earnie liest sie aus dem Speicherstand, den der Optimierer für diese Viertelstunde plant (siehe **Live-Band**).
 - **Grenzen:** Das Ziel liegt mindestens beim Sollwert und höchstens bei `Sollwert + boost_k`. Meldet die Regelung `get_temperature_heat_storage_max`, begrenzt Earnie zusätzlich darauf. Diese Grenze gilt auch für die Ladung auf Vorrat. Kennt Earnie den Wirkungsgrad der Wärmepumpe nach Temperatur ([COP-Punkte](#haus-wärme-cop-punkte)), reicht das Ziel bis zur gemeldeten Maximaltemperatur.
@@ -505,7 +505,7 @@ Ein weiteres Szenario kann für die Haus-Wärme ein anderes Heizsystem aus dem K
 
 ## E-Auto und Wallbox: Ladestrom
 
-Seit Datenmodell 6 sind E-Auto und Wallbox getrennt. Die Wallbox steht in `components.json` unter `wallboxes[]`, das E-Auto ist ein Verbraucher im Hausprofil und verweist mit `wallbox_assignment` auf seine Wallbox. Die Ladegrenzen sind **Ströme**, keine Leistungen: Eine Leistung hängt vom Paar ab (Spannung, Phasen), ein Strom ist eine Eigenschaft des Geräts.
+E-Auto und Wallbox sind getrennt. Die Wallbox steht in `components.json` unter `wallboxes[]`, das E-Auto ist ein Verbraucher im Hausprofil und verweist mit `wallbox_assignment` auf seine Wallbox. Die Ladegrenzen sind **Ströme**, keine Leistungen: Eine Leistung hängt vom Paar ab (Spannung, Phasen), ein Strom ist eine Eigenschaft des Geräts.
 
 | Feld | Ort | Bedeutung |
 | ---- | --- | --------- |
@@ -524,7 +524,7 @@ Im Hauskonfigurator werden Auto und Wallbox getrennt gepflegt:
 - **Bereich Wallboxen:** Bezeichnung, **Spannung (V)**, **Phasen**, **Mindest-** und **Höchst-Ladestrom (A)** der Wallbox. Die Kennung entsteht beim Anlegen aus der Bezeichnung und bleibt danach fest, weil die E-Autos und die IDs `evcs.<Kennung>.*` auf sie verweisen. Unter den Feldern stehen die zugeordneten E-Autos mit dem Ladebereich des Paars. Eine Wallbox, der noch ein E-Auto zugeordnet ist, lässt sich nicht entfernen. Eine Änderung, nach der ein zugeordnetes E-Auto keinen gemeinsamen Ladestrom mehr hätte, speichert Earnie nicht und zeigt eine Meldung.
 - **E-Auto im Hausprofil:** **Phasen des Autos**, **Mindest-** und **Höchst-Ladestrom des Autos (A)** und die Auswahl **Wallbox**. Darunter zeigt Earnie die Daten der Wallbox und die Ladeleistung des Paars in kW. **Neue Wallbox für dieses E-Auto anlegen** erzeugt eine Wallbox mit den Grenzen des Autos und 230 V. Ohne Wallbox wird das E-Auto nicht gespeichert.
 
-Bei fester Zuordnung lädt eine Wallbox innerhalb eines Hausprofils genau ein E-Auto; zwei fest zugeordnete E-Autos eines Profils an derselben Wallbox lehnt Earnie mit einer Meldung ab. Mehrere Autos an einer Wallbox gehen über die [dynamische Zuordnung](#dynamische-zuordnung-mehrere-autos-mehrere-wallboxen). Dasselbe E-Auto in mehreren Hausprofilen (kopierte Profile) nutzt dieselbe Wallbox. Die Lade-Bindings der Wallbox pflegt die Seite EHAL-Com wie bisher beim E-Auto.
+Bei fester Zuordnung lädt eine Wallbox innerhalb eines Hausprofils genau ein E-Auto; zwei fest zugeordnete E-Autos eines Profils an derselben Wallbox lehnt Earnie mit einer Meldung ab. Mehrere Autos an einer Wallbox gehen über die [dynamische Zuordnung](#dynamische-zuordnung-mehrere-autos-mehrere-wallboxen). Dasselbe E-Auto in mehreren Hausprofilen (kopierte Profile) nutzt dieselbe Wallbox. Die Lade-Bindings der Wallbox pflegt die Seite EHAL-Com.
 
 Im Live-Betrieb schreibt Earnie Ladestrom und Lademodus je E-Auto an dessen Wallbox, mit der Spannung der Wallbox und den Phasen des Paars. Die EHAL-IDs tragen dabei die Kennung der Wallbox (`evcs.<Wallbox>.set_evcs_max_current`). Nach der Migration hat jede Wallbox die Kennung ihres E-Autos, die IDs bleiben dort also gleich. Schlägt das Schreiben an einer Wallbox fehl, schreibt Earnie an die übrigen weiter. Unter OpenEMS steht die Komponente je Wallbox im Binding `set_evcs_max_current` (`<Komponente>/SetChargePowerLimit`, z.B. `evcs0/SetChargePowerLimit`); eine Wallbox ohne diese Adresse wird nicht geschrieben.
 
@@ -625,7 +625,7 @@ Fehlt der Block, trägt das Formular die Vorschläge ein. Der Hauskonfigurator s
 
 ## Pool-Filter: `filter_schedule` und `loxone_remaining_hours`
 
-Der Filter ist ein eigener Verbraucher `pool_filter`. Die Heizung bleibt ein separater Verbraucher, z. B. `pool_swimspa` / `swimspa` mit `daily_target_source: thermal`.
+Der Filter ist ein eigener Verbraucher `pool_filter`. Die Heizung bleibt ein separater Verbraucher, z. B. `pool` mit `daily_target_source: thermal`.
 
 | Feld | Bedeutung |
 | ---- | --------- |
@@ -634,7 +634,7 @@ Der Filter ist ein eigener Verbraucher `pool_filter`. Die Heizung bleibt ein sep
 | `filter_schedule.enabled` | `true` = das native Duty-Cycle-Fenster sperrt MILP-Slots |
 | `filter_schedule.config_fallback` | Festes Fenster für Backtesting/Offline (kein natives Live-Fenster) |
 
-Earnie schaltet nur **ergänzend** außerhalb des nativen Fensters ein (`flex.pool_filter.set_enable`). Entwickler-Spec: [SwimSpa Filter](../dev/done/swimspa-filter.md).
+Earnie schaltet nur **ergänzend** außerhalb des nativen Fensters ein (`flex.pool_filter.set_enable`). Entwickler-Spec: [Pool-Filter](../dev/done/swimspa-filter.md).
 
 Im **Szenario-Explorer** läuft der Filter im Fenster aus `filter_schedule.config_fallback` mit `nominal_power_kw` als feste Last. Diese Energie bucht Earnie auf `pool_filter` und rechnet sie gegen das Tagesziel. Earnie plant nur den Rest außerhalb des Fensters. Bei Sonnenaufgang-Fenstern zählt dabei nur der native Lauf im jeweiligen Buchungsfenster.
 
@@ -683,7 +683,7 @@ Im Hausprofil (`house_profiles.json`, `type: generic`) legt `earnie_role` (Stand
 | `flex` | Optimierbare Flex-Last (MILP) | Verschiebungsfenster (± h) |
 | `manual` | **Manuelles Gerät** auf **Live-Cockpit → Manuelle Geräte**; Modus `advice` (Start-Empfehlung) oder `reserve` (Powerstation). Im **Szenario-Explorer** optimiert die MILP es wie `flex` (CSV-Energie als Ziel, wenn „Von Basis-Last abziehen“ aktiv ist, sonst Schedule). **Live mit `advice`:** nur der aktive Nutzer-Tagesplan, kein Default-Wochen-Overlay. | Bei `advice`: **Empfehlungshorizont (h)**; bei `reserve`: Powerstation-Anbindung |
 
-Die Einstellung liegt im **Hauskonfigurator** unter „Earnie-Berücksichtigung“. Thermische Verbraucher (SwimSpa, Wärmepumpe) und das E-Auto sind davon nicht betroffen.
+Die Einstellung liegt im **Hauskonfigurator** unter „Earnie-Berücksichtigung“. Thermische Verbraucher (Pool, Wärmepumpe) und das E-Auto sind davon nicht betroffen.
 
 Ein `flex`- oder `manual`-Gerät läuft in ganzen Blöcken von `schedule.duration_h`. Bleibt im Planungsfenster weniger Platz als ein Block (zum Beispiel, weil das Fenster um 08:00 endet und der Lauf um 07:00 beginnen dürfte), plant Earnie den Lauf im nächsten Fenster; die übrigen Verbraucher werden normal geplant.
 
@@ -698,4 +698,4 @@ Bei `earnie_role: known` oder `manual` lässt sich optional eine **Live-Leistung
 | `appliance_recommendation.default_power_kw` | Nennleistung für Empfehlung/Grundlast |
 | `schedule.duration_h` | Nenndauer pro Lauf, zugleich Laufzeit für Advice/Reserve |
 
-Earnie speichert die Adresse. Die Live-Leistung (`sens_power_act` / aktiv) fließt bereits in die Reserve-Freigabe ein. Die **Adaption** der konfigurierten Nennleistung für Overlay und Startzeit-Empfehlung folgt in einer späteren Version. Bis dahin nutzen Overlay und Empfehlung die Werte aus dem Profil.
+Earnie speichert die Adresse. Die Live-Leistung (`sens_power_act` / aktiv) fließt in die Reserve-Freigabe ein. Overlay und Startzeit-Empfehlung nutzen die Nennleistung aus dem Profil.

@@ -13,7 +13,7 @@ Live-Bezugspreise entstehen aus Spot-Tarifen (`spot_hourly` u. a.) und dem Day-A
 3. **Energy-Charts** (Fraunhofer),
 4. **aWATTar** (nur AT und DE).
 
-Providerunabhängige EPEX-Daten für Planung und Backtesting kommen weiterhin von **Energy-Charts** (AT/DE/CH); aWATTar bleibt dort API-Fallback. Die aWATTar-API-URL leitet Earnie aus `import_tariff_id` → `land` ab, nicht aus dem Tarif-`type`.
+Die aWATTar-API-URL leitet Earnie aus `import_tariff_id` → `land` ab, nicht aus dem Tarif-`type`.
 
 Quellen und rechtliche Grundlagen: [Tarife und Preise nachrechnen](../referenz/tarife-quellen.md), [OeMAG & Referenzmarktwert](../referenz/oemag-referenzmarktwert.md).
 
@@ -114,7 +114,7 @@ Die Zahlen sind Platzhalter. Die Sätze sind netto; Earnie rechnet die USt des B
 
 - **Szenario-Explorer:** Er weist den Betrag je Kalendermonat aus, für jede Vergleichsstufe und für die Optimierung ([Tarife und Preise nachrechnen](../referenz/tarife-quellen.md)).
 - **Monitor:** Er zeigt im laufenden Monat die gemessene Spitze, die abgerechnete Leistung und den Betrag bisher ([Betriebsmodi](../ui/betriebsmodi.md#sunset-2-sunset-seite-monitor)).
-- **Bezugsgrenze:** Am Szenario lässt sich eine Grenze für den Netzbezug je Viertelstunde eintragen, dazu eine Marge ([Konfiguration](overview.md), [Handbuch](../user-manual/Benutzer-Handbuch-Earnie.md)). Der Plan hält den Bezug dann unter Grenze minus Marge. Den Preis selbst kennt die Planung nicht: Earnie wägt nicht ab, ob sich ein Überschreiten in diesem Monat lohnen würde. Die Grenze wählt der Nutzer.
+- **Bezugsgrenze:** Am Szenario lässt sich eine Grenze für den Netzbezug je Viertelstunde eintragen, dazu eine Sicherheitsmarge ([Konfiguration](overview.md), [Handbuch](../user-manual/Benutzer-Handbuch-Earnie.md)). Der Plan hält den Bezug dann unter Grenze minus Sicherheitsmarge. Den Preis selbst kennt die Planung nicht: Earnie wägt nicht ab, ob sich ein Überschreiten in diesem Monat lohnen würde. Die Grenze wählt der Nutzer.
 - **Vorgehen:** Zuerst im Szenario-Explorer Varianten mit verschiedenen Grenzen vergleichen, denn eine enge Grenze kann mehr Strom kosten, als sie beim Leistungspreis spart. Dann die Grenze im Live-Betrieb auf **Beobachten** stellen: Earnie steuert wie ohne Grenze und zeigt auf dem Monitor, wo er eingegriffen hätte und was das gespart hätte. Erst danach auf **Danach planen** umstellen.
 
 **Batterie nach Plan.** Mit **Danach planen** verteilt der Plan die Batterie oft über mehrere teure Viertelstunden und entlädt in jeder nur einen Teil des Verbrauchs. Im Automatikbetrieb würde der Wechselrichter den ganzen Verbrauch decken und die Batterie zu früh leeren. Earnie setzt deshalb in Viertelstunden mit Grenze die Entladegrenze des Wechselrichters auf die geplante Leistung. Liegt der Verbrauch über der Prognose, hebt Earnie die Grenze so weit an, dass der Bezug auf dem geplanten Wert bleibt. Zwangsladen holt einen Rückstand zum geplanten SoC höchstens bis zur Grenze auf. Der Szenario-Explorer bucht genauso.
@@ -122,7 +122,7 @@ Die Zahlen sind Platzhalter. Die Sätze sind netto; Earnie rechnet die USt des B
 **Ein zuverlässiger Plan, keine Garantie.** Earnie plant jede Viertelstunde so, dass der Bezug unter der Grenze bleibt. Die gemessene Spitze kann trotzdem höher liegen:
 
 - **Keine Regelung innerhalb der Viertelstunde.** Earnie plant einmal je Viertelstunde. Schaltet jemand Herd, Wasserkocher oder Waschmaschine ein, steigt der Bezug, und Earnie reagiert erst mit dem nächsten Plan.
-- **Lastprognose und Messung.** Der Plan rechnet mit einer geschätzten Grundlast, und Earnie misst den Bezug selbst, nicht mit dem Zähler des Netzbetreibers. Die Marge, vorbelegt mit 0,7 kW, fängt den üblichen Fehler beider ab, nicht jeden. Der Wert stammt aus einem Vergleich mit den Viertelstundenwerten des Netzbetreibers über knapp zwei Wochen an einer Anlage. Wer schon eine Grenze mit 0,3 kW gespeichert hat, behält diesen Wert und sollte ihn anheben.
+- **Lastprognose und Messung.** Der Plan rechnet mit einer geschätzten Grundlast, und Earnie misst den Bezug selbst, nicht mit dem Zähler des Netzbetreibers. Die Sicherheitsmarge, vorbelegt mit 0,7 kW, fängt den üblichen Fehler beider ab, nicht jeden. Der Wert stammt aus einem Vergleich mit den Viertelstundenwerten des Netzbetreibers über knapp zwei Wochen an einer Anlage. Wer schon eine Grenze mit 0,3 kW gespeichert hat, behält diesen Wert und sollte ihn anheben.
 - **Plan hält die Grenze nicht.** Reichen Batterie und Verschieben nicht, etwa bei hoher Grundlast, leerer Batterie oder einem Verbraucher, der sein Ziel erreichen muss, nennt der Monitor die Viertelstunden und die Ursache.
 - **Ohne Plan keine Grenze.** Im Automatikbetrieb und in Fenstern ohne Optimierung gilt die Grenze nicht; Protokoll und Monitor vermerken das.
 - **Einmal überschritten.** Liegt die Spitze des Monats schon über der Grenze, plant Earnie bis zu dieser Spitze, weil sie ohnehin bezahlt wird.
@@ -139,7 +139,7 @@ Die Region schlägt auch den **Netzbereich** vor. Jeder österreichische Katalog
 - Ein gewählter Netzbereich, der in der Region liegt, bleibt stehen, ebenso **Eigener Arbeitspreis**.
 - Ein Netzbereich einer anderen Region wird ersetzt, wenn die neue Region eindeutig ist; sonst bleibt er stehen.
 - Benutzer-Netzbereiche (`user_grid_fees.json`) haben keine Region und werden nie automatisch gesetzt.
-- Eine `grid_fees.json`, die vor dieser Änderung angelegt wurde, hat noch kein Feld `regions`. Dann setzt Earnie keinen Netzbereich; der Benutzer wählt ihn wie bisher.
+- Hat eine ältere `grid_fees.json` noch kein Feld `regions`, setzt Earnie keinen Netzbereich; der Benutzer wählt ihn selbst.
 
 ## Bezugspreis (Live)
 
@@ -154,10 +154,10 @@ Die Marktpreise (Live) kommen aus der Gebotszone des Hausprofil-`land` (AT / DE-
 - **Erwartetes Fenster:** die letzten 7 Tage (Quellen für die Spiegelung) bis heute 24:00, ab 12:00 Ortszeit (Day-Ahead-Veröffentlichung) bis morgen 24:00. Spätere Stunden des Planungshorizonts füllt die Strategie unter [Fehlende Zukunftspreise](#fehlende-zukunftspreise-live) auf.
 - **ENTSO-E:** Mit `ENTSOE_API_TOKEN` in `config/.env` fragt Earnie zuerst die **ENTSO-E Transparency Platform** ab (A44 Day-Ahead). AT/DE-LU liefern meist PT15M, CH derzeit PT60M; stündliche Werte gelten für alle vier Viertelstunden.
 - **Energy-Charts:** Ohne Token oder wenn ENTSO-E nicht das ganze Fenster liefert, folgt **Energy-Charts** (Fraunhofer).
-- **aWATTar:** Danach **aWATTar** (stündlich, auf 15-Min-Slots aufgeteilt), nur für AT (`api.awattar.at`) und DE (`api.awattar.de`). **CH hat keine dritte Quelle**; früher nahm Earnie für CH ersatzweise die aWATTar-Reihe von AT, das entfällt.
+- **aWATTar:** Danach **aWATTar** (stündlich, auf 15-Min-Slots aufgeteilt), nur für AT (`api.awattar.at`) und DE (`api.awattar.de`). **CH hat keine dritte Quelle.**
 - **Cache:** Der letzte Abruf liegt unter `runtime/edibert_market/market_<zone>.json`. Deckt er das Fenster ab, fragt Earnie keine Quelle. Fehlt etwas, fragt Earnie höchstens alle 10 Minuten erneut nach.
 - **Ausfall aller Quellen:** Earnie nimmt die beste Teilantwort (auch aus dem Cache) und meldet die fehlenden Viertelstunden im Log; die Lücke füllt die Strategie für fehlende Preise. Ohne jeden Preis bricht der Lauf mit „Keine Day-Ahead-Preise“ ab.
-- **Land:** Fehlt `land` im Hausprofil oder ist es unbekannt, bricht der Abruf mit einer Fehlermeldung ab (früher galt still AT).
+- **Land:** Fehlt `land` im Hausprofil oder ist es unbekannt, bricht der Abruf mit einer Fehlermeldung ab.
 
 ### Berechnung
 
@@ -203,7 +203,7 @@ Eigene Tarife entstehen auf der Seite **Konfiguration → Tarife** (Tarif-Editor
 - Benutzertarife mit Zeitregeln (`rules`), Preisunter- oder -obergrenze (`price_floor_cent_kwh` / `price_cap_cent_kwh`) berechnet Earnie über Edibert wie jeden anderen Tarif.
 - Edibert prüft die Datei streng: ein falsches ID-Präfix, ein unbekanntes Feld oder eine doppelte ID ist ein Ladefehler mit Hinweis auf `user_tariffs.json`. Jeder Benutzertarif braucht wie Katalog-Tarife ein `land` und einen `vat_percent` (`0` erlaubt).
 - **Migration (Tarifformat 1):** Für Benutzertarife ohne `vat_percent` fragt der Migrations-Wizard den USt-Satz ab. Er schlägt den Standardsatz des Landes vor (AT 20 %, DE 19 %, CH 8,1 %), übernimmt ihn aber nur nach Bestätigung (Schaltfläche **Vorschlag übernehmen** oder eigener Wert).
-- **Netz-Grundgebühr (`grid_monthly_fee_eur`):** Seit Edibert 0.1.12 gehört die monatliche Netz-Grundgebühr zum Netzbereich, nicht mehr zum Tarif. Ein Benutzertarif mit `grid_monthly_fee_eur` ist ein Ladefehler mit Hinweis auf die Migration. Der Migrations-Wizard verschiebt den Betrag als feste Jahresgebühr (`grid_base_fee`) in den eigenen Netzbereich, wenn alle Hausprofile denselben Benutzer-Netzbereich verwenden. Nutzen die Hausprofile verschiedene Netzbereiche oder einen Katalog-Netzbereich, oder haben mehrere Tarife verschiedene Werte, blockiert der Wizard und nennt die Tarife; das Feld ist dann von Hand zu entfernen. Die Szenario-Rechnung weist diese Gebühr derzeit nicht aus (eigener Schritt im Backlog).
+- **Netz-Grundgebühr (`grid_monthly_fee_eur`):** Seit Edibert 0.1.12 gehört die monatliche Netz-Grundgebühr zum Netzbereich, nicht mehr zum Tarif. Ein Benutzertarif mit `grid_monthly_fee_eur` ist ein Ladefehler mit Hinweis auf die Migration. Der Migrations-Wizard verschiebt den Betrag als feste Jahresgebühr (`grid_base_fee`) in den eigenen Netzbereich, wenn alle Hausprofile denselben Benutzer-Netzbereich verwenden. Nutzen die Hausprofile verschiedene Netzbereiche oder einen Katalog-Netzbereich, oder haben mehrere Tarife verschiedene Werte, blockiert der Wizard und nennt die Tarife; das Feld ist dann von Hand zu entfernen. Im Szenario-Explorer zählt sie dann wie die übrigen festen Beträge des Netzbereichs (siehe [Netznutzungsentgelte](#netznutzungsentgelte-arbeitspreis)).
 - **Teilen mit der Tarifdatenbank:** nur mit eigener Zustimmung auf der Seite *Tarife* (siehe [Benutzer-Handbuch](../user-manual/Benutzer-Handbuch-Earnie.md#tarife-benutzertarife)). Die Antwort steht in `runtime/tariff_share.json`; ohne Zustimmung bekommt der Editor weder Sendeweg noch Serververbindung.
 
 ## Planung & Backtesting
@@ -248,7 +248,7 @@ Die Berechnung macht Edibert (Anbindung in [`data/edibert_slot_prices.py`](../..
 | DE | DE-LU | Energy-Charts (`bzn=DE-LU`) |
 | CH | CH | Energy-Charts |
 
-`simulation/engine.py` und `data/backtesting_prices.py` bepreisen über die Edibert-Preisreferenz der Szenario-Auflösung (`_edibert_pricing`); `_import_tariff_spec` / `_export_tariff_spec` tragen nur noch die Katalogparameter für Anzeige, Fixkosten und Rechnung. Day-Ahead-Daten: [Energy-Charts](https://energy-charts.info) (Fraunhofer ISE), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+Day-Ahead-Daten: [Energy-Charts](https://energy-charts.info) (Fraunhofer ISE), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 
 **DACH-Katalog importieren:** `tools/convert_dach_tariffs.py` aus `stromtarife_dach_kombiniert.json` + `einspeisetarife_dach_erweitert.json` – seit 2.8 nur noch für Korrekturen bestehender Einträge (siehe *Basiskatalog ohne neue Einträge*).
 
@@ -256,7 +256,7 @@ Die Berechnung macht Edibert (Anbindung in [`data/edibert_slot_prices.py`](../..
 
 ```powershell
 python -m scripts.validate_tariffs --check-catalog
-tools/convert_dach_tariffs.py --check
+python tools/convert_dach_tariffs.py --check
 ```
 
 ### Monatspreis (`monthly_table`) – OeMAG / RefMarkt vs. aWATTar-SUNNY
@@ -303,13 +303,13 @@ Im Backtesting mit `price_strategy=forecast` berechnet Earnie den Bias aus dense
 
 Prognose und Spiegelung füllen höchstens 72 Stunden ab dem ersten fehlenden Börsenpreis. Fehlen mehr, bricht die Preisberechnung mit einer Fehlermeldung ab, statt weiter in die Zukunft zu raten.
 
-Spec: [Preis-Prognose (Dev)](../dev/done/price-forecast-renewables.md).
+Spec: [Preis-Prognose](../dev/done/price-forecast-renewables.md) (Entwickler-Doku).
 
 ## Historische Preise
 
 Für das **Backtesting** (Szenario-Explorer) legt `scenario_explorer_conf.price_source` die Quelle fest: `api` oder CSV über `path_price`.
 
-- Die API lädt **Energy-Charts** (natives EPEX-Viertelstundenraster) über Edibert. Es gibt **keinen aWATTar-Fallback** mehr: Antwortet Energy-Charts nicht und liegt nichts im Cache, bricht der Lauf mit einer Fehlermeldung ab.
+- Die API lädt **Energy-Charts** (natives EPEX-Viertelstundenraster) über Edibert. Antwortet Energy-Charts nicht und liegt nichts im Cache, bricht der Lauf mit einer Fehlermeldung ab.
 - **Cache:** ein Monat pro Datei unter `runtime/edibert_market/market_archive/<Zone>/JJJJ-MM.json`. Ein abgeschlossener Monat wird nicht erneut abgefragt; wiederholte Backtests laufen damit ohne Netz. Fehlende Viertelstunden meldet das Log als Warnung.
 - **CSV** (`price_source` ≠ `api`): eine Energy-Charts-CSV unter `path_price`, Spalte `Day Ahead Auktion (<Zone>)`.
 - `price_provider` ist ein Legacy-Feld und steuert die Reihenfolge nicht mehr.

@@ -48,4 +48,12 @@ Features marked `[dev]` in the backlog (Shadow Mode, HouseSim, test/analysis too
 
 ## No internal backlog version IDs
 
-Do not write internal backlog chapter IDs (`2.7.n`, `2.6.a`, `2.+1`, epic phases like `P5` / `Q8`) in user docs — they confuse readers; describe the behaviour or the release (`ab Version 2.7`) instead. `tests/test_user_docs_audience.py` blocks new occurrences; existing ones are a shrinking per-file baseline (`backlog_id_baseline` in `.github/release-notes/audience.toml`) — remove IDs when you touch a doc and lower the baseline.
+Do not write internal backlog chapter IDs (`2.7.n`, `2.6.a`, `2.+1`, epic phases like `P5` / `Q8`) in user docs — they confuse readers; describe the behaviour instead. `tests/test_user_docs_audience.py` blocks new occurrences; existing ones are a shrinking per-file baseline (`backlog_id_baseline` in `.github/release-notes/audience.toml`) — remove IDs when you touch a doc and lower the baseline.
+
+## Current state only (decided 2026-11-25, maintainer)
+
+User docs describe how Earnie works **now**. No history and no diff to an old state: no "früher …", "nicht mehr", "entfällt", "wie bisher", "weiterhin", "ab Version 2.x" / "seit Datenmodell n", "nach dem Fix", "Warum X kleiner ist als früher". That belongs in the release notes. Likewise no announcements of future versions ("folgt in einer späteren Version", "bis dahin …", "zukünftig …"); plans belong in the backlog. A plain "noch nicht" for a missing feature is fine.
+
+Exceptions: the migration chapter in `docs/einrichtung/betrieb.md` (it describes old → new by nature), and hints a user with an old configuration still needs, phrased as a current condition ("Hat eine ältere `grid_fees.json` noch kein Feld `regions`, …").
+
+Links from user docs into `docs/dev/` or `docs/dev/done/` stay but are marked, e.g. "(Entwickler-Doku)", "(Entwickler-Doku auf Englisch)" or "(Lab-Anleitung)".

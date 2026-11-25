@@ -17,7 +17,7 @@ Am meisten bringt Earnie bei **dynamischen Spot-Tarifen** (z. B. aWATTar), deren
 
 - aktuelle Strompreise (und eine Prognose, falls die Börse noch keine Preise veröffentlicht hat),
 - die PV-Ertragsprognose aus dem Wetter am Standort,
-- Ggf. Heizbedarf für Haus oder Pool in Abhängigkeit von der aktuellen Wettervorhersage am Standort,
+- ggf. Heizbedarf für Haus oder Pool in Abhängigkeit von der aktuellen Wettervorhersage am Standort,
 - Ladezustand und Grenzen des Batteriespeichers,
 - steuerbare Verbraucher wie E-Auto, Wärmepumpe, Pool und Haushaltsgeräte.
 
@@ -90,7 +90,7 @@ Die typischen Wege im Überblick:
 3. Oberfläche im Browser öffnen (im Produktivbetrieb meist Port **8501**, siehe [Streamlit-Ports](../dev/streamlit-ports.md)).
 4. Für den späteren Live-Betrieb: auf der Seite **Smarthome-Backend** das Backend wählen und den Zugang hinterlegen ([Smarthome-Backend wählen](../einrichtung/smarthome-backend-wahl.md)). Danach mit dem Hauskonfigurator weitermachen.
 
-Details: [Container](../einrichtung/container.md) · [VMware](../einrichtung/vmware-vctl.md) `vctl` [(Windows-PC)](../einrichtung/vmware-vctl.md) · [Betrieb](../einrichtung/betrieb.md) · [Greenfield](../einrichtung/greenfield-dev-stack.md)
+Details: [Container](../einrichtung/container.md) · [VMware `vctl` (Windows-PC)](../einrichtung/vmware-vctl.md) · [Betrieb](../einrichtung/betrieb.md) · [Greenfield](../einrichtung/greenfield-dev-stack.md)
 
 Nach dem ersten Start öffnet Earnie die Seite **Smarthome-Backend** (unter **Daemon Control**). Dort wird das Backend gewählt und verbunden; **Optimierer-Dienst** und **EHAL-Com** sind erst danach freigeschaltet. Weitere Seiten wie Monitor oder Szenario-Explorer erscheinen, sobald die Einrichtung weit genug ist.
 
@@ -111,7 +111,7 @@ Empfohlene Reihenfolge:
 3. **Live-Szenario zuweisen:** festlegen, welche Bausteine als Basis gelten.
 4. **Szenario-Explorer:** Verbrauch erzeugen, Rechnung starten, Ergebnisse auswerten.
 
-> **Hinweis:** Ein eigenes Szenario ohne PV und Batterie ist nicht nötig. Diese Referenz berechnet Earnie automatisch (Zeile **Historisch** im Szenario-Explorer).
+> **Hinweis:** Ein eigenes Szenario ohne PV und Batterie ist nicht nötig. Diese Referenz rechnet der Szenario-Explorer mit, solange unter **Referenzen berechnen** das Kreuz **Historisch** gesetzt ist (Standard).
 
 
 
@@ -271,7 +271,7 @@ Welche Referenzen der Szenario-Explorer rechnet, wird dort für den ganzen Lauf 
 
 **Tarife:** Bezugs- und Einspeisetarif kommen aus dem Tarifkatalog oder werden als **Eigener Festpreis** mit eigenem Wert in Cent/kWh eingetragen (der Wert gehört dann zum Szenario, nicht zum Katalog).
 
-**Bezugsgrenze:** Optionale Grenze für den Netzbezug je Viertelstunde, gedacht für den Leistungspreis. Leer bedeutet keine Grenze. Sie wirkt nur in Monaten, in denen der Netzbereich einen Leistungspreis hat, im Szenario-Explorer und im Live-Betrieb. Ist im laufenden Monat schon eine höhere Viertelstunde gemessen, plant Earnie bis zu dieser Höhe, weil sie ohnehin bezahlt wird. Ist der Monat noch ohne Messung, etwa direkt nach der Installation, hält der Plan die Grenze selbst. Kann Earnie nicht planen und schaltet in den Automatikbetrieb, gilt die Grenze nicht; das Protokoll und der [Monitor](#monitor) vermerken das. Der Monitor zeigt auch Monatsspitze, Betrag und Viertelstunden, in denen der Plan die Grenze nicht halten kann. Eine enge Grenze kann mehr kosten, als sie spart. Das zeigt ein Vergleich von Varianten mit verschiedenen Grenzen im Szenario-Explorer. Der Plan ist zuverlässig, aber keine Garantie: Earnie regelt nicht innerhalb der Viertelstunde nach, und Last, die die Prognose nicht kennt, kann die gemessene Spitze über die Grenze heben. Start je Netzbereich, Preise und Grenzen des Verfahrens: [Leistungspreis und Bezugsgrenze](../konfiguration/preise.md#leistungspreis-und-bezugsgrenze).
+**Bezugsgrenze:** Optionale Grenze für den Netzbezug je Viertelstunde, gedacht für den Leistungspreis. Leer bedeutet keine Grenze. Der Plan zielt auf die Grenze minus eine **Sicherheitsmarge** (vorbelegt 0,7 kW). Sie fängt die üblichen Fehler von Lastprognose und Messung ab. Die Grenze wirkt nur in Monaten, in denen der Netzbereich einen Leistungspreis hat, im Szenario-Explorer und im Live-Betrieb. Ist im laufenden Monat schon eine höhere Viertelstunde gemessen, plant Earnie bis zu dieser Höhe, weil sie ohnehin bezahlt wird. Ist der Monat noch ohne Messung, etwa direkt nach der Installation, hält der Plan die Grenze selbst. Kann Earnie nicht planen und schaltet in den Automatikbetrieb, gilt die Grenze nicht; das Protokoll und der [Monitor](#monitor) vermerken das. Der Monitor zeigt auch Monatsspitze, Betrag und Viertelstunden, in denen der Plan die Grenze nicht halten kann. Eine enge Grenze kann mehr kosten, als sie spart. Das zeigt ein Vergleich von Varianten mit verschiedenen Grenzen im Szenario-Explorer. Der Plan ist zuverlässig, aber keine Garantie: Earnie regelt nicht innerhalb der Viertelstunde nach, und Last, die die Prognose nicht kennt, kann die gemessene Spitze über die Grenze heben. Start je Netzbereich, Preise und Grenzen des Verfahrens: [Leistungspreis und Bezugsgrenze](../konfiguration/preise.md#leistungspreis-und-bezugsgrenze).
 
 **Im Live-Betrieb: Beobachten oder Danach planen.** Mit einer Bezugsgrenze legt das Szenario fest, was Earnie im Live-Betrieb damit tut. Vorgeschlagen ist **Beobachten**: Earnie plant und steuert wie ohne Grenze. Jede Viertelstunde rechnet er zusätzlich einen Plan mit Grenze, führt ihn aber nicht aus. Der [Monitor](#monitor) zeigt dann, wo und wie Earnie eingegriffen hätte, die geschätzte Monatsspitze und den Leistungspreis mit Earnie. So lässt sich die Grenze ohne Risiko ansehen, bevor sie steuert. **Danach planen** hält die Grenze ein, wie oben beschrieben. Die Wahl gilt nur für das Live-Szenario; der Szenario-Explorer plant immer mit der Grenze.
 
@@ -280,7 +280,7 @@ Welche Referenzen der Szenario-Explorer rechnet, wird dort für den ganzen Lauf 
 - Land- und Tariftyp-Filter schränken nur die Liste ein. Ein gespeicherter Tarif bleibt gewählt, auch wenn er nicht zum Filter passt.
 - Kurz vor Monatsende warnt der Editor, wenn einem Monatstarif (`monthly_table`) der Preis des nächsten Monats fehlt. Bei Katalogtarifen wird er direkt dort eingetragen; bei einem Benutzertarif führt **Im Tarif-Editor öffnen** auf die Seite Tarife.
 - **Monatliche Fixkosten** (Grundpreis des Lieferanten, feste Beträge des Netzbereichs, optional Messstellen- und sonstige Kosten) fließen als Näherung in die Gesamt- und Monatskosten des Szenario-Explorers ein, nicht in die Live-Optimierung.
-- Der volumetrische **Netznutzung-Arbeitspreis** wird im Hausprofil (Standort) gepflegt. Er fließt in Live-Betrieb und Szenario-Explorer ein und steht in den Fake-Jahresrechnungen getrennt vom Lieferantenanteil.
+- Der volumetrische **Netznutzung-Arbeitspreis** wird im Hausprofil in der Gruppe **Netzanschluss & Netzentgelt** gepflegt (Netzbereich oder eigener Arbeitspreis). Er fließt in Live-Betrieb und Szenario-Explorer ein und steht in den Fake-Jahresrechnungen getrennt vom Lieferantenanteil.
 - Nach jedem Lauf des Szenario-Explorers liegen **Fake-Jahresrechnungen** (Markdown) im Log-Ordner unter `invoices/`: Bezug und Einspeisung mit Ø Tarif- und Ø Ist-Preis, die Katalogparameter stehen am Ende.
 
 Nachrechnen: [Tarife und Preise nachrechnen](../referenz/tarife-quellen.md) · Technik: [Preise und Marktdaten](../konfiguration/preise.md)
@@ -378,7 +378,7 @@ Alle Zeilen zählen dasselbe: den **gebuchten Hausverbrauch** der jeweiligen Zei
 | ------------------------------------ | -------------------------------------------------------------------------------------------------- |
 | **Historisch** (ohne Optimierung, …) | Last des Live-Hausprofils ohne PV und Batterie über dieselben Zeitfenster wie die Optimierung      |
 | **Referenz ohne Speicher** (…)       | Last des Hausprofils des Szenarios über dieselben Zeitfenster wie die Optimierung                  |
-| **Wechselrichter-Eigenverbrauch**, **Standard-Regeln** | Grundlast und flexible Verbraucher mit derselben Energie wie die Optimierung, ohne Speicher-Standby |
+| **Wechselrichter-Eigenverbrauch** | Grundlast und flexible Verbraucher mit derselben Energie wie die Optimierung, ohne Speicher-Standby |
 | **Optimiertes Szenario**             | Gebuchte Last aus Grundlast und flexiblen Verbrauchern nach der Optimierung, ohne Speicher-Standby |
 
 
@@ -509,16 +509,18 @@ Der Monitor unter **Live-Cockpit → Monitor** (Sunset-2-Sunset) zeigt Vergangen
 
 **Ersparnis in Chart 2:** Chart 2 ist eine Kontoansicht: Zwei Linien zeigen den Kontostand seit Fensterstart mit und ohne Earnie (links von Jetzt gebucht aus dem Ersparnis-Buch, rechts der Plan gegen BL Ziel); fällt eine Linie, wird bezahlt. Die Fläche zwischen den Linien ist grün, wo die Linie mit Earnie oben liegt, sonst rot. Mit **Gemeinsamer Start** (Standard) beginnen beide bei 0 € (Abstand bei Jetzt = bisher, am Ende = gesamt), mit dem Umschalter **Ist bei Jetzt** treffen sich die Linien bei Jetzt (Abstand am Ende = erwartet, „Bisher“ als Label bei Jetzt). Das Panel darunter prüft, ob beide Seiten mit demselben Verbrauch gerechnet wurden. Beträge stehen ohne Vorzeichen, die Bedeutung als Wort dabei („gespart“, „mehr ausgegeben“). Das Dezimalzeichen folgt der Sprache des Browsers: Steht in den Spracheinstellungen Englisch vor Deutsch, zeigt Earnie einen Punkt (`2.18 €`), sonst ein Komma (`2,18 €`). Das gilt auch für kWh, kW und Prozent, für Tabellen und für die Achsen der Charts. Nur Eingabefelder zeigen weiter einen Punkt. Die SoC-Korrektur steht als eigenes Label, abgeschlossene Tage zeigen ihr **Ergebnis** aus dem Buch, ein Fenster ohne Vergangenheit den **Plan**. Details: [Charts](../ui/charts.md#chart-2-kontostand-mit-und-ohne-earnie). Der Energievergleich im Expander bezieht sich dagegen auf den vollen Planungshorizont (jetzt bis übernächster Sonnenaufgang).
 
-#### Chart 1: SoC-Linien (Plausibilität)
+#### Chart 1: Plan und SoC-Linien
 
-Ab **Jetzt** können zwei SoC-Verläufe zu sehen sein: **SoC** (Plan der Optimierung) und **SoC BL Ziel** (Gegenprobe ohne smarte Batterie und ohne preisabhängige Lastverschiebung). Kurzfassung und Farben: [Charts & Panels – Chart 1](../ui/charts.md#chart-1-leistung-soc--preis)
+Rechts von **Jetzt** zeigt Chart 1 genau den Plan, den Earnie in diesem Lauf an die Anlage gesendet hat. Findet die Optimierung keinen gültigen Plan, stellt Earnie die Batterie auf Automatik; Chart 1 zeigt dann „kein Plan (Automatik)“ statt eines Verlaufs, bis ein späterer Lauf wieder einen Plan hat.
+
+Ab **Jetzt** können zwei SoC-Verläufe zu sehen sein: **SoC** (Plan der Optimierung) und **SoC BL Ziel** (Gegenprobe ohne smarte Batterie und ohne preisabhängige Lastverschiebung, mit denselben Lade- und Entladegrenzen und derselben Energiereserve wie der Plan). Kurzfassung und Farben: [Charts & Panels – Chart 1](../ui/charts.md#chart-1-leistung-soc--preis)
 
 ### Manuelle Geräte
 
 Die Seite **Live-Cockpit → Manuelle Geräte** zeigt alle Verbraucher mit der Rolle **manuell**. Im Hauskonfigurator wird je Gerät unter **Unterstützung** eine von zwei Varianten gewählt:
 
 - **Start-Empfehlung:** Sterne und optional ein Tagesplan. Geplante Läufe erscheinen in Chart 1.
-- **Energiereserve:** Status der Powerstation und Trigger.
+- **Energiereserve:** Status der Powerstation und Trigger. Die Reserve hält Earnie nur in den einzelnen Slots, in denen Strom aus der Batterie billiger ist als aus dem Netz; davor lädt er sie in den günstigsten Slots auf. Bei flachen Preisen hält er keine Reserve. Details: [Virtuelle Powerstation](../konfiguration/batterie-pv.md#virtuelle-powerstation-carve-out).
 
 <a id="analyse-verbrauch-kosten"></a>
 

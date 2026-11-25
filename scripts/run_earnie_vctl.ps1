@@ -263,7 +263,7 @@ function Run-EarnieContainer {
         "-e", "EARNIE_STRICT_TARIFF_VALIDATE=1",
         "-e", "EARNIE_VERIFY_LOXONE_ON_START=$verify",
         "-e", "EARNIE_AUTO_START_MAIN=1",
-        "-e", "EARNIE_UI_MODES=sunset2sunset,live_environment",
+        "-e", "EARNIE_UI_MODES=sunset2sunset,scenario_explorer,live_environment",
         $Image,
         "python", "-m", "scripts.run_streamlit", "--",
         "--server.enableCORS", "false",

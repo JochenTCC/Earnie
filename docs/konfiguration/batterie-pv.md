@@ -16,7 +16,7 @@ Im **Szenario-Explorer** (Verbrauchsdaten / cons_data) gilt für die PV-Linien:
 | Parameter | Einheit | Quelle | Bedeutung |
 | --------- | ------- | ------ | --------- |
 | `pv_system_ids` | – | Szenario → `components.json` | Eine oder mehrere Referenzen auf `pv_systems[].id` |
-| `battery_ids` | – | Szenario → `components.json` | Eine oder mehrere Referenzen auf **Hausbatterien** `batteries[].id` mit `type: house` (ersetzt `battery_id`). Powerstations sind hier nicht zulässig. |
+| `battery_ids` | – | Szenario → `components.json` | Eine oder mehrere Referenzen auf **Hausbatterien** `batteries[].id` mit `type: house`. Powerstations sind hier nicht zulässig. |
 | `id` / `id_locked` / `id_provisional_label` | – | `components.json` → `inverters[]` / `batteries[]` / `pv_systems[]` | Interne ID (EHAL-Slug / Kennung). Neue Einträge und Kopien starten mit freigegebener ID (`id_locked: false`, Vorschlag in `id_provisional_label`). Die erste geänderte **Bezeichnung** setzt `id` aus dem Label und sperrt die ID. Bestehende Einträge ohne Flag gelten als gesperrt. Einmalig steht der UI-Button „ID aus Bezeichnung übernehmen“ zur Verfügung. Zum einmaligen Bereinigen unsauberer IDs offline: `python -m scripts.clean_entity_ids_once --config-dir <config>` (Dry-Run; `--apply` schreibt; optional `--only-copy`). |
 | `type` | enum | `components.json` → `batteries[]` | `house` (Default) oder `powerstation` (Reserve; Anbindung über ein manuelles Gerät mit `mode: reserve`) |
 | `backing` / `role` / `attached_consumer_ids` | – | `components.json` → Powerstation | Nur bei `type: powerstation`: `virtual`\|`physical` bzw. `single_use`\|`standby_backup`. `attached_consumer_ids` (Liste) ist optional; die Zuordnung ist auch über manuelle Geräte mit `mode: reserve` + `powerstation_id` möglich. Ältere Konfigurationen: `attached_consumer_id` entspricht dem ersten Listenelement. |
@@ -28,12 +28,12 @@ Im **Szenario-Explorer** (Verbrauchsdaten / cons_data) gilt für die PV-Linien:
 | `horizon_source`, `horizon` | – / ° | `house_profiles.json` | Horizont am Standort (Gelände, Gebäude, Bäume), siehe [Horizont](#horizont). Ohne die Felder rechnet Earnie mit freiem Horizont. |
 | `k_push_cent` | Cent/kWh | `tariffs.json` (Export-Tarif) | **Einspeisevergütung** |
 | `battery_capacity_kwh` | kWh | `components.json` → `batteries[]` | Nutzbare Speicherkapazität |
-| `battery_max_charge_power_kw` | kW | `components.json` → `batteries[]` | Max. Ladeleistung (ersetzt das gemeinsame `battery_max_power_kw`) |
+| `battery_max_charge_power_kw` | kW | `components.json` → `batteries[]` | Max. Ladeleistung |
 | `battery_max_discharge_power_kw` | kW | `components.json` → `batteries[]` | Max. Entladeleistung |
-| `battery_max_power_kw` | kW | `components.json` → `batteries[]` | **Veraltet (deprecated):** früher eine Grenze für beide Richtungen; wird beim Laden der Konfiguration in Lade- und Entladegrenze übertragen |
+| `battery_max_power_kw` | kW | `components.json` → `batteries[]` | **Veraltet:** eine gemeinsame Grenze für beide Richtungen. Steht sie noch in einer Konfiguration, überträgt Earnie sie beim Laden in Lade- und Entladegrenze. |
 | `limits_from_live` | bool | `components.json` → `batteries[]` | Bei `true` kommen SOC-Min/Max und max. Lade-/Entladeleistung live aus `get_ess_*` (Fallback: Hauskonfigurator-Werte). Diese Lesewerte müssen statische Gerätegrenzen sein, nie ein Wert, den Earnie selbst schreibt (Details: [EHAL-Referenz](../referenz/ehal.md#get_ess_-limits-device-capability-only-never-an-earnie-setpoint)) |
 | `efficiency` | 0–1 | `components.json` → `inverters[]` | Einweg-Wirkungsgrad DC↔AC (**η_inv**), Pflicht. Wirkt auf PV DC→AC und als Teil des Speicherpfads. Migration bestehender Konfigurationen: `python -m scripts.migrate_conversion_efficiency_once --config-dir <config>` |
-| `battery_efficiency` | 0–1 | `components.json` → `batteries[]` | Einweg-Wirkungsgrad der Zellchemie (**η_batt**). Optimierung und Simulation nutzen **η_path = η_inv · η_batt** (Roundtrip ≈ η_path²). Früher stand hier ein zusammengefasster Pfad-Faktor; die Migration rechnet η_inv heraus. |
+| `battery_efficiency` | 0–1 | `components.json` → `batteries[]` | Einweg-Wirkungsgrad der Zellchemie (**η_batt**). Optimierung und Simulation nutzen **η_path = η_inv · η_batt** (Roundtrip ≈ η_path²). |
 | `battery_min_soc` | % | `components.json` → `batteries[]` | Untere SOC-Grenze (Schutz). Liegt der gemessene SoC darunter, plant Earnie keine Entladung, bis die Grenze wieder erreicht ist; geladen wird preisoptimal, nicht sofort. Danach wird die Grenze nicht mehr unterschritten. Eine virtuelle Reserve hebt die Grenze nur in den Viertelstunden an, in denen sie sich lohnt (siehe unten) |
 | `battery_max_soc` | % | `components.json` → `batteries[]` | Obere SOC-Grenze. Liegt der gemessene SoC darüber, plant Earnie keine Ladung, bis die Grenze wieder erreicht ist; entladen wird preisoptimal, nicht sofort. Danach wird die Grenze nicht mehr überschritten |
 | `threshold_power` | Anteil | `components.json` → `batteries[]` | Relativ zu `max(charge, discharge)` in kW (z. B. `0.2` = 20 %). Schwellwert für die Modus-Erkennung und für die Entscheidung zwischen Zwangsentladen und Automatik |
@@ -69,8 +69,8 @@ Solange ein Gerät aktiv ist, gibt Earnie die gehaltene Reserve frei, der SoC-Fl
 - Endet der Zusatzlauf erst nach dem nächsten Viertelstunden-Takt, startet Earnie sofort einen regulären Lauf für die neue Viertelstunde. Sonst blieben die Sollwerte der alten Viertelstunde bis zum übernächsten Takt stehen.
 - Die Prüfung zwischen den Läufen liest nur Signale, die Earnie live abfragen kann: das digitale Aktiv-Signal (`sens_consumer_active`) und die Live-Leistung des Geräts. Signale, die nur in der Telemetrie eines Laufs stehen (etwa die Ausgangsleistung einer physischen Powerstation), sieht erst der nächste reguläre Lauf.
 - Kann Earnie ein Signal nicht lesen (z. B. Smarthome nicht erreichbar), schreibt es eine Warnung ins Log, einmal pro Quelle und Wartezeit, und prüft weiter. Über ein nicht lesbares Signal gibt Earnie bis zum nächsten Lauf nichts frei.
-- Leere Reserven und physische Powerstations lösen keinen Zusatzlauf aus. Physische Powerstations gibt weiterhin der reguläre Lauf frei.
-- Ein Smarthome kann denselben Effekt weiterhin von außen auslösen, indem es beim Gerätestart `Earnie_Request_Optimize` sendet.
+- Leere Reserven und physische Powerstations lösen keinen Zusatzlauf aus. Physische Powerstations gibt der reguläre Lauf frei.
+- Ein Smarthome kann denselben Effekt auch von außen auslösen, indem es beim Gerätestart `Earnie_Request_Optimize` sendet.
 
 **Schutz der gehaltenen Reserve:** Der SoC-Floor ist der Mindest-SoC der Hausbatterie plus der Carve-out (z. B. 5 % + 1,1 kWh von 15 kWh = 12,3 %).
 
@@ -84,7 +84,7 @@ Solange ein Gerät aktiv ist, gibt Earnie die gehaltene Reserve frei, der SoC-Fl
 - Liegt der SoC beim Start unter dem Mindest-SoC, führt Earnie ihn zurück und baut die Reserve bis zur ersten Viertelstunde auf, in der sie sich lohnt (soweit die Ladeleistung reicht).
 - Reicht die Ladeleistung nicht, um die Reserve bis zur ersten teuren Viertelstunde aufzubauen, baut Earnie sie so schnell wie möglich auf und schreibt eine Warnung ins Log.
 
-- Im Modus **Automatik** begrenzt Earnie das geschriebene Entladelimit auf die Energie über diesem Floor, die in einer Viertelstunde abfließen darf. Das gilt nur, wenn die Reserve in der aktuellen Viertelstunde gehalten wird; ohne Floor bleibt das volle Entladelimit. Bei 14 % SoC und einem Floor von 12,3 % sind das rund 0,9 kW. So kann ein großer Verbraucher (z. B. SwimSpa) die Reserve nicht innerhalb eines Slots leeren, die danach aus dem Netz nachgeladen werden müsste. Weiter über dem Floor bleibt das volle Entladelimit.
+- Im Modus **Automatik** begrenzt Earnie das geschriebene Entladelimit auf die Energie über diesem Floor, die in einer Viertelstunde abfließen darf. Das gilt nur, wenn die Reserve in der aktuellen Viertelstunde gehalten wird; ohne Floor bleibt das volle Entladelimit. Bei 14 % SoC und einem Floor von 12,3 % sind das rund 0,9 kW. So kann ein großer Verbraucher (z. B. Pool) die Reserve nicht innerhalb eines Slots leeren, die danach aus dem Netz nachgeladen werden müsste. Weiter über dem Floor bleibt das volle Entladelimit.
 - **Toleranz am Floor:** Die Anlage meldet den SoC in ganzen Prozent, und die Batterie verliert im Haltebetrieb durch Selbstentladung laufend etwas Energie. Damit das keine kurzen Lade- und Entladeimpulse auslöst, gilt um den Floor ein Toleranzband:
   - Liegt die Anzeige höchstens 1 % über dem Floor (z. B. 13 % bei 12,3 %), gibt Earnie nichts frei: kein Entladen im Plan und ein Entladelimit von 0 in **Automatik**.
   - Liegt die Anzeige unter dem Floor, aber innerhalb des Nachladebands (z. B. 12 % oder 11 % bei 12,3 %), hält Earnie den Stand und lädt nicht nach. Die Selbstentladung darf weiterlaufen.
@@ -105,7 +105,7 @@ Physische Powerstations (`backing: physical`) behalten das volle Batterie-Formul
 Diese Rolle ist für Dauerläufer ohne einzelnen Lauf-Auslöser gedacht (PC, Router, NAS, Hub, …). Earnie schaltet die Versorgung der angeschlossenen Verbraucher **preisgetrieben** zwischen Netz-Durchleitung (Pass-Through) und Batterie-Inselbetrieb um (`ess.<id>.set_ess_source_select`: `0` = Netz, `1` = Batterie). In günstigen Slots darf die Powerstation parallel laden (`set_ess_charge_power_limit`).
 
 - **Nur `backing: physical`:** Earnie überspringt virtuelle Standby-Instanzen zur Laufzeit. Auf der Hausbatterie gibt es dafür keinen geschützten Floor; ggf. das globale `battery_min_soc` erhöhen.
-- **Harte Voraussetzung:** Die physische Standby-Backup-Batterie braucht die Capability `supports_ess_source_select` und ein Mapping von `ess.<id>.set_ess_source_select`. Bei EcoFlow ist das der HA-Switch `switch.<device>_grid_bypass`; bei `ehal.backend=loxone` ein Pattern-B-Merker mit Bridge zu HA, siehe [EcoFlow Delta 3](../dev/done/ecoflow-delta3-loxone.md). Anlage und Hausspeicher haben kein Feld für die Quellenwahl.
+- **Harte Voraussetzung:** Die physische Standby-Backup-Batterie braucht die Capability `supports_ess_source_select` und ein Mapping von `ess.<id>.set_ess_source_select`. Bei EcoFlow ist das der HA-Switch `switch.<device>_grid_bypass`; bei `ehal.backend=loxone` ein Pattern-B-Merker mit Bridge zu HA, siehe [EcoFlow Delta 3](../dev/done/ecoflow-delta3-loxone.md) (Lab-Anleitung). Anlage und Hausspeicher haben kein Feld für die Quellenwahl.
 - **Quellenwahl und Ladegrenzen:** Beide brauchen an der physischen Powerstation jeweils ein **eigenes** Pattern-B-Binding. Sie greifen **nicht** auf die Mappings der Hausbatterie zurück, da sonst deren Lade-/Entladegrenzen überschrieben würden.
 - **Reserve-Größe:** angeschlossene Last × teure Stunden im Horizont. Ein Lernen der Energie pro Lauf wie bei `single_use` gibt es hier nicht.
 
@@ -116,7 +116,7 @@ Die Live-PV-Leistung (AC-Summe der Anlage) leitet Earnie aus den netzgekoppelten
 - **Mapping je Wechselrichter:** Jeder Wechselrichter mit angeschlossenen PV-Feldern braucht dieses Mapping. Fehlt die PV-Leistung des Wechselrichters, können vollständige String-Mappings `pv.{id}.sens_pv_production_active` die Summe je Wechselrichter ersetzen.
 - **Nicht berücksichtigt:** Powerstation- und Insel-Wechselrichter (`ac_connection: island`) zählen nicht mit.
 - **Unvollständige Mappings** führen zu einem Fehler.
-- **Kein flaches Anlagen-Feld mehr:** `plant.ehal_bindings.sens_pv_production_active` gibt es nicht mehr. Die Migration überträgt ein eindeutiges Mapping auf den einzigen Wechselrichter.
+- **Kein Anlagen-Feld für PV:** `plant.ehal_bindings.sens_pv_production_active` gibt es nicht; ein vorhandenes eindeutiges Mapping überträgt die Migration auf den einzigen Wechselrichter.
 - **Intervallenergie:** Die Intervallenergie für `cons_data` (`pv_kwh_interval`) integriert Earnie aus der abgeleiteten Anlagen-Leistung.
 
 ### PV-Prognose im Live-Betrieb
@@ -166,7 +166,7 @@ Steht die Sonne hinter einem Berg, einem Nachbarhaus oder einem Baum, erreicht s
 
 > **Wichtig für forecast.solar:** Ohne eingetragenen Horizont rechnet forecast.solar mit dem Gelände am Standort (PVGIS-Horizont). Der eingetragene Horizont **ersetzt** dieses Gelände. Tragen Sie deshalb auch entfernte Berge ein, nicht nur Nachbarhäuser und Bäume; sonst fehlt der Bergschatten in der PV-Prognose.
 
-> **Hinweis:** Ein eingeschalteter Horizont ändert die Ergebnisse: PV-Ertrag und Kollektorwärme sinken vor allem im Winter und in den Randstunden. Ohne die beiden Felder oder mit ausgeschaltetem Schalter bleibt alles wie bisher.
+> **Hinweis:** Ein eingeschalteter Horizont ändert die Ergebnisse: PV-Ertrag und Kollektorwärme sinken vor allem im Winter und in den Randstunden. Ohne die beiden Felder oder mit ausgeschaltetem Schalter rechnet Earnie mit freiem Horizont.
 
 ## Wechselrichter (`inverters[]`)
 
@@ -175,7 +175,7 @@ PV-Felder und Batterien können über `inverter_id` auf denselben Wechselrichter
 | Feld | Bedeutung |
 |------|-----------|
 | `type` | `hybrid` (PV + Batterie DC), `pv_string` (nur PV), `battery` (AC-gekoppelter Batterie-Wechselrichter ohne PV-Seite) |
-| `ac_connection` | `grid_tied` = AC am Hausbus (Automatik/Optimieren möglich); `island` = speist nur angeschlossene Verbraucher, **nicht** den AC-Bus des Hauses (die PV dieses Wechselrichters zählt nicht in der Hausbilanz). Der AC-Eingang kann am Netz hängen (einseitige Last); `island` beschreibt also die **Bus-Teilnahme** und bedeutet nicht „netzlos“. Ersetzt das frühere `batteries[].kind` (`isolated` ⇒ `island`). |
+| `ac_connection` | `grid_tied` = AC am Hausbus (Automatik/Optimieren möglich); `island` = speist nur angeschlossene Verbraucher, **nicht** den AC-Bus des Hauses (die PV dieses Wechselrichters zählt nicht in der Hausbilanz). Der AC-Eingang kann am Netz hängen (einseitige Last); `island` beschreibt also die **Bus-Teilnahme** und bedeutet nicht „netzlos“. |
 | `max_ac_power_kw` | Optional: AC-Clipping bzw. Obergrenze der Entladung; ohne Wert gibt es keine Grenze |
 | `max_pv_input_kw` | Optional: Obergrenze DC/MPPT |
 | `max_ac_charge_kw` | Optional: Netzladen über den Wechselrichter |
@@ -241,14 +241,14 @@ Optional lässt sich im Hauskonfigurator eine statische Obergrenze für die Eins
 Gilt keine Begrenzung, schreibt Earnie die maximal mögliche Einspeisung der Anlage auf `set_grid_export_power_limit`. Dafür summiert Earnie über alle netzgekoppelten Wechselrichter `min(max_ac_power_kw, PV-kWp begrenzt durch max_pv_input_kw + Zwangsentlade-kW)`:
 
 - **Insel-Wechselrichter** zählen nicht.
-- **Ohne Wechselrichter in der Anlagen-Topologie** (keine Wechselrichter angelegt) gilt die bisherige Rechnung (Legacy): Summe PV-kWp plus max. Entladeleistung der Batterien mit `control = full` (früher `Batteriesteuerung = voll`). Batterien mit `limits_only` oder `read_only` zählen nicht. Powerstations (`type: powerstation`) zählen nicht mit, da sie nicht ins Hausnetz zurückspeisen.
+- **Ohne Wechselrichter in der Anlagen-Topologie** (keine Wechselrichter angelegt) rechnet Earnie mit der Summe aus PV-kWp und max. Entladeleistung der Batterien mit `control = full`. Batterien mit `limits_only` oder `read_only` zählen nicht. Powerstations (`type: powerstation`) zählen nicht mit, da sie nicht ins Hausnetz zurückspeisen.
 - **Ist das Ergebnis 0 oder unbekannt** (weder PV-kWp noch Zwangsentladeleistung hinterlegt bzw. keine netzgekoppelten Wechselrichter), schreibt Earnie als Obergrenze `1000` kW (EHAL: 1 000 000 W).
 
 Die Umsetzung im Smarthome-System (z. B. Abregelung in Loxone Config) beschreibt die jeweilige Anbindungs-Doku, für Loxone die [Loxone-Anbindung](../einrichtung/loxone-anbindung.md).
 
 ## SOC-Verhalten
 
-Der Parameter `battery_wear` kann niedrigere End-SOCs wirtschaftlich bestrafen. Das ist ein weicher Anreiz, unabhängig vom Modus. Der Block gehört zum jeweiligen Eintrag in `components.json` → `batteries[]` und liegt nicht mehr global in `config.json`.
+Der Parameter `battery_wear` kann niedrigere End-SOCs wirtschaftlich bestrafen. Das ist ein weicher Anreiz, unabhängig vom Modus. Der Block gehört zum jeweiligen Eintrag in `components.json` → `batteries[]`.
 
 Block `planning_horizon` in `config.json`:
 
@@ -258,7 +258,7 @@ Block `planning_horizon` in `config.json`:
 }
 ```
 
-Details: [Spezifikation Sunset-Planungshorizont](../dev/done/planning-horizon-sunset.md).
+Details: [Spezifikation Sunset-Planungshorizont](../dev/done/planning-horizon-sunset.md) (Entwickler-Doku).
 
 ## Batterieverschleiß (`battery_wear`)
 
@@ -275,7 +275,7 @@ Beispiel (5 kWh, 1500 €, 6000 Zyklen, 50 % zyklenbedingt): **2,5 ct/kWh**.
 | `expected_cycles` | Angenommene Vollzyklen bis zum Ersatz |
 | `cycle_cost_fraction` | Anteil der Kosten, der auf Zyklen entfällt (Rest: Kalenderalterung) |
 
-Im Hauskonfigurator unter **Batterien** schaltet die Checkbox „Verschleiß berücksichtigen“ die drei Parameter frei. Direktes Bearbeiten von `components.json` ist weiterhin möglich.
+Im Hauskonfigurator unter **Batterien** schaltet die Checkbox „Verschleiß berücksichtigen“ die drei Parameter frei. Direktes Bearbeiten von `components.json` ist ebenfalls möglich.
 
 
 

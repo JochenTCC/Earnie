@@ -83,7 +83,7 @@ Aus dem Repo-Root aufrufen (oder den Skript-Pfad anpassen):
 .\scripts\run_earnie_vctl.ps1 -Action up -SkipLoxoneVerify
 
 # Bestimmte Version
-.\scripts\run_earnie_vctl.ps1 -Action up -Image ghcr.io/jochentcc/earnie-energy:2.6.2
+.\scripts\run_earnie_vctl.ps1 -Action up -Image ghcr.io/jochentcc/earnie-energy:2.7.2
 ```
 
 Bei einem Authentifizierungsfehler beim Pull zuerst anmelden:
@@ -114,7 +114,7 @@ vctl run --name earnie-productive -d `
   -e EARNIE_STRICT_TARIFF_VALIDATE=1 `
   -e EARNIE_VERIFY_LOXONE_ON_START=1 `
   -e EARNIE_AUTO_START_MAIN=1 `
-  -e EARNIE_UI_MODES=sunset2sunset,live_environment `
+  -e EARNIE_UI_MODES=sunset2sunset,scenario_explorer,live_environment `
   ghcr.io/jochentcc/earnie-energy:latest `
   python -m scripts.run_streamlit -- --server.enableCORS false --server.enableXsrfProtection false
 ```
@@ -122,10 +122,9 @@ vctl run --name earnie-productive -d `
 ## 5. Konfiguration nach dem ersten Start
 
 1. UI öffnen: `http://localhost:8501`
-2. Auf dem Windows-Host diese Dateien anpassen:
-   - `earnie_env\config\.env`: Zugang zum Backend (z. B. Loxone).
-   - `earnie_env\config\config.json` und `tariffs.json`: Haus und Tarife.
-3. Container neu starten:
+2. Auf dem Windows-Host in `earnie_env\config\.env` den Zugang zum Backend eintragen (z. B. Loxone).
+3. Haus, Szenarien und Tarife in der Oberfläche einrichten: **Hauskonfigurator**, **Szenarienkonfigurator** und **Tarife**. Eigene Tarife speichert Earnie in `user_tariffs.json`; den mitgelieferten Katalog `tariffs.json` nicht von Hand ändern.
+4. Nach einer Änderung an `.env` den Container neu starten:
 
 ```powershell
 .\scripts\run_earnie_vctl.ps1 -Action restart
@@ -147,7 +146,7 @@ Die Log-Datei liegt unter `%USERPROFILE%\Earnie\earnie_env\runtime\earnie.log`.
 
 Das Skript startet die Runtime, lädt das Image neu, entfernt den Container und legt ihn mit denselben Volume-Mounts wieder an. Die persistenten Daten unter `earnie_env\` bleiben erhalten.
 
-Für Vorabversionen (Community) den Image-Tag fest angeben, z. B. `ghcr.io/jochentcc/earnie-energy:X.Y.Z-alpha.N`. Der Tag `:latest` zeigt weiterhin auf die letzte offizielle Version.
+Für Vorabversionen (Community) den Tag `:next` angeben: `.\scripts\run_earnie_vctl.ps1 -Action update -Image ghcr.io/jochentcc/earnie-energy:next`. `:next` zeigt auf das neueste Release einschließlich Vorabversionen, `:latest` auf die letzte offizielle Version. Eine bestimmte Vorabversion lässt sich mit ihrem Tag festhalten, z. B. `:X.Y.Z-beta.N`.
 
 ## Einschränkungen
 

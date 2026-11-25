@@ -19,10 +19,13 @@ Damit zeigen Cursor und VS Code für viele Felder **Hover-Beschreibungen** aus [
 | `system` | Timeouts für HTTP und den Optimierungszyklus |
 | `market_prices` | Strategie für fehlende Zukunftspreise (`forecast` / `mirror`), siehe [Preise](preise.md) |
 | `ui` | Streamlit-Port, Refresh-Intervalle, optionale Dev-Seiten |
-| `loxone_blocks` | Optional, darf leer bleiben; das Mapping läuft nur noch über `plant.ehal_bindings` bzw. die `ehal_bindings` der Verbraucher (EHAL-Com) |
+| `loxone_blocks` | Optional, darf leer bleiben; das Mapping läuft über `plant.ehal_bindings` bzw. die `ehal_bindings` der Verbraucher (EHAL-Com) |
 | `live_scenario_id` | ID des **Live-Szenarios** in `backtesting_scenarios.json` (Default: `live`) |
-| `earnie_env/config/components.json` | Technische Parameter für Speicher und PV (`batteries[]`, `pv_systems[]`); Referenz über IDs |
+| `earnie_env/config/components.json` | Technische Anlagenteile (`inverters[]`, `batteries[]`, `pv_systems[]`, `wallboxes[]`, `heating_systems[]`); Referenz über IDs |
 | `earnie_env/config/tariffs.json` | Laufzeit-Tarifkatalog (Bezug/Einspeise); Seed aus dem öffentlichen [`share/config/tariffs.json`](../../share/config/tariffs.json) |
+| `earnie_env/config/user_tariffs.json` | Eigene Tarife (Benutzertarife) aus der Seite **Tarife**, siehe [Preise](preise.md#benutzertarife-usertariffsjson) |
+| `earnie_env/config/grid_fees.json` | Netzbereiche (Arbeitspreis, Zeitregeln, feste Beträge, Leistungspreis); Seed aus dem öffentlichen [`share/config/grid_fees.json`](../../share/config/grid_fees.json) |
+| `earnie_env/config/user_grid_fees.json` | Eigene Netzbereiche (Eigener Arbeitspreis), siehe [Preise](preise.md#eigener-arbeitspreis-benutzer-netzbereich) |
 | `earnie_env/config/house_profiles.json` | Standort (Geo/Zeitzone), Arbeitspreis der Netznutzung, Planungs-Verbraucher (EV, WP, Waschmaschine, …); Referenz über `house_profile_id` |
 | `earnie_env/config/backtesting_scenarios.json` | **Alle** Szenarien (Live und Varianten) im einheitlichen `settings`-Format |
 | `scenario_explorer_conf` | Szenario-Explorer / Backtesting: `cons_data.csv` und Preisquelle; der Zeitraum ergibt sich aus den Monaten in `cons_data` |
@@ -51,11 +54,10 @@ Vorlage für Szenarien: [`backtesting_scenarios.example.json`](../../share/confi
 | `price_range` | `last_12_months`: 12 Kalendermonate bis zum letzten **vollständigen** Monat in `cons_data` (rückwärts definiert, Tage chronologisch) |
 | `energy_charts_bzn` | Bidding Zone (z. B. `DE-LU`), wenn das Live-Szenario keine `market_zone` hat; wählt auch die Spalte der Energy-Charts-CSV |
 
-**Drei CSV-Ebenen**, die getrennt bleiben:
+**Zwei CSV-Ebenen**, die getrennt bleiben:
 
 1. **`path_cons_data`:** Laufzeitdaten für den Live-Betrieb und den Szenario-Explorer.
 2. **Hausprofil-CSVs** (`total_profile_csv` / `pv_profile_csv` / `profile_csv`): Planung sowie Vergleich von Ist-Werten und Modell (siehe [Verbrauchs-CSV](verbrauchs-csv.md)).
-3. **`path_consumption` / `path_production`:** entfernt (Datenmodell v3). Früher waren das Paare von Roh-CSVs aus Loxone, die nur die Zeitraumgrenzen lieferten.
 
 Details zu Preisen: [Preise und Marktdaten](preise.md).
 
@@ -64,13 +66,13 @@ Details zu Preisen: [Preise und Marktdaten](preise.md).
 Im Abschnitt **Konfiguration** pflegt der **Szenarienkonfigurator** das Live-Szenario und weitere Varianten.
 
 - **Übersicht, Auswahl und Reihenfolge:** Eine Tabelle zeigt alle Szenarien; ein Klick auf die Bezeichnung öffnet eines im Formular darunter. Die **Positionsauswahl** je Zeile ändert die **Reihenfolge** der übrigen Szenarien (Reihenfolge in `backtesting_scenarios.json`, Anzeige im Szenario-Explorer); das Live-Szenario bleibt auf Position 1. **„…“ duplizieren** kopiert das offene Szenario, **Neu (leer)** legt eines ohne Einstellungen an.
-- **Entitäten:** Hausprofil, Batterie, PV und Tarife werden per Dropdown gewählt (`battery_id`, PV, Tarife, Hausprofil).
+- **Entitäten:** Hausprofil, Batterien, PV-Felder und Tarife werden per Auswahl gewählt (`house_profile_id`, `battery_ids`, `pv_system_ids`, `import_tariff_id`, `export_tariff_id`). Batterien und PV-Felder sind Mehrfachauswahl.
 - **Aktiv im Explorer** (`enabled`, Default true): Haken in der Übersicht, nicht im Formular; er schreibt sofort nur dieses Feld. Er steuert, ob die Variante in die Berechnung des Szenario-Explorers eingeht. Beim Live-Szenario ist der Schalter immer an und gesperrt, weil der Szenario-Explorer alle Szenarien mit Live vergleicht.
-- **Referenzen:** Welche Vergleichsreihen (Historisch, Referenz ohne Speicher, Wechselrichter-Eigenverbrauch) gerechnet werden, legen seit Version 2.8 drei Kästchen im Szenario-Explorer für den ganzen Lauf fest ([Referenzen wählen](../ui/betriebsmodi.md#referenzen-wählen)). Den früheren Szenario-Schalter `own_reference` entfernt die Konfig-Migration.
+- **Referenzen:** Welche Vergleichsreihen (Historisch, Referenz ohne Speicher, Wechselrichter-Eigenverbrauch) gerechnet werden, legen drei Kästchen im Szenario-Explorer für den ganzen Lauf fest ([Referenzen wählen](../ui/betriebsmodi.md#referenzen-wählen)).
 - **Tarif-Filter:** Vor den Tarif-Dropdowns steht ein gemeinsamer Filter **Land** für Bezug und Einspeise (`land`: AT/DE/CH). Er ist **immer gesetzt**, eine Option „alle“ gibt es nicht; die Vorgabe stammt aus dem Standort des Hausprofils. Dazu kommen getrennte **Typ**-Filter. Sie verwenden die Preisarten des Edibert-Editors: **Festpreis**, **Börsenpreis + Aufschlag** oder **Monatspreise**. Börsentarife mit viertelstündlicher und stündlicher Abrechnung stehen unter derselben Option. Jede Option trägt die Richtung, z. B. „Börsenpreis + Aufschlag – Bezug“ oder „Monatspreise – Einspeisung“. Ein Regionsfilter fehlt noch.
 - **Tarifparameter:** Nach der Tarifwahl erscheinen die Katalogparameter schreibgeschützt, einschließlich `supplier_id` und ungefährer Monatsgebühr.
 - **Eigener Festpreis:** `__user_fixed__` mit `user_import_cent_kwh` / `user_export_cent_kwh` am Szenario (siehe [Preise](preise.md)).
-- **Bezugsgrenze** (`import_cap_kw`, `import_cap_margin_kw`): Grenze für den Netzbezug je Viertelstunde, gedacht für den Leistungspreis. Leer bedeutet keine Grenze; das Feld zeigt dann „∞ (keine Grenze)“. Die Marge zieht der Plan von der Grenze ab, vorbelegt sind 0,7 kW. Beide Werte brauchen ein Hausprofil mit Netzbereich. Die Grenze wirkt nur in Monaten, in denen der Netzbereich einen Leistungspreis hat. Unter der Mindestleistung des Netzbereichs lässt sie sich nicht speichern, weil sie dort nichts spart. Mit einer Grenze speichert das Formular auch `import_cap_mode` („Im Live-Betrieb“): `observe` (Beobachten, vorgeschlagen) plant ohne die Grenze und zeigt auf dem Monitor, was Earnie mit ihr getan hätte; `optimize` (Danach planen) hält sie ein. Im Live-Szenario ist die Angabe Pflicht, sobald eine Grenze gesetzt ist; der Szenario-Explorer plant immer mit der Grenze. Hintergrund, Start je Netzbereich und Grenzen des Verfahrens: [Leistungspreis und Bezugsgrenze](preise.md#leistungspreis-und-bezugsgrenze).
+- **Bezugsgrenze** (`import_cap_kw`, `import_cap_margin_kw`): Grenze für den Netzbezug je Viertelstunde, gedacht für den Leistungspreis. Leer bedeutet keine Grenze; das Feld zeigt dann „∞ (keine Grenze)“. Die Sicherheitsmarge zieht der Plan von der Grenze ab, vorbelegt sind 0,7 kW. Beide Werte brauchen ein Hausprofil mit Netzbereich. Die Grenze wirkt nur in Monaten, in denen der Netzbereich einen Leistungspreis hat. Unter der Mindestleistung des Netzbereichs lässt sie sich nicht speichern, weil sie dort nichts spart. Mit einer Grenze speichert das Formular auch `import_cap_mode` („Im Live-Betrieb“): `observe` (Beobachten, vorgeschlagen) plant ohne die Grenze und zeigt auf dem Monitor, was Earnie mit ihr getan hätte; `optimize` (Danach planen) hält sie ein. Im Live-Szenario ist die Angabe Pflicht, sobald eine Grenze gesetzt ist; der Szenario-Explorer plant immer mit der Grenze. Hintergrund, Start je Netzbereich und Grenzen des Verfahrens: [Leistungspreis und Bezugsgrenze](preise.md#leistungspreis-und-bezugsgrenze).
 - **Heizsystem:** Je Haus-Wärme-Verbraucher wählt ein weiteres Szenario ein Heizsystem aus dem Katalog (`heating_system_ids`): das Referenzsystem des Hauses (Vorgabe) oder eine Variante. Das Live-Szenario rechnet immer mit dem Referenzsystem; dort steht nur die Zeile „Heizsystem: … (Referenzsystem, Änderung im Hauskonfigurator)“. Das Referenzsystem ändert sich nur im Hauskonfigurator (Hausprofil, Abschnitt **Heizsystem**). Varianten legt der Hauskonfigurator im Bereich **Heizsysteme** an, ändert und entfernt sie. Details: [Heizsystem im Szenario](flexible-verbraucher.md#heizsystem-im-szenario-heating_system_ids).
 
 Die gewählten IDs landen im jeweiligen Szenario in `backtesting_scenarios.json`. Der **Name** des Live-Szenarios (`live_scenario_id` in `config.json`, Default-ID: `live`) ist fest und lässt sich weder umbenennen noch entfernen.

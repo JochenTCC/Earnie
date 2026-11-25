@@ -395,11 +395,11 @@ def _render_cap(panel: CapacityPanel) -> None:
     for note in panel.cap_notes:
         st.info(note)
     if panel.planning_limit_kw is None:
-        st.caption(f"Bezugsgrenze {_kw(cap.cap_kw)}, Reserve {_kw(cap.margin_kw)}.")
+        st.caption(f"Bezugsgrenze {_kw(cap.cap_kw)}, Sicherheitsmarge {_kw(cap.margin_kw)}.")
         return
     planned = "der Vergleichsplan rechnet" if panel.observe else "geplant wird"
     text = (
-        f"Bezugsgrenze {_kw(cap.cap_kw)}, Reserve {_kw(cap.margin_kw)}: "
+        f"Bezugsgrenze {_kw(cap.cap_kw)}, Sicherheitsmarge {_kw(cap.margin_kw)}: "
         f"{planned} bis {_kw(panel.planning_limit_kw)}."
     )
     ratchet = panel.observe_peak if panel.observe else panel.peak
