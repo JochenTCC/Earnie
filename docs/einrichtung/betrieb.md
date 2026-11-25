@@ -388,7 +388,7 @@ Lokal liegt der Zustand in `runtime/usage_ping.json`.
 - **IP-Adresse / User-Agent:** Der Empfänger speichert sie **nicht** (kein Access-Log für diese Route). Beim Transport ist die IP-Adresse trotzdem ein personenbezogenes Datum; deshalb steht dieser Hinweis hier.
 - **Speicherung serverseitig:** Die Installations-ID wird mit einem täglich wechselnden Salt gehasht. Gespeichert werden nur Tageszähler, es gibt also keine geräteübergreifende Profilbildung über Tage. Die Earnie-Points gehen nur als Verteilung ein (Histogramm der Punktesummen pro Tag), nicht als Wert je Installation.
 - **Earnie-Points:** eine grobe abgeleitete Zahl ohne Konfigurationsinhalte. Aus ihr lässt sich die Anlage nicht zurückrechnen; sie dient nur der Statistik (keine Lizenz- oder Abrechnungsprüfung).
-- **Hosting:** Der Zähler-Endpunkt läuft auf einem gemieteten VPS bei **easyname** in der **EU**. Mit dem Hoster besteht ein **Auftragsverarbeitungsvertrag (AV)**.
+- **Hosting:** Der Zähler-Endpunkt läuft auf einem gemieteten VPS bei **easyname** in **Österreich**.
 
 ### Feedback zum Szenario-Explorer
 
