@@ -21,7 +21,6 @@ from zoneinfo import ZoneInfo
 import config
 from data.planning_window import (
     compute_planning_window,
-    hourly_slots_inclusive,
     official_sun_times,
     sunrise_anchor_slot_index,
 )
@@ -119,6 +118,43 @@ def hourly_slots_half_open(start: datetime, end: datetime) -> tuple[datetime, ..
     return tuple(slots)
 
 
+def wall_clock_slots_inclusive(start: datetime, end: datetime) -> tuple[datetime, ...]:
+    """SE MILP slots from floor(start) to floor(end) inclusive, stepped on the wall clock.
+
+    The SE books on naive local slots of its historical data (cons_data, ``naive_backtesting_slot``
+    keys), so its MILP grid must use the same wall-clock grid as the book
+    (``hourly_slots_half_open``). The real-time Live grid (``hourly_slots_inclusive``) has no
+    02:xx slots on the spring DST day and the 02:xx hour twice in autumn; both broke the SE
+    book overlay. On DST days the SE keeps the wall-clock approximation of its data: four
+    non-existent 02:xx slots in spring, one hour less in autumn.
+    """
+    from optimizer.slot_duration import normalize_quarter_hour_slot, slot_step
+
+    if start.tzinfo is None or end.tzinfo is None:
+        raise ValueError("start und end müssen timezone-aware sein.")
+    # ``+ timedelta`` steps the wall clock only within one ZoneInfo; a fixed offset (the
+    # Live grid's slot form) or two zones would step real time and split MILP and book again.
+    if not (
+        isinstance(start.tzinfo, ZoneInfo)
+        and isinstance(end.tzinfo, ZoneInfo)
+        and start.tzinfo.key == end.tzinfo.key
+    ):
+        raise ValueError(
+            "SE-Slots brauchen start und end in derselben ZoneInfo-Zeitzone "
+            f"(start {start.tzinfo!r}, end {end.tzinfo!r})."
+        )
+    if end < start:
+        raise ValueError(f"end ({end}) liegt vor start ({start}).")
+    slot = normalize_quarter_hour_slot(start)
+    end_slot = normalize_quarter_hour_slot(end)
+    step = slot_step()
+    slots: list[datetime] = []
+    while slot <= end_slot:
+        slots.append(slot)
+        slot += step
+    return tuple(slots)
+
+
 def _sunrise_on(day: date, latitude: float, longitude: float, timezone_name: str) -> datetime:
     sunrise, _sunset = official_sun_times(day, latitude, longitude, timezone_name)
     return sunrise
@@ -156,7 +192,7 @@ def resolve_ready_by_sunrise_step(
         )
     from optimizer.slot_duration import normalize_quarter_hour_slot
 
-    milp_slots = hourly_slots_inclusive(sa0, sa2 + timedelta(hours=lookahead_hours()))
+    milp_slots = wall_clock_slots_inclusive(sa0, sa2 + timedelta(hours=lookahead_hours()))
     book_slots = hourly_slots_half_open(sa1, sa2)
     if book_period is not None:
         period_start, period_end = book_period
