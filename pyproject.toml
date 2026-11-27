@@ -38,6 +38,9 @@ dev = [
     "pytest-xdist>=3.5.0",
     "vulture>=2.11",
     "pytest-deadfixtures>=2.2.1",
+    # Cognitive complexity as SonarCloud python:S3776 counts it
+    # (scripts/check_cognitive_complexity.py, skill quality-gate).
+    "complexipy>=9.0",
     # EarlyStart equivalence test: freezes the wall clock globally, with the local
     # time zone (freezegun cannot). Its native extension is unsigned, so Windows
     # Smart App Control may block it: the test then skips (importorskip) and the
