@@ -34,7 +34,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
     - [x] Release notes: draft reviewed and finalized, migration section if the registry gained steps, HA add-on changelog blurb checked. *(2026-11-27: `.github/release-notes/v2.8.0-beta.1.md`; the archive pass is left for the RC, see **2.8 RC hardening**)*
     - [ ] Private regression repo clean and pushed; regression green locally right before the tag (`scripts.run_regression`).
     - [ ] `git status` clean, `main` equals `origin/main`. *(The doc review checklist is already in `docs/dev/done/doc-review-checklist-2.8.0-beta.1.md`, `b1a3b653`.)*
-    - [ ] Docs changed after the docs review of 2026-11-25 re-checked on tag day; findings fixed before the tag or listed under `## Document Review Findings` in `Backlog-Bugfixes.md`.
+    - [x] Docs changed after the docs review of 2026-11-25 re-checked on tag day; findings fixed before the tag or listed under `## Document Review Findings` in `Backlog-Bugfixes.md`. *(2026-11-27: no user doc changed since `7c566730`; the code changes since then contradict none; no findings)*
     - [ ] Push the annotated tag; Actions run `release`, `addon_smoke` and `addon_lint` green; `promote` waits for approval.
     - [ ] Test the candidate on the HA dev add-on and on the NAS (checklist step 3), including the feature checks: max-power tariff, reserve, "Mit Earnie gespart".
     - [ ] Approve `promote`; after it: GitHub pre-release correct, GHCR `:next`, HA pre-release add-on offers the update, `streamlitcloud` reset to the tag, release entry in `Backlog-Erledigt.md`.
