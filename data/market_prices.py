@@ -120,6 +120,7 @@ def _append_predicted_slot(
     *,
     forecast_model_path: Path | None = None,
     eu_power_live_source: str | None = None,
+    eu_power_stand_in: tuple[str, ...] | None = None,
     live_bias_cent_kwh: float | None = None,
 ) -> None:
     row: dict[str, Any] = {
@@ -132,6 +133,8 @@ def _append_predicted_slot(
         row["forecast_model_path"] = str(forecast_model_path)
     if eu_power_live_source is not None:
         row["eu_power_live_source"] = eu_power_live_source
+    if eu_power_stand_in:
+        row["eu_power_stand_in"] = list(eu_power_stand_in)
     if live_bias_cent_kwh is not None:
         row["live_bias_cent_kwh"] = float(live_bias_cent_kwh)
     resolved.append(row)
@@ -219,6 +222,7 @@ def resolve_market_slots(
     forecast_feature_frame: pd.DataFrame | None = None,
     forecast_model_path: Path | None = None,
     eu_power_live_source: str | None = None,
+    eu_power_stand_in: tuple[str, ...] | None = None,
     live_bias_enabled: bool = False,
     live_bias_lookback_hours: int = 48,
     live_bias_cap_cent_kwh: float = 12.0,
@@ -296,6 +300,7 @@ def resolve_market_slots(
                 epex,
                 forecast_model_path=forecast_model_path,
                 eu_power_live_source=eu_power_live_source,
+                eu_power_stand_in=eu_power_stand_in,
                 live_bias_cent_kwh=live_bias,
             )
         else:

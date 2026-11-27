@@ -371,3 +371,59 @@ def test_live_missing_country_falls_back_to_mirror(caplog):
     sources = {slot["price_source"] for slot in resolved[12:]}
     assert sources == {PRICE_SOURCE_MIRRORED}
     assert PRICE_SOURCE_PREDICTED not in {slot["price_source"] for slot in resolved}
+
+
+def test_live_country_without_data_is_stood_in_and_labelled(caplog):
+    """Energy-Charts answered 404 for Denmark from 2026-11-04 on: the live forecast fell back
+    to the mirror for weeks. The country is now stood in by its share and the slots say so."""
+    import requests
+
+    from data import price_forecast_live as pfl
+    from data.market_prices import PRICE_SOURCE_PREDICTED, resolve_market_slots
+
+    pfl._feature_input_cache.clear()
+    pfl._power_day_cache.clear()
+    pfl._feature_failure_until.clear()
+    tz = ZoneInfo("Europe/Vienna")
+    ref_day = pfl._archive_latest_complete_day()
+
+    def _country(country, start, end):
+        del end
+        if country == "dk":
+            response = requests.Response()
+            response.status_code = 404
+            raise requests.HTTPError("404 Client Error: Not Found", response=response)
+        hours = [datetime(start.year, start.month, start.day, h, tzinfo=tz) for h in range(24)]
+        return pd.DataFrame(
+            {"wind_mw": 3000.0, "solar_mw": 500.0, "load_mw": 20000.0, "residual_load_mw": 16500.0},
+            index=pd.DatetimeIndex(hours, name="slot_datetime"),
+        )
+
+    start = datetime(2099, 1, 1, 0, tzinfo=tz)
+    market_data = [
+        {"timestamp": start - timedelta(hours=36 - i), "hour": 0, "price_buy": 10.0}
+        for i in range(36)
+    ]
+    target_hours = [start + timedelta(hours=i) for i in range(24)]
+    weather = pd.DataFrame(
+        {"eu_wind_speed_kmh": 15.0, "eu_shortwave_radiation_wm2": 100.0},
+        index=pd.DatetimeIndex(target_hours),
+    )
+    with patch(
+        "data.price_forecast_live.get_missing_price_strategy",
+        return_value=MISSING_PRICE_STRATEGY_FORECAST,
+    ), patch("data.price_forecast_live.get_live_bias_enabled", return_value=False), patch(
+        "data.eu_market_features.fetch_country_power_hourly", side_effect=_country
+    ), patch(
+        "data.eu_market_features.fetch_eu_weather_forecast_hourly", return_value=weather
+    ):
+        with caplog.at_level("WARNING"):
+            kwargs = resolve_market_slots_kwargs(target_hours)
+    assert ref_day in pfl._power_day_cache
+    assert kwargs["missing_price_strategy"] == MISSING_PRICE_STRATEGY_FORECAST
+    assert kwargs["eu_power_stand_in"] == ("dk",)
+    assert not any("EU-Features nicht ladbar" in r.getMessage() for r in caplog.records)
+    resolved = resolve_market_slots(market_data, target_hours, **kwargs)
+    predicted = [slot for slot in resolved if slot["price_source"] == PRICE_SOURCE_PREDICTED]
+    assert len(predicted) == 24
+    assert all(slot["eu_power_stand_in"] == ["dk"] for slot in predicted)

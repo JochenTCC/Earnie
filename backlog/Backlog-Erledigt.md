@@ -2,6 +2,12 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix — live price forecast mirrored for weeks without Danish power data (2026-11-27)
+
+- [x] **Bugfix — one country without Energy-Charts data drops the live price forecast to the mirror** *(found 2026-11-27 in the NAS log: `EuPowerIncompleteError … Land dk fehlt (HTTPError: 404 …)` on every attempt since 2026-11-09; Energy-Charts publishes no `public_power` for Denmark since 2026-11-04 08:45, other Danish endpoints still answer; maintainer asked Energy-Charts)*: the live EU power features needed all twelve countries, so a single country without data meant no OLS forecast at all.
+  - **Fixed:** live only, a country Energy-Charts answers 404 for is stood in by its share (per column, month and hour) from `share/data/eu_power_country_shares.json` (one year 2024-11-01 to 2025-11-01, new script `scripts.build_eu_power_country_shares`); the sum of the other countries is scaled by `1 / (1 - share)`. Limit 15 % of any EU column for all missing countries together, above it mirror as before. 429 / server errors are not stood in. One WARNING per reference day; predicted slots carry `eu_power_stand_in`. Archive mode and training stay strict. Docs: `preise.md`, dev doc `price-forecast-renewables.md` §11.1.
+  - **Tests:** `tests/test_eu_power_stand_in.py`, `test_live_country_without_data_is_stood_in_and_labelled` (mirror on the unfixed code).
+
 ### Bugfix — SE year runs abort on DST days (2026-11-25)
 
 - [x] **Bugfix — SE sunrise step fails on DST days since the real-time slot grid** *(found 2026-11-25 in an SE year run 2025-10 to 2026-09; regression of `dc192f00`, 2026-11-21)*: `dc192f00` made `data/planning_window.hourly_slots_inclusive` step in real time (92 / 100 slots on DST days), and `simulation/backtesting_horizon.resolve_ready_by_sunrise_step` used it for the SE MILP slots, while the SE book (`hourly_slots_half_open`) and all SE data (cons_data, matrix rows, `naive_backtesting_slot` keys) stay naive wall clock. Every scenario of a period with a DST change aborted: spring "Sunrise-Overlay: Buchungs-Slots fehlen in der MILP-Matrix: 2026-03-29T02:00:00, …", autumn "Sunrise-Schritt: erwartet 92 Slots, gefunden 96" (the repeated 02:xx hour twice under one naive key).

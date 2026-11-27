@@ -42,7 +42,9 @@ _model_fallback_warned = False
 # Network inputs of the EU features, keyed by (kind, start date, end date): the
 # planning window moves every hour, its calendar days do not.
 _feature_input_cache: dict[tuple[str, date, date], tuple[float, pd.DataFrame]] = {}
-_power_day_cache: dict[date, pd.DataFrame] = {}
+_power_day_cache: dict[date, tuple[pd.DataFrame, tuple[str, ...]]] = {}
+# Feature frame attribute: countries whose power was stood in by their share.
+EU_POWER_STAND_IN_ATTR = "eu_power_stand_in"
 # Feature mode ("archive" / "live_forecast") -> monotonic time until which a failed
 # load is not retried.
 _feature_failure_until: dict[str, float] = {}
@@ -224,9 +226,14 @@ def _enrich_merged_features(merged: pd.DataFrame) -> pd.DataFrame | None:
     return enrich_model_features(_align_live_feature_index(merged))
 
 
-def _cached_eu_power_day(ref_day: date) -> pd.DataFrame:
-    """Archive EU power for one calendar day (process-local cache)."""
-    from data.eu_market_features import fetch_eu_power_hourly
+def _cached_eu_power_day(ref_day: date) -> tuple[pd.DataFrame, tuple[str, ...]]:
+    """Archive EU power for one calendar day and its stood-in countries (process-local cache).
+
+    A country Energy-Charts has no data for is stood in by its share
+    (``fetch_eu_power_hourly_with_stand_in``); the result is cached for the day like a
+    complete one, so the missing country is not asked again in every cycle.
+    """
+    from data.eu_market_features import fetch_eu_power_hourly_with_stand_in, load_country_shares
 
     cached = _power_day_cache.get(ref_day)
     if cached is not None:
@@ -235,9 +242,11 @@ def _cached_eu_power_day(ref_day: date) -> pd.DataFrame:
         "Preisprognose: lade EU-Leistungs-Archiv für %s (einmalig, gecacht)…",
         ref_day.isoformat(),
     )
-    frame = fetch_eu_power_hourly(ref_day, ref_day + timedelta(days=1))
-    _power_day_cache[ref_day] = frame
-    return frame
+    result = fetch_eu_power_hourly_with_stand_in(
+        ref_day, ref_day + timedelta(days=1), load_country_shares()
+    )
+    _power_day_cache[ref_day] = result
+    return result
 
 
 def _cached_feature_input(kind: str, start: date, end: date, fetch) -> pd.DataFrame:
@@ -301,10 +310,12 @@ def _build_forecast_feature_frame(slots: list[datetime]) -> pd.DataFrame | None:
     )
     t_weather = time.perf_counter() - t0
     ref_day = _archive_latest_complete_day()
-    power_ref = _cached_eu_power_day(ref_day)
+    power_ref, stand_in = _cached_eu_power_day(ref_day)
     power = remap_power_by_hour_of_day(power_ref, slots)
     merged = power.join(weather, how="inner")
     frame = _enrich_merged_features(merged)
+    if frame is not None and stand_in:
+        frame.attrs[EU_POWER_STAND_IN_ATTR] = stand_in
     elapsed = time.perf_counter() - t0
     # INFO only when it took noticeable time (network); cached builds are routine.
     logger.log(
@@ -457,6 +468,9 @@ def resolve_market_slots_kwargs(target_hours: list) -> dict:
     feature_frame = build_live_feature_frame_for_slots(target_hours)
     if feature_frame is not None and not feature_frame.empty:
         kwargs["forecast_feature_frame"] = feature_frame
+        stand_in = feature_frame.attrs.get(EU_POWER_STAND_IN_ATTR)
+        if stand_in:
+            kwargs["eu_power_stand_in"] = tuple(stand_in)
         kwargs["live_bias_enabled"] = get_live_bias_enabled()
         if kwargs["live_bias_enabled"]:
             kwargs["live_bias_lookback_hours"] = get_live_bias_lookback_hours()

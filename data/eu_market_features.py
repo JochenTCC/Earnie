@@ -1,13 +1,16 @@
 """EU-Wetter- und Erzeugungsfeatures für Preisprognose-Training (Spec: price-forecast-renewables)."""
 from __future__ import annotations
 
+import json
 import logging
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
 import pandas as pd
+import requests
 
 import config
 from data import opendata_session
@@ -182,41 +185,261 @@ def fetch_country_renewables_hourly(
     return fetch_country_power_hourly(country, start, end)[["wind_mw", "solar_mw"]]
 
 
-def fetch_eu_power_hourly(start: date, end: date) -> pd.DataFrame:
-    """Summierte EU-Wind, Solar, Last und Residuallast (MW) je Stunde.
+def _country_missing_message(country: str, start: date, end: date, exc: BaseException) -> str:
+    return (
+        f"EU-Leistungsdaten für {start.isoformat()} bis {end.isoformat()} unvollständig: "
+        f"Land {country} fehlt ({type(exc).__name__}: {str(exc).split('?')[0][:180]})."
+    )
 
-    Every country of :data:`GENERATION_COUNTRIES` must load: a failed country raises
-    :class:`EuPowerIncompleteError` naming it (live then falls back to the mirror). An
-    unreachable host (``ApiUnreachableError``) aborts at the first country.
+
+def _is_country_without_data(exc: BaseException) -> bool:
+    """Energy-Charts answered 404 ("no content available") for this country.
+
+    Only this case may be stood in (:func:`fetch_eu_power_hourly_with_stand_in`): a rate
+    limit (429) or a server error concerns the host, not the country.
     """
-    total: pd.DataFrame | None = None
+    response = getattr(exc, "response", None)
+    return isinstance(exc, requests.HTTPError) and getattr(response, "status_code", None) == 404
+
+
+def fetch_country_power_frames(
+    start: date,
+    end: date,
+    *,
+    tolerate_missing_countries: bool = False,
+) -> tuple[dict[str, pd.DataFrame], dict[str, str]]:
+    """Hourly power per country of :data:`GENERATION_COUNTRIES` and the countries without data.
+
+    A failed country raises :class:`EuPowerIncompleteError`; with
+    ``tolerate_missing_countries`` a country Energy-Charts answers 404 for is returned in the
+    second dict (country -> error summary) instead. An unreachable host
+    (``ApiUnreachableError``) aborts at the first country.
+    """
+    frames: dict[str, pd.DataFrame] = {}
+    missing: dict[str, str] = {}
     for country in GENERATION_COUNTRIES:
         try:
-            country_frame = fetch_country_power_hourly(country, start, end)
+            frames[country] = fetch_country_power_hourly(country, start, end)
         except ApiUnreachableError:
             # The host does not answer: asking the other countries only repeats the wait.
             raise
         except (OSError, ValueError, RuntimeError) as exc:
-            raise EuPowerIncompleteError(
-                f"EU-Leistungsdaten für {start.isoformat()} bis {end.isoformat()} unvollständig: "
-                f"Land {country} fehlt ({type(exc).__name__}: {str(exc).split('?')[0][:180]})."
-            ) from exc
-        country_frame = country_frame.rename(
+            message = _country_missing_message(country, start, end, exc)
+            if tolerate_missing_countries and _is_country_without_data(exc):
+                missing[country] = message
+                continue
+            raise EuPowerIncompleteError(message) from exc
+    return frames, missing
+
+
+def _sum_country_frames(frames: dict[str, pd.DataFrame], start: date, end: date) -> pd.DataFrame:
+    total: pd.DataFrame | None = None
+    for country, country_frame in frames.items():
+        renamed = country_frame.rename(
             columns={col: f"{col}_{country}" for col in country_frame.columns}
         )
-        total = country_frame if total is None else total.join(country_frame, how="outer")
-    assert total is not None  # GENERATION_COUNTRIES is not empty
+        total = renamed if total is None else total.join(renamed, how="outer")
+    if total is None:
+        raise EuPowerIncompleteError(
+            f"EU-Leistungsdaten für {start.isoformat()} bis {end.isoformat()}: kein Land geladen."
+        )
     result = pd.DataFrame(index=total.index)
-    for base, eu_name in (
-        ("wind_mw", "eu_wind_mw"),
-        ("solar_mw", "eu_solar_mw"),
-        ("load_mw", "eu_load_mw"),
-        ("residual_load_mw", "eu_residual_load_mw"),
-    ):
+    for base, eu_name in EU_POWER_COLUMNS:
         cols = [c for c in total.columns if c.startswith(f"{base}_")]
         result[eu_name] = total[cols].sum(axis=1, min_count=1)
     mask = (result.index.date >= start) & (result.index.date < end)
     return result.loc[mask].sort_index()
+
+
+def fetch_eu_power_hourly(start: date, end: date) -> pd.DataFrame:
+    """Summierte EU-Wind, Solar, Last und Residuallast (MW) je Stunde.
+
+    Every country of :data:`GENERATION_COUNTRIES` must load: a failed country raises
+    :class:`EuPowerIncompleteError` naming it (archive, training). An unreachable host
+    (``ApiUnreachableError``) aborts at the first country. The live forecast uses
+    :func:`fetch_eu_power_hourly_with_stand_in`.
+    """
+    frames, _missing = fetch_country_power_frames(start, end)
+    return _sum_country_frames(frames, start, end)
+
+
+# --- Country shares: stand-in for a country Energy-Charts has no data for -------------
+
+EU_POWER_COLUMNS: tuple[tuple[str, str], ...] = (
+    ("wind_mw", "eu_wind_mw"),
+    ("solar_mw", "eu_solar_mw"),
+    ("load_mw", "eu_load_mw"),
+    ("residual_load_mw", "eu_residual_load_mw"),
+)
+DEFAULT_COUNTRY_SHARES_PATH = Path("share/data/eu_power_country_shares.json")
+COUNTRY_SHARES_VERSION = 1
+# Largest share of an EU sum (per column, month and hour) the missing countries may have
+# together; above it the stand-in would carry too much of the feature and the live
+# forecast falls back to the mirror.
+MAX_STAND_IN_SHARE = 0.15
+# A (month, hour) bucket whose EU sum stays below this mean (MW) gets share 0: solar at
+# night, where a ratio says nothing and the missing country adds nothing either.
+_MIN_BUCKET_MEAN_MW = 1.0
+
+
+@dataclass(frozen=True)
+class CountryShares:
+    """Mean share of each country in the EU sums, per column, month (1-12) and hour (0-23)."""
+
+    range_start: str
+    range_end: str
+    # country -> base column (``wind_mw`` ...) -> 12 x 24 shares
+    shares: dict[str, dict[str, list[list[float]]]]
+
+    def share(self, country: str, base: str, month: int, hour: int) -> float:
+        return self.shares[country][base][month - 1][hour]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "version": COUNTRY_SHARES_VERSION,
+            "range_start": self.range_start,
+            "range_end": self.range_end,
+            "countries": self.shares,
+        }
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> CountryShares:
+        version = payload.get("version")
+        if version != COUNTRY_SHARES_VERSION:
+            raise ValueError(
+                f"Länderanteile: Version {version!r} nicht unterstützt "
+                f"(erwartet {COUNTRY_SHARES_VERSION})."
+            )
+        shares = payload["countries"]
+        for country in GENERATION_COUNTRIES:
+            if country not in shares:
+                raise ValueError(f"Länderanteile: Land {country} fehlt.")
+            for base, _eu in EU_POWER_COLUMNS:
+                table = shares[country].get(base)
+                if not isinstance(table, list) or len(table) != 12 or any(
+                    len(row) != 24 for row in table
+                ):
+                    raise ValueError(
+                        f"Länderanteile: {country}/{base} ist keine 12x24-Tabelle."
+                    )
+        return cls(
+            range_start=str(payload["range_start"]),
+            range_end=str(payload["range_end"]),
+            shares=shares,
+        )
+
+
+def compute_country_shares(
+    frames: dict[str, pd.DataFrame],
+    *,
+    range_start: date,
+    range_end: date,
+) -> CountryShares:
+    """Shares per country from hourly per-country power (ratio of sums per month and hour).
+
+    Only hours with data for every country count. Every month must be covered, else
+    ``ValueError`` (a year of data is needed).
+    """
+    missing_countries = [c for c in GENERATION_COUNTRIES if c not in frames]
+    if missing_countries:
+        raise ValueError(f"Länderanteile: keine Daten für {', '.join(missing_countries)}.")
+    shares: dict[str, dict[str, list[list[float]]]] = {c: {} for c in GENERATION_COUNTRIES}
+    for base, _eu in EU_POWER_COLUMNS:
+        table = pd.DataFrame({c: frames[c][base] for c in GENERATION_COUNTRIES}).dropna()
+        months = sorted(set(table.index.month))
+        if months != list(range(1, 13)):
+            raise ValueError(
+                f"Länderanteile: {base} deckt nur die Monate {months} ab (alle 12 nötig)."
+            )
+        table["_month"] = table.index.month
+        table["_hour"] = table.index.hour
+        grouped = table.groupby(["_month", "_hour"])
+        sums = grouped[list(GENERATION_COUNTRIES)].sum()
+        counts = grouped.size()
+        total = sums.sum(axis=1)
+        for country in GENERATION_COUNTRIES:
+            rows: list[list[float]] = []
+            for month in range(1, 13):
+                row: list[float] = []
+                for hour in range(24):
+                    key = (month, hour)
+                    if key not in total.index:
+                        raise ValueError(
+                            f"Länderanteile: {base} ohne Daten für Monat {month}, Stunde {hour}."
+                        )
+                    eu_sum = float(total.loc[key])
+                    if abs(eu_sum) / int(counts.loc[key]) < _MIN_BUCKET_MEAN_MW:
+                        row.append(0.0)
+                    else:
+                        row.append(round(float(sums.loc[key, country]) / eu_sum, 6))
+                rows.append(row)
+            shares[country][base] = rows
+    return CountryShares(
+        range_start=range_start.isoformat(),
+        range_end=range_end.isoformat(),
+        shares=shares,
+    )
+
+
+def save_country_shares(shares: CountryShares, path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8", newline="\n") as handle:
+        json.dump(shares.to_dict(), handle, indent=1, ensure_ascii=False)
+        handle.write("\n")
+
+
+def load_country_shares(path: Path = DEFAULT_COUNTRY_SHARES_PATH) -> CountryShares:
+    with path.open(encoding="utf-8") as handle:
+        return CountryShares.from_dict(json.load(handle))
+
+
+def fetch_eu_power_hourly_with_stand_in(
+    start: date,
+    end: date,
+    shares: CountryShares,
+) -> tuple[pd.DataFrame, tuple[str, ...]]:
+    """EU sums like :func:`fetch_eu_power_hourly`; a country without data is stood in.
+
+    Energy-Charts answering 404 for a country (it publishes no data for it, e.g. Denmark
+    since 2026-11-04) does not drop the live forecast: the sum of the other countries is
+    scaled by ``1 / (1 - share)`` with the missing countries' share from ``shares`` (per
+    column, month and hour). If the missing countries together exceed
+    :data:`MAX_STAND_IN_SHARE` of a column in any hour, :class:`EuPowerIncompleteError`.
+    Returns the frame and the stood-in countries (empty when all loaded).
+    """
+    frames, missing = fetch_country_power_frames(start, end, tolerate_missing_countries=True)
+    result = _sum_country_frames(frames, start, end)
+    if not missing:
+        return result, ()
+    countries = tuple(sorted(missing))
+    months = result.index.month
+    hours = result.index.hour
+    for base, eu_name in EU_POWER_COLUMNS:
+        missing_share = pd.Series(
+            [
+                sum(shares.share(c, base, int(m), int(h)) for c in countries)
+                for m, h in zip(months, hours, strict=True)
+            ],
+            index=result.index,
+        )
+        worst = float(missing_share.abs().max()) if len(missing_share) else 0.0
+        if worst > MAX_STAND_IN_SHARE:
+            raise EuPowerIncompleteError(
+                f"{' '.join(missing[c] for c in countries)} Ersatz über Länderanteile nicht "
+                f"möglich: Anteil an {eu_name} bis {worst:.0%} (Grenze "
+                f"{MAX_STAND_IN_SHARE:.0%})."
+            )
+        result[eu_name] = result[eu_name] / (1.0 - missing_share)
+    logger.warning(
+        "EU-Leistung %s bis %s ohne %s (Energy-Charts liefert keine Daten) — ersetzt über "
+        "Länderanteile %s bis %s.",
+        start.isoformat(),
+        end.isoformat(),
+        ", ".join(countries),
+        shares.range_start,
+        shares.range_end,
+    )
+    return result, countries
 
 
 def fetch_eu_renewables_hourly(start: date, end: date) -> pd.DataFrame:
