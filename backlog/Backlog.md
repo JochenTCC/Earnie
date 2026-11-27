@@ -30,7 +30,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 - [ ] **Beta checklist `2.8.0-beta.1`** `[rel]` *(created 2026-11-23; release notes are tracked elsewhere; general steps: [`docs/workflow/release-checklist.md`](../docs/workflow/release-checklist.md); prepared steps, checks before the tag and decisions B1–B8 done, see [Erledigt](Backlog-Erledigt.md))*:
   - **Tag date:** 2026-11-30 (decision B7); the `version.py` bump is approved on that day.
   - **Release steps (approvals by the maintainer):**
-    - [ ] Approve the `version.py` bump to `2.8.0-beta.1` (never changed without approval).
+    - [x] Approve the `version.py` bump to `2.8.0-beta.1` (never changed without approval). *(approved and bumped 2026-11-27; tag moved forward from 2026-11-30, maintainer)*
     - [x] Release notes: draft reviewed and finalized, migration section if the registry gained steps, HA add-on changelog blurb checked. *(2026-11-27: `.github/release-notes/v2.8.0-beta.1.md`; the archive pass is left for the RC, see **2.8 RC hardening**)*
     - [ ] Private regression repo clean and pushed; regression green locally right before the tag (`scripts.run_regression`).
     - [ ] `git status` clean, `main` equals `origin/main`. *(The doc review checklist is already in `docs/dev/done/doc-review-checklist-2.8.0-beta.1.md`, `b1a3b653`.)*
