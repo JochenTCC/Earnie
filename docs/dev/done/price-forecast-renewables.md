@@ -234,6 +234,16 @@ Rolling EPEX residual correction on **predicted** green-zone slots only (Day-Ahe
 
 EU live power features stay the product **archive hour-of-day** stand-in. The unsuccessful `energy_charts_forecast` trial (async disk cache, Optimierer-Dienst panel) is archived on branch `archive/energy-charts-forecast-research` — not shipped.
 
+### 11.1 Missing country: stand-in by share (2026-11-27)
+
+Energy-Charts may stop publishing `public_power` for one country (Denmark: 404 "no content available" since 2026-11-04 08:45). Before, live then fell back to the mirror on every cycle. Now `fetch_eu_power_hourly_with_stand_in` (live only, `price_forecast_live._cached_eu_power_day`) scales the sum of the loaded countries by `1 / (1 - share)`:
+
+- Shares per country, column (`wind_mw`, `solar_mw`, `load_mw`, `residual_load_mw`), month and hour, ratio of sums over hours with all twelve countries: `share/data/eu_power_country_shares.json`, built by `python -m scripts.build_eu_power_country_shares --start 2024-11-01 --end 2025-11-01`. Buckets with a mean EU sum below 1 MW (solar at night) get share 0.
+- Only a 404 for a country is stood in. 429, server errors and parse errors still raise `EuPowerIncompleteError` at that country; an unreachable host still aborts at once.
+- Limit `MAX_STAND_IN_SHARE` = 15 % of any column in any hour for all missing countries together; above it `EuPowerIncompleteError` (mirror).
+- Visible: one WARNING per reference day (the day result is cached), predicted slots carry `eu_power_stand_in` (list of countries).
+- Archive mode (backtesting, training, `fetch_eu_power_hourly`) stays strict: all twelve countries.
+
 Tariff extras (settlement, markup, Netznutzung, VAT) apply via `epex_to_brutto_cent` / `import_cent_kwh` for **both** Day-Ahead and predicted slots; regression: `test_predicted_and_day_ahead_same_tariff_extras_for_equal_epex`.
 
 Compare script: `python -m scripts.compare_live_price_prognosis_research` (optional `--with-live-bias`).
@@ -248,6 +258,7 @@ Compare script: `python -m scripts.compare_live_price_prognosis_research` (optio
 
 | Datum | Version | Inhalt |
 |-------|---------|--------|
+| 2026-11-27 | 0.7 | Live stand-in for a country without Energy-Charts data (§11.1) |
 | 2026-10-02 | 0.6 | Live bias product default on (cap ±12); Energy-Charts forecast trial archived off branch |
 | 2026-10-01 | 0.5 | Research gates: EU power forecast + live bias + tariff parity (§11); not product default |
 | 2026-09-29 | 0.4 | Phase 3 live: Default `forecast`/OLS; Open-Meteo Features; ship-Modell `share/data/` |
