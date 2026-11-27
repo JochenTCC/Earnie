@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -48,6 +48,21 @@ GENERATION_COUNTRIES: tuple[str, ...] = (
     "cz",
     "pt",
 )
+# Energy-Charts returns the local days of the requested country (``start``/``end`` as dates).
+COUNTRY_TIMEZONES: dict[str, str] = {
+    "de": "Europe/Berlin",
+    "at": "Europe/Vienna",
+    "fr": "Europe/Paris",
+    "nl": "Europe/Amsterdam",
+    "be": "Europe/Brussels",
+    "pl": "Europe/Warsaw",
+    "es": "Europe/Madrid",
+    "it": "Europe/Rome",
+    "dk": "Europe/Copenhagen",
+    "se": "Europe/Stockholm",
+    "cz": "Europe/Prague",
+    "pt": "Europe/Lisbon",
+}
 
 
 @dataclass(frozen=True)
@@ -232,7 +247,9 @@ def fetch_country_power_frames(
     return frames, missing
 
 
-def _sum_country_frames(frames: dict[str, pd.DataFrame], start: date, end: date) -> pd.DataFrame:
+def _join_country_frames(
+    frames: dict[str, pd.DataFrame], start: date, end: date
+) -> pd.DataFrame:
     total: pd.DataFrame | None = None
     for country, country_frame in frames.items():
         renamed = country_frame.rename(
@@ -243,24 +260,63 @@ def _sum_country_frames(frames: dict[str, pd.DataFrame], start: date, end: date)
         raise EuPowerIncompleteError(
             f"EU-Leistungsdaten für {start.isoformat()} bis {end.isoformat()}: kein Land geladen."
         )
+    mask = (total.index.date >= start) & (total.index.date < end)
+    return total.loc[mask].sort_index()
+
+
+def _missing_country_hours(total: pd.DataFrame, start: date, end: date) -> pd.DataFrame:
+    """Per hour and country: True where the country has no value although it should.
+
+    Energy-Charts returns the local days of each country, so a country in another time
+    zone (``pt``) structurally lacks an edge hour of the planning window; such an hour is
+    not expected and does not count. Inside the country's own days a missing hour counts
+    (Denmark on 2026-11-04: data ended at 08:45 without any error).
+    """
+    missing = pd.DataFrame(False, index=total.index, columns=list(GENERATION_COUNTRIES))
+    for country in GENERATION_COUNTRIES:
+        tz = ZoneInfo(COUNTRY_TIMEZONES[country])
+        first = datetime.combine(start, time.min, tzinfo=tz)
+        stop = datetime.combine(end, time.min, tzinfo=tz)
+        expected = (total.index >= first) & (total.index < stop)
+        cols = [f"{base}_{country}" for base, _eu in EU_POWER_COLUMNS if f"{base}_{country}" in total]
+        has_value = total[cols].notna().any(axis=1) if cols else pd.Series(False, index=total.index)
+        missing[country] = expected & ~has_value.to_numpy()
+    return missing
+
+
+def _missing_hours_summary(missing: pd.DataFrame, country: str) -> str:
+    hours = missing.index[missing[country]]
+    return f"Land {country} ohne Werte für {len(hours)} Stunde(n) ab {hours[0]:%Y-%m-%d %H:%M}"
+
+
+def _sum_eu_columns(total: pd.DataFrame) -> pd.DataFrame:
     result = pd.DataFrame(index=total.index)
     for base, eu_name in EU_POWER_COLUMNS:
         cols = [c for c in total.columns if c.startswith(f"{base}_")]
         result[eu_name] = total[cols].sum(axis=1, min_count=1)
-    mask = (result.index.date >= start) & (result.index.date < end)
-    return result.loc[mask].sort_index()
+    return result
 
 
 def fetch_eu_power_hourly(start: date, end: date) -> pd.DataFrame:
     """Summierte EU-Wind, Solar, Last und Residuallast (MW) je Stunde.
 
-    Every country of :data:`GENERATION_COUNTRIES` must load: a failed country raises
-    :class:`EuPowerIncompleteError` naming it (archive, training). An unreachable host
+    Every country of :data:`GENERATION_COUNTRIES` must load, with a value in every hour of
+    its own local days: a failed country or a gap raises :class:`EuPowerIncompleteError`
+    naming it (archive, training). An unreachable host
     (``ApiUnreachableError``) aborts at the first country. The live forecast uses
     :func:`fetch_eu_power_hourly_with_stand_in`.
     """
     frames, _missing = fetch_country_power_frames(start, end)
-    return _sum_country_frames(frames, start, end)
+    total = _join_country_frames(frames, start, end)
+    missing = _missing_country_hours(total, start, end)
+    gaps = [c for c in GENERATION_COUNTRIES if missing[c].any()]
+    if gaps:
+        raise EuPowerIncompleteError(
+            f"EU-Leistungsdaten für {start.isoformat()} bis {end.isoformat()} unvollständig: "
+            + "; ".join(_missing_hours_summary(missing, c) for c in gaps)
+            + "."
+        )
+    return _sum_eu_columns(total)
 
 
 # --- Country shares: stand-in for a country Energy-Charts has no data for -------------
@@ -407,35 +463,45 @@ def fetch_eu_power_hourly_with_stand_in(
     :data:`MAX_STAND_IN_SHARE` of a column in any hour, :class:`EuPowerIncompleteError`.
     Returns the frame and the stood-in countries (empty when all loaded).
     """
-    frames, missing = fetch_country_power_frames(start, end, tolerate_missing_countries=True)
-    result = _sum_country_frames(frames, start, end)
-    if not missing:
+    frames, not_found = fetch_country_power_frames(start, end, tolerate_missing_countries=True)
+    total = _join_country_frames(frames, start, end)
+    missing = _missing_country_hours(total, start, end)
+    result = _sum_eu_columns(total)
+    countries = tuple(c for c in GENERATION_COUNTRIES if missing[c].any())
+    if not countries:
         return result, ()
-    countries = tuple(sorted(missing))
+    reasons = "; ".join(
+        f"Land {c}: keine Daten (404)" if c in not_found else _missing_hours_summary(missing, c)
+        for c in countries
+    )
     months = result.index.month
     hours = result.index.hour
     for base, eu_name in EU_POWER_COLUMNS:
         missing_share = pd.Series(
             [
-                sum(shares.share(c, base, int(m), int(h)) for c in countries)
-                for m, h in zip(months, hours, strict=True)
+                sum(
+                    shares.share(c, base, int(m), int(h))
+                    for c in countries
+                    if missing.at[slot, c]
+                )
+                for slot, m, h in zip(result.index, months, hours, strict=True)
             ],
             index=result.index,
         )
         worst = float(missing_share.abs().max()) if len(missing_share) else 0.0
         if worst > MAX_STAND_IN_SHARE:
             raise EuPowerIncompleteError(
-                f"{' '.join(missing[c] for c in countries)} Ersatz über Länderanteile nicht "
-                f"möglich: Anteil an {eu_name} bis {worst:.0%} (Grenze "
-                f"{MAX_STAND_IN_SHARE:.0%})."
+                f"EU-Leistungsdaten für {start.isoformat()} bis {end.isoformat()} unvollständig "
+                f"({reasons}); Ersatz über Länderanteile nicht möglich: Anteil an {eu_name} "
+                f"bis {worst:.0%} (Grenze {MAX_STAND_IN_SHARE:.0%})."
             )
         result[eu_name] = result[eu_name] / (1.0 - missing_share)
     logger.warning(
-        "EU-Leistung %s bis %s ohne %s (Energy-Charts liefert keine Daten) — ersetzt über "
-        "Länderanteile %s bis %s.",
+        "EU-Leistung %s bis %s ohne %s (%s) — ersetzt über Länderanteile %s bis %s.",
         start.isoformat(),
         end.isoformat(),
         ", ".join(countries),
+        reasons,
         shares.range_start,
         shares.range_end,
     )

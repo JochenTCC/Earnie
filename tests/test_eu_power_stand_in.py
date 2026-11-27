@@ -84,6 +84,48 @@ def test_country_without_data_is_stood_in_by_its_share(caplog):
     assert any("ohne dk" in r.getMessage() for r in caplog.records)
 
 
+def _fetch_with_hours(hours_by_country: dict[str, range]):
+    """Countries listed get only these Vienna hours (a response that just ends early)."""
+
+    def _fetch(country: str, start: date, end: date) -> pd.DataFrame:
+        del end
+        frame = _country_frame(start)
+        if country in hours_by_country:
+            frame = frame.loc[[ts.hour in hours_by_country[country] for ts in frame.index]]
+        return frame
+
+    return _fetch
+
+
+def test_country_data_ending_early_is_stood_in_for_the_missing_hours():
+    """Denmark on 2026-11-04: values until 08:45, then nothing, and no error from the API."""
+    shares = _uniform_shares({"dk": 0.10})
+    with patch.object(emf, "fetch_country_power_hourly", side_effect=_fetch_with_hours({"dk": range(9)})):
+        frame, stand_in = fetch_eu_power_hourly_with_stand_in(DAY, DAY + timedelta(days=1), shares)
+    assert stand_in == ("dk",)
+    assert frame["eu_wind_mw"].iloc[8] == pytest.approx(1200.0)
+    assert frame["eu_wind_mw"].iloc[9] == pytest.approx(1100.0 / 0.9)
+
+
+def test_archive_sum_fails_loud_on_a_gap_inside_the_day():
+    with patch.object(emf, "fetch_country_power_hourly", side_effect=_fetch_with_hours({"dk": range(9)})):
+        with pytest.raises(EuPowerIncompleteError, match=r"Land dk ohne Werte für 15 Stunde\(n\) ab 2026-11-26 09:00"):
+            fetch_eu_power_hourly(DAY, DAY + timedelta(days=1))
+
+
+def test_hour_outside_the_country_local_day_is_no_gap():
+    """Energy-Charts returns Portugal's local day: 00:00 Vienna is never in it."""
+    fetch = _fetch_with_hours({"pt": range(1, 24)})
+    with patch.object(emf, "fetch_country_power_hourly", side_effect=fetch):
+        strict = fetch_eu_power_hourly(DAY, DAY + timedelta(days=1))
+        frame, stand_in = fetch_eu_power_hourly_with_stand_in(
+            DAY, DAY + timedelta(days=1), _uniform_shares({})
+        )
+    assert stand_in == ()
+    assert strict["eu_wind_mw"].iloc[0] == pytest.approx(1100.0)
+    assert frame["eu_wind_mw"].iloc[0] == pytest.approx(1100.0)
+
+
 def test_complete_data_needs_no_stand_in():
     with patch.object(emf, "fetch_country_power_hourly", side_effect=_fetch_without({})):
         frame, stand_in = fetch_eu_power_hourly_with_stand_in(
@@ -96,7 +138,7 @@ def test_complete_data_needs_no_stand_in():
 def test_stand_in_above_the_share_limit_fails_loud():
     shares = _uniform_shares({"de": 0.30})
     with patch.object(emf, "fetch_country_power_hourly", side_effect=_fetch_without({"de": 404})):
-        with pytest.raises(EuPowerIncompleteError, match=r"Land de fehlt.*Grenze 15%"):
+        with pytest.raises(EuPowerIncompleteError, match=r"Land de: keine Daten \(404\).*Grenze 15%"):
             fetch_eu_power_hourly_with_stand_in(DAY, DAY + timedelta(days=1), shares)
 
 
