@@ -32,12 +32,12 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - **Release steps (approvals by the maintainer):**
     - [x] Approve the `version.py` bump to `2.8.0-beta.1` (never changed without approval). *(approved and bumped 2026-11-27; tag moved forward from 2026-11-30, maintainer)*
     - [x] Release notes: draft reviewed and finalized, migration section if the registry gained steps, HA add-on changelog blurb checked. *(2026-11-27: `.github/release-notes/v2.8.0-beta.1.md`; the archive pass is left for the RC, see **2.8 RC hardening**)*
-    - [ ] Private regression repo clean and pushed; regression green locally right before the tag (`scripts.run_regression`).
-    - [ ] `git status` clean, `main` equals `origin/main`. *(The doc review checklist is already in `docs/dev/done/doc-review-checklist-2.8.0-beta.1.md`, `b1a3b653`.)*
+    - [x] Private regression repo clean and pushed; regression green locally right before the tag (`scripts.run_regression`). *(2026-11-27: private repo clean and up to date; pre-push regression 18/18 green on `6d9d83ad`)*
+    - [x] `git status` clean, `main` equals `origin/main`. *(The doc review checklist is already in `docs/dev/done/doc-review-checklist-2.8.0-beta.1.md`, `b1a3b653`.)*
     - [x] Docs changed after the docs review of 2026-11-25 re-checked on tag day; findings fixed before the tag or listed under `## Document Review Findings` in `Backlog-Bugfixes.md`. *(2026-11-27: no user doc changed since `7c566730`; the code changes since then contradict none; no findings)*
-    - [ ] Push the annotated tag; Actions run `release`, `addon_smoke` and `addon_lint` green; `promote` waits for approval.
-    - [ ] Test the candidate on the HA dev add-on and on the NAS (checklist step 3), including the feature checks: max-power tariff, reserve, "Mit Earnie gespart".
-    - [ ] Approve `promote`; after it: GitHub pre-release correct, GHCR `:next`, HA pre-release add-on offers the update, `streamlitcloud` reset to the tag, release entry in `Backlog-Erledigt.md`.
+    - [x] Push the annotated tag; Actions run `release`, `addon_smoke` and `addon_lint` green; `promote` waits for approval. *(2026-11-27: tag `v2.8.0-beta.1` on `6d9d83ad`, `targets: both`; run 45985401070 all jobs green incl. both qemu smokes)*
+    - [x] Test the candidate on the HA dev add-on and on the NAS (checklist step 3), including the feature checks: max-power tariff, reserve, "Mit Earnie gespart". *(2026-11-27: HA dev add-on recopied from `earnie_prerelease` (option `ehal_http_port`); update, `.env` move to `/config`, migration dm4 → dm6 with backup and baseline rebuild OK; no HA mapping in the dev config, so no live cycle there (maintainer: NAS covers it). NAS productive: Loxone startup check 50/50, first cycle OK, import cap observe report, reserve held with fill basis, savings ledger chain continued (`savings_v` 4); UI checks by the maintainer OK)*
+    - [x] Approve `promote`; after it: GitHub pre-release correct, GHCR `:next`, HA pre-release add-on offers the update, `streamlitcloud` reset to the tag, release entry in `Backlog-Erledigt.md`. *(2026-11-27: approved; `promote` and `publish_ha_addon` green, GitHub pre-release published, `:next` = `2.8.0-beta.1`, `:latest` stays `2.7.2`, `e819b9a4` bumps the pre-release add-on. `streamlitcloud` stays on 2.7.2 until 2.8.0 (maintainer). Open: release entry in `Backlog-Erledigt.md`)*
 
 #### 2.8.0 release (RC / official)
 
