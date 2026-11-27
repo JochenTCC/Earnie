@@ -2,6 +2,20 @@
 
 Same image family as `earnie/`. Pre-releases and official releases both bump this tree (`version:` = newest including alpha/rc on pre-release tags; matches stable on official tags).
 
+## 2.8.0-beta.1
+
+- Erste Beta der Linie 2.8: mehrere E-Autos und Wallboxen, Brennstoff-Heizungen mit Heizstab und Heizsystem-Vergleich, ein genaueres Hausmodell, ein Tarif-Editor, Leistungspreis und Bezugsgrenze sowie eine Ersparnis-Kachel mit echten Messwerten.
+  - Nach dem Update: Konfigurationsmigration per Assistent, mit Backup
+  - Loxone-Vorlagen und Home-Assistant-Paket neu erzeugen und importieren
+  - Mehrere E-Autos und Wallboxen, auch dynamisch zugeordnet
+  - Öl, Gas, Pellets und Fernwärme mit optionalem Heizstab, Heizsysteme vergleichen
+  - Genaueres Hausmodell und Editor für die Verschattung
+  - Eigene Tarife im neuen Tarif-Editor
+  - Leistungspreis und Bezugsgrenze, zuerst nur beobachten
+  - Kachel „Mit Earnie gespart“ aus gemessenen Werten
+  - Virtuelle Reserve nur noch, wenn sie sich lohnt
+- Earnie release: [2.8.0-beta.1](https://github.com/JochenTCC/Earnie/releases/tag/v2.8.0-beta.1)
+
 ## 2.7.2
 
 - Pins Earnie `2.7.2` (`ghcr.io/jochentcc/earnie-energy:2.7.2`).
