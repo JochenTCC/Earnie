@@ -289,7 +289,11 @@ def format_start_window_caption(start_hour: int, start_shift_h: float) -> str:
         return "Startzeitpunkt vollständig frei (Verschiebung 12 h)."
     if is_fixed_start(start_shift_h):
         return f"Fixer Start um {start_hour:02d}:00 Uhr."
-    hours = sorted(eligible_start_hours(start_hour, start_shift_h))
-    if len(hours) == 1:
-        return f"Erlaubter Start: {hours[0]:02d}:00 Uhr."
-    return f"Erlaubter Start: {hours[0]:02d}:00–{hours[-1]:02d}:00 Uhr."
+    # Same hours as eligible_start_hours, named from first to last start so a window past midnight
+    # reads 22:00–02:00 and not as the sorted hours 00:00–23:00.
+    center = int(start_hour) % 24
+    shift = int(float(start_shift_h))
+    if shift == 0:
+        return f"Erlaubter Start: {center:02d}:00 Uhr."
+    first, last = (center - shift) % 24, (center + shift) % 24
+    return f"Erlaubter Start: {first:02d}:00–{last:02d}:00 Uhr."

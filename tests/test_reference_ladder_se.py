@@ -206,6 +206,18 @@ def test_price_load_reaches_the_day_after_the_end():
     assert load_end == pd.Timestamp("2026-07-01")
 
 
+def test_price_load_covers_a_look_ahead_past_noon(monkeypatch):
+    """The last window plans to SA₂ on the day after the end plus the look-ahead (study run
+    with ``EARNIE_SE_LOOKAHEAD_H=24`` failed: no price for the second day after the end)."""
+    from scripts.run_backtesting import _price_load_window
+
+    start, end = pd.Timestamp("2026-06-01"), pd.Timestamp("2026-06-30")
+    monkeypatch.setenv("EARNIE_SE_LOOKAHEAD_H", "24")
+    assert _price_load_window(start, end, "perfect")[1] == pd.Timestamp("2026-07-02")
+    monkeypatch.setenv("EARNIE_SE_LOOKAHEAD_H", "8")
+    assert _price_load_window(start, end, "perfect")[1] == pd.Timestamp("2026-07-01")
+
+
 def _meta(ladder: bool = True) -> dict:
     meta = {
         "reference_id": "historical_reference",

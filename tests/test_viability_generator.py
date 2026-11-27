@@ -14,10 +14,11 @@ from pathlib import Path
 import pytest
 
 from data.consumption_profiles import _timestamp_hour_key
+from house_config.generic_schedule import eligible_start_hours, generic_allowed_slot_hours
 from house_config.edibert_tariffs import load_grid_fees, profile_grid_fee
 from house_config.netznutzung import default_netznutzung_config
 from studies.viability import params as params_mod
-from studies.viability.appliances import baseload_target_kwh, daily_runs, start_hour_weights
+from studies.viability.appliances import baseload_target_kwh, daily_runs, start_hour_weights, write_profile
 from studies.viability.derive import (
     all_houses,
     derive_house,
@@ -30,10 +31,18 @@ from studies.viability.make_houses import (
     heating_system,
     load_house_list,
     price_csv_for_year,
+    scenario_market_zone,
     study_grid_fees,
     write_pack,
 )
-from studies.viability.run_houses import DONE_FILE, house_ids, is_done
+from studies.viability.run_houses import (
+    DONE_FILE,
+    cons_data_range,
+    house_ids,
+    is_done,
+    ladder_command,
+    needs_cons_data,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -231,7 +240,22 @@ def test_unknown_key_and_missing_fuel_year_fail_loud():
 
 def test_missing_price_data_fails_loud():
     with pytest.raises(SystemExit, match="1999"):
-        price_csv_for_year(1999)
+        price_csv_for_year(1999, "AT")
+
+
+def test_price_file_must_reach_a_week_before_the_year(tmp_path, monkeypatch):
+    from studies.viability import make_houses
+
+    monkeypatch.setattr(make_houses, "REPO_ROOT", tmp_path)
+    folder = tmp_path / make_houses.PRICE_DIR
+    folder.mkdir(parents=True)
+    (folder / "prices_AT_2025.csv").write_text("x", encoding="utf-8")
+    manifest = folder / "prices_AT_2025.manifest.json"
+    manifest.write_text(json.dumps({"start": "2025-01-01", "end": "2026-01-04"}), encoding="utf-8")
+    with pytest.raises(SystemExit, match="2025-01-01"):
+        make_houses.price_csv_for_year(2025, "AT")
+    manifest.write_text(json.dumps({"start": "2024-12-20", "end": "2026-01-04"}), encoding="utf-8")
+    assert make_houses.price_csv_for_year(2025, "AT").endswith("prices_AT_2025.csv")
 
 
 def test_price_year_must_be_a_full_archive_year():
@@ -300,6 +324,28 @@ def test_house_list_does_not_overwrite_a_pack_with_results(params, tmp_path):
     # a list that grew after its first build: the built houses are left out, the new ones stay
     kept = load_house_list(_list_file(tmp_path, _house(), _house(id="N")), params, tmp_path / "packs", skip_done=True)
     assert list(kept) == ["N"]
+
+
+def test_runner_cons_data_reaches_past_the_year_on_both_sides(tmp_path):
+    from datetime import date
+
+    first, last = cons_data_range(2025)
+    # L1's first sunrise step reads two days before the year, the last chain the day after.
+    assert first <= date(2024, 12, 30) and last >= date(2026, 1, 1)
+    path = tmp_path / "cons_data.csv"
+    assert needs_cons_data(path, 2025)
+    path.write_text("timestamp;total_kw\n2025-01-01 00:00:00;0.4\n", encoding="utf-8")
+    assert needs_cons_data(path, 2025)  # a pack built before the margin
+    path.write_text(f"timestamp;total_kw\n{first.isoformat()} 00:00:00;0.4\n", encoding="utf-8")
+    assert not needs_cons_data(path, 2025)
+
+
+def test_runner_passes_months_with_the_price_year(tmp_path):
+    args = argparse.Namespace(workers=2, start_month=1, end_month=12, sensitivity=False, forecast_price_strategy=None)
+    command = ladder_command(args, 2025, tmp_path)
+    # A bare month number would land in 2026, the latest year of the cons_data with its margin.
+    assert command[command.index("--start-month") + 1] == "2025-01"
+    assert command[command.index("--end-month") + 1] == "2025-12"
 
 
 def test_runner_finds_all_built_packs_and_what_is_done(tmp_path):
@@ -422,6 +468,98 @@ def test_study_grid_fee_without_snap_or_with_unknown_area(params):
         study_grid_fees(catalog, unknown)
 
 
+DE_PARAMS = REPO_ROOT / "studies/viability/haeuser_de.json"
+
+
+@pytest.fixture(scope="module")
+def params_de() -> dict:
+    return params_mod.load(DE_PARAMS)
+
+
+def test_german_parameters_differ_from_the_austrian_only_in_the_tariff_frame():
+    at = json.loads(params_mod.DEFAULT_PATH.read_text(encoding="utf-8"))
+    de = json.loads(DE_PARAMS.read_text(encoding="utf-8"))
+    tariff_frame = {"szenarien", "standard_szenarien", "netz", "stichproben"}
+    public = {k for k in at if not k.startswith("_")}
+    assert {k for k in de if not k.startswith("_")} == public
+    for key in sorted(public - tariff_frame - {"annahmen"}):
+        assert de[key] == at[key], f"{key} weicht in haeuser_de.json ab"
+    assert {k: v for k, v in de["annahmen"].items() if k != "netzbereich"} == {
+        k: v for k, v in at["annahmen"].items() if k != "netzbereich"
+    }
+    # Same sample houses, only the scenario names change.
+    strip = [{k: v for k, v in h.items() if k != "szenarien"} for h in at["stichproben"]]
+    assert [{k: v for k, v in h.items() if k != "szenarien"} for h in de["stichproben"]] == strip
+
+
+def test_german_pack_carries_the_study_tariffs_and_prices_in_de_lu(params_de, tmp_path):
+    root = write_pack(derive_house(_house(szenarien=["de_fix", "de_dynamisch"]), params_de), params_de, tmp_path / "T")
+    config = root / "pack/config"
+    user_tariffs = json.loads((config / "user_tariffs.json").read_text(encoding="utf-8"))
+    assert [t["id"] for t in user_tariffs["import_tariffs"]] == ["user_de_tibber_simple_fix"]
+    assert (config / "user_grid_fees.json").read_text(encoding="utf-8") == (
+        REPO_ROOT / "studies/viability/tarife_de/user_grid_fees.json"
+    ).read_text(encoding="utf-8")
+    profile = json.loads((config / "house_profiles.json").read_text(encoding="utf-8"))["profiles"][0]
+    assert profile["netznutzung"]["area_id"] == "user_de_netze_bw_2026"
+    settings = json.loads((config / "config.json").read_text(encoding="utf-8"))
+    assert settings["scenario_explorer_conf"]["path_price"].endswith("prices_DE-LU_2025.csv")
+    # The catalog grid fees stay untouched (no SNAP shift for a study area).
+    catalog = json.loads((REPO_ROOT / "share/config/grid_fees.json").read_text(encoding="utf-8"))
+    assert json.loads((config / "grid_fees.json").read_text(encoding="utf-8")) == catalog
+
+
+def test_austrian_pack_has_no_study_tariff_files(params, tmp_path):
+    root = write_pack(derive_house(_house(), params), params, tmp_path / "T")
+    assert not (root / "pack/config/user_tariffs.json").exists()
+    assert not (root / "pack/config/user_grid_fees.json").exists()
+
+
+def test_scenarios_of_two_market_zones_fail_loud(params_de):
+    mixed = copy.deepcopy(params_de)
+    mixed["szenarien"]["duo"] = {"import_tariff_id": "at_vkw_strom_duo_normalpreis", "export_tariff_id": "at_vkw_pv_flex"}
+    user_dir = REPO_ROOT / "studies/viability/tarife_de"
+    assert scenario_market_zone(["de_fix", "de_dynamisch"], mixed, user_dir) == "DE-LU"
+    with pytest.raises(SystemExit, match="Marktzonen"):
+        scenario_market_zone(["de_fix", "duo"], mixed, user_dir)
+    mixed["szenarien"]["kaputt"] = {"import_tariff_id": "de_gibt_es_nicht", "export_tariff_id": "x"}
+    with pytest.raises(SystemExit, match="de_gibt_es_nicht"):
+        scenario_market_zone(["kaputt"], mixed, user_dir)
+
+
+def test_snap_on_a_study_grid_area_fails_loud(params_de):
+    catalog = json.loads((REPO_ROOT / "share/config/grid_fees.json").read_text(encoding="utf-8"))
+    areas = json.loads((REPO_ROOT / "studies/viability/tarife_de/user_grid_fees.json").read_text(encoding="utf-8"))["areas"]
+    snap = copy.deepcopy(params_de)
+    snap["netz"] = {**snap["netz"], "snap_im_preisjahr": True}
+    with pytest.raises(SystemExit, match="SNAP"):
+        study_grid_fees(catalog, snap, areas)
+
+
+def test_german_pack_passes_the_tariff_check(params_de, tmp_path):
+    from scripts.validate_tariffs import main as validate_tariffs
+
+    root = write_pack(derive_house(_house(szenarien=["de_fix", "de_dynamisch"]), params_de), params_de, tmp_path / "T")
+    config = root / "pack/config"
+    # Catalog, study tariffs, grid areas and the house profile's price context, all through Edibert.
+    assert validate_tariffs([
+        "--tariffs", str(config / "tariffs.json"),
+        "--scenarios", str(config / "backtesting_scenarios.json"),
+        "--grid-fees", str(config / "grid_fees.json"),
+        "--house-profiles", str(config / "house_profiles.json"),
+    ]) == 0
+
+
+def test_missing_study_tariff_file_fails_loud(params_de, tmp_path, monkeypatch):
+    from studies.viability import make_houses
+
+    monkeypatch.setattr(make_houses, "STUDY_DIR", tmp_path)
+    (tmp_path / "tarife_de").mkdir()
+    (tmp_path / "tarife_de" / "user_tariffs.json").write_text("{}", encoding="utf-8")
+    with pytest.raises(SystemExit, match="user_grid_fees.json"):
+        make_houses.user_tariff_dir(params_de)
+
+
 def test_duo_scenario_uses_flex_with_all_months_of_the_price_year(params):
     assert params["szenarien"]["duo"]["export_tariff_id"] == "at_vkw_pv_flex"
     catalog = json.loads((REPO_ROOT / "share/config/tariffs.json").read_text(encoding="utf-8"))
@@ -463,16 +601,17 @@ def test_appliance_profiles_are_reproducible_and_stay_in_the_window(params):
     assert first == daily_runs("trockner", 2.0, "T", params)
     assert first != daily_runs("trockner", 2.0, "U", params)
     assert first != daily_runs("waschmaschine", 2.0, "T", params)
-    assert set(first.values()) <= set(range(7, 22))
+    assert set(first.values()) <= set(range(14, 23))
     in_year = sum(1 for day in first if day.year == 2025)
     assert in_year == pytest.approx(2.0 * 365 / 7, rel=0.2)
 
 
-def test_start_hours_peak_slightly_at_eight_noon_and_seven_pm(params):
+def test_start_hours_peak_in_the_evening_at_six(params):
     weights = start_hour_weights(params)
-    assert sorted(weights) == list(range(7, 22))
-    assert weights[8] > weights[10] and weights[12] > weights[10] and weights[19] > weights[16]
-    assert max(weights.values()) < 2.5 * min(weights.values())
+    assert sorted(weights) == list(range(14, 23))
+    assert max(weights, key=weights.get) == 18
+    evening = sum(weights[hour] for hour in (17, 18, 19)) / sum(weights.values())
+    assert evening == pytest.approx(0.56, abs=0.01)  # the share haeuser.json states
 
 
 def test_pack_with_appliances_reads_back_their_energy_as_fixed_load(params, tmp_path):
@@ -505,16 +644,18 @@ def test_flex_appliances_keep_the_profile_and_get_the_start_window_as_schedule(p
     rows = {c["id"]: c for c in profile["consumers"] if c["type"] == "generic"}
     dish = rows["geschirrspueler"]
     assert dish["earnie_role"] == "flex" and dish["use_profile_csv"] is True
-    first, last = params["geraete"]["fenster_start"]
     weekly = params["geraete"]["laeufe_je_woche"][str(_house()["personen"])]["geschirrspueler"]
+    # Earnie's window is fenster_earnie [12, 24], not the window of the random starts.
     assert dish["schedule"] == {
         "runs_per_week": math.ceil(weekly),  # a whole number for Earnie's schedule check
         "duration_h": 2.5,
-        "start_hour": (first + last) // 2,
-        "start_shift_h": float((last - first) // 2),
+        "start_hour": 18,
+        "start_shift_h": 6.0,
     }
-    assert dish["schedule"]["start_hour"] - dish["schedule"]["start_shift_h"] == first
-    assert dish["schedule"]["start_hour"] + dish["schedule"]["start_shift_h"] == last
+    # Earnie reads start hours modulo 24: the window runs from noon to midnight.
+    assert eligible_start_hours(18, 6.0) == frozenset(range(12, 24)) | {0}
+    # The slot mask MILP and L2 use: a late run may still lie in the hours after midnight.
+    assert generic_allowed_slot_hours(18, 6.0, 2.5) == frozenset(range(12, 24)) | {0, 1, 2}
     assert "appliance_recommendation" not in dish
 
 
@@ -524,11 +665,71 @@ def test_appliance_role_and_odd_flex_window_fail_loud():
     with pytest.raises(params_mod.ParameterError, match="geraete.rolle"):
         params_mod.validate(doc)
     doc["geraete"]["rolle"] = "flex"
-    doc["geraete"]["fenster_start"] = [7, 20]
+    doc["geraete"]["fenster_earnie"] = [12, 23]
     with pytest.raises(params_mod.ParameterError, match="gerade"):
         params_mod.validate(doc)
     doc["geraete"]["rolle"] = "known"
     params_mod.validate(doc)  # an odd window is fine for fixed load
+
+
+@pytest.mark.parametrize(
+    "window, message",
+    [
+        ([16, 24], "enthaelt"),  # misses the starts at 14 and 15
+        ([14, 20], "enthaelt"),  # misses the starts up to 22
+        ([12, 26], "ungueltig"),  # beyond midnight after the run day
+        ([18, 18], "mindestens 2"),  # Earnie needs a shift above 0
+        ([8, 24], "Mitternacht"),  # L2 knows no price after midnight before noon
+    ],
+)
+def test_earnie_window_must_hold_every_random_start(window, message):
+    doc = json.loads(params_mod.DEFAULT_PATH.read_text(encoding="utf-8"))
+    doc["geraete"]["fenster_earnie"] = window
+    with pytest.raises(params_mod.ParameterError, match=f"fenster_earnie.*{message}"):
+        params_mod.validate(doc)
+
+
+def test_appliance_section_fails_loud_without_the_earnie_window():
+    doc = json.loads(params_mod.DEFAULT_PATH.read_text(encoding="utf-8"))
+    del doc["geraete"]["fenster_earnie"]
+    with pytest.raises(params_mod.ParameterError, match="fenster_earnie"):
+        params_mod.validate(doc)
+
+
+def test_a_late_run_carries_into_the_next_day(params, tmp_path):
+    from datetime import date
+
+    path = tmp_path / "geschirrspueler.csv"
+    # 2.5 h from 22:00 on New Year's Eve: two hours that day, half an hour after midnight.
+    annual = write_profile(path, {date(2025, 3, 1): 22, date(2024, 12, 31): 22}, 0.4, 2.5, params)
+    lines = path.read_text(encoding="utf-8").splitlines()[1:]
+    power = {line.split(";")[0]: float(line.split(";")[1]) for line in lines}
+    assert power["2025-03-01 22:00:00"] == pytest.approx(0.4)
+    assert power["2025-03-01 23:00:00"] == pytest.approx(0.4)
+    assert power["2025-03-02 00:00:00"] == pytest.approx(0.2)
+    assert power["2025-03-02 01:00:00"] == 0.0
+    assert power["2025-01-01 00:00:00"] == pytest.approx(0.2)
+    # Only the price year counts: the March run in full, the half hour after New Year's Eve.
+    assert annual == pytest.approx(1.0 + 0.2)
+
+
+def test_parameter_module_loads_without_earnie_config_and_knows_the_publication_hour():
+    from data.backtesting_prices import EPEX_DAY_AHEAD_PUBLISH_HOUR
+
+    assert params_mod.EPEX_DAY_AHEAD_PUBLISH_HOUR == EPEX_DAY_AHEAD_PUBLISH_HOUR
+    # Earnie-Projekt's evaluation imports the module without EARNIE_ENV_PATH or a config.json.
+    probe = "import sys; import studies.viability.params; sys.exit('config' in sys.modules)"
+    env = {k: v for k, v in os.environ.items() if k != "EARNIE_ENV_PATH"}
+    assert subprocess.run([sys.executable, "-c", probe], cwd=REPO_ROOT, env=env).returncode == 0
+
+
+def test_overlapping_runs_fail_loud(params, tmp_path):
+    from datetime import date
+
+    # 3 h from 23:00 reaches 01:00, where the next day's run starts.
+    runs = {date(2025, 3, 1): 23, date(2025, 3, 2): 1}
+    with pytest.raises(SystemExit, match="ueberlappen"):
+        write_profile(tmp_path / "trockner.csv", runs, 1.0, 3.0, params)
 
 
 def test_appliance_section_fails_loud_on_a_missing_household_size(params):

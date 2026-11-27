@@ -996,6 +996,16 @@ def test_eligible_start_hours_shift_cases():
     assert len(eligible_start_hours(18, 12.0)) == 24
 
 
+def test_start_window_caption_runs_past_midnight():
+    from house_config.generic_schedule import format_start_window_caption
+
+    assert format_start_window_caption(18, 2.0) == "Erlaubter Start: 16:00–20:00 Uhr."
+    # 18 ± 6 h reaches midnight: the caption shows 12:00 to 00:00, not the sorted hours 00 to 23.
+    assert format_start_window_caption(18, 6.0) == "Erlaubter Start: 12:00–00:00 Uhr."
+    assert format_start_window_caption(2, 4.0) == "Erlaubter Start: 22:00–06:00 Uhr."
+    assert format_start_window_caption(18, 0.5) == "Erlaubter Start: 18:00 Uhr."
+
+
 def test_reject_legacy_start_flexibility():
     from house_config.generic_schedule import reject_legacy_start_flexibility
 

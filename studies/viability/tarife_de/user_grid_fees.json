@@ -1,0 +1,151 @@
+{
+  "tariff_format": 1,
+  "rule_sets": {
+    "user_de_netze_bw_modul3_2026": [
+      {
+        "id": "ht",
+        "label": "Par. 14a Modul 3 Hochtarif",
+        "valid_from": "2026-01-01",
+        "valid_to": "2026-12-31",
+        "time": {
+          "from": "17:00",
+          "to": "22:00"
+        },
+        "effect": {
+          "mode": "absolute_cent",
+          "value": 11.06
+        },
+        "requires": [
+          "quarter_hour_meter"
+        ],
+        "source": "Netze BW GmbH, Preisblatt Netzentgelte Strom 2026 (endgueltig, Stand 12.12.2025): https://assets.cdn.netze-bw.de/xytfb1vrn7of/7eQvxehZzn3ECbR9rALmyD/ecc795b9dcd666ce1f53d9d04362a321/netzentgelte-strom-netze-bw-gmbh-2026.pdf",
+        "note": "Gilt Q1-Q4. Voraussetzung: Modul 1 + iMSys."
+      },
+      {
+        "id": "nt",
+        "label": "Par. 14a Modul 3 Niedertarif",
+        "valid_from": "2026-01-01",
+        "valid_to": "2026-12-31",
+        "time": {
+          "from": "10:00",
+          "to": "14:00"
+        },
+        "effect": {
+          "mode": "absolute_cent",
+          "value": 3.03
+        },
+        "requires": [
+          "quarter_hour_meter"
+        ],
+        "source": "Netze BW GmbH, Preisblatt Netzentgelte Strom 2026 (endgueltig, Stand 12.12.2025): https://assets.cdn.netze-bw.de/xytfb1vrn7of/7eQvxehZzn3ECbR9rALmyD/ecc795b9dcd666ce1f53d9d04362a321/netzentgelte-strom-netze-bw-gmbh-2026.pdf",
+        "note": "Gilt Q1-Q4. Standardtarif (= Basis 7,57) in der uebrigen Zeit."
+      }
+    ]
+  },
+  "areas": [
+    {
+      "id": "user_de_netze_bw_2026",
+      "label": "DE Netze BW 2026 (Standard-Arbeitspreis)",
+      "land": "DE",
+      "base_cent_kwh": {
+        "unmetered_power": 7.57,
+        "metered_power": 7.57
+      },
+      "source": "Netze BW GmbH, Preisblatt Netzentgelte Strom 2026 (endgueltig, Stand 12.12.2025): https://assets.cdn.netze-bw.de/xytfb1vrn7of/7eQvxehZzn3ECbR9rALmyD/ecc795b9dcd666ce1f53d9d04362a321/netzentgelte-strom-netze-bw-gmbh-2026.pdf. Standard-Arbeitspreis ganztags (Par. 14a Modul 1). Par. 14a Modul 1 (pauschale Gutschrift 124 EUR/a netto, 2026) ist NICHT enthalten: Edibert erlaubt keine negativen Jahresbetraege. Fuer ein Haus mit Waermepumpe/Wallbox in der Auswertung abziehen. 2027 vorlaeufig (Stand 26.10.2026): AP 7,17 ct, GP 84 EUR/a, Modul 1 121 EUR/a, Modul 3 HT 10,47 / NT 2,87 ct; KWKG 0,451, Offshore 1,143, Par. 19 2,027 ct; Stromsteuer 2027 auf 0,1 ct geplant (nicht beschlossen). Keine 2025-Werte: Monate vor 2026 rechnen mit 2026-Preisen.",
+      "components": [
+        {
+          "id": "concession_fee",
+          "label": "Konzessionsabgabe (Tarifkunde, Gemeinde 25.001-100.000 EW)",
+          "cent_kwh": 1.59,
+          "source": "KAV Par. 2 Abs. 2; Netze BW Preisblatt 10",
+          "note": "Gemeindegroesse: <=25.000 EW 1,32; <=100.000 EW 1,59; <=500.000 EW 1,99; >500.000 EW 2,39 ct/kWh."
+        }
+      ],
+      "fixed_eur_year": [
+        {
+          "id": "grid_base_fee",
+          "label": "Netzentgelt Grundpreis (SLP Haushalt)",
+          "eur_year": 84.0,
+          "source": "Netze BW GmbH, Preisblatt Netzentgelte Strom 2026 (endgueltig, Stand 12.12.2025): https://assets.cdn.netze-bw.de/xytfb1vrn7of/7eQvxehZzn3ECbR9rALmyD/ecc795b9dcd666ce1f53d9d04362a321/netzentgelte-strom-netze-bw-gmbh-2026.pdf"
+        },
+        {
+          "id": "metering_imsys",
+          "label": "Messstellenbetrieb intelligentes Messsystem (Par. 14a-Anlage)",
+          "eur_year": 42.02,
+          "source": "Par. 30 MsbG Preisobergrenze 50 EUR/a brutto fuer Par. 14a-Anlagen = 42,02 EUR netto",
+          "note": "Netze BW nennt eigene iMSys-Preise nur auf der Website; hier die gesetzliche Obergrenze. Ohne Par. 14a bei 6.000-10.000 kWh: 40 EUR brutto."
+        }
+      ],
+      "levy_set": "user_de_levies_2026"
+    },
+    {
+      "id": "user_de_netze_bw_2026_modul3",
+      "label": "DE Netze BW 2026 (Par. 14a Modul 3)",
+      "land": "DE",
+      "base_cent_kwh": {
+        "unmetered_power": 7.57,
+        "metered_power": 7.57
+      },
+      "source": "Netze BW GmbH, Preisblatt Netzentgelte Strom 2026 (endgueltig, Stand 12.12.2025): https://assets.cdn.netze-bw.de/xytfb1vrn7of/7eQvxehZzn3ECbR9rALmyD/ecc795b9dcd666ce1f53d9d04362a321/netzentgelte-strom-netze-bw-gmbh-2026.pdf. Zeitvariabler Arbeitspreis Modul 3 (nur zusammen mit Modul 1). Par. 14a Modul 1 (pauschale Gutschrift 124 EUR/a netto, 2026) ist NICHT enthalten: Edibert erlaubt keine negativen Jahresbetraege. Fuer ein Haus mit Waermepumpe/Wallbox in der Auswertung abziehen. 2027 vorlaeufig (Stand 26.10.2026): AP 7,17 ct, GP 84 EUR/a, Modul 1 121 EUR/a, Modul 3 HT 10,47 / NT 2,87 ct; KWKG 0,451, Offshore 1,143, Par. 19 2,027 ct; Stromsteuer 2027 auf 0,1 ct geplant (nicht beschlossen). Keine 2025-Werte: Monate vor 2026 rechnen mit 2026-Preisen.",
+      "components": [
+        {
+          "id": "concession_fee",
+          "label": "Konzessionsabgabe (Tarifkunde, Gemeinde 25.001-100.000 EW)",
+          "cent_kwh": 1.59,
+          "source": "KAV Par. 2 Abs. 2; Netze BW Preisblatt 10",
+          "note": "Gemeindegroesse: <=25.000 EW 1,32; <=100.000 EW 1,59; <=500.000 EW 1,99; >500.000 EW 2,39 ct/kWh."
+        }
+      ],
+      "fixed_eur_year": [
+        {
+          "id": "grid_base_fee",
+          "label": "Netzentgelt Grundpreis (SLP Haushalt)",
+          "eur_year": 84.0,
+          "source": "Netze BW GmbH, Preisblatt Netzentgelte Strom 2026 (endgueltig, Stand 12.12.2025): https://assets.cdn.netze-bw.de/xytfb1vrn7of/7eQvxehZzn3ECbR9rALmyD/ecc795b9dcd666ce1f53d9d04362a321/netzentgelte-strom-netze-bw-gmbh-2026.pdf"
+        },
+        {
+          "id": "metering_imsys",
+          "label": "Messstellenbetrieb intelligentes Messsystem (Par. 14a-Anlage)",
+          "eur_year": 42.02,
+          "source": "Par. 30 MsbG Preisobergrenze 50 EUR/a brutto fuer Par. 14a-Anlagen = 42,02 EUR netto",
+          "note": "Netze BW nennt eigene iMSys-Preise nur auf der Website; hier die gesetzliche Obergrenze. Ohne Par. 14a bei 6.000-10.000 kWh: 40 EUR brutto."
+        }
+      ],
+      "levy_set": "user_de_levies_2026",
+      "rule_set": "user_de_netze_bw_modul3_2026"
+    }
+  ],
+  "levy_sets": {
+    "user_de_levies_2026": {
+      "label": "Bundesweite Umlagen und Stromsteuer DE 2026 (Haushalt)",
+      "components": [
+        {
+          "id": "kwkg",
+          "label": "KWKG-Umlage",
+          "cent_kwh": 0.446,
+          "source": "UeNB-Veroeffentlichung 2026; Netze BW Preisblatt 7"
+        },
+        {
+          "id": "offshore",
+          "label": "Offshore-Netzumlage",
+          "cent_kwh": 0.941,
+          "source": "UeNB-Veroeffentlichung 2026; Netze BW Preisblatt 7"
+        },
+        {
+          "id": "stromnev19",
+          "label": "Aufschlag fuer besondere Netznutzung (Par. 19 StromNEV, Kat. A')",
+          "cent_kwh": 1.559,
+          "source": "UeNB-Veroeffentlichung 2026; Netze BW Preisblatt 6"
+        },
+        {
+          "id": "electricity_tax",
+          "label": "Stromsteuer",
+          "cent_kwh": 2.05,
+          "source": "StromStG Par. 3 (Regelsatz 20,50 EUR/MWh, 2026 fuer Haushalte unveraendert)"
+        }
+      ],
+      "source": "Werte 2026, je Position angegeben; Stand 26.11.2026",
+      "note": "KWKG/Offshore/Par. 19 aendern sich jaehrlich (2027: 0,451 / 1,143 / 2,027)."
+    }
+  }
+}

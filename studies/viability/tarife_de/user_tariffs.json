@@ -1,0 +1,22 @@
+{
+  "tariff_format": 1,
+  "import_tariffs": [
+    {
+      "id": "user_de_tibber_simple_fix",
+      "label": "Tibber — Simple Fix (Energieanteil, Netze BW)",
+      "type": "fixed_cent",
+      "land": "DE",
+      "currency": "EUR",
+      "supplier_id": "tibber",
+      "fix_cent_kwh": 17.36,
+      "settlement_fee_cent_kwh": 0.0,
+      "markup_percent": 0.0,
+      "prices_include_vat": false,
+      "vat_percent": 19.0,
+      "monthly_fee_eur": 6.1,
+      "source": "Tibber-Tarifrechner join.tibber.com, eine PLZ im Gebiet von Netze BW (Gemeinde 25.001-100.000 EW), 4.000 kWh, abgefragt 26.11.2026: AP 37,50 ct/kWh brutto, GP 16,65 EUR/Monat brutto, 12 Monate Preisgarantie. Netto 31,514 ct minus Netze BW AP 7,57, KA 1,59, KWKG 0,446, Offshore 0,941, Par. 19 1,559, Stromsteuer 2,05 = 17,36 ct. GP netto 167,88 EUR/a minus Netz-GP 84 und Messung 10,67 (Eintarifzaehler, wie im Smart-Dynamic-Angebot) = 73,21 EUR/a = 6,10 EUR/Monat. Gegenprobe Smart Dynamic im selben Rechner: GP 15,38 brutto = 5,03 Tibber + 84 + 10,67 netto.",
+      "last_verified": "2026-11-26"
+    }
+  ],
+  "export_tariffs": []
+}

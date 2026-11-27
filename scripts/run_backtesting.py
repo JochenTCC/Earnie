@@ -9,6 +9,7 @@ if __name__ == "__main__":
 import argparse
 import json
 import logging
+import math
 import time
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
@@ -219,6 +220,8 @@ def resolve_backtesting_window(
 
 # Days of prices before the period start for perfect foresight (first window plans from SA₀).
 PERFECT_PRICE_LOOKBACK_DAYS = 3
+# Upper bound of the local sunrise hour (SA₂) for the price load end.
+LATEST_SUNRISE_HOUR = 12
 
 
 def _price_load_window(
@@ -231,9 +234,13 @@ def _price_load_window(
     Auch Perfect Foresight lädt Tage vor dem Start: das erste Sunrise-Fenster plant ab SA₀,
     bis etwa zwei Tage vor dem Periodenstart. Die Preissperre der Standard-Regeln rangiert
     am letzten Nachmittag auch den dann veröffentlichten Folgetag (Spec
-    ``rule-based-reference.md`` § 4.2).
+    ``rule-based-reference.md`` § 4.2). The last window plans to SA₂ (sunrise on that day,
+    before noon) plus the look-ahead, so a look-ahead past noon needs the days after it too.
     """
-    load_end = end + pd.Timedelta(days=1)
+    from optimizer.milp_horizon_extras import lookahead_hours
+
+    extra_days = max(0, math.ceil((lookahead_hours() - (24 - LATEST_SUNRISE_HOUR)) / 24))
+    load_end = end + pd.Timedelta(days=1 + extra_days)
     if price_strategy == PRICE_STRATEGY_PERFECT:
         return (start - pd.Timedelta(days=PERFECT_PRICE_LOOKBACK_DAYS)).normalize(), load_end
     from data.market_prices import MAX_MIRROR_LOOKBACK_DAYS

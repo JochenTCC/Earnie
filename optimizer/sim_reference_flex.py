@@ -128,6 +128,22 @@ def _is_nonexistent_local_slot(slot_dt: datetime) -> bool:
     return round_trip.replace(tzinfo=None) != slot_dt
 
 
+def _price_before_spring_gap(slot_dt: datetime, price_series: dict[datetime, float]) -> float | None:
+    """Price of the last real slot before the spring DST gap, for a wall-clock slot inside it.
+
+    The SE grid keeps the four 02:xx slots of the spring day (wall-clock approximation) and the
+    market data fill them with the previous price (``data.market_prices``); a cycle placed over
+    them is priced the same way. None when no slot within the hour before has a price.
+    """
+    step = timedelta(hours=float(DEFAULT_DT_H))
+    current = slot_dt - step
+    for _ in range(int(round(timedelta(hours=1) / step))):
+        if current in price_series:
+            return float(price_series[current])
+        current -= step
+    return None
+
+
 def _last_published_stop(slot_dt: datetime) -> datetime:
     """End (exclusive) of the last day-ahead day published at ``slot_dt``."""
     from data.backtesting_prices import last_day_ahead_calendar_date
@@ -333,12 +349,15 @@ def _move_to_cheapest_block(
         total = 0.0
         for offset, power_kw in enumerate(cycle):
             slot_dt = matrix[first + offset]["slot_datetime"]
-            if slot_dt not in price_series:
+            price = price_series.get(slot_dt)
+            if price is None and _is_nonexistent_local_slot(slot_dt):
+                price = _price_before_spring_gap(slot_dt, price_series)
+            if price is None:
                 raise ValueError(
                     f"Referenz-Regeln: Kein Endkundenpreis für {slot_dt:%Y-%m-%d %H:%M} "
                     "(nötig für den günstigsten Block)."
                 )
-            total += power_kw * float(price_series[slot_dt])
+            total += power_kw * float(price)
         return total
 
     costs: dict[int, float] = {}

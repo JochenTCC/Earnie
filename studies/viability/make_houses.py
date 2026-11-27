@@ -20,7 +20,7 @@ import subprocess
 import sys
 import time
 from dataclasses import asdict
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 from studies.poc_cloud.run_poc import _env, _harvest_weather_cache, _install_weather_cache
@@ -33,6 +33,7 @@ REPO_ROOT = STUDY_DIR.parents[1]
 SHARE = REPO_ROOT / "share" / "config"
 POC_PACK_CONFIG = REPO_ROOT / "studies" / "poc_cloud" / "pack" / "config"
 PRICE_DIR = "studies/poc_cloud/cache"
+PRICE_LEAD_DAYS = 7
 WEATHER_CACHE = STUDY_DIR / "cache" / "open_meteo"
 HOUSE_ID = "house"
 HEATING_CONSUMER_ID = "wp_heating"
@@ -41,6 +42,8 @@ BASELOAD_TOLERANCE_KWH = 5.0
 # The study's wallbox kW are converted to current with this voltage (data model 6).
 WALLBOX_VOLTAGE_V = 230.0
 BASELOAD_ITERATIONS = 5
+# The study's own tariffs (``netz.nutzer_tarife``), copied into every pack next to the catalog.
+USER_TARIFF_FILES = ("user_tariffs.json", "user_grid_fees.json")
 
 
 def _load(path: Path) -> dict:
@@ -52,18 +55,20 @@ def _dump(path: Path, doc: dict) -> None:
     path.write_text(json.dumps(doc, indent=2, ensure_ascii=False), encoding="utf-8")  # NOSONAR pythonsecurity:S2083
 
 
-def price_csv_for_year(year: int) -> str:
-    """Repo-relative price CSV of the year; its absence or a short range fails loud."""
-    relative = f"{PRICE_DIR}/prices_AT_{year}.csv"
+def price_csv_for_year(year: int, zone: str) -> str:
+    """Repo-relative price CSV of the year and market zone; its absence or a short range fails loud."""
+    relative = f"{PRICE_DIR}/prices_{zone}_{year}.csv"
+    # The SE prices the references' first sunrise step two days before the year (L2 reads them).
+    first = date(year, 1, 1) - timedelta(days=PRICE_LEAD_DAYS)
     csv_path = REPO_ROOT / relative
     manifest_path = csv_path.with_suffix(".manifest.json")
     if not csv_path.is_file() or not manifest_path.is_file():
         raise SystemExit(
             f"Preisdaten fuer {year} fehlen: {relative}. Erst holen: python -m studies.poc_cloud.fetch_prices "
-            f"--start {year}-01-01 --end {year + 1}-01-04"
+            f"--zone {zone} --start {first.isoformat()} --end {year + 1}-01-04"
         )
     manifest = _load(manifest_path)
-    if manifest["start"] > f"{year}-01-01" or manifest["end"] < f"{year + 1}-01-02":
+    if manifest["start"] > first.isoformat() or manifest["end"] < f"{year + 1}-01-02":
         raise SystemExit(f"{relative} deckt {year} samt Jahresrand nicht ab: {manifest['start']}..{manifest['end']}")
     return relative
 
@@ -273,13 +278,55 @@ def _components(house: DerivedHouse, params: dict, *, performance_ratio: float) 
     return doc, [b["id"] for b in batteries], [p["id"] for p in pv_systems]
 
 
-def study_grid_fees(catalog: dict, params: dict) -> dict:
-    """Grid fee catalog of a pack: SNAP over the whole price year, the catalog's prices as they are."""
+def user_tariff_dir(params: dict) -> Path | None:
+    """Folder of the study's own tariff files (``netz.nutzer_tarife``), or None; a missing file fails loud."""
+    name = params["netz"]["nutzer_tarife"]
+    if name is None:
+        return None
+    folder = STUDY_DIR / name
+    missing = [f for f in USER_TARIFF_FILES if not (folder / f).is_file()]
+    if missing:
+        raise SystemExit(f"netz.nutzer_tarife {name}: {', '.join(missing)} fehlt unter {folder}.")
+    return folder
+
+
+def scenario_market_zone(scenario_ids: list[str], params: dict, user_dir: Path | None) -> str:
+    """The one market zone of the house's scenarios, from the land of their import tariffs.
+
+    A pack has one price file, so scenarios of two zones (an AT and a DE tariff) fail loud.
+    """
+    from house_config.edibert_tariffs import market_zone
+
+    tariffs = list(_load(SHARE / "tariffs.json")["import_tariffs"])
+    if user_dir is not None:
+        tariffs += _load(user_dir / "user_tariffs.json")["import_tariffs"]
+    by_id = {t["id"]: t for t in tariffs}
+    zones: dict[str, set[str]] = {}
+    for sid in scenario_ids:
+        tariff_id = params["szenarien"][sid]["import_tariff_id"]
+        if tariff_id not in by_id:
+            raise SystemExit(f"Szenario {sid}: Bezugstarif {tariff_id} fehlt im Katalog und in den Studientarifen.")
+        zones.setdefault(market_zone(by_id[tariff_id]["land"]), set()).add(sid)
+    if len(zones) != 1:
+        raise SystemExit(f"Szenarien in mehreren Marktzonen, ein Paket hat nur eine Preisdatei: {zones}")
+    return next(iter(zones))
+
+
+def study_grid_fees(catalog: dict, params: dict, user_areas: list[dict] | None = None) -> dict:
+    """Grid fee catalog of a pack: SNAP over the whole price year, the catalog's prices as they are.
+
+    The area may also come from the study's ``user_grid_fees.json`` (``user_areas``); SNAP is an
+    Austrian catalog rule, so it needs a catalog area.
+    """
     doc = copy.deepcopy(catalog)
     area_id = params["annahmen"]["netzbereich"]
     area = next((a for a in doc["areas"] if a["id"] == area_id), None)
     if area is None:
-        raise SystemExit(f"Netzbereich {area_id} fehlt im Netzentgelt-Katalog.")
+        if any(a["id"] == area_id for a in user_areas or []):
+            if params["netz"]["snap_im_preisjahr"]:
+                raise SystemExit(f"SNAP gilt nur fuer Katalog-Netzbereiche, {area_id} ist ein Studien-Netzbereich.")
+            return doc
+        raise SystemExit(f"Netzbereich {area_id} fehlt im Netzentgelt-Katalog und in den Studientarifen.")
     if params["netz"]["snap_im_preisjahr"]:
         snap = next((r for r in doc["rule_sets"][area["rule_set"]] if r["id"] == "SNAP"), None)
         if snap is None:
@@ -296,12 +343,19 @@ def write_pack(house: DerivedHouse, params: dict, root: Path, *, annual_kwh: flo
     config_dir.mkdir(parents=True)
     (root / "pack" / "runtime").mkdir()
     shutil.copy2(SHARE / "tariffs.json", config_dir / "tariffs.json")
-    _dump(config_dir / "grid_fees.json", study_grid_fees(_load(SHARE / "grid_fees.json"), params))
+    user_dir = user_tariff_dir(params)
+    user_areas: list[dict] = []
+    if user_dir is not None:
+        for name in USER_TARIFF_FILES:
+            shutil.copy2(user_dir / name, config_dir / name)
+        user_areas = _load(user_dir / "user_grid_fees.json")["areas"]
+    _dump(config_dir / "grid_fees.json", study_grid_fees(_load(SHARE / "grid_fees.json"), params, user_areas))
     shutil.copy2(SHARE / "deviation_rules.example.json", config_dir / "deviation_rules.json")
 
     config = _load(POC_PACK_CONFIG / "config.json")
     config["live_scenario_id"] = house.scenarios[0]
-    config["scenario_explorer_conf"]["path_price"] = price_csv_for_year(int(params["preisjahr"]))
+    zone = scenario_market_zone(house.scenarios, params, user_dir)
+    config["scenario_explorer_conf"]["path_price"] = price_csv_for_year(int(params["preisjahr"]), zone)
     _dump(config_dir / "config.json", config)
     appliances = build_appliances(house, params, config_dir)
     _dump(config_dir / "house_profiles.json", _profile(house, params, annual_kwh or house.demand_kwh, appliances))

@@ -374,6 +374,25 @@ def test_cheapest_block_without_a_published_start_keeps_the_timing_and_reports_i
     assert result.no_published_block_ids == ["spueler"]
 
 
+def test_cheapest_block_prices_the_spring_gap_slots_like_the_market_data():
+    # The SE grid keeps the wall-clock slots 02:00-02:45 of the spring day; they have no market price.
+    gap_day = datetime(2026, 3, 29)
+    matrix = [
+        {"slot_datetime": gap_day + timedelta(minutes=15 * t), "expected_p_pv": 0.0, "expected_p_act": 1.0}
+        for t in range(2 * SLOTS_PER_DAY)
+    ]
+    prices = {
+        gap_day + timedelta(minutes=15 * t): (12.0 if 4 <= t < 8 else 30.0)
+        for t in range(3 * SLOTS_PER_DAY)
+        if not 8 <= t < 12
+    }
+    window = {**WINDOW_GENERIC, "generic_flex_window": {"start_hour": 2, "start_shift_h": 2.0, "duration_h": 2.0}}
+    # The run starts at 01:30 and lies over the gap; 01:00-01:45 is the cheapest hour.
+    result = _build(window, 2.0, {t: 1.0 for t in range(6, 14)}, list(range(0, 20)), matrix=matrix, prices=prices)
+    # A gap slot takes 01:45's price (12 ct), so 01:00-02:45 wins over any start at 30 ct.
+    assert _running(result, "spueler") == {t: 1.0 for t in range(4, 12)}
+
+
 def test_cycle_longer_than_the_window_has_no_start():
     shape = {t: 1.0 for t in [40, 41, 60]}
     result = _build(WINDOW_GENERIC, 0.75, shape, [40, 41, 60])

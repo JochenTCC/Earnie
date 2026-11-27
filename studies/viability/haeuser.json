@@ -25,19 +25,23 @@
   },
   "netz": {
     "_snap": "SNAP gilt erst ab 01.04.2026. Die Studie rechnet ein fiktives Jahr mit Preisen des Preisjahrs und Tarifstand 2026, daher gilt SNAP dort im ganzen Preisjahr. Der Abschlag gilt nur auf den Arbeitspreis, nicht auf Netzverlust und Abgaben im Katalog.",
-    "snap_im_preisjahr": true
+    "snap_im_preisjahr": true,
+    "_nutzer_tarife": "Ordner unter studies/viability mit user_tariffs.json und user_grid_fees.json, die jedes Paket mitbekommt (Studientarife ausserhalb des eingefrorenen Katalogs), oder null.",
+    "nutzer_tarife": null
   },
   "geraete": {
     "_hinweis": "Ohne Quelle fuer die Staffelung nach Personen (Plan F18). Die Energie stammt aus dem Haushaltsstrom. Die zufaelligen Starts gelten in L0 und L1 als feste Last.",
     "aktiv": true,
-    "_rolle": "known: feste Last in L0 bis L3 (Stufe 1, packs_stufe1d). flex: L2 und L3 verschieben den Lauf im Startfenster desselben Tages (ab Stufe 2, Plan 5.2).",
+    "_rolle": "known: feste Last in L0 bis L3 (Stufe 1, packs_stufe1d). flex: L2 und L3 verschieben den Start im Fenster fenster_earnie (ab Stufe 2, Plan 5.2).",
     "rolle": "flex",
     "seed": 7,
-    "fenster_start": [7, 21],
-    "haeufungen": [8, 12, 19],
-    "_haeufung": "Gewicht einer Startstunde: 1 plus je Haeufung eine Glockenkurve mit dieser Hoehe und Breite, also eine leichte Haeufung.",
-    "haeufung_gewicht": 1.0,
-    "haeufung_breite_h": 1.0,
+    "_fenster": "fenster_start: Stunden der zufaelligen Starts (L0, L1). fenster_earnie: Starts, zwischen denen L2 und L3 verschieben duerfen, Stunden ab Mitternacht des Lauftags (24 = Mitternacht danach); muss fenster_start enthalten, bei rolle flex mit gerader Breite. Bis 26.11.2026: Starts 7 bis 21 mit leichter Haeufung um 8, 12 und 19 Uhr, Earnie im selben Fenster.",
+    "fenster_start": [14, 22],
+    "fenster_earnie": [12, 24],
+    "haeufungen": [18],
+    "_haeufung": "Gewicht einer Startstunde: 1 plus je Haeufung eine Glockenkurve mit dieser Hoehe und Breite. Mit 4 und 1,5 h starten 56 % der Laeufe zwischen 17 und 19 Uhr.",
+    "haeufung_gewicht": 4.0,
+    "haeufung_breite_h": 1.5,
     "geraete": {
       "waschmaschine": {"kwh_je_lauf": 0.8, "dauer_h": 2.0},
       "geschirrspueler": {"kwh_je_lauf": 0.9, "dauer_h": 2.5},

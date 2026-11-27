@@ -18,6 +18,7 @@ import subprocess
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import date, timedelta
 from pathlib import Path
 
 from studies.poc_cloud.run_poc import REPO_ROOT, _env, _harvest_weather_cache, _install_weather_cache
@@ -26,6 +27,7 @@ STUDY_DIR = Path(__file__).resolve().parent
 WEATHER_CACHE = STUDY_DIR / "cache" / "open_meteo"
 DONE_FILE = "reference_ladder_summary.csv"
 RUN_SWITCHES = ("EARNIE_SE_LOOKAHEAD_H", "EARNIE_BASE_LEVEL", "EARNIE_PLAN_VENDOR_MODE")
+CONS_DATA_MARGIN_DAYS = 7
 
 
 def house_ids(packs: Path, ids: str | None) -> list[str]:
@@ -47,15 +49,32 @@ def _run_logged(command: list[str], env: dict[str, str], log) -> None:
         raise RuntimeError(f"Schritt fehlgeschlagen ({result.returncode}): {' '.join(command)}")
 
 
-def run_house(root: Path, args: argparse.Namespace) -> float:
-    pack_dir = root / "pack"
-    year = int(json.loads((root / "house.json").read_text(encoding="utf-8"))["preisjahr"])
-    env = _env(pack_dir, offline_guard=not args.allow_network, climate_year=year)
-    out_dir = root / "results" / args.run
-    out_dir.mkdir(parents=True, exist_ok=True)
+def cons_data_range(year: int) -> tuple[date, date]:
+    """Days of the synthetic cons_data: the price year plus a margin on each side.
+
+    The SE reads before the period (L1's first sunrise step starts two days earlier) and after it
+    (the last sunrise chain), and fails loud on missing hours since 2026-11-21.
+    """
+    margin = timedelta(days=CONS_DATA_MARGIN_DAYS)
+    return date(year, 1, 1) - margin, date(year, 12, 31) + margin
+
+
+def needs_cons_data(path: Path, year: int) -> bool:
+    """True when cons_data is missing or does not reach the margin (a pack built before the margin)."""
+    if not path.is_file():
+        return True
+    with path.open(encoding="utf-8") as handle:
+        handle.readline()
+        first = handle.readline().split(";", 1)[0]
+    return first[:10] > cons_data_range(year)[0].isoformat()
+
+
+def ladder_command(args: argparse.Namespace, year: int, out_dir: Path) -> list[str]:
+    """``run_reference_ladder`` call of one house; months carry the year, because the SE reads a bare
+    month number in the latest year of cons_data, which the margin pushes into the next year."""
     command = [
         "-m", "scripts.run_reference_ladder", "--workers", str(args.workers), "--output-dir", str(out_dir),
-        "--start-month", str(args.start_month), "--end-month", str(args.end_month),
+        "--start-month", f"{year}-{args.start_month:02d}", "--end-month", f"{year}-{args.end_month:02d}",
         "--references", "l0",
     ]
     if not args.sensitivity:
@@ -64,13 +83,24 @@ def run_house(root: Path, args: argparse.Namespace) -> float:
         command += ["--forecast-price-strategy", args.forecast_price_strategy]
     else:
         command.append("--skip-forecast")
+    return command
+
+
+def run_house(root: Path, args: argparse.Namespace) -> float:
+    pack_dir = root / "pack"
+    year = int(json.loads((root / "house.json").read_text(encoding="utf-8"))["preisjahr"])
+    env = _env(pack_dir, offline_guard=not args.allow_network, climate_year=year)
+    out_dir = root / "results" / args.run
+    out_dir.mkdir(parents=True, exist_ok=True)
+    command = ladder_command(args, year, out_dir)
     started = time.time()
     with open(out_dir / "run.log", "w", encoding="utf-8") as log:
         log.write("Schalter: " + ", ".join(f"{key}={env.get(key, '')}" for key in RUN_SWITCHES) + "\n")
-        if not (pack_dir / "runtime" / "cons_data.csv").is_file():
+        if needs_cons_data(pack_dir / "runtime" / "cons_data.csv", year):
+            first, last = cons_data_range(year)
             _run_logged(
                 ["-m", "scripts.generate_cons_data", "--source", "synthetic",
-                 "--synthetic-start", f"{year}-01-01", "--synthetic-end", f"{year}-12-31"],
+                 "--synthetic-start", first.isoformat(), "--synthetic-end", last.isoformat()],
                 env, log,
             )
         _run_logged(command, env, log)

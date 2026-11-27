@@ -5,7 +5,11 @@ on which days it runs and when it starts is random, with a fixed seed, so L0 to 
 runs. ``geraete.rolle`` says what Earnie may do with them: ``known`` keeps the profile as fixed load
 in every ladder step (the person starts the appliance, Earnie only uses the battery); ``flex`` keeps
 energy and run days of the profile but lets L2 (cheapest block) and L3 (plan) choose the start inside
-the window ``fenster_start`` of the same day, L0 and L1 keep the profile's times.
+the window ``fenster_earnie``, L0 and L1 keep the profile's times.
+
+``fenster_start`` is where the random starts fall (with the peaks ``haeufungen``), ``fenster_earnie``
+where Earnie may move them; it holds ``fenster_start``. Hours count from midnight of the run day, so
+an Earnie window up to 24 lets a run start at midnight, and a late run ends after midnight.
 """
 from __future__ import annotations
 
@@ -77,13 +81,23 @@ def _hour_shares(duration_h: float) -> list[float]:
 
 
 def write_profile(path: Path, runs: dict[date, int], power_kw: float, duration_h: float, params: dict) -> float:
-    """Write the hourly profile in Earnie's CSV format; returns the kWh of the price year."""
+    """Write the hourly profile in Earnie's CSV format; returns the kWh of the price year.
+
+    A run that starts late carries its last hours into the next day.
+    """
     year = int(params["preisjahr"])
     shares = _hour_shares(duration_h)
-    if max(params["geraete"]["fenster_start"]) + len(shares) > HOURS_PER_DAY:
-        raise SystemExit(f"Ein Lauf von {duration_h} h endet nicht mehr am selben Tag: {path.name}")
     first = date(year, 1, 1) - timedelta(days=MARGIN_DAYS)
     days = (date(year, 12, 31) - first).days + 1 + MARGIN_DAYS
+    load: dict[tuple[int, int], float] = {}
+    for day, start in runs.items():
+        base = (day - first).days * HOURS_PER_DAY + start
+        for step, share in enumerate(shares):
+            offset, hour = divmod(base + step, HOURS_PER_DAY)
+            key = (offset, hour)
+            if key in load:
+                raise SystemExit(f"Zwei Laeufe ueberlappen am {first + timedelta(days=offset)} {hour:02d}:00: {path.name}")
+            load[key] = power_kw * share
     annual = 0.0
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="\n") as handle:  # NOSONAR pythonsecurity:S2083 built from the study folder
@@ -91,11 +105,8 @@ def write_profile(path: Path, runs: dict[date, int], power_kw: float, duration_h
         writer.writerow(["timestamp", "power_kw"])
         for offset in range(days):
             day = first + timedelta(days=offset)
-            start = runs.get(day)
             for hour in range(HOURS_PER_DAY):
-                kw = 0.0
-                if start is not None and 0 <= hour - start < len(shares):
-                    kw = power_kw * shares[hour - start]
+                kw = load.get((offset, hour), 0.0)
                 if day.year == year:
                     annual += kw
                 # Earnie looks a slot up by this exact text; another format would read as 0 kW.
@@ -129,12 +140,13 @@ def baseload_target_kwh(household_kwh: float, profile_consumers: list[dict]) -> 
 
 
 def flex_schedule(appliance: Appliance, params: dict) -> dict:
-    """Earnie schedule of a ``flex`` appliance: start window = ``fenster_start`` as start hour +- shift.
+    """Earnie schedule of a ``flex`` appliance: start window = ``fenster_earnie`` as start hour +- shift.
 
     Energy and run days come from the CSV (``use_profile_csv``); ``runs_per_week`` only has to be a
-    positive integer for Earnie's schedule check, so the weekly runs are rounded up.
+    positive integer for Earnie's schedule check, so the weekly runs are rounded up. Earnie takes the
+    start hours modulo 24, so a window end of 24 is a start at midnight.
     """
-    first, last = params["geraete"]["fenster_start"]
+    first, last = params["geraete"]["fenster_earnie"]
     shift = (last - first) // 2
     return {
         "runs_per_week": max(1, math.ceil(appliance.runs_per_week - _EPS)),

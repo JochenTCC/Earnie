@@ -11,9 +11,11 @@ variable ``EARNIE_STUDY_PARAMS``, else ``haeuser.json`` next to this module.
 from __future__ import annotations
 
 import json
+import math
 import os
 from pathlib import Path
 from typing import Any
+
 
 ENV_VAR = "EARNIE_STUDY_PARAMS"
 DEFAULT_PATH = Path(__file__).resolve().parent / "haeuser.json"
@@ -22,12 +24,17 @@ _SECTIONS = {
     "preisjahr", "annahmen", "solver", "regeln", "brennstoffpreise", "heizsysteme", "achsen", "eauto_muster",
     "szenarien", "standard_szenarien", "stichproben", "netz", "geraete",
 }
-_GRID = {"snap_im_preisjahr"}
+_GRID = {"snap_im_preisjahr", "nutzer_tarife"}
 _APPLIANCES = {
-    "aktiv", "seed", "rolle", "fenster_start", "haeufungen", "haeufung_gewicht", "haeufung_breite_h", "geraete",
-    "laeufe_je_woche",
+    "aktiv", "seed", "rolle", "fenster_start", "fenster_earnie", "haeufungen", "haeufung_gewicht", "haeufung_breite_h",
+    "geraete", "laeufe_je_woche",
 }
 APPLIANCE_ROLES = ("known", "flex")
+HOURS_PER_DAY = 24
+# Same value as data.backtesting_prices.EPEX_DAY_AHEAD_PUBLISH_HOUR (a test keeps them equal); not imported,
+# because that module loads Earnie's config and the parameter file must load without an Earnie environment.
+EPEX_DAY_AHEAD_PUBLISH_HOUR = 12
+_EPS = 1e-9
 _APPLIANCE_KEYS = {"kwh_je_lauf", "dauer_h"}
 _ASSUMPTIONS = {
     "standort", "netzbereich", "pv_neigung_grad", "pv_performance_ratio", "akku_leistung_c",
@@ -119,13 +126,36 @@ def validate_house(raw: Any, doc: dict, where: str) -> dict:
 
 
 def check_appliance_window(data: dict) -> None:
-    """``rolle`` must be known or flex; a flex window must be symmetric (start hour +- whole hours)."""
-    first, last = data["fenster_start"]
+    """``rolle`` must be known or flex; Earnie's flex window must be symmetric and hold every random start.
+
+    Earnie's start window is start hour +- whole hours, so a flex window has an even width, and it
+    holds ``fenster_start`` so that Earnie can keep every start of the profile (L0, L1).
+    """
     if data["rolle"] not in APPLIANCE_ROLES:
         _fail("geraete.rolle", f"{data['rolle']!r} ist nicht {' oder '.join(APPLIANCE_ROLES)}")
-    if data["rolle"] == "flex" and (last - first) % 2:
-        # Earnie's start window is start_hour +- start_shift_h in whole hours, so it must be symmetric.
-        _fail("geraete.fenster_start", f"bei rolle flex muss die Breite gerade sein, nicht {last - first} h")
+    if data["rolle"] != "flex":
+        return
+    first, last = data["fenster_earnie"]
+    if (last - first) % 2 or last - first < 2:
+        _fail(
+            "geraete.fenster_earnie",
+            f"bei rolle flex muss die Breite gerade und mindestens 2 h sein, nicht {last - first} h",
+        )
+    longest = max(math.ceil(spec["dauer_h"] - _EPS) for spec in data["geraete"].values())
+    if first < EPEX_DAY_AHEAD_PUBLISH_HOUR and last + longest > HOURS_PER_DAY:
+        # L2 prices a block only up to the last published day-ahead day: before noon a block past
+        # midnight is never priced, so L2 would pull every late run before midnight.
+        _fail(
+            "geraete.fenster_earnie",
+            f"{data['fenster_earnie']} beginnt vor {EPEX_DAY_AHEAD_PUBLISH_HOUR} Uhr und reicht ueber Mitternacht; "
+            "L2 kennt dann die Preise nach Mitternacht nicht",
+        )
+    start_first, start_last = data["fenster_start"]
+    if not first <= start_first <= start_last <= last:
+        _fail(
+            "geraete.fenster_earnie",
+            f"{data['fenster_earnie']} enthaelt die Starts fenster_start {data['fenster_start']} nicht",
+        )
 
 
 def _validated_appliances(raw: Any, persons: list[int]) -> dict:
@@ -138,6 +168,10 @@ def _validated_appliances(raw: Any, persons: list[int]) -> dict:
     first, last = data["fenster_start"]
     if not 0 <= first <= last <= 23:
         _fail("geraete.fenster_start", f"ungueltig: {data['fenster_start']}")
+    earnie_first, earnie_last = data["fenster_earnie"]
+    # Start hours of the run day; 24 is midnight after it (Earnie reads start hours modulo 24).
+    if not 0 <= earnie_first <= earnie_last <= 24:
+        _fail("geraete.fenster_earnie", f"ungueltig: {data['fenster_earnie']}")
     check_appliance_window(data)
     per_week = _public(data["laeufe_je_woche"], "geraete.laeufe_je_woche")
     data["laeufe_je_woche"] = {
@@ -177,6 +211,9 @@ def validate(doc: Any) -> dict:
     data["achsen"] = _exact_keys(data["achsen"], _AXES, "achsen")
     data["szenarien"] = _public(data["szenarien"], "szenarien")
     data["netz"] = _exact_keys(data["netz"], _GRID, "netz")
+    folder = data["netz"]["nutzer_tarife"]
+    if folder is not None and (not isinstance(folder, str) or not folder.strip()):
+        _fail("netz.nutzer_tarife", f"{folder!r} ist weder null noch ein Ordnername")
     data["geraete"] = _validated_appliances(data["geraete"], data["achsen"]["personen"])
     data["heizsysteme"] = {
         sid: _exact_keys(system, _HEATING_KEYS, f"heizsysteme.{sid}")
