@@ -31,7 +31,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - **Tag date:** 2026-11-30 (decision B7); the `version.py` bump is approved on that day.
   - **Release steps (approvals by the maintainer):**
     - [ ] Approve the `version.py` bump to `2.8.0-beta.1` (never changed without approval).
-    - [ ] Release notes: draft reviewed and finalized, migration section if the registry gained steps, HA add-on changelog blurb checked.
+    - [x] Release notes: draft reviewed and finalized, migration section if the registry gained steps, HA add-on changelog blurb checked. *(2026-11-27: `.github/release-notes/v2.8.0-beta.1.md`; the archive pass is left for the RC, see **2.8 RC hardening**)*
     - [ ] Private regression repo clean and pushed; regression green locally right before the tag (`scripts.run_regression`).
     - [ ] `git status` clean, `main` equals `origin/main`. *(The doc review checklist is already in `docs/dev/done/doc-review-checklist-2.8.0-beta.1.md`, `b1a3b653`.)*
     - [ ] Docs changed after the docs review of 2026-11-25 re-checked on tag day; findings fixed before the tag or listed under `## Document Review Findings` in `Backlog-Bugfixes.md`.
@@ -44,6 +44,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 - [ ] **2.8 RC hardening** `[qual]` *(left from the beta checklist and the 2.8 quality gate, 2026-11-25)*:
   - **Note (2026-11-26):** the four functions over cyclomatic 10 (AST estimate) were re-measured with the harmonized KPI (cognitive complexity, skill `quality-gate`): `_check_segments` 10, `_add_segment_fill` 10, `plan_live_store_horizon` 8 are within 15; `thermal_house_rc.calibrate_house_heat_loss_with_gains` is 17, which falls under the transition rule (16–30: split when touched, item **SonarCloud code smells — triage and mechanical cleanup**), so no RC work. radon is no longer needed.
   - [ ] SonarCloud: the 45 new code smells since the 2026-11-23 snapshot (mostly complexity and parameter counts moved by the KPI splits; decision B5: they wait for the RC together with the complexity item).
+  - [ ] Release notes for the RC / official: go through the archive entries since the 2.7 cut that the beta notes skipped (189 feat / fix / unmarked entries in the evidence pack of 2026-11-25, 256 without audience marker; skill `release-notes` §3) and add the user-visible ones (decided 2026-11-27, maintainer).
   - [ ] Cut `release/2.8` at the RC / official (release plan above).
 
 - [ ] **Grid import measurement: boundary interpolation** `[qual]` *(from the field test, 2026-11-23; after the beta, maintainer 2026-11-23)*: (1) take the quarter-hour import from the counter interpolated on the boundaries by its push times (`*_pushed_at`), as P5a planned, instead of dividing by the time between two reads; check the 45 s lag on a second install before building it in as an offset; (2) keep the sampler reading at the boundary while the cycle runs, so the mean fallback becomes rare. Each fix needs a test that fails on today's behaviour (missing boundary read → mean; read-time window).
