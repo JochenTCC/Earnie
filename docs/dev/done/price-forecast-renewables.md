@@ -239,9 +239,10 @@ EU live power features stay the product **archive hour-of-day** stand-in. The un
 Energy-Charts may stop publishing `public_power` for one country (Denmark: 404 "no content available" since 2026-11-04 08:45). Before, live then fell back to the mirror on every cycle. Now `fetch_eu_power_hourly_with_stand_in` (live only, `price_forecast_live._cached_eu_power_day`) scales the sum of the loaded countries by `1 / (1 - share)`:
 
 - Shares per country, column (`wind_mw`, `solar_mw`, `load_mw`, `residual_load_mw`), month and hour, ratio of sums over hours with all twelve countries: `share/data/eu_power_country_shares.json`, built by `python -m scripts.build_eu_power_country_shares --start 2024-11-01 --end 2025-11-01`. Buckets with a mean EU sum below 1 MW (solar at night) get share 0.
-- Only a 404 for a country is stood in. 429, server errors and parse errors still raise `EuPowerIncompleteError` at that country; an unreachable host still aborts at once.
+- Gaps count per hour: a country without a value in an hour of its own local day (Energy-Charts returns the country's local days, so Portugal never covers 00:00 Vienna; that hour is not a gap) is missing in that hour. Denmark on 2026-11-04 ended at 08:45 with HTTP 200. Live, missing hours are stood in hour by hour; archive and training raise `EuPowerIncompleteError` naming the country and the first missing hour (before, such gaps were summed away silently).
+- Only a 404 for a whole country is stood in. 429, server errors and parse errors still raise `EuPowerIncompleteError` at that country; an unreachable host still aborts at once.
 - Limit `MAX_STAND_IN_SHARE` = 15 % of any column in any hour for all missing countries together; above it `EuPowerIncompleteError` (mirror).
-- Visible: one WARNING per reference day (the day result is cached), predicted slots carry `eu_power_stand_in` (list of countries).
+- Visible: one WARNING per fetch, predicted slots carry `eu_power_stand_in` (list of countries). A day with a stand-in is cached for `LIVE_FEATURE_FAILURE_BACKOFF_SEC` (1 h) only, a complete day for good, so a country that only lags replaces the estimate within the hour.
 - Archive mode (backtesting, training, `fetch_eu_power_hourly`) stays strict: all twelve countries.
 
 Tariff extras (settlement, markup, Netznutzung, VAT) apply via `epex_to_brutto_cent` / `import_cent_kwh` for **both** Day-Ahead and predicted slots; regression: `test_predicted_and_day_ahead_same_tariff_extras_for_equal_epex`.

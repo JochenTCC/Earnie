@@ -427,3 +427,27 @@ def test_live_country_without_data_is_stood_in_and_labelled(caplog):
     predicted = [slot for slot in resolved if slot["price_source"] == PRICE_SOURCE_PREDICTED]
     assert len(predicted) == 24
     assert all(slot["eu_power_stand_in"] == ["dk"] for slot in predicted)
+
+
+def test_stood_in_power_day_is_refetched_after_the_backoff():
+    """A country that only lags must replace the estimate once its data is there."""
+    from data import price_forecast_live as pfl
+
+    pfl._power_day_cache.clear()
+    now = [1000.0]
+    day = datetime(2026, 11, 26).date()
+    frame = pd.DataFrame({"eu_wind_mw": [1.0]})
+    results = [(frame, ("be",)), (frame, ()), (frame, ())]
+    with patch.object(pfl, "_feature_failure_clock", lambda: now[0]), patch(
+        "data.eu_market_features.fetch_eu_power_hourly_with_stand_in", side_effect=results
+    ) as fetch_mock, patch("data.eu_market_features.load_country_shares"):
+        assert pfl._cached_eu_power_day(day)[1] == ("be",)
+        now[0] += 15 * 60
+        assert pfl._cached_eu_power_day(day)[1] == ("be",)
+        assert fetch_mock.call_count == 1
+        now[0] += pfl.LIVE_FEATURE_FAILURE_BACKOFF_SEC
+        assert pfl._cached_eu_power_day(day)[1] == ()
+        now[0] += 10 * pfl.LIVE_FEATURE_FAILURE_BACKOFF_SEC
+        assert pfl._cached_eu_power_day(day)[1] == ()
+        assert fetch_mock.call_count == 2  # a complete day stays cached
+    pfl._power_day_cache.clear()

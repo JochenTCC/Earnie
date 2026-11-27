@@ -42,7 +42,8 @@ _model_fallback_warned = False
 # Network inputs of the EU features, keyed by (kind, start date, end date): the
 # planning window moves every hour, its calendar days do not.
 _feature_input_cache: dict[tuple[str, date, date], tuple[float, pd.DataFrame]] = {}
-_power_day_cache: dict[date, tuple[pd.DataFrame, tuple[str, ...]]] = {}
+# Reference day -> (EU power, stood-in countries, monotonic fetch time).
+_power_day_cache: dict[date, tuple[pd.DataFrame, tuple[str, ...], float]] = {}
 # Feature frame attribute: countries whose power was stood in by their share.
 EU_POWER_STAND_IN_ATTR = "eu_power_stand_in"
 # Feature mode ("archive" / "live_forecast") -> monotonic time until which a failed
@@ -230,23 +231,26 @@ def _cached_eu_power_day(ref_day: date) -> tuple[pd.DataFrame, tuple[str, ...]]:
     """Archive EU power for one calendar day and its stood-in countries (process-local cache).
 
     A country Energy-Charts has no data for is stood in by its share
-    (``fetch_eu_power_hourly_with_stand_in``); the result is cached for the day like a
-    complete one, so the missing country is not asked again in every cycle.
+    (``fetch_eu_power_hourly_with_stand_in``). A complete day is cached for good; a day
+    with a stand-in only for ``LIVE_FEATURE_FAILURE_BACKOFF_SEC``, so data published later
+    (a country that only lags) replaces the estimate without asking in every cycle.
     """
     from data.eu_market_features import fetch_eu_power_hourly_with_stand_in, load_country_shares
 
     cached = _power_day_cache.get(ref_day)
     if cached is not None:
-        return cached
+        frame, stand_in, fetched_at = cached
+        if not stand_in or _feature_failure_clock() - fetched_at < LIVE_FEATURE_FAILURE_BACKOFF_SEC:
+            return frame, stand_in
     logger.info(
-        "Preisprognose: lade EU-Leistungs-Archiv für %s (einmalig, gecacht)…",
+        "Preisprognose: lade EU-Leistungs-Archiv für %s (gecacht)…",
         ref_day.isoformat(),
     )
-    result = fetch_eu_power_hourly_with_stand_in(
+    frame, stand_in = fetch_eu_power_hourly_with_stand_in(
         ref_day, ref_day + timedelta(days=1), load_country_shares()
     )
-    _power_day_cache[ref_day] = result
-    return result
+    _power_day_cache[ref_day] = (frame, stand_in, _feature_failure_clock())
+    return frame, stand_in
 
 
 def _cached_feature_input(kind: str, start: date, end: date, fetch) -> pd.DataFrame:
