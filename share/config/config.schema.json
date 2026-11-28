@@ -114,6 +114,18 @@
           "exclusiveMinimum": 0,
           "default": 12.0,
           "description": "Absolute Kappe der Bias-Korrektur in ±Cent/kWh."
+        },
+        "live_bias_seam_hours": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 2,
+          "description": "Bekannte Stunden vor dem ersten prognostizierten Slot, deren Abweichung den Anschluss bestimmt."
+        },
+        "live_bias_seam_decay_hours": {
+          "type": "number",
+          "minimum": 0,
+          "default": 8.0,
+          "description": "Stunden, in denen der Anschluss linear in die Bias-Korrektur übergeht; 0 = ohne Anschluss."
         }
       }
     },

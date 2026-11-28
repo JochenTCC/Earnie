@@ -29,6 +29,10 @@ MISSING_PRICE_STRATEGY_FORECAST = "forecast"
 DEFAULT_LIVE_BIAS_LOOKBACK_HOURS = 48
 DEFAULT_LIVE_BIAS_CAP_CENT = 12.0
 MIN_LIVE_BIAS_SAMPLES = 6
+# Seam: the first predicted slot starts at the residual of the last known hours, which decays
+# linearly into the rolling bias (backtest 2026-03..11 in docs/dev/price-forecast-seam.md).
+DEFAULT_LIVE_BIAS_SEAM_HOURS = 2
+DEFAULT_LIVE_BIAS_SEAM_DECAY_HOURS = 8.0
 DEFAULT_MODEL_PATH = Path("share/data/price_model_coefficients.json")
 LEGACY_MODEL_PATH = Path("data/cache/price_model_coefficients.json")
 LIVE_FEATURE_CACHE_TTL_SEC = 45 * 60
@@ -134,6 +138,33 @@ def get_live_bias_cap_cent_kwh() -> float:
     if cap <= 0:
         raise ValueError("market_prices.live_bias_cap_cent_kwh muss > 0 sein.")
     return cap
+
+
+def _market_prices_block() -> dict:
+    import config
+
+    block = config.Config._read_json_dict(str(config.CONFIG_JSON_PATH)).get("market_prices")
+    return block if isinstance(block, dict) else {}
+
+
+def get_live_bias_seam_hours() -> int:
+    """Known hours before the first predicted slot whose residual starts the forecast."""
+    hours = int(_market_prices_block().get("live_bias_seam_hours", DEFAULT_LIVE_BIAS_SEAM_HOURS))
+    if hours < 1:
+        raise ValueError("market_prices.live_bias_seam_hours muss >= 1 sein.")
+    return hours
+
+
+def get_live_bias_seam_decay_hours() -> float:
+    """Hours over which the seam residual decays into the rolling bias; 0 = no seam."""
+    hours = float(
+        _market_prices_block().get(
+            "live_bias_seam_decay_hours", DEFAULT_LIVE_BIAS_SEAM_DECAY_HOURS
+        )
+    )
+    if hours < 0:
+        raise ValueError("market_prices.live_bias_seam_decay_hours muss >= 0 sein.")
+    return hours
 
 
 def get_forecast_model_path() -> Path:
@@ -393,18 +424,12 @@ def compute_rolling_epex_bias_cent(
     ``feature_frame`` holds the lookback features (SE: training CSV); without it they are
     fetched live (``build_live_feature_frame_for_slots``).
 
+    The window is the ``lookback_hours`` clock hours before ``reference_slot``; an hour's actual
+    price is the mean of its known quarter-hours.
+
     Returns (bias_cent_or_None, sample_count).
     """
-    from data.market_prices import normalize_price_slot
-    from optimizer.slot_duration import fixed_offset_local, floor_to_hour_slot, slot_zone
-
-    ref = floor_to_hour_slot(normalize_price_slot(reference_slot))
-    zone = slot_zone(ref)
-    lookback_slots: list[datetime] = [
-        fixed_offset_local(ref - timedelta(hours=hours_back), zone)
-        for hours_back in range(1, lookback_hours + 1)
-    ]
-
+    lookback_slots = lookback_hour_slots(reference_slot, lookback_hours)
     if feature_frame is None:
         feature_frame = build_live_feature_frame_for_slots(lookback_slots)
     if feature_frame is None or feature_frame.empty:
@@ -413,22 +438,9 @@ def compute_rolling_epex_bias_cent(
         )
         return None, 0
 
-    residuals: list[float] = []
-    for slot in lookback_slots:
-        actual = day_ahead_by_slot.get(slot)
-        if actual is None:
-            parent = floor_to_hour_slot(slot)
-            actual = day_ahead_by_slot.get(parent)
-        if actual is None:
-            continue
-        lookup = slot.replace(tzinfo=None) if feature_frame.index.tz is None else slot
-        if lookup not in feature_frame.index:
-            parent = floor_to_hour_slot(lookup)
-            if parent not in feature_frame.index:
-                continue
-            lookup = parent
-        predicted = float(predict_prices(forecast_model, feature_frame.loc[[lookup]])[0])
-        residuals.append(float(actual) - predicted)
+    residuals = hourly_residuals_cent(
+        day_ahead_by_slot, forecast_model=forecast_model, hour_slots=lookback_slots, feature_frame=feature_frame
+    )
 
     if len(residuals) < min_samples:
         logger.warning(
@@ -448,6 +460,112 @@ def compute_rolling_epex_bias_cent(
         cap_cent_kwh,
     )
     return capped, len(residuals)
+
+
+def lookback_hour_slots(reference_slot: datetime, hours: int) -> list[datetime]:
+    """The ``hours`` clock hours before ``reference_slot`` (newest first), as slot keys."""
+    from data.market_prices import normalize_price_slot
+    from optimizer.slot_duration import fixed_offset_local, floor_to_hour_slot, slot_zone
+
+    ref = floor_to_hour_slot(normalize_price_slot(reference_slot))
+    zone = slot_zone(ref)
+    return [fixed_offset_local(ref - timedelta(hours=back), zone) for back in range(1, hours + 1)]
+
+
+def _hour_actual_cent(day_ahead_by_slot: dict[datetime, float], hour_slot: datetime) -> float | None:
+    """Mean of the known quarter-hours of ``hour_slot`` (an hourly price counts as its hour)."""
+    prices = [
+        day_ahead_by_slot[slot]
+        for slot in (hour_slot + timedelta(minutes=minutes) for minutes in (0, 15, 30, 45))
+        if slot in day_ahead_by_slot
+    ]
+    return sum(prices) / len(prices) if prices else None
+
+
+def hourly_residuals_cent(
+    day_ahead_by_slot: dict[datetime, float],
+    *,
+    forecast_model: PriceForecastModel,
+    hour_slots: list[datetime],
+    feature_frame: pd.DataFrame,
+) -> list[float]:
+    """Actual − OLS per hour of ``hour_slots`` that has a known price and a feature row."""
+    from optimizer.slot_duration import floor_to_hour_slot
+
+    residuals: list[float] = []
+    for slot in hour_slots:
+        actual = _hour_actual_cent(day_ahead_by_slot, floor_to_hour_slot(slot))
+        if actual is None:
+            continue
+        lookup = slot.replace(tzinfo=None) if feature_frame.index.tz is None else slot
+        if lookup not in feature_frame.index:
+            parent = floor_to_hour_slot(lookup)
+            if parent not in feature_frame.index:
+                continue
+            lookup = parent
+        predicted = float(predict_prices(forecast_model, feature_frame.loc[[lookup]])[0])
+        residuals.append(float(actual) - predicted)
+    return residuals
+
+
+def compute_seam_anchor_cent(
+    day_ahead_by_slot: dict[datetime, float],
+    *,
+    forecast_model: PriceForecastModel,
+    seam_slot: datetime,
+    seam_hours: int,
+    cap_cent_kwh: float,
+    feature_frame: pd.DataFrame,
+) -> float | None:
+    """Mean residual of the ``seam_hours`` known hours right before the first predicted slot.
+
+    None (logged) when one of these hours has no price or no feature row: the forecast then
+    uses the rolling bias alone.
+    """
+    residuals = hourly_residuals_cent(
+        day_ahead_by_slot,
+        forecast_model=forecast_model,
+        hour_slots=lookback_hour_slots(seam_slot, seam_hours),
+        feature_frame=feature_frame,
+    )
+    if len(residuals) < seam_hours:
+        logger.warning(
+            "Preisprognose: Anschluss an %s ohne Werte (%d von %d Stunden) — nur live bias.",
+            seam_slot,
+            len(residuals),
+            seam_hours,
+        )
+        return None
+    anchor = sum(residuals) / len(residuals)
+    return max(-cap_cent_kwh, min(cap_cent_kwh, anchor))
+
+
+def live_lookback_feature_frame(
+    lookback_slots: list[datetime],
+    *,
+    planning_start: datetime,
+    forecast_feature_frame: pd.DataFrame | None,
+) -> pd.DataFrame | None:
+    """Features for a bias window that may reach past the planning start.
+
+    Hours before ``planning_start`` come from the live fetch (archive or forecast, as before);
+    hours from ``planning_start`` on are rows of the horizon's own ``forecast_feature_frame``.
+    """
+    from optimizer.slot_duration import floor_to_hour_slot
+
+    start_hour = floor_to_hour_slot(planning_start)
+    past = [slot for slot in lookback_slots if slot < start_hour]
+    frames: list[pd.DataFrame] = []
+    if past:
+        past_frame = build_live_feature_frame_for_slots(past)
+        if past_frame is not None and not past_frame.empty:
+            frames.append(past_frame)
+    if forecast_feature_frame is not None and not forecast_feature_frame.empty:
+        frames.append(forecast_feature_frame)
+    if not frames:
+        return None
+    merged = pd.concat(frames)
+    return merged[~merged.index.duplicated(keep="first")].sort_index()
 
 
 def resolve_market_slots_kwargs(target_hours: list) -> dict:
@@ -479,6 +597,8 @@ def resolve_market_slots_kwargs(target_hours: list) -> dict:
         if kwargs["live_bias_enabled"]:
             kwargs["live_bias_lookback_hours"] = get_live_bias_lookback_hours()
             kwargs["live_bias_cap_cent_kwh"] = get_live_bias_cap_cent_kwh()
+            kwargs["live_bias_seam_hours"] = get_live_bias_seam_hours()
+            kwargs["live_bias_seam_decay_hours"] = get_live_bias_seam_decay_hours()
         return kwargs
 
     kwargs["missing_price_strategy"] = MISSING_PRICE_STRATEGY_MIRROR

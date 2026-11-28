@@ -255,8 +255,8 @@ def test_resolve_market_slots_applies_live_bias_to_predicted_only():
             return_value=5.0,
         ):
             with patch(
-                "data.market_prices._resolve_live_bias_cent",
-                return_value=1.25,
+                "data.market_prices._resolve_live_bias",
+                return_value=(1.25, None),
             ):
                 out = resolve_market_slots(
                     market,

@@ -4,6 +4,9 @@ The golden ``tests/fixtures/edibert_forecast/expected.json`` was recorded with t
 ``resolve_market_slots`` on recorded EU features and Day-Ahead prices (``scripts.ols_forecast_golden``).
 Re-recorded 2026-11-21 for the DST slot grid: the live-bias lookback is now 48 real hours (before:
 48 wall-clock hours, 47 / 49 real ones across the change), which moves only the ``bias_on`` cases.
+Re-recorded 2026-11-28 for the price seam: the bias window now ends at the first predicted slot
+and the first slot starts at the residual of the last two known hours (decay 8 h); only the
+``bias_on`` / ``bias_capped`` cases moved (mean 0.0–0.7 ct, at most 2.6 ct per slot).
 """
 from __future__ import annotations
 

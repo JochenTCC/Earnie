@@ -199,6 +199,8 @@ def _render_live_bias_expander() -> None:
             get_live_bias_cap_cent_kwh,
             get_live_bias_enabled,
             get_live_bias_lookback_hours,
+            get_live_bias_seam_decay_hours,
+            get_live_bias_seam_hours,
         )
 
         try:
@@ -207,6 +209,8 @@ def _render_live_bias_expander() -> None:
                     "live_bias_enabled": get_live_bias_enabled(),
                     "live_bias_lookback_hours": get_live_bias_lookback_hours(),
                     "live_bias_cap_cent_kwh": get_live_bias_cap_cent_kwh(),
+                    "live_bias_seam_hours": get_live_bias_seam_hours(),
+                    "live_bias_seam_decay_hours": get_live_bias_seam_decay_hours(),
                 }
             )
         except ValueError as exc:
