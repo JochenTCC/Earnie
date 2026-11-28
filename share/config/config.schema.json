@@ -125,7 +125,7 @@
           "type": "number",
           "minimum": 0,
           "default": 8.0,
-          "description": "Stunden, in denen der Anschluss linear in die Bias-Korrektur übergeht; 0 = ohne Anschluss."
+          "description": "Stunden, in denen der Anschluss in Stundenstufen in die Bias-Korrektur übergeht; 0 = ohne Anschluss."
         }
       }
     },

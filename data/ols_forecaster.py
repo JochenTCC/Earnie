@@ -24,9 +24,12 @@ SLOT = timedelta(minutes=15)
 
 @dataclass(frozen=True)
 class SeamAnchor:
-    """Offset at the first predicted slot that decays linearly into the rolling bias.
+    """Offset at the first predicted slot that decays into the rolling bias in hourly steps.
 
-    At ``start`` the offset is ``anchor_cent``; it reaches the bias after ``decay_hours``.
+    In the clock hour of ``start`` the offset is ``anchor_cent``; each following clock hour it
+    steps linearly towards the bias and reaches it ``decay_hours`` after the start hour (a decay
+    under one hour holds the anchor for the start hour, then the bias). All
+    quarter-hours of a clock hour share one offset, like the hourly OLS value they are added to.
     """
 
     start: datetime
@@ -40,9 +43,15 @@ class SeamAnchor:
             raise ValueError("SeamAnchor.decay_hours muss > 0 sein.")
 
     def weight(self, slot: datetime) -> float:
-        """Share of the anchor in the offset of ``slot`` (1 at ``start``, 0 after the decay)."""
-        hours = (slot - self.start).total_seconds() / 3600.0
-        if hours < 0:
+        """Share of the anchor in the offset of ``slot`` (1 in the start hour, 0 after the decay).
+
+        Clock hours are counted in UTC, which matches local clock hours for whole-hour UTC
+        offsets (all EPEX bidding zones Earnie uses); a half-hour zone would step mid-hour.
+        """
+        slot_hour = slot.astimezone(UTC).replace(minute=0, second=0, microsecond=0)
+        start_hour = self.start.astimezone(UTC).replace(minute=0, second=0, microsecond=0)
+        hours = (slot_hour - start_hour).total_seconds() / 3600.0
+        if hours <= 0:
             return 1.0
         return max(0.0, 1.0 - hours / self.decay_hours)
 

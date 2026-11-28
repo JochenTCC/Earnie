@@ -21,7 +21,10 @@ sat at the 48 h level, a visible jump after the last known price (production ins
 - **Seam anchor:** the mean residual of the last `live_bias_seam_hours` (2) known hours before
   the first predicted slot, capped like the bias.
 - **Decay:** offset(t) = bias + (anchor − bias) · max(0, 1 − h / `live_bias_seam_decay_hours`),
-  h = hours since the first predicted slot; default 8 h, 0 = no seam.
+  h = whole clock hours since the clock hour of the first predicted slot (hourly steps: all
+  quarter-hours of an hour share one offset, like the hourly OLS value; a per-quarter-hour ramp
+  drew sloping lines in the chart); default 8 h, 0 = no seam. The backtest is hourly and does not
+  change with the steps.
 - An hour's actual price is the mean of its known quarter-hours (before: the price of its
   :00 quarter).
 - A seam hour without a price or a feature row → no anchor, the bias alone (log warning).

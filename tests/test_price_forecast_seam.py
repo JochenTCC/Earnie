@@ -89,6 +89,26 @@ def test_seam_offset_decays_linearly_into_the_bias():
     assert _at(rows, 11.75)["price_buy"] == pytest.approx(bias)
 
 
+def test_seam_offset_steps_per_clock_hour():
+    """2026-11-28 on the production install: a per-quarter-hour decay drew sloping lines in the
+    chart; the offset steps per clock hour, so the quarter-hours of an hour share one price."""
+    rows = _resolve()
+    bias = (46 * 20.0 + 2 * 5.0) / 48
+    for hour in range(9):
+        expected = 5.0 + (bias - 5.0) * min(hour / 8, 1.0)
+        prices = [_at(rows, hour + q / 4)["price_buy"] for q in range(4)]
+        assert len(set(prices)) == 1, f"hour {hour}: {prices}"
+        assert prices[0] == pytest.approx(expected, abs=1e-4), f"hour {hour}"
+
+
+def test_seam_anchor_steps_on_clock_hours_when_it_starts_mid_hour():
+    start = (SEAM + timedelta(minutes=30)).astimezone(UTC)
+    seam = SeamAnchor(start=start, anchor_cent=2.0, decay_hours=4.0)
+    assert seam.weight(start + timedelta(minutes=15)) == pytest.approx(1.0)  # still the start hour
+    assert seam.weight(start + timedelta(minutes=30)) == pytest.approx(0.75)  # next clock hour
+    assert seam.weight(start + timedelta(minutes=75)) == pytest.approx(0.75)
+
+
 def test_decay_zero_keeps_a_constant_bias_up_to_the_seam():
     rows = _resolve(live_bias_seam_decay_hours=0.0)
     bias = (46 * 20.0 + 2 * 5.0) / 48
