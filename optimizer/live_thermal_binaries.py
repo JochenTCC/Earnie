@@ -8,12 +8,17 @@ the first-day model took one second.
 
 Only the first slot is executed; each cycle plans again. So the far horizon only has to hold
 the energy and the store band: from ``LIVE_THERMAL_BINARY_HOURS`` on these on-variables are
-continuous in ``[0, 1]`` (the average share of the slot the consumer runs). Start variables of
-the pulse limit follow the on-variable (``thermal_flex_base.add_max_pulses_per_day_constraints``).
-The SE book keeps all binaries.
+continuous in ``[0, 1]`` (the average share of the slot the consumer runs), and so are the
+PV-follow switches of the same consumers (``pv_follow <= on`` would otherwise allow PV-follow
+only at a full share). Start variables of the pulse limit follow the on-variable
+(``thermal_flex_base.add_max_pulses_per_day_constraints``). The SE book keeps all binaries.
+
+The window is counted in slots (``LIVE_THERMAL_BINARY_HOURS / dt_h``) from the first slot of the
+plan, not in wall-clock hours: a partial first slot shifts its end by less than one slot.
 """
 from __future__ import annotations
 
+import logging
 import math
 from typing import TYPE_CHECKING, Any
 
@@ -22,12 +27,14 @@ import pulp
 if TYPE_CHECKING:
     from optimizer.milp_horizon import MilpHorizonModel
 
+logger = logging.getLogger(__name__)
+
 # Hours from the plan start in which a Live thermal consumer switches on/off (binary).
 LIVE_THERMAL_BINARY_HOURS = 12.0
 
 
 def live_thermal_binary_slots(dt_h: float) -> int:
-    """Number of leading slots whose thermal on-variables stay binary."""
+    """Number of leading slots whose thermal on-variables stay binary (slot count, see above)."""
     if dt_h <= 0:
         raise ValueError(f"Slotdauer muss positiv sein (ist {dt_h:g} h).")
     return int(math.ceil(LIVE_THERMAL_BINARY_HOURS / float(dt_h) - 1e-9))
@@ -63,11 +70,20 @@ def relax_far_live_thermal_binaries(
         ):
             continue
         on_vars = model.consumer_on[cid]
-        for var in on_vars[first_relaxed:]:
+        far_vars = list(on_vars[first_relaxed:])
+        if cid in model.consumer_pv_follow:
+            far_vars += model.consumer_pv_follow[cid][first_relaxed:]
+        for var in far_vars:
             var.cat = pulp.LpContinuous
             var.lowBound, var.upBound = 0, 1
         if len(on_vars) > first_relaxed:
             relaxed.append(cid)
+    if relaxed:
+        logger.debug(
+            "Live: Ein/Aus von %s ab Slot %d als Laufzeitanteil geplant.",
+            ", ".join(relaxed),
+            first_relaxed,
+        )
     return relaxed
 
 

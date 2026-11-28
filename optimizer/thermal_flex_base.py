@@ -11,6 +11,7 @@ import pulp
 
 from house_config.generic_schedule import generic_allowed_slot_hours
 from optimizer.charging_context import matrix_slot_datetime
+from optimizer.live_thermal_binaries import is_relaxed_on_var
 
 if TYPE_CHECKING:
     from optimizer.milp_horizon import MilpHorizonModel
@@ -161,7 +162,7 @@ def add_max_pulses_per_day_constraints(
             prev_on = on_vars[prev_slot] if prev_slot == slot - 1 else 0
         # A Live on-variable relaxed in the far horizon (``live_thermal_binaries``) gets a
         # continuous start: a share of a start, like the on-variable is a share of the slot.
-        relaxed = getattr(on_vars[slot], "cat", pulp.LpInteger) == pulp.LpContinuous
+        relaxed = is_relaxed_on_var(on_vars[slot])
         start_var = pulp.LpVariable(
             f"{prefix}_start_{slot}",
             lowBound=0,

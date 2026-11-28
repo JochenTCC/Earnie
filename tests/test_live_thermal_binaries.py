@@ -29,6 +29,7 @@ def _model(consumers: list[dict], horizon: int = 96, dt_h: float = 0.25):
         consumer_on=on,
         consumer_milp_charge_kw={str(c["id"]): 2.0 for c in consumers},
         consumer_p={},
+        consumer_pv_follow={},
     )
 
 
@@ -68,6 +69,25 @@ def test_live_relaxes_far_thermal_slots_only(monkeypatch, thermal_kinds):
         assert set(cats[48:]) == {pulp.LpContinuous}
         assert all(var.upBound == 1 and var.lowBound == 0 for var in model.consumer_on[cid])
     assert {var.cat for var in model.consumer_on["ev"]} == {pulp.LpInteger}
+
+
+def test_live_relaxes_far_pv_follow_of_a_relaxed_consumer_and_logs_it(
+    monkeypatch, thermal_kinds, caplog
+):
+    """``pv_follow <= on`` with a binary PV-follow allowed it only at a full share."""
+    _live(monkeypatch, True)
+    model = _model([_HP, _EV])
+    for cid in ("wp", "ev"):
+        model.consumer_pv_follow[cid] = [
+            pulp.LpVariable(f"{cid}_pv_{t}", cat=pulp.LpBinary) for t in range(96)
+        ]
+    with caplog.at_level("DEBUG", logger="optimizer.live_thermal_binaries"):
+        assert relax_far_live_thermal_binaries(model, [{}] * 96, None) == ["wp"]
+    cats = [var.cat for var in model.consumer_pv_follow["wp"]]
+    assert set(cats[:48]) == {pulp.LpInteger}
+    assert set(cats[48:]) == {pulp.LpContinuous}
+    assert {var.cat for var in model.consumer_pv_follow["ev"]} == {pulp.LpInteger}
+    assert "wp" in caplog.text and "48" in caplog.text
 
 
 @pytest.mark.parametrize(("is_live", "book"), [(False, None), (True, [0, 1, 2])])

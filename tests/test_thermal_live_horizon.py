@@ -220,6 +220,41 @@ def test_heat_pump_store_level_spans_the_horizon(live, monkeypatch):
     assert store.terminal_min_kwh is not None
 
 
+def test_live_build_relaxes_far_slots_before_the_pulse_limit(live, monkeypatch):
+    """The relaxation must run before the thermal constraints: their pulse starts copy the
+    on-variable type, and a binary start on a continuous on-variable forces a whole start."""
+    import pulp
+
+    from house_config.heat_source import heat_source_efficiency
+    from optimizer import milp_model
+    from optimizer.live_thermal_binaries import live_thermal_binary_slots
+
+    profile = _profile(_consumer(_HP))
+    live(profile, plan=_store_plan(46.0, jaz=heat_source_efficiency(_HP)))
+    captured = {}
+    original = milp_model._add_flex_side_constraints
+
+    def spy(model, *args, **kwargs):
+        original(model, *args, **kwargs)
+        captured["model"] = model
+
+    monkeypatch.setattr(milp_model, "_add_flex_side_constraints", spy)
+    _solve(_matrix(), profile)
+    model = captured["model"]
+    window = live_thermal_binary_slots(float(model.dt_h))
+    on_cats = [var.cat for var in model.consumer_on[_CID]]
+    assert set(on_cats[:window]) == {pulp.LpInteger}
+    assert set(on_cats[window:]) == {pulp.LpContinuous}
+    starts = {
+        int(var.name.rsplit("_", 1)[1]): var.cat
+        for var in model.prob.variables()
+        if var.name.startswith(f"{_CID}_") and "_start_" in var.name
+    }
+    assert starts, "no pulse starts built"
+    assert {cat for slot, cat in starts.items() if slot < window} == {pulp.LpInteger}
+    assert {cat for slot, cat in starts.items() if slot >= window} == {pulp.LpContinuous}
+
+
 def test_heat_pump_without_store_delivers_every_days_target(live):
     profile = _profile(_consumer(_HP, storage=None))
     live(profile, house_slot_kwh=0.05)  # 0.2 kW house heat need, electric
