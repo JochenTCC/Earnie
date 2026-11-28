@@ -114,7 +114,9 @@ def main() -> int:
                 "mean_epex": round(sum(prices) / len(prices), 3),
                 "min_epex": round(min(prices), 3),
                 "max_epex": round(max(prices), 3),
-                "live_bias": predicted[0].get("live_bias_cent_kwh"),
+                # Offset of the first and last predicted slot: seam anchor, then the bias.
+                "live_offset_first": predicted[0].get("live_bias_cent_kwh"),
+                "live_offset_last": predicted[-1].get("live_bias_cent_kwh"),
             }
         )
 

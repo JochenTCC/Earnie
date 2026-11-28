@@ -146,11 +146,22 @@ def _day_ahead_epex_by_slot(
     return {slot: float(row["price_buy"]) for slot, row in by_slot.items()}
 
 
-def _resolve_live_bias(
+def _missing_blocks(missing: list[datetime]) -> list[list[datetime]]:
+    """Contiguous runs of missing UTC quarter-hours (sorted input)."""
+    blocks: list[list[datetime]] = []
+    for slot in missing:
+        if blocks and slot - blocks[-1][-1] == _SLOT:
+            blocks[-1].append(slot)
+        else:
+            blocks.append([slot])
+    return blocks
+
+
+def _resolve_live_corrections(
     by_slot: dict[datetime, dict[str, Any]],
+    blocks: list[list[datetime]],
     *,
     planning_start: datetime,
-    first_missing: datetime | None,
     forecast_model: Any,
     forecast_feature_frame: pd.DataFrame | None,
     live_bias_enabled: bool,
@@ -159,33 +170,65 @@ def _resolve_live_bias(
     live_bias_seam_hours: int,
     live_bias_seam_decay_hours: float,
     live_bias_feature_frame: pd.DataFrame | None,
-) -> tuple[float | None, SeamAnchor | None]:
-    """Rolling bias over the hours before the first missing slot, and the seam anchor there.
+) -> list[tuple[float | None, SeamAnchor | None]]:
+    """Bias and seam anchor per contiguous block of missing slots.
 
-    The window ends at the first predicted slot, so it includes the known prices of the horizon
-    itself (e.g. the rest of today before tomorrow's Day-Ahead is published).
+    Each block gets its own window ending at its first slot, so a gap earlier in the horizon
+    (one missing hour today) does not move the seam of tomorrow's block. The features of all
+    windows are fetched once.
     """
-    if not live_bias_enabled or forecast_model is None or first_missing is None:
-        return None, None
-    from data.price_forecast_live import (
-        compute_rolling_epex_bias_cent,
-        compute_seam_anchor_cent,
-        live_lookback_feature_frame,
-        lookback_hour_slots,
-    )
+    if not live_bias_enabled or forecast_model is None or not blocks:
+        return [(None, None)] * len(blocks)
+    from data.price_forecast_live import live_lookback_feature_frame, lookback_hour_slots
 
-    seam_slot = normalize_price_slot(first_missing)
     feature_frame = live_bias_feature_frame
     if feature_frame is None:
+        hours = max(live_bias_lookback_hours, live_bias_seam_hours)
+        lookback = sorted(
+            {slot for block in blocks for slot in lookback_hour_slots(normalize_price_slot(block[0]), hours)}
+        )
         feature_frame = live_lookback_feature_frame(
-            lookback_hour_slots(seam_slot, max(live_bias_lookback_hours, live_bias_seam_hours)),
+            lookback,
             planning_start=planning_start,
             forecast_feature_frame=forecast_feature_frame,
         )
     if feature_frame is None or feature_frame.empty:
         logger.warning("Preisprognose: live bias — keine Features für Lookback.")
-        return None, None
+        return [(None, None)] * len(blocks)
     day_ahead = _day_ahead_epex_by_slot(by_slot)
+    return [
+        _resolve_block_correction(
+            day_ahead,
+            normalize_price_slot(block[0]),
+            forecast_model=forecast_model,
+            feature_frame=feature_frame,
+            live_bias_lookback_hours=live_bias_lookback_hours,
+            live_bias_cap_cent_kwh=live_bias_cap_cent_kwh,
+            live_bias_seam_hours=live_bias_seam_hours,
+            live_bias_seam_decay_hours=live_bias_seam_decay_hours,
+        )
+        for block in blocks
+    ]
+
+
+def _resolve_block_correction(
+    day_ahead: dict[datetime, float],
+    seam_slot: datetime,
+    *,
+    forecast_model: Any,
+    feature_frame: pd.DataFrame,
+    live_bias_lookback_hours: int,
+    live_bias_cap_cent_kwh: float,
+    live_bias_seam_hours: int,
+    live_bias_seam_decay_hours: float,
+) -> tuple[float | None, SeamAnchor | None]:
+    """Rolling bias over the hours before ``seam_slot``, and the seam anchor there.
+
+    The window ends at the block's first predicted slot, so it includes the known prices of the
+    horizon itself (e.g. the rest of today before tomorrow's Day-Ahead is published).
+    """
+    from data.price_forecast_live import compute_rolling_epex_bias_cent, compute_seam_anchor_cent
+
     bias, _n = compute_rolling_epex_bias_cent(
         day_ahead,
         forecast_model=forecast_model,
@@ -233,17 +276,21 @@ def _forecast_missing_slots(
     known: dict[datetime, float],
     tz: ZoneInfo,
     *,
-    ols: OlsForecaster | None,
+    ols_blocks: list[tuple[list[datetime], OlsForecaster]],
 ) -> dict[datetime, tuple[float, str]]:
-    """Price and method per missing UTC slot: OLS where it has features, else Edibert's mirror."""
+    """Price and method per missing UTC slot: OLS where it has features, else Edibert's mirror.
+
+    ``ols_blocks`` pairs each contiguous block of missing slots with its forecaster (own bias
+    and seam); empty without OLS.
+    """
     if not missing:
         return {}
     start, end = min(missing), max(missing) + _SLOT
     _check_forecast_span(start, end)
     filled: dict[datetime, tuple[float, str]] = {}
-    if ols is not None:
-        predicted = ols.forecast(known, start, end)
-        filled = {slot: (predicted[slot], METHOD_OLS) for slot in missing if slot in predicted}
+    for block, ols in ols_blocks:
+        predicted = ols.forecast(known, block[0], block[-1] + _SLOT)
+        filled.update({slot: (predicted[slot], METHOD_OLS) for slot in block if slot in predicted})
     rest = [slot for slot in missing if slot not in filled]
     if not rest:
         return filled
@@ -290,8 +337,8 @@ def resolve_market_slots(
     Stunde. Der Prognosezeitraum (erster bis letzter fehlender Slot) ist höchstens
     ``MAX_FORECAST_HOURS`` lang, sonst ``ValueError``.
 
-    Live bias (only with ``live_bias_enabled``): rolling Day-Ahead−OLS residual over the
-    ``live_bias_lookback_hours`` before the first missing slot, capped by
+    Live bias (only with ``live_bias_enabled``), per contiguous block of missing slots: rolling
+    Day-Ahead−OLS residual over the ``live_bias_lookback_hours`` before the block, capped by
     ``live_bias_cap_cent_kwh`` (default ±12 Cent/kWh). Seam: the first predicted slot starts at
     the residual of the last ``live_bias_seam_hours`` known hours, which decays linearly into the
     bias over ``live_bias_seam_decay_hours`` (0 = no seam). The lookback features come from
@@ -318,10 +365,11 @@ def resolve_market_slots(
         and forecast_model is not None
         and forecast_feature_frame is not None
     )
-    live_bias, seam = _resolve_live_bias(
+    blocks = _missing_blocks(missing) if use_ols else []
+    corrections = _resolve_live_corrections(
         by_slot,
+        blocks,
         planning_start=min(slots),
-        first_missing=missing[0] if missing and use_ols else None,
         forecast_model=forecast_model,
         forecast_feature_frame=forecast_feature_frame,
         live_bias_enabled=live_bias_enabled,
@@ -331,12 +379,12 @@ def resolve_market_slots(
         live_bias_seam_decay_hours=live_bias_seam_decay_hours,
         live_bias_feature_frame=live_bias_feature_frame,
     )
-    ols = (
-        OlsForecaster(forecast_model, forecast_feature_frame, tz=tz, bias_cent=live_bias, seam=seam)
-        if use_ols
-        else None
-    )
-    forecast = _forecast_missing_slots(missing, known, tz, ols=ols)
+    ols_blocks = [
+        (block, OlsForecaster(forecast_model, forecast_feature_frame, tz=tz, bias_cent=bias, seam=seam))
+        for block, (bias, seam) in zip(blocks, corrections, strict=True)
+    ]
+    ols_by_slot = {slot: ols for block, ols in ols_blocks for slot in block}
+    forecast = _forecast_missing_slots(missing, known, tz, ols_blocks=ols_blocks)
     resolved: list[dict[str, Any]] = []
 
     for slot in slots:
@@ -361,7 +409,7 @@ def resolve_market_slots(
                 forecast_model_path=forecast_model_path,
                 eu_power_live_source=eu_power_live_source,
                 eu_power_stand_in=eu_power_stand_in,
-                live_bias_cent_kwh=ols.offset_cent(slot_utc) if ols is not None else None,
+                live_bias_cent_kwh=ols_by_slot[slot_utc].offset_cent(slot_utc),
             )
         else:
             _append_mirrored_slot(resolved, slot, epex)

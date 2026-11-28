@@ -125,6 +125,73 @@ def test_live_path_fetches_only_hours_before_the_planning_start():
     assert _at(rows, 0)["price_buy"] == pytest.approx(5.0)
 
 
+def test_an_earlier_gap_does_not_move_the_midnight_seam():
+    """Review 2026-11-28: one missing hour today put the seam there, and midnight jumped again."""
+    market = [row for row in _market() if row["timestamp"] != SEAM - timedelta(hours=10)]
+    target = [datetime(2025, 7, 1, 10, 0, tzinfo=VIENNA) + timedelta(minutes=15 * i) for i in range(4 * 24)]
+    frame = _feature_frame(SEAM - timedelta(hours=70), SEAM + timedelta(hours=24))
+    rows = resolve_market_slots(
+        market,
+        target,
+        missing_price_strategy="forecast",
+        forecast_model=_zero_model(),
+        forecast_feature_frame=frame,
+        live_bias_enabled=True,
+        live_bias_cap_cent_kwh=50.0,
+        live_bias_feature_frame=frame,
+    )
+    by_utc = {row["slot_datetime"].astimezone(UTC): row for row in rows}
+    gap = by_utc[(SEAM - timedelta(hours=10)).astimezone(UTC)]
+    assert gap["price_source"] == PRICE_SOURCE_PREDICTED
+    assert gap["price_buy"] == pytest.approx(20.0)  # its own seam: the 20 ct hours before it
+    assert _at(by_utc, 0)["price_buy"] == pytest.approx(5.0)  # before the fix: 20 ct after 5 ct
+
+
+def test_failed_past_feature_fetch_gives_no_bias_instead_of_a_shorter_window(caplog):
+    """Review 2026-11-28: a failed fetch silently took the bias from the horizon hours only."""
+    target_frame = _feature_frame(PLANNING_START, SEAM + timedelta(hours=24))
+    with patch("data.price_forecast_live.build_live_feature_frame_for_slots", return_value=None):
+        rows = _resolve(forecast_feature_frame=target_frame, live_bias_feature_frame=None)
+    first = _at(rows, 0)
+    assert first["price_buy"] == pytest.approx(0.0)  # model alone
+    assert "live_bias_cent_kwh" not in first
+    assert "Lookback-Stunden" in caplog.text
+
+
+def test_aware_forecast_frame_merges_with_the_naive_past_frame():
+    """Review 2026-11-28: concat of an aware horizon frame with the naive past frame raised."""
+    naive = _feature_frame(PLANNING_START, SEAM + timedelta(hours=24))
+    aware = naive.copy()
+    aware.index = aware.index.tz_localize(VIENNA)
+
+    def _fetch(slots):
+        return _feature_frame(SEAM - timedelta(hours=60), PLANNING_START)
+
+    with patch("data.price_forecast_live.build_live_feature_frame_for_slots", side_effect=_fetch):
+        rows = _resolve(forecast_feature_frame=aware, live_bias_feature_frame=None)
+    assert _at(rows, 0)["price_buy"] == pytest.approx(5.0)
+    assert _at(rows, 8)["price_buy"] == pytest.approx((46 * 20.0 + 2 * 5.0) / 48)
+
+
+@pytest.mark.parametrize(
+    ("key", "value"),
+    [
+        ("live_bias_seam_hours", 2.7),
+        ("live_bias_seam_hours", True),
+        ("live_bias_seam_decay_hours", float("nan")),
+        ("live_bias_seam_decay_hours", True),
+        ("live_bias_seam_decay_hours", "8"),
+    ],
+)
+def test_seam_config_rejects_non_numbers(key, value):
+    from data.price_forecast_live import get_live_bias_seam_decay_hours, get_live_bias_seam_hours
+
+    getter = get_live_bias_seam_hours if key == "live_bias_seam_hours" else get_live_bias_seam_decay_hours
+    with patch("config.Config._read_json_dict", return_value={"market_prices": {key: value}}):
+        with pytest.raises(ValueError):
+            getter()
+
+
 def test_seam_anchor_weight_and_validation():
     start = SEAM.astimezone(UTC)
     seam = SeamAnchor(start=start, anchor_cent=2.0, decay_hours=8.0)

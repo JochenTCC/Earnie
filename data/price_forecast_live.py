@@ -149,22 +149,22 @@ def _market_prices_block() -> dict:
 
 def get_live_bias_seam_hours() -> int:
     """Known hours before the first predicted slot whose residual starts the forecast."""
-    hours = int(_market_prices_block().get("live_bias_seam_hours", DEFAULT_LIVE_BIAS_SEAM_HOURS))
-    if hours < 1:
-        raise ValueError("market_prices.live_bias_seam_hours muss >= 1 sein.")
-    return hours
+    raw = _market_prices_block().get("live_bias_seam_hours", DEFAULT_LIVE_BIAS_SEAM_HOURS)
+    if isinstance(raw, bool) or not isinstance(raw, int) or raw < 1:
+        raise ValueError("market_prices.live_bias_seam_hours muss eine ganze Zahl >= 1 sein.")
+    return raw
 
 
 def get_live_bias_seam_decay_hours() -> float:
     """Hours over which the seam residual decays into the rolling bias; 0 = no seam."""
-    hours = float(
-        _market_prices_block().get(
-            "live_bias_seam_decay_hours", DEFAULT_LIVE_BIAS_SEAM_DECAY_HOURS
-        )
+    import math
+
+    raw = _market_prices_block().get(
+        "live_bias_seam_decay_hours", DEFAULT_LIVE_BIAS_SEAM_DECAY_HOURS
     )
-    if hours < 0:
-        raise ValueError("market_prices.live_bias_seam_decay_hours muss >= 0 sein.")
-    return hours
+    if isinstance(raw, bool) or not isinstance(raw, (int, float)) or not math.isfinite(raw) or raw < 0:
+        raise ValueError("market_prices.live_bias_seam_decay_hours muss eine Zahl >= 0 sein.")
+    return float(raw)
 
 
 def get_forecast_model_path() -> Path:
@@ -549,23 +549,46 @@ def live_lookback_feature_frame(
     """Features for a bias window that may reach past the planning start.
 
     Hours before ``planning_start`` come from the live fetch (archive or forecast, as before);
-    hours from ``planning_start`` on are rows of the horizon's own ``forecast_feature_frame``.
+    hours from ``planning_start`` on are rows of the horizon's own ``forecast_feature_frame``,
+    which wins on overlap. A naive and an aware index are aligned on naive planning time; two
+    aware indexes stay aware (the repeated autumn hour keeps both rows). A failed fetch
+    of the past hours gives None (no bias, logged), never a window shrunk to the horizon.
     """
     from optimizer.slot_duration import floor_to_hour_slot
 
     start_hour = floor_to_hour_slot(planning_start)
     past = [slot for slot in lookback_slots if slot < start_hour]
     frames: list[pd.DataFrame] = []
-    if past:
-        past_frame = build_live_feature_frame_for_slots(past)
-        if past_frame is not None and not past_frame.empty:
-            frames.append(past_frame)
     if forecast_feature_frame is not None and not forecast_feature_frame.empty:
         frames.append(forecast_feature_frame)
+    if past:
+        past_frame = build_live_feature_frame_for_slots(past)
+        if past_frame is None or past_frame.empty:
+            logger.warning(
+                "Preisprognose: live bias — keine Features für die %d Lookback-Stunden vor %s.",
+                len(past),
+                start_hour,
+            )
+            return None
+        frames.append(past_frame)
     if not frames:
         return None
+    if len({frame.index.tz is None for frame in frames}) > 1:
+        # Mixed naive / aware: align on naive planning time (the live fetch is naive).
+        frames = [_naive_planning_index(frame) for frame in frames]
     merged = pd.concat(frames)
     return merged[~merged.index.duplicated(keep="first")].sort_index()
+
+
+def _naive_planning_index(frame: pd.DataFrame) -> pd.DataFrame:
+    """``frame`` with a naive planning-timezone index (an aware index is converted)."""
+    if frame.index.tz is None:
+        return frame
+    import config
+
+    out = frame.copy()
+    out.index = frame.index.tz_convert(config.get_planning_timezone()).tz_localize(None)
+    return out
 
 
 def resolve_market_slots_kwargs(target_hours: list) -> dict:
