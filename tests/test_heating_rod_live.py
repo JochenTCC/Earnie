@@ -16,6 +16,7 @@ from house_config.heating_rod_bindings import (
     rod_field,
 )
 from house_config.planning_flex_bridge import collect_planning_flex_consumers
+from optimizer.thermal_flex_base import ROD_HEAT_CAPS_BY_SLOT_KEY
 from settings.ehal_marker_resolve import (
     marker_flex_enable,
     marker_flex_power,
@@ -322,7 +323,9 @@ def test_gas_house_rod_is_capped_by_the_free_store_heat(live):
     cap = plan.opp_cap_electric_kwh * 0.95
     assert cap > 0.0
     assert remaining[_ROD_ID] == pytest.approx(cap, abs=1e-3)
-    assert contexts[_ROD_ID]["daily_heat_cap_kwh"] == {date(2024, 1, 15): pytest.approx(cap, abs=1e-3)}
+    caps = contexts[_ROD_ID][ROD_HEAT_CAPS_BY_SLOT_KEY]
+    assert len(caps) == 24
+    assert caps == pytest.approx([cap] * 24, abs=1e-3)  # no draw: the room in every slot
     assert 0.0 < _rod_kwh(model) <= cap + 1e-6
     assert all(10 <= slot < 14 for slot in _on_slots(model, _ROD_ID))
 
@@ -344,7 +347,7 @@ def _drawing_store_plan(start_c: float, *, horizon: int = 24):
     )
 
 
-def test_gas_house_rod_cap_counts_the_boilers_heat_of_the_first_day(live):
+def test_gas_house_rod_cap_counts_the_boilers_heat_of_the_horizon(live):
     """Regression (HA Lab 2026-11-17): the boiler's normal operation was subtracted as a floor,
     so a store that draws heat left the rod a cap of 0 in every heating day."""
     from optimizer.thermal_flex_context import live_rod_heat_cap_kwh
@@ -361,20 +364,46 @@ def test_gas_house_rod_cap_counts_the_boilers_heat_of_the_first_day(live):
     )
 
 
-def test_gas_house_rod_cap_counts_only_the_draw_until_midnight(live):
-    from optimizer.thermal_flex_context import live_rod_heat_cap_kwh
+def test_gas_house_rod_cap_grows_with_the_draw_across_midnight(live):
+    """Live 2026-11-27: the cap held for the first calendar day only, the rod was off after
+    midnight. It now holds per slot: the room plus the draw until the slot's end."""
+    from optimizer.thermal_flex_context import live_rod_heat_caps_by_slot_kwh
 
     plan = _drawing_store_plan(45.0)
     profile = _profile(_consumer(_GAS, rod_bindings=_BOUND))
     live(plan, profile)
     room = plan.capacity_kwh_per_k * (50.0 - 45.0)
-    draw_7h = sum(plan.hourly_draw_at_min_kw()[:7])
-    matrix = _matrix([30.0] * 24, start=17)  # 17:00 … 16:00 next day, one calendar date here
+    draw = plan.hourly_draw_at_min_kw()
+    matrix = _matrix([30.0] * 24, start=17)  # 17:00 … 16:00 next day
     for row in matrix[7:]:
         row["slot_datetime"] = row["slot_datetime"].replace(day=16)
         row["date"] = date(2024, 1, 16)
     parent = profile["consumers"][0]
-    assert live_rod_heat_cap_kwh(parent, profile, matrix) == pytest.approx(room + draw_7h, abs=1e-3)
+    caps = live_rod_heat_caps_by_slot_kwh(parent, profile, matrix)
+    assert caps[6] == pytest.approx(room + sum(draw[:7]), abs=1e-3)  # until midnight
+    assert caps[-1] == pytest.approx(room + sum(draw[:24]), abs=1e-3)  # whole horizon
+
+
+def test_gas_house_rod_cap_starts_at_the_first_slot_not_its_full_hour(live):
+    """A plan starting at 12:45: the draw of 12:00–12:45 is past, the rod may not count it."""
+    from optimizer.thermal_flex_context import live_rod_heat_caps_by_slot_kwh
+
+    plan = _drawing_store_plan(45.0)
+    profile = _profile(_consumer(_GAS, rod_bindings=_BOUND))
+    live(plan, profile)
+    room = plan.capacity_kwh_per_k * (50.0 - 45.0)
+    draw = plan.hourly_draw_at_min_kw()
+    assert min(draw[:3]) > 0.0
+    matrix = _matrix([30.0] * 10, start=12)  # 12:45 … 21:45
+    for row in matrix:
+        row["slot_datetime"] = row["slot_datetime"].replace(minute=45)
+    parent = profile["consumers"][0]
+    caps = live_rod_heat_caps_by_slot_kwh(parent, profile, matrix)
+    # First slot 12:45–13:45: the last quarter of plan hour 0 and 3/4 of hour 1.
+    assert caps[0] == pytest.approx(room + 0.25 * draw[0] + 0.75 * draw[1], abs=1e-3)
+    assert caps[1] == pytest.approx(
+        room + 0.25 * draw[0] + draw[1] + 0.75 * draw[2], abs=1e-3
+    )
 
 
 def test_gas_house_rod_runs_although_the_boiler_heats_today(live):
@@ -410,13 +439,15 @@ def test_missing_signal_keeps_the_rod_out_of_the_live_plan(live):
     assert _on_slots(model, _ROD_ID) == []
 
 
-def test_gas_house_rod_stays_off_after_the_first_day(live):
+def test_gas_house_rod_runs_on_the_cheap_next_day(live):
+    """Live 2026-11-27: the rod was forced off after the first calendar day."""
     profile = _profile(_consumer(_GAS, rod_bindings=_BOUND))
-    live(_store_plan(30.0, jaz=0.95), profile)
+    live(_store_plan(30.0, jaz=0.95, horizon=48), profile)
     today = _matrix([40.0] * 24)
     tomorrow = _matrix([2.0] * 24, day=date(2024, 1, 16))
     model, _remaining, _contexts = _solve(today + tomorrow, profile)
-    assert _on_slots(model, _ROD_ID) == []
+    assert _on_slots(model, _ROD_ID)
+    assert all(slot >= 24 for slot in _on_slots(model, _ROD_ID))
 
 
 def test_heat_pump_house_rod_runs_only_within_the_store_level(live):
@@ -513,3 +544,11 @@ def test_baseload_subtracts_the_measured_rod():
         {"house": 3.5, "pv": 0.0, "grid": 3.5, "battery": 0.0}, {_ROD_ID: 3.0}
     )
     assert snapshot["baseload_kw"] == pytest.approx(0.5)
+
+
+def test_rod_caps_of_another_length_than_the_plan_fail_loud():
+    from optimizer.thermal_flex_store import _add_fuel_parent_rod_caps
+
+    ctx = {ROD_HEAT_CAPS_BY_SLOT_KEY: [5.0, 5.0]}
+    with pytest.raises(ValueError, match="2 Wärme-Obergrenzen für 3 Slots"):
+        _add_fuel_parent_rod_caps(None, [{}, {}, {}], [0, 1, 2], {"id": _ROD_ID}, ctx, set())

@@ -365,6 +365,8 @@ def _solve_and_extract_controls(
         )
     if model.live_store_plans:
         _add_heat_storage_plan(controls.milp_plan, model, matrix)
+    if model.thermal_rc_levels:
+        _add_thermal_rc_plan(controls.milp_plan, model)
     urgent_observability = _collect_urgent_rule_observability(
         model, matrix, remaining, schedule_indices, contexts, filters
     )
@@ -394,6 +396,16 @@ def _add_heat_storage_plan(
     milp_plan[HEAT_STORAGE_TARGETS_KEY] = heat_storage_targets(model, forced)
     milp_plan[HEAT_STORAGE_LEVELS_KEY] = store_level_report(model)
     milp_plan[HEAT_STORE_PLANNED_KEY] = sorted(model.live_store_plans)
+
+
+def _add_thermal_rc_plan(milp_plan: dict, model: MilpHorizonModel) -> None:
+    """Live pools on their water band: slack warning; BL Ziel delivers the plan's energy."""
+    from optimizer.thermal_rc_live import report_thermal_rc_slack
+
+    report_thermal_rc_slack(model)
+    milp_plan[HEAT_STORE_PLANNED_KEY] = sorted(
+        set(milp_plan.get(HEAT_STORE_PLANNED_KEY) or ()) | set(model.thermal_rc_levels or {})
+    )
 
 
 def _optimizer_result_tuple(controls, urgent_observability: dict[str, dict]) -> tuple:

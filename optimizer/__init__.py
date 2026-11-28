@@ -77,6 +77,7 @@ from .targets import (
     consumer_column_name as _consumer_column_name,
     consumer_pv_follow_column_name as _consumer_pv_follow_column_name,
     consumer_immediate_charge_column_name as _consumer_immediate_charge_column_name,
+    is_measured_thermal_target,
     resolve_applied_daily_targets,
     resolve_baseload_kwh,
     resolve_horizon_consumer_targets_kwh,
@@ -256,7 +257,9 @@ def get_consumer_remaining_kwh(
         cid = consumer["id"]
         daily_target = float(daily_targets.get(cid, consumer["daily_target_kwh"]))
         ctx = (contexts or {}).get(cid)
-        if uses_loxone_debt_counter(consumer):
+        if uses_loxone_debt_counter(consumer) or is_measured_thermal_target(
+            consumer, optimization_matrix
+        ):
             already = 0.0
         elif is_charging_session_context(consumer, ctx):
             booked = session_delivered_kwh(sessions, cid)

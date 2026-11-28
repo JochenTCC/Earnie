@@ -254,10 +254,22 @@ def _consumer_power_at(
     if cid in model.consumer_p:
         value = model.consumer_p[cid][hour_index].varValue
         return max(0.0, float(value)) if value is not None else 0.0
-    on_val = model.consumer_on[cid][hour_index].varValue
-    if on_val is not None and on_val > 0.5:
-        return float(model.consumer_milp_charge_kw[cid])
-    return 0.0
+    return _on_share(model.consumer_on[cid][hour_index]) * float(
+        model.consumer_milp_charge_kw[cid]
+    )
+
+
+def _on_share(var) -> float:
+    """Share of the slot a consumer runs: 0/1 for a binary, the value for a relaxed Live
+    on-variable (``optimizer.live_thermal_binaries``)."""
+    from optimizer.live_thermal_binaries import is_relaxed_on_var
+
+    value = var.varValue
+    if value is None:
+        return 0.0
+    if is_relaxed_on_var(var):
+        return min(1.0, max(0.0, float(value)))
+    return 1.0 if value > 0.5 else 0.0
 
 
 def _consumer_powers_at(
@@ -298,7 +310,5 @@ def _planned_consumer_kwh_in_slots(
             if value is not None:
                 total += float(value) * dt_h
             continue
-        on_val = model.consumer_on[cid][t].varValue
-        if on_val is not None and on_val > 0.5:
-            total += charge_kw * dt_h
+        total += _on_share(model.consumer_on[cid][t]) * charge_kw * dt_h
     return total

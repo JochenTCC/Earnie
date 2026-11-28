@@ -19,6 +19,9 @@ THERMAL_MAX_ON_HOURS = 4
 THERMAL_MAX_PULSES_PER_DAY = 4
 # Context key of the Live store plan (``LiveStorePlan``) of a heat pump with a store.
 LIVE_STORE_PLAN_KEY = "live_store_plan"
+# Context key of a Live heating rod beside a fuel source: heat [kWh] it may have added by the
+# end of each matrix slot (store room plus draw until then).
+ROD_HEAT_CAPS_BY_SLOT_KEY = "heat_cap_by_slot_kwh"
 
 
 def is_thermal_flex_consumer(consumer: dict) -> bool:
@@ -156,7 +159,15 @@ def add_max_pulses_per_day_constraints(
         else:
             prev_slot = sorted_idx[position - 1]
             prev_on = on_vars[prev_slot] if prev_slot == slot - 1 else 0
-        start_var = pulp.LpVariable(f"{prefix}_start_{slot}", cat=pulp.LpBinary)
+        # A Live on-variable relaxed in the far horizon (``live_thermal_binaries``) gets a
+        # continuous start: a share of a start, like the on-variable is a share of the slot.
+        relaxed = getattr(on_vars[slot], "cat", pulp.LpInteger) == pulp.LpContinuous
+        start_var = pulp.LpVariable(
+            f"{prefix}_start_{slot}",
+            lowBound=0,
+            upBound=1,
+            cat=pulp.LpContinuous if relaxed else pulp.LpBinary,
+        )
         prob += start_var >= on_vars[slot] - prev_on
         prob += start_var <= on_vars[slot]
         starts.append(start_var)

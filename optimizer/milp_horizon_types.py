@@ -43,6 +43,9 @@ class MilpHorizonModel:
     live_store_plans: dict[str, Any] | None = None
     # Live: (StoreLevelModel, StoreLevelVars) per heat pump with a store (HeatControl P4).
     live_store_levels: dict[str, tuple[Any, Any]] | None = None
+    # Live: (StoreLevelModel, StoreLevelVars, recovery slack vars) per thermal_rc consumer
+    # (pool water band; recovery slack only when the water starts below the band).
+    thermal_rc_levels: dict[str, tuple[Any, Any, list]] | None = None
 
 
 @dataclass

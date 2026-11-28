@@ -37,6 +37,7 @@ from optimizer import schedule as optimization_schedule
 from optimizer.thermal_targets import (
     collect_thermal_observability,
     thermal_horizon_hours_from_slots,
+    thermal_rc_horizon_hours,
 )
 from optimizer.thermal_live_store import collect_heat_storage_observability
 from optimizer.start_scheduler import (
@@ -629,7 +630,8 @@ def _main_cycle(
         live_consumers,
         active_targets_kwh=targets,
         baseline_targets_kwh=baseline_targets,
-        horizon=thermal_horizon,
+        # Same hours as the pool's RC target and Live store: one memoized plan per cycle.
+        horizon=thermal_rc_horizon_hours(optimization_matrix),
     )
     thermal_observability.extend(
         collect_heat_storage_observability(

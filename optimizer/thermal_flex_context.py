@@ -8,7 +8,7 @@ sibling that uses it (see ``.cursor/rules/import-facades.mdc``).
 from __future__ import annotations
 
 import logging
-from datetime import date
+from datetime import date, datetime
 from typing import TYPE_CHECKING
 
 from optimizer.charging_context import matrix_slot_datetime
@@ -16,6 +16,7 @@ from optimizer.hp_store import HP_STORE_CONTEXT_KEY, hp_store_balance
 from optimizer.rod_store import STORE_BALANCE_CONTEXT_KEY, rod_store_balance
 from optimizer.thermal_flex_base import (  # noqa: F401  (re-exported)
     LIVE_STORE_PLAN_KEY,
+    ROD_HEAT_CAPS_BY_SLOT_KEY,
     THERMAL_MAX_ON_HOURS,
     THERMAL_MAX_PULSES_PER_DAY,
     _force_thermal_on_slots,
@@ -335,16 +336,25 @@ def live_rod_ready(rod: dict, parent: dict) -> bool:
 
 
 def live_rod_heat_cap_kwh(parent: dict, house_profile: dict, matrix: list) -> float:
-    """Heat [kWh] the rod may add in Live.
+    """Heat [kWh] the rod may add in Live over the horizon.
 
     Beside an electric source the store level of the MILP caps the rod (HeatControl P4); this
     is only the store's room over the horizon, so the rod gets planned at all. Beside a fuel
-    source it is the cap itself, for the first calendar day of the matrix: the room up to the
-    charge maximum plus the store's draw (and loss) until midnight. The rod's heat displaces
-    the boiler's, so that draw is no floor to subtract but heat the rod may deliver. Same plan
-    and same absent-mode setback as the heat source itself.
+    source it is the room up to the charge maximum plus the store's draw (and loss) over the
+    horizon; the MILP caps it per slot (``live_rod_heat_caps_by_slot_kwh``). The rod's heat
+    displaces the boiler's, so that draw is no floor to subtract but heat the rod may deliver.
+    Same plan and same absent-mode setback as the heat source itself.
     """
     from house_config.heat_source import consumer_heat_source, heat_source_is_electric
+
+    plan = _live_rod_parent_plan(parent, house_profile, matrix)
+    if heat_source_is_electric(consumer_heat_source(parent)):
+        return round(float(plan.charge_room_heat_kwh), 3)
+    caps = live_rod_heat_caps_by_slot_kwh(parent, house_profile, matrix)
+    return round(caps[-1], 3) if caps else 0.0
+
+
+def _live_rod_parent_plan(parent: dict, house_profile: dict, matrix: list):
     from optimizer.absent_mode import resolve_absent_status, thermal_source_with_live_absent
     from optimizer.thermal_live_store import live_store_plan_for_matrix
 
@@ -358,34 +368,60 @@ def live_rod_heat_cap_kwh(parent: dict, house_profile: dict, matrix: list) -> fl
             f"Heizstab an '{parent.get('id')}': Live-Speicherplan fehlt, der Heizstab setzt "
             "einen Wärmespeicher voraus (heat_storage im Heizsystem)."
         )
-    if heat_source_is_electric(consumer_heat_source(parent)):
-        return round(float(plan.charge_room_heat_kwh), 3)
-    return round(float(plan.charge_room_heat_kwh_within(_hours_to_first_midnight(matrix))), 3)
+    return plan
 
 
-def _hours_to_first_midnight(matrix: list) -> float:
-    """Hours from the matrix start to the end of its first calendar day."""
-    from datetime import datetime, time, timedelta
+def live_rod_heat_caps_by_slot_kwh(parent: dict, house_profile: dict, matrix: list) -> list[float]:
+    """Beside a fuel source: heat [kWh] the rod may have added by the end of each slot.
 
-    start = matrix_slot_datetime(matrix, 0)
-    midnight = datetime.combine(start.date() + timedelta(days=1), time(0, 0), tzinfo=start.tzinfo)
-    return (midnight - start).total_seconds() / 3600.0
+    The room up to the charge maximum plus the store's draw from the first slot's start until
+    the slot's end (the plan's hour 0 is the full hour of the first slot; the part of it before
+    the first slot does not count): the rod can never fill the store above its
+    maximum, however cheap one slot is, and it may replace the boiler's heat on every day of
+    the horizon.
+    """
+    plan = _live_rod_parent_plan(parent, house_profile, matrix)
+    if not matrix:
+        return []
+    starts = [row.get("slot_datetime") for row in matrix]
+    if not all(isinstance(moment, datetime) for moment in starts):
+        raise ValueError("Heizstab-Grenze je Slot: Matrix-Zeile ohne slot_datetime.")
+    plan_start = matrix_slot_datetime(matrix, 0)  # the plan's hour 0: full hour of slot 0
+    if len(starts) > 1:
+        last_step = starts[-1] - starts[-2]
+    else:
+        from optimizer.slot_duration import slot_step
+
+        last_step = slot_step()
+    ends = starts[1:] + [starts[-1] + last_step]
+    # A plan starting inside an hour: the draw of that hour before the first slot is past and
+    # no room for the rod (``within(0)`` is the room alone).
+    offset_h = (starts[0] - plan_start).total_seconds() / 3600.0
+    past_draw = plan.charge_room_heat_kwh_within(offset_h) - plan.charge_room_heat_kwh_within(0.0)
+    return [
+        max(
+            0.0,
+            float(plan.charge_room_heat_kwh_within((end - plan_start).total_seconds() / 3600.0))
+            - past_draw,
+        )
+        for end in ends
+    ]
 
 
 def _live_rod_context(matrix: list, rod: dict, parent: dict, house_profile: dict) -> dict:
     """Live: pulse limit for a real switch; a fuel parent caps the rod here (no flex entry).
 
     Beside an electric parent the store overlay of the parent already caps the rod
-    (``_add_live_store_consumer``). Only the first day.
+    (``_add_live_store_consumer``). Beside a fuel parent the cap holds per slot over the whole
+    horizon (``live_rod_heat_caps_by_slot_kwh``).
     """
     if not live_rod_ready(rod, parent):
         return {}
     ctx: dict = {"live_pulse_limit": True}
     if not rod["parent_heat_electric"]:
-        first_day = matrix_slot_datetime(matrix, 0).date()
-        ctx["daily_heat_cap_kwh"] = {
-            first_day: live_rod_heat_cap_kwh(parent, house_profile, matrix)
-        }
+        ctx[ROD_HEAT_CAPS_BY_SLOT_KEY] = live_rod_heat_caps_by_slot_kwh(
+            parent, house_profile, matrix
+        )
     return ctx
 
 

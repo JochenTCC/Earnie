@@ -231,14 +231,16 @@ def test_live_keeps_its_own_bound(monkeypatch, day_heat):
 
     monkeypatch.setattr("optimizer.live_cycle_scope.is_live_thermal_planning", lambda _matrix: True)
     monkeypatch.setattr(thermal_flex_context, "live_rod_ready", lambda _rod, _parent: True)
-    monkeypatch.setattr(thermal_flex_context, "live_rod_heat_cap_kwh", lambda *_args: 5.0)
+    monkeypatch.setattr(
+        thermal_flex_context, "live_rod_heat_caps_by_slot_kwh", lambda *_args: [5.0] * 4
+    )
     consumer = _consumer()
     profile = _profile(consumer)
     contexts = thermal_flex_context.resolve_thermal_flex_contexts(
         _matrix([1.0] * 4), collect_planning_flex_consumers(profile), profile
     )
     assert STORE_BALANCE_CONTEXT_KEY not in contexts[ROD_ID]
-    assert contexts[ROD_ID]["daily_heat_cap_kwh"] == {DAY: 5.0}
+    assert contexts[ROD_ID]["heat_cap_by_slot_kwh"] == [5.0] * 4
 
 
 # --- L2 --------------------------------------------------------------------------------------

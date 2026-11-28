@@ -78,7 +78,19 @@ def _resolve_subtracted_filter_kw(consumer: dict) -> float:
 
 
 def _build_thermal_plan(consumer: dict, *, horizon: int = 24):
-    """Liefert ThermalPlanResult oder wirft bei fehlenden Live-Daten."""
+    """Liefert ThermalPlanResult oder wirft bei fehlenden Live-Daten.
+
+    Built once per Live cycle (``optimizer.live_cycle_scope``): the horizon target and the
+    MILP store level of the same cycle share one set of readings and one forecast.
+    """
+    from optimizer.live_cycle_scope import cycle_memo
+    from optimizer.thermal_year_cache import fingerprint_json
+
+    key = ("thermal_rc_plan", fingerprint_json(consumer), int(horizon))
+    return cycle_memo(key, lambda: _compute_thermal_plan(consumer, horizon=horizon))
+
+
+def _compute_thermal_plan(consumer: dict, *, horizon: int):
     thermal = consumer.get("thermal_control")
     if not thermal or not thermal.get("enabled"):
         raise ValueError(f"Verbraucher '{consumer.get('id')}' hat kein aktives thermal_control.")
@@ -130,6 +142,87 @@ def resolve_thermal_daily_target_kwh(consumer: dict, *, horizon: int = 24) -> fl
         )
     plan, *_ = _build_thermal_plan(consumer, horizon=horizon)
     return float(plan.required_kwh)
+
+
+def _slot_hours(matrix: list) -> list[int]:
+    """Hour of the RC forecast (0 = the plan's first hour) for each matrix slot."""
+    from optimizer.charging_schedule import matrix_slot_datetime
+
+    start = matrix_slot_datetime(matrix, 0)
+    return [
+        int((matrix_slot_datetime(matrix, index) - start).total_seconds() // 3600)
+        for index in range(len(matrix))
+    ]
+
+
+def thermal_rc_horizon_hours(matrix: list) -> int:
+    """RC forecast hours for a matrix: its slot count, and at least every hour a slot touches.
+
+    A Live matrix starting at :15 / :30 / :45 reaches one wall hour more than its slot count
+    says; the RC target and the Live store need the same hours (one memoized plan per cycle).
+    """
+    if not matrix:
+        return thermal_horizon_hours_from_slots(0)
+    return max(thermal_horizon_hours_from_slots(len(matrix)), _slot_hours(matrix)[-1] + 1)
+
+
+def thermal_rc_live_store(consumer: dict, matrix: list, dt_h: float):
+    """Live store level of a ``thermal_rc`` consumer (pool / SwimSpa) over the matrix.
+
+    Same RC model as ``plan_minimum_heating`` (same readings and forecast in a Live cycle),
+    written as the linear store level of ``optimizer.thermal_store_model``: the level is the
+    heat above the band minimum, ``x = C · (T − T_min)``, the band is ``[0, C · (T_max −
+    T_min)]``. The loss ``H · (T − T_amb)`` splits into the leak ``H · Δt / C`` of the level
+    and the drain ``H · Δt · (T_min − T_amb)`` per slot, so the plan may heat in any slot of
+    the horizon as long as the water stays in the band (no calendar-day window).
+    """
+    from optimizer.thermal_store_model import StoreLevelModel
+
+    if not matrix:
+        raise ValueError("thermal_rc Live-Speicher: leere Planungsmatrix.")
+    horizon = thermal_rc_horizon_hours(matrix)
+    _plan, band, readings, ambient_forecast, _src, capacity, heat_loss = _build_thermal_plan(
+        consumer, horizon=horizon
+    )
+    thermal = consumer.get("thermal_control") or {}
+    leak_kw_per_k = float(heat_loss)
+    fixed_paths: list[tuple[float, float]] = []
+    for path in thermal.get("heat_paths") or []:
+        coeff = float(path.get("heat_loss_kw_per_k", 0.0) or 0.0)
+        if coeff <= 0:
+            continue
+        if str(path.get("reference", "ambient")).strip().lower() == "fixed":
+            if path.get("reference_temp_c") is None:
+                raise ValueError(
+                    f"thermal_rc '{consumer.get('id')}': Wärmepfad mit reference=fixed "
+                    "braucht reference_temp_c."
+                )
+            fixed_paths.append((coeff, float(path["reference_temp_c"])))
+        else:
+            leak_kw_per_k += coeff
+    hours = _slot_hours(matrix)
+    if hours[-1] >= len(ambient_forecast):
+        raise ValueError(
+            f"thermal_rc Live-Speicher '{consumer.get('id')}': Außentemperatur-Prognose "
+            f"({len(ambient_forecast)} h) deckt den Horizont ({hours[-1] + 1} h) nicht ab."
+        )
+    fixed_loss_at_min_kw = sum(coeff * (band.min_c - ref) for coeff, ref in fixed_paths)
+    drain = [
+        float(dt_h)
+        * (
+            leak_kw_per_k * (band.min_c - float(ambient_forecast[hour]))
+            + fixed_loss_at_min_kw
+        )
+        for hour in hours
+    ]
+    leak_kw_per_k += sum(coeff for coeff, _ref in fixed_paths)
+    return StoreLevelModel(
+        capacity_kwh=float(capacity) * (band.max_c - band.min_c),
+        start_kwh=float(capacity) * (float(readings["actual_c"]) - band.min_c),
+        efficiency=float(thermal["heating_efficiency"]),
+        drain_kwh=drain,
+        leak_per_slot=float(dt_h) * leak_kw_per_k / float(capacity),
+    )
 
 
 def build_thermal_observability(

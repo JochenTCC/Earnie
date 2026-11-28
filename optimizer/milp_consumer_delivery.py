@@ -29,6 +29,7 @@ from .milp_consumer_vars import (
     _planned_consumer_kwh_in_slots,
 )
 from .thermal_flex_context import is_heating_rod_consumer, is_thermal_flex_consumer
+from .thermal_rc_live import is_live_thermal_rc_store
 from .slot_duration import DEFAULT_DT_H
 
 if TYPE_CHECKING:
@@ -492,6 +493,9 @@ def _add_consumer_delivery_constraints(
     for consumer in model.planned_consumers:
         # Thermal day targets and the heating rod's caps live in thermal_flex_context.
         if is_thermal_flex_consumer(consumer) or is_heating_rod_consumer(consumer):
+            continue
+        # Live pool: band over the whole horizon (thermal_rc_live), not a today-only delivery.
+        if is_live_thermal_rc_store(consumer, matrix, book_indices):
             continue
         _add_one_consumer_delivery_constraints(
             model,

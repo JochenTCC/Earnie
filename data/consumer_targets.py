@@ -88,10 +88,10 @@ def _target_from_thermal(
         return _historical_target_kwh(consumer, target_date, matrix, cache)
     from optimizer.thermal_targets import (
         resolve_thermal_daily_target_kwh,
-        thermal_horizon_hours_from_slots,
+        thermal_rc_horizon_hours,
     )
 
-    horizon = thermal_horizon_hours_from_slots(len(matrix)) if matrix else 24
+    horizon = thermal_rc_horizon_hours(list(matrix)) if matrix else 24
     return resolve_thermal_daily_target_kwh(consumer, horizon=horizon)
 
 

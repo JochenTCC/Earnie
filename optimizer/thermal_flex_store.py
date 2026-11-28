@@ -12,6 +12,7 @@ from optimizer.hp_store import HpStoreBalance
 from optimizer.rod_store import RodStoreBalance
 from optimizer.thermal_flex_base import (
     LIVE_STORE_PLAN_KEY,
+    ROD_HEAT_CAPS_BY_SLOT_KEY,
     _force_thermal_on_slots,
     _indices_for_date,
     _max_pulses_per_day,
@@ -33,18 +34,30 @@ def _add_fuel_parent_rod_caps(
     ctx: dict,
     covered: set[int],
 ) -> None:
-    """Live, rod beside a fuel source: rod heat (η = 1) of the first day ≤ the store's free heat."""
-    caps: dict[date, float] = dict(ctx.get("daily_heat_cap_kwh") or {})
-    eligible_set = set(consumer_thermal_eligible_indices(matrix, rod, schedule_indices))
-    for day, cap in sorted(caps.items()):
-        day_indices = [i for i in _indices_for_date(matrix, day) if i in eligible_set]
-        if not day_indices or cap <= 1e-9:
-            continue
-        model.prob += (
-            _rod_energy_expr(model, rod, day_indices) <= cap,
-            f"{rod['id']}_rod_cap_{day.isoformat()}",
+    """Live, rod beside a fuel source: its heat (η = 1) up to each slot ≤ the store's free heat
+    until then (room plus draw), over the whole horizon."""
+    caps: list[float] = list(ctx.get(ROD_HEAT_CAPS_BY_SLOT_KEY) or [])
+    if not caps:
+        return
+    if len(caps) != len(matrix):
+        raise ValueError(
+            f"Heizstab {rod['id']}: {len(caps)} Wärme-Obergrenzen für {len(matrix)} Slots"
         )
-        covered.update(day_indices)
+    eligible = sorted(consumer_thermal_eligible_indices(matrix, rod, schedule_indices))
+    if not eligible or caps[eligible[-1]] <= 1e-9:
+        return
+    # Running sum as a variable chain: O(n) terms instead of one prefix sum per slot.
+    previous: pulp.LpVariable | None = None
+    for index in eligible:
+        cum = pulp.LpVariable(f"{rod['id']}_rod_cum_{index}", lowBound=0)
+        step = _rod_energy_expr(model, rod, [index])
+        model.prob += (
+            cum == (step if previous is None else previous + step),
+            f"{rod['id']}_rod_cum_def_{index}",
+        )
+        model.prob += cum <= caps[index], f"{rod['id']}_rod_cap_{index}"
+        previous = cum
+    covered.update(eligible)
 
 
 def _add_rod_store_balance(

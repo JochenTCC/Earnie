@@ -180,6 +180,21 @@ def _build_milp_model_with_objective(
     return model
 
 
+def _thermal_schedule_indices(matrix: list[dict[str, Any]], inputs: _MilpInputs) -> list[int]:
+    """Slots of the thermal consumers: the SE book, or in Live the whole horizon.
+
+    Without a book ``schedule_indices`` are the slots of the current calendar day; a store
+    level, day targets and rod caps cut there dropped every later day of the Live horizon.
+    A book-less solve outside Live (diagnosis scripts) keeps them, like the pool's Live store
+    (``is_live_thermal_rc_store``).
+    """
+    from optimizer.live_cycle_scope import is_live_thermal_planning
+
+    if inputs.book_indices is not None or not is_live_thermal_planning(matrix):
+        return list(inputs.schedule_indices)
+    return list(range(inputs.horizon))
+
+
 def _add_flex_side_constraints(
     model: MilpHorizonModel,
     matrix: list[dict[str, Any]],
@@ -189,7 +204,11 @@ def _add_flex_side_constraints(
     thermal_flex_contexts: dict[str, dict] | None,
 ) -> None:
     """Liefermengen, generische Flex-Rollfenster und thermische Randbedingungen."""
+    from optimizer.live_thermal_binaries import relax_far_live_thermal_binaries
+
     block_flex_outside_book(model, inputs.book_indices)
+    # Before the thermal constraints: their pulse start variables copy the on-variable type.
+    relax_far_live_thermal_binaries(model, matrix, inputs.book_indices)
     _add_consumer_delivery_constraints(
         model,
         matrix,
@@ -199,6 +218,11 @@ def _add_flex_side_constraints(
         verbose,
         filter_contexts=inputs.filters,
         book_indices=inputs.book_indices,
+    )
+    from optimizer.thermal_rc_live import add_thermal_rc_live_stores
+
+    add_thermal_rc_live_stores(
+        model, matrix, inputs.contexts, inputs.filters, inputs.book_indices
     )
     add_generic_flex_rolling_constraints(
         model,
@@ -216,7 +240,7 @@ def _add_flex_side_constraints(
     add_thermal_flex_constraints(
         model,
         window,
-        inputs.schedule_indices,
+        _thermal_schedule_indices(matrix, inputs),
         thermal_contexts,
         consumer_continue_on=consumer_continue_on,
     )

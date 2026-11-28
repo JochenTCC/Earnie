@@ -190,6 +190,8 @@ Feldnamen und Mapping-UI: [EHAL-Com](../ui/ehal-com.md). Loxone-Default-Namen un
 
 Bei `daily_target_source: thermal` leitet das RC-Modell das Tagesenergie-Ziel aus Wassertemperatur und Umgebung ab.
 
+**Live:** Die Optimierung führt die Wassertemperatur über den ganzen Planungshorizont, Viertelstunde für Viertelstunde, mit derselben Messung und Außentemperatur-Prognose wie das RC-Modell. Das Wasser bleibt zwischen `setpoint_c − tolerance_c` und `setpoint_c + tolerance_c` (Werte aus dem Smarthome, sonst aus der Konfiguration). Wann geheizt wird, entscheidet der Optimierer nach Preis: Er heizt in den günstigsten Viertelstunden, die das Band halten, auch nach Mitternacht. Liegt das Wasser beim Start unter dem Band, heizt Earnie es so schnell wie möglich zurück ins Band. Die heute schon gelieferte Energie steckt in der gemessenen Wassertemperatur und wird nicht noch einmal abgezogen. Hält das Band nicht (zu wenig Leistung oder Freigabe), plant der Optimierer trotzdem, mit hohen Strafkosten für die Wärme außerhalb des Bands, und meldet das im Log. Ein/Aus plant Earnie dabei wie bei der Wärmepumpe nur in den ersten 12 Stunden als echtes Schalten, danach als Anteil der Laufzeit (siehe **Fernerer Horizont** unter Live-Band).
+
 | Feld | Bedeutung |
 | ---- | --------- |
 | `thermal_control.enabled` | Modell aktiv |
@@ -355,8 +357,8 @@ Live plant den Heizstab nur, wenn alle drei Signale vorhanden sind. Fehlt eines,
 
 Die Signale ordnest du in der EHAL-Zuordnung der eigenen Zeile des Heizstabs zu. Earnie speichert sie am Verbraucher in `heating_rod_ehal_bindings`, nicht im Heizsystem, weil die Verdrahtung zum Haus gehört und das Heizsystem im Szenario austauschbar bleibt.
 
-- **Wie viel:** Neben einem Brennstoff höchstens die freie Wärme des Speichers bis zum Sollwert plus die Wärme, die der Speicher bis Mitternacht an Haus und Warmwasser abgibt. Diese Wärme müsste sonst der Kessel nachheizen, der Heizstab ersetzt sie. Neben einer Wärmepumpe begrenzt der geplante Speicherstand. Ist der Speicher voll und gibt bis Mitternacht keine Wärme ab, bleibt der Heizstab aus. Reicht die Wärme nicht für eine Viertelstunde Heizstab, bleibt er ebenfalls aus.
-- **Wann:** Nur am laufenden Kalendertag, höchstens vier Einschaltungen je Tag. Billige Nachtstunden nach Mitternacht plant Earnie erst nach dem Tageswechsel ein.
+- **Wie viel:** Neben einem Brennstoff bis zu jeder Viertelstunde höchstens die freie Wärme des Speichers bis zum Sollwert plus die Wärme, die der Speicher bis dahin an Haus und Warmwasser abgibt. Diese Wärme müsste sonst der Kessel nachheizen, der Heizstab ersetzt sie. So füllt der Heizstab den Speicher nie über den Sollwert, auch wenn eine einzelne Viertelstunde sehr billig ist. Neben einer Wärmepumpe begrenzt der geplante Speicherstand. Ist der Speicher voll und gibt bis dahin keine Wärme ab, bleibt der Heizstab aus. Reicht die Wärme nicht für eine Viertelstunde Heizstab, bleibt er ebenfalls aus.
+- **Wann:** Im ganzen Planungshorizont, auch nach Mitternacht, höchstens vier Einschaltungen je Tag.
 - **Neben einer Wärmepumpe:** Sie liefert dieselbe Wärme mit weniger Strom, der Heizstab läuft deshalb selten, z. B. bei negativen Preisen. Beide zusammen können den Speicher dann über die freie Wärme hinaus laden, bis die nächste Messung den Heizstab abschaltet.
 - **Neben einem Brennstoff:** Die Kachel „Mit Earnie gespart“ vergleicht mit einer Anlage, in der der Heizstab aus bleibt und seine Wärme aus dem Brennstoff kommt, zum selben Brennstoffpreis wie in der Planung. Der Heizstab-Strom zählt als Kosten mit Earnie, der gesparte Brennstoff als Ersparnis. Ohne Brennstoffpreis zählt der Heizstab im Vergleich zur gemessenen Zeit.
 
@@ -402,6 +404,7 @@ Jedes Fenster beginnt mit dem Pegel, mit dem das vorige endete; das erste Fenste
 - **Band hält nicht:** Reicht die Leistung nicht, plant der Optimierer trotzdem, mit hohen Strafkosten für die Wärme außerhalb des Bands. Das `earnie.log` warnt dann („Plan hält den Speicher nicht im Band“).
 - **Unterster Fühler:** Liegt `T_low` unter `setpoint − tolerance`, erzwingt Earnie die Freigabe in der ersten Stunde.
 - **Starts:** Die Wärmepumpe startet höchstens `max_pulses_per_day`-mal pro Tag (Vorgabe 4). Eine Höchstdauer je Lauf gibt es mit Speicher nicht; das Band begrenzt die Ladung.
+- **Fernerer Horizont:** Ein/Aus plant Earnie nur in den ersten 12 Stunden als echtes Schalten. Danach plant es je Viertelstunde einen Anteil der Laufzeit (z. B. 40 % der Leistung im Mittel); Energie und Band rechnet es dort genauso. Ausgeführt wird ohnehin nur der aktuelle Slot, und jeder Lauf plant neu. Chart 1 zeigt im ferneren Horizont deshalb auch Teilleistungen. Das gilt für Wärmepumpe, Heizstab und Pool im Live-Betrieb; der Szenarien-Explorer schaltet über den ganzen Horizont.
 
 **Speicherband aus der Regelung:** Meldet das Smarthome-Backend Sollwert und Toleranz der Heizungsregelung, plant Live mit diesen Werten und nicht mit `heat_storage.setpoint_c` / `tolerance_c`. Plan und Regelung können dann nicht auseinanderlaufen.
 
@@ -419,7 +422,7 @@ Die Ladung bis `Sollwert + boost_k` (höchstens bis zur gemeldeten Maximaltemper
 - **Wärmeverlust des Gebäudes:** Ohne eigenen Wert in `house_heat_loss_kw_per_k` kalibriert Earnie den Wärmeverlust (H) aus dem **letzten vollständigen Kalenderjahr** des Open-Meteo-Archivs. Das laufende, unvollständige Jahr fließt nicht ein.
 - **Hauskonfigurator beim ersten Öffnen:** Für den Jahresbedarf einer Wärmepumpe (`thermal_annual`) lädt der Hauskonfigurator die Klimadaten des Archivs einmal von Open-Meteo und legt sie im Cache ab (`data/cache/open_meteo_utc`, anderes Verzeichnis über `EARNIE_OPEN_METEO_CACHE_PATH`). Währenddessen zeigt die Seite einen Hinweis. Dauert der Abruf länger als 30 s (langsames Netz, Ratenlimit), bricht Earnie ab und zeigt eine Fehlermeldung; ein erneutes Öffnen versucht es noch einmal.
 
-**Live ohne Wärmespeicher:** Auch ohne `heat_storage` rechnet die Live-Optimierung nur über den Planungshorizont. Die Simulation des Hauses startet bei der Solltemperatur (`target_temp_c`), da es keinen Innentemperatur-Fühler gibt. Sie nutzt die Außentemperatur-Prognose und dieselben Regeln wie die Jahressimulation. Daraus ergeben sich der WP-Bedarf je Viertelstunde und die Tagesziele. Ohne Wohnfläche (`living_area_m2 = 0`) plant Earnie nur Warmwasser und zieht den prognostizierten Kollektorertrag pro Tag ab. Szenario-Explorer und Backtesting nutzen die Jahressimulation mit historischem Wetter.
+**Live ohne Wärmespeicher:** Auch ohne `heat_storage` rechnet die Live-Optimierung nur über den Planungshorizont. Die Simulation des Hauses startet bei der Solltemperatur (`target_temp_c`), da es keinen Innentemperatur-Fühler gibt. Sie nutzt die Außentemperatur-Prognose und dieselben Regeln wie die Jahressimulation. Daraus ergeben sich der WP-Bedarf je Viertelstunde und die Tagesziele; jedes Tagesziel gilt für die Viertelstunden seines Tages im Horizont, also auch für die Tage nach Mitternacht. Ohne Wohnfläche (`living_area_m2 = 0`) plant Earnie nur Warmwasser und zieht den prognostizierten Kollektorertrag pro Tag ab. Szenario-Explorer und Backtesting nutzen die Jahressimulation mit historischem Wetter.
 
 <a id="haus-wärme-sg-ready"></a>
 

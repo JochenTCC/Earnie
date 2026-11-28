@@ -1,6 +1,7 @@
 """Zielenergie-Auflösung und UI-Detail-Builder für flexible Verbraucher."""
 from __future__ import annotations
 
+import logging
 from datetime import date, datetime, time
 
 import config
@@ -275,6 +276,21 @@ def resolve_heating_rod_horizon_kwh(
     )
 
 
+def is_measured_thermal_target(consumer: dict, optimization_matrix: list | None) -> bool:
+    """True when the RC target is computed from the measured water temperature.
+
+    That temperature already holds today's delivered heat, so the delivered kWh must not be
+    subtracted from the target again (it would plan too little heat for the horizon).
+    """
+    from optimizer.live_cycle_scope import is_live_thermal_planning
+
+    # Same condition as the Live store level (``thermal_rc_live``), so a measured target is
+    # never squeezed into today's slots without its subtraction.
+    return consumer.get("daily_target_source") == "thermal" and is_live_thermal_planning(
+        optimization_matrix
+    )
+
+
 def resolve_horizon_target_kwh(
     consumer: dict,
     consumer_daily_targets_kwh: dict | None,
@@ -288,10 +304,10 @@ def resolve_horizon_target_kwh(
     if source == "thermal" and not logged_targets_only:
         from optimizer.thermal_targets import (
             resolve_thermal_daily_target_kwh,
-            thermal_horizon_hours_from_slots,
+            thermal_rc_horizon_hours,
         )
 
-        horizon = thermal_horizon_hours_from_slots(len(optimization_matrix or []))
+        horizon = thermal_rc_horizon_hours(list(optimization_matrix or []))
         return float(resolve_thermal_daily_target_kwh(consumer, horizon=horizon))
     if source == "thermal_annual" and not logged_targets_only:
         return resolve_thermal_annual_horizon_kwh(consumer, optimization_matrix)
@@ -485,6 +501,42 @@ def resolve_applied_daily_targets(
     )
 
 
+def _live_thermal_annual_label(consumer: dict, optimization_matrix: list | None) -> str | None:
+    """Source label of a heat pump planned by a Live horizon plan; None outside Live.
+
+    Same Live test as the planning (``is_live_thermal_planning``): a Live matrix whose first
+    row stays ``forecast`` is still Live inside the cycle.
+    """
+    from optimizer.live_cycle_scope import is_live_thermal_planning
+
+    if not is_live_thermal_planning(optimization_matrix):
+        return None
+    from house_config.planning_flex_bridge import _house_thermal_consumers
+    from optimizer.scenario_planning_scope import planning_runtime_settings
+    from optimizer.thermal_live_store import heat_storage_enabled
+
+    profile = planning_runtime_settings().get("_house_profile") or {}
+    source = next(
+        (
+            item
+            for item in _house_thermal_consumers(profile)
+            if str(item["id"]) == str(consumer["id"])
+        ),
+        None,
+    )
+    if source is None:
+        # Planned in Live all the same; no store/house-plan detail without the house entry.
+        logging.getLogger(__name__).warning(
+            "Wärmeverbraucher %s: Live-Planung, aber kein passender Eintrag im Hausprofil.",
+            consumer["id"],
+        )
+        return "thermal_annual (Live)"
+    thermal = source.get("thermal") or source
+    if heat_storage_enabled(thermal.get("heat_storage")):
+        return "thermal_annual (Wärmespeicher Live)"
+    return "thermal_annual (Hausplan Live)"
+
+
 def build_applied_targets_detail(
     optimization_matrix: list,
     consumer_daily_targets_kwh: dict | None = None,
@@ -530,11 +582,13 @@ def build_applied_targets_detail(
                 "thermal": "thermal (RC-Modell)",
                 "thermal_annual": "thermal_annual (HDD-Tagesziel)",
             }
-            if (
-                source_key == "thermal_annual"
-                and consumption_mode == "live_snapshot"
-            ):
-                source = "thermal_annual (Wärmespeicher Live)"
+            live_thermal = (
+                _live_thermal_annual_label(consumer, optimization_matrix)
+                if source_key == "thermal_annual"
+                else None
+            )
+            if live_thermal is not None:
+                source = live_thermal
             else:
                 source = source_labels.get(source_key, source_key)
         details.append({
